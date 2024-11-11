@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'IHM'
+package_name = 'ihm'
 
 setup(
     name=package_name,
@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'interface = IHM.interface:main'
+            'interface = ihm.interface:main'
         ],
     },
 )
