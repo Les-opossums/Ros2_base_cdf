@@ -44,7 +44,7 @@ class ImageApp:
         self.color = selected_color
 
         print(os.getcwd())
-        self.img = Image.open("plateau.png")
+        self.img = Image.open("src/ihm/ihm/plateau.png")
         self.img = self.img.resize((915, 611))
         self.tk_img = ImageTk.PhotoImage(self.img)
 

@@ -33,6 +33,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/ActionSequencer.action"
   "action/MoveTo.action"
   DEPENDENCIES std_msgs geometry_msgs vision_msgs
+  "srv/Init.srv"
+  DEPENDENCIES std_msgs geometry_msgs
 )
 
 
