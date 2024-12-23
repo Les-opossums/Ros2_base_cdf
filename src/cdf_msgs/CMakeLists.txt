@@ -29,6 +29,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/GoalDetection.msg"
   "msg/CamCommand.msg"
   "action/ActionSequencer.action"
+  "srv/Init.srv"
   DEPENDENCIES std_msgs geometry_msgs
 )
 
