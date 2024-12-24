@@ -7,8 +7,14 @@ class ColorChoiceApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Choisir une couleur")
-        self.root.geometry("480x800")
-
+        
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        if (screen_width==480 and screen_height==800):
+            # Plein écran
+            self.root.attributes("-fullscreen", True)
+        else :
+            self.root.geometry("480x800")
         self.label = tk.Label(root, text="Choisissez une couleur :")
         self.label.pack(pady=10)
 
@@ -88,10 +94,11 @@ class ImageApp:
         # Label pour afficher les coordonnées
         self.label = tk.Label(root, text=f"Couleur choisie: {self.color}")
         self.label.pack(pady=10)
-
+        
         # Bouton pour quitter
         self.button_quit = tk.Button(root, text="Quitter", command=root.quit)
         self.button_quit.pack(pady=10)
+        self.button_quit.place(x=200, y=760)
 
 
     def get_coordinates(self, event):
