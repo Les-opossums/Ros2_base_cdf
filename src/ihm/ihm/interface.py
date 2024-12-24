@@ -7,7 +7,7 @@ class ColorChoiceApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Choisir une couleur")
-        self.root.attributes('-fullscreen', True)
+        self.root.geometry("480x800")
 
         self.label = tk.Label(root, text="Choisissez une couleur :")
         self.label.pack(pady=10)
@@ -47,7 +47,7 @@ class ImageApp:
     def __init__(self, root, selected_color):
         self.root = root
         self.root.title("Cliquez sur l'image")
-        self.root.attributes('-fullscreen', True)
+        self.root.geometry("480x800")
         self.color = selected_color 
 
         current_dir = Path(__file__).resolve().parent
