@@ -53,18 +53,31 @@ class ImageApp:
         current_dir = Path(__file__).resolve().parent
         image_path = os.path.join(current_dir, "plateau.png")
         self.img = Image.open(image_path)
-        self.img = self.img.resize((915, 611))
+        # Pivoter l'image de 90° dans le sens des aiguilles d'une montre
+        self.img = self.img.rotate(90, expand=True)
+        # Dimensions de la fenêtre
+        window_width = 480
+        window_height = 800
+        # Dimensions de l'image après la rotation
+        img_width, img_height = self.img.size
+        # Calculer les facteurs de redimensionnement pour la largeur et la hauteur
+        width_factor = window_width / img_width
+        height_factor = window_height / img_height
+        # Choisir le plus petit facteur pour conserver le ratio
+        scale_factor = min(width_factor, height_factor)
+        # Redimensionner l'image en maintenant le ratio
+        new_width = int(img_width * scale_factor)
+        new_height = int(img_height * scale_factor)
+        # Redimensionner l'image
+        self.img = self.img.resize((new_width, new_height))
+        # Convertir l'image en format compatible avec Tkinter
         self.tk_img = ImageTk.PhotoImage(self.img)
-
-        self.canvas = tk.Canvas(root, width=915, height=611)
+        # Créer un canevas pour afficher l'image
+        self.canvas = tk.Canvas(root, width=window_width, height=window_height)
         self.canvas.pack()
-
-        # Afficher l'image sur le canevas
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.tk_img)
-
         # Bind pour obtenir les coordonnées du clic
         self.canvas.bind("<Button-1>", self.get_coordinates)
-
         # Label pour afficher les coordonnées
         self.label = tk.Label(root, text=f"Couleur choisie: {self.color}")
         self.label.pack(pady=10)
