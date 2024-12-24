@@ -1,12 +1,13 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 import os
-
+from pathlib import Path
 
 class ColorChoiceApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Choisir une couleur")
+        self.root.attributes('-fullscreen', True)
 
         self.label = tk.Label(root, text="Choisissez une couleur :")
         self.label.pack(pady=10)
@@ -26,6 +27,11 @@ class ColorChoiceApp:
 
         self.selected_color = None
 
+        # Bouton pour quitter
+        self.button_quit = tk.Button(root, text="Quitter", command=root.quit)
+        self.button_quit.pack(pady=10)
+
+
     def chs_clr(self, color):
         self.selected_color = color
         self.root.destroy()
@@ -41,10 +47,12 @@ class ImageApp:
     def __init__(self, root, selected_color):
         self.root = root
         self.root.title("Cliquez sur l'image")
-        self.color = selected_color
+        self.root.attributes('-fullscreen', True)
+        self.color = selected_color 
 
-        print(os.getcwd())
-        self.img = Image.open("src/ihm/ihm/plateau.png")
+        current_dir = Path(__file__).resolve().parent
+        image_path = os.path.join(current_dir, "plateau.png")
+        self.img = Image.open(image_path)
         self.img = self.img.resize((915, 611))
         self.tk_img = ImageTk.PhotoImage(self.img)
 
@@ -60,6 +68,11 @@ class ImageApp:
         # Label pour afficher les coordonnées
         self.label = tk.Label(root, text=f"Couleur choisie: {self.color}")
         self.label.pack(pady=10)
+
+        # Bouton pour quitter
+        self.button_quit = tk.Button(root, text="Quitter", command=root.quit)
+        self.button_quit.pack(pady=10)
+
 
     def get_coordinates(self, event):
         x, y = event.x, event.y
