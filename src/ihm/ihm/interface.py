@@ -47,7 +47,14 @@ class ImageApp:
     def __init__(self, root, selected_color):
         self.root = root
         self.root.title("Cliquez sur l'image")
-        self.root.geometry("480x800")
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        
+        if (screen_width==480 and screen_height==800):
+            # Plein écran
+            self.root.attributes("-fullscreen", True)
+        else :
+            self.root.geometry("480x800")
         self.color = selected_color 
 
         current_dir = Path(__file__).resolve().parent
