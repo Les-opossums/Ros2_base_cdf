@@ -1,6 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from cdf_msgs.srv import Init
+import tkinter as tk
+from .interface import ColorChoiceApp
 
 class ParametersServer(Node):
     def __init__(self):
@@ -39,6 +41,8 @@ class ParametersServer(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = ParametersServer()
+    interface = ColorChoiceApp(tk.Tk())
+    interface.run_ihm()
     rclpy.spin(node)
     rclpy.shutdown()
 
