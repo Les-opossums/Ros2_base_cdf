@@ -2,12 +2,15 @@ import tkinter as tk
 from PIL import Image, ImageTk
 import os
 from pathlib import Path
+import sys
+import subprocess
+from tkinter import messagebox
 
 class ColorChoiceApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Choisir une couleur")
-        
+
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
         if (screen_width==480 and screen_height==800):
@@ -34,7 +37,7 @@ class ColorChoiceApp:
         self.selected_color = None
 
         # Bouton pour quitter
-        self.button_quit = tk.Button(root, text="Quitter", command=root.quit)
+        self.button_quit = tk.Button(root, text="Quitter", command=root.destroy)
         self.button_quit.pack(pady=10)
 
 
@@ -48,11 +51,14 @@ class ColorChoiceApp:
         ImageApp(image_window, self.selected_color)
         image_window.mainloop()
 
+    def run_ihm(self):
+        self.root.mainloop()
+
 
 class ImageApp:
     def __init__(self, root, selected_color):
         self.root = root
-        self.root.title("Cliquez sur l'image")
+        self.root.title("Choose your script")
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
         
@@ -81,12 +87,13 @@ class ImageApp:
         # Redimensionner l'image en maintenant le ratio
         new_width = int(img_width * scale_factor)
         new_height = int(img_height * scale_factor)
+        print(f"Dimensions de l'image: {img_width}x{img_height}")
         # Redimensionner l'image
         self.img = self.img.resize((new_width, new_height))
         # Convertir l'image en format compatible avec Tkinter
         self.tk_img = ImageTk.PhotoImage(self.img)
         # Créer un canevas pour afficher l'image
-        self.canvas = tk.Canvas(root, width=window_width, height=window_height)
+        self.canvas = tk.Canvas(root, width=new_width, height=new_height)
         self.canvas.pack()
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.tk_img)
         # Bind pour obtenir les coordonnées du clic
@@ -96,7 +103,7 @@ class ImageApp:
         self.label.pack(pady=10)
         
         # Bouton pour quitter
-        self.button_quit = tk.Button(root, text="Quitter", command=root.quit)
+        self.button_quit = tk.Button(root, text="Quitter", command=root.destroy)
         self.button_quit.pack(pady=10)
         self.button_quit.place(x=200, y=760)
 
