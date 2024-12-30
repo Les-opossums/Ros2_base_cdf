@@ -1,12 +1,11 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 import os
+from cdf_msgs.srv import Init
 from pathlib import Path
-import sys
-import subprocess
-from tkinter import messagebox
+import rclpy 
 
-class ColorChoiceApp:
+class ColorChoiceApp():
     def __init__(self, root):
         self.root = root
         self.root.title("Choisir une couleur")
@@ -24,14 +23,13 @@ class ColorChoiceApp:
         self.button_yellow = tk.Button(root,
                                        text="Jaune",
                                        bg="yellow",
-                                       command=lambda: self.chs_clr("jaune"))
+                                       command=lambda: self.chs_clr("yellow"))
         self.button_yellow.pack(side=tk.LEFT, padx=20)
 
         self.button_blue = tk.Button(root,
                                      text="Bleu",
                                      bg="blue",
-                                     fg="white",
-                                     command=lambda: self.chs_clr("bleu"))
+                                     command=lambda: self.chs_clr("blue"))
         self.button_blue.pack(side=tk.LEFT, padx=20)
 
         self.selected_color = None
@@ -43,6 +41,7 @@ class ColorChoiceApp:
 
     def chs_clr(self, color):
         self.selected_color = color
+        self.update_parameters()
         self.root.destroy()
         self.open_image_window()
 
@@ -50,6 +49,18 @@ class ColorChoiceApp:
         image_window = tk.Tk()
         ImageApp(image_window, self.selected_color)
         image_window.mainloop()
+
+    def update_parameters(self):
+        client = self.create_client(Init, 'set_parameters')
+        request = Init.Request()
+        request.team_color = self.selected_color
+        future = client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        response = future.result()
+        if response.success:
+            print("Paramètres mis à jour avec succès.")
+        else:
+            print("Échec de la mise à jour des paramètres.")
 
     def run_ihm(self):
         self.root.mainloop()
