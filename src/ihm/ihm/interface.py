@@ -56,11 +56,6 @@ class ColorChoiceApp():
         request.team_color = self.selected_color
         future = client.call_async(request)
         rclpy.spin_until_future_complete(self, future)
-        response = future.result()
-        if response.success:
-            print("Paramètres mis à jour avec succès.")
-        else:
-            print("Échec de la mise à jour des paramètres.")
 
     def run_ihm(self):
         self.root.mainloop()
@@ -98,7 +93,6 @@ class ImageApp:
         # Redimensionner l'image en maintenant le ratio
         new_width = int(img_width * scale_factor)
         new_height = int(img_height * scale_factor)
-        print(f"Dimensions de l'image: {img_width}x{img_height}")
         # Redimensionner l'image
         self.img = self.img.resize((new_width, new_height))
         # Convertir l'image en format compatible avec Tkinter
