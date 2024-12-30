@@ -24,7 +24,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'ihm_node = ihm.ihm_node:main',  
+            'ihm_node = ihm.ihm_node:main', 
+            'parameters_server = ihm.parameters_server:main', 
         ],
     },
 )
