@@ -118,14 +118,14 @@ class ImageApp():
         self.button_reload.place(x=100, y=760)
 
         # Bouton pour quitter
-        self.button_quit = tk.Button(self.root, 
-                                     text="Quit", 
+        self.button_valid = tk.Button(self.root, 
+                                     text="Validation", 
                                      command=self.root.destroy,
                                      height=3,
                                      width=10
                                      )
-        self.button_quit.pack(padx=20,pady=10)
-        self.button_quit.place(x=300, y=760)
+        self.button_valid.pack(padx=20,pady=10)
+        self.button_valid.place(x=300, y=760)
         self.root.mainloop()
 
     def get_coordinates(self, event):
@@ -138,6 +138,88 @@ class ImageApp():
         self.root.destroy()
         self.reload = True
 
+class ValidationApp():
+    def __init__(self,color,script):
+        self.color = color
+        self.script = script
+        self.reload = False
+
+        # Initialisation de la fenêtre principale
+        self.root = tk.Tk()
+        self.root.title("Validation")
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        if (screen_width==480 and screen_height==800):
+            # Plein écran
+            self.root.attributes("-fullscreen", True)
+        else :
+            self.root.geometry("480x800")
+        self.root.configure(bg="white")  # Couleur de fond
+
+        # Création des widgets
+        self.create_widgets()
+
+        # Lancer la boucle principale
+        self.root.mainloop()
+
+    def create_widgets(self):
+        # Titre
+        title_label = tk.Label(
+            self.root,
+            text="Détails de la Validation",
+            font=("Arial", 16, "bold"),
+            bg="white",
+            fg="black"
+        )
+        title_label.pack(pady=10)
+
+        # Affichage de la couleur
+        color_label = tk.Label(
+            self.root,
+            text=f"Couleur : {self.color}",
+            font=("Arial", 14),
+            bg=self.color,  # Utilisation de la couleur fournie
+            fg="white" if self.color.lower() != "white" else "black",  # Texte visible
+            width=30,  # Largeur fixe
+            anchor="w",  # Alignement à gauche
+            padx=10
+        )
+        color_label.pack(pady=5)
+
+        # Affichage du script
+        script_label = tk.Label(
+            self.root,
+            text=f"Script : {self.script}",
+            font=("Arial", 14),
+            bg="white",
+            fg="black",
+            anchor="w",
+            padx=10
+        )
+        script_label.pack(pady=5)
+
+        # Bouton de validation
+        validate_button = tk.Button(
+            self.root,
+            text="Validation",
+            command=self.on_validate
+        )
+        validate_button.pack(pady=10)
+
+        reload_button = tk.Button(
+            self.root,
+            text="Reload",
+            command=self.on_reload
+        )
+        reload_button.pack(pady=20)
+
+    def on_validate(self):
+        print("Validation effectuée.")
+        self.root.destroy()
+
+    def on_reload(self):
+        self.reload = True
+        self.root.destroy()
 
 class GUI:
     def __init__(self):
@@ -157,6 +239,12 @@ class GUI:
 
     def get_script(self):
         return self.img_app.selected_script
+
+    def run_validation(self):
+        assert self.color_app.selected_color is not None
+        assert self.img_app.selected_script is not None
+        self.validation_app = ValidationApp(self.color_app.selected_color, self.img_app.selected_script)
+        self.reload = self.validation_app.reload
 
 # if __name__ == '__main__':
 #     main()

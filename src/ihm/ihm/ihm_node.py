@@ -11,8 +11,7 @@ class IhmNode(Node, GUI):
         self.gui =  GUI()
 
     def main(self):
-        valid = False
-        while not valid:
+        while True:
             self.gui.reload = False
             self.gui.run_color()
             if self.gui.reload:
@@ -25,7 +24,10 @@ class IhmNode(Node, GUI):
             self.scr = self.gui.get_script()
             self.get_logger().info("Script selected: " + str(self.scr))
             self.update_parameters()
-            valid = True
+            self.gui.run_validation()
+            if self.gui.reload:
+                continue
+            break 
 
     def update_parameters(self):
         client = self.create_client(Init, 'set_parameters')
