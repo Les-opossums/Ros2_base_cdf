@@ -1,10 +1,12 @@
 import tkinter as tk
+from tkinter import messagebox
 from PIL import Image, ImageTk
 import os
 from pathlib import Path
 
 class ColorChoiceApp():
     def __init__(self):
+        self.reload = False
         self.root = tk.Tk()
         self.root.title("Choisir une couleur")
 
@@ -49,29 +51,16 @@ class ColorChoiceApp():
 
     def chs_clr(self, color):
         self.selected_color = color
-        #self.update_parameters()
         self.root.destroy()
-        #self.open_image_window()
-
-    def open_image_window(self):
-        image_window = tk.Tk()
-        ImageApp(image_window, self.selected_color)
-        image_window.mainloop()
-
-    # def update_parameters(self):
-    #     client = self.create_client(Init, 'set_parameters')
-    #     request = Init.Request()
-    #     request.team_color = self.selected_color
-    #     future = client.call_async(request)
-    #     rclpy.spin_until_future_complete(self, future)
 
     def reload_ihm(self):
         self.root.destroy()
-        self.__init__()
+        self.reload = True
 
 
 class ImageApp():
     def __init__(self, selected_color):
+        self.reload = False
         self.selected_script = 100
         self.selected_color = selected_color
 
@@ -144,24 +133,19 @@ class ImageApp():
         self.label.config(text=f"Couleur: {self.color} | x={x}, y={y})")
         print(f"Couleur choisie: {self.color}, Coordonnées: ({x}, {y})")
         self.selected_script = 1
-
+        
     def reload_ihm(self):
         self.root.destroy()
-        self.__init__(self.selected_color)
+        self.reload = True
 
-    #def read_parameters(self):
-    #    client = self.create_client(Init, 'get_parameters')
-    #    request = Init.Request()
-    #    future = client.call_async(request)
-    #    rclpy.spin_until_future_complete(self, future)
-    #    return future.result().team_color
 
 class GUI:
     def __init__(self):
-        pass
+        self.reload = False
 
     def run_color(self):
         self.color_app = ColorChoiceApp()
+        self.reload = self.color_app.reload
 
     def get_color(self):
         return self.color_app.selected_color
@@ -169,6 +153,7 @@ class GUI:
     def run_script(self):
         assert self.color_app.selected_color is not None
         self.img_app = ImageApp(self.color_app.selected_color)
+        self.reload = self.img_app.reload
 
     def get_script(self):
         return self.img_app.selected_script
