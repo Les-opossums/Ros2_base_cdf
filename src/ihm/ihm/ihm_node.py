@@ -29,7 +29,8 @@ class IhmNode(Node, GUI):
                 continue
             else:
                 self.update_parameters()
-            break 
+            break
+        self.gui.run_score() 
 
     def update_parameters(self):
         client = self.create_client(Init, 'set_parameters')

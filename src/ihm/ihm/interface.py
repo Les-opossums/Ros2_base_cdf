@@ -66,6 +66,7 @@ class ImageApp():
 
         self.root = tk.Tk()
         self.root.title("Choose your script")
+        self.root.configure(bg=selected_color)
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         
@@ -105,8 +106,8 @@ class ImageApp():
         # Bind pour obtenir les coordonnées du clic
         self.canvas.bind("<Button-1>", self.get_coordinates)
         # Label pour afficher les coordonnées
-        self.label = tk.Label(self.root, text=f"Color: {self.color}")
-        self.label.pack(pady=10)
+        # self.label = tk.Label(self.root, text=f"Color: {self.color}")
+        # self.label.pack(pady=10)
         
         self.button_reload = tk.Button(self.root, 
                                        text="Reload", 
@@ -115,17 +116,17 @@ class ImageApp():
                                        width=10
                                        )
         self.button_reload.pack(padx=0,pady=10)
-        self.button_reload.place(x=100, y=760)
+        self.button_reload.place(x=100, y=725)
 
         # Bouton pour quitter
         self.button_valid = tk.Button(self.root, 
-                                     text="Validation", 
+                                     text="Valid", 
                                      command=self.root.destroy,
                                      height=3,
                                      width=10
                                      )
         self.button_valid.pack(padx=20,pady=10)
-        self.button_valid.place(x=300, y=760)
+        self.button_valid.place(x=300, y=725)
         self.root.mainloop()
 
     def get_coordinates(self, event):
@@ -201,7 +202,7 @@ class ValidationApp():
         # Bouton de validation
         validate_button = tk.Button(
             self.root,
-            text="Validation",
+            text="Valid",
             command=self.on_validate
         )
         validate_button.pack(pady=10)
@@ -220,6 +221,37 @@ class ValidationApp():
     def on_reload(self):
         self.reload = True
         self.root.destroy()
+
+class ScoreApp:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("Score")
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        if (screen_width==480 and screen_height==800):
+            # Plein écran
+            self.root.attributes("-fullscreen", True)
+        else :
+            self.root.geometry("480x800")
+        self.root.configure(bg="white")
+
+        # Création de la frame
+        self.create_frame()
+        # Lancer la boucle principale
+        self.root.mainloop()
+
+    def create_frame(self):
+        frame = tk.Frame(self.root, bg="lightgray", relief="solid", bd=2)
+        frame.pack(expand=True, fill="both", padx=20, pady=20)
+
+        zero_label = tk.Label(
+            frame,
+            text="0",
+            font=("Arial", 120, "bold"),
+            bg="lightgray",
+            fg="black"
+        )
+        zero_label.pack(expand=True)
 
 class GUI:
     def __init__(self):
@@ -245,6 +277,9 @@ class GUI:
         assert self.img_app.selected_script is not None
         self.validation_app = ValidationApp(self.color_app.selected_color, self.img_app.selected_script)
         self.reload = self.validation_app.reload
+
+    def run_score(self):
+        self.score_app = ScoreApp()
 
 # if __name__ == '__main__':
 #     main()
