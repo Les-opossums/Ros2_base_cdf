@@ -131,7 +131,7 @@ class ImageApp():
 
     def get_coordinates(self, event):
         x, y = event.x, event.y
-        self.label.config(text=f"Couleur: {self.color} | x={x}, y={y})")
+        #self.label.config(text=f"Couleur: {self.color} | x={x}, y={y})")
         print(f"Couleur choisie: {self.color}, Coordonnées: ({x}, {y})")
         self.selected_script = 1
         
@@ -244,18 +244,19 @@ class ScoreApp:
         frame = tk.Frame(self.root, bg="lightgray", relief="solid", bd=2)
         frame.pack(expand=True, fill="both", padx=20, pady=20)
 
-        zero_label = tk.Label(
+        self.zero_label = tk.Label(
             frame,
             text="0",
             font=("Arial", 120, "bold"),
             bg="lightgray",
             fg="black"
         )
-        zero_label.pack(expand=True)
+        self.zero_label.pack(expand=True)
 
 class GUI:
     def __init__(self):
         self.reload = False
+        self.initialized = False
 
     def run_color(self):
         self.color_app = ColorChoiceApp()
@@ -280,6 +281,19 @@ class GUI:
 
     def run_score(self):
         self.score_app = ScoreApp()
+
+    def update_score(self, score):
+        assert self.initialized
+        self.get_logger().info(f"Score: {score}")
+        #self.score_app.zero_label.config(text=str(score))
+
+    def update_au(self, au):
+        assert self.initialized
+        # self.score_app.update_au(au)
+
+    def update_timer(self, enable_timer):
+        assert self.initialized
+        # self.score_app.update_timer(enable_timer)
 
 # if __name__ == '__main__':
 #     main()
