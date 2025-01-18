@@ -1,10 +1,7 @@
 import tkinter as tk
 from PIL import Image, ImageTk
-from rclpy.node import Node
 import os
-from cdf_msgs.srv import Init
 from pathlib import Path
-import rclpy 
 
 class ColorChoiceApp():
     def __init__(self):
@@ -161,13 +158,17 @@ class ImageApp():
 
 class GUI:
     def __init__(self):
+        pass
+
+    def run_color(self):
         self.color_app = ColorChoiceApp()
-        self.get_logger().info("Color selected: " + self.color_app.selected_color)
-        self.img_app = ImageApp(self.color_app.selected_color)
-        self.get_logger().info("Script selected: " + str(self.img_app.selected_script))
 
     def get_color(self):
         return self.color_app.selected_color
+
+    def run_script(self):
+        assert self.color_app.selected_color is not None
+        self.img_app = ImageApp(self.color_app.selected_color)
 
     def get_script(self):
         return self.img_app.selected_script
