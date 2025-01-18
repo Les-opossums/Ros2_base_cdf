@@ -27,6 +27,8 @@ class IhmNode(Node, GUI):
             self.gui.run_validation()
             if self.gui.reload:
                 continue
+            else:
+                self.update_parameters()
             break 
 
     def update_parameters(self):
