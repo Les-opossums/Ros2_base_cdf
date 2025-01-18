@@ -24,13 +24,13 @@ class ColorChoiceApp():
                                        text="Jaune",
                                        bg="yellow",
                                        command=lambda: self.chs_clr("yellow"))
-        self.button_yellow.pack(side=tk.LEFT, padx=20)
+        self.button_yellow.pack(padx=20)
 
         self.button_blue = tk.Button(root,
                                      text="Bleu",
                                      bg="blue",
                                      command=lambda: self.chs_clr("blue"))
-        self.button_blue.pack(side=tk.LEFT, padx=20)
+        self.button_blue.pack(padx=20)
 
         self.selected_color = None
 
