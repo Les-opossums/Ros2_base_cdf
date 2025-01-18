@@ -2,18 +2,17 @@ import rclpy
 from rclpy.node import Node
 from cdf_msgs.srv import Init
 import tkinter as tk
-from .interface import ColorChoiceApp
+from .interface import GUI
 
-class IhmNode(Node, ColorChoiceApp):
-    def __init__(self, root):
+class IhmNode(Node, GUI):
+    def __init__(self):
         super().__init__('ihm_node')
-        ColorChoiceApp.__init__(self, root)
+        GUI.__init__(self)
 
 def main(args=None):
     rclpy.init(args=args)
-    root = tk.Tk()
-    node = IhmNode(root)
-    node.run_ihm()
+    #root = tk.Tk()
+    node = IhmNode() #root)
     rclpy.spin(node)
     rclpy.shutdown()
 
