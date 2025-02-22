@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(cdf_msgs)
+project(orchestrator_gui)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -7,32 +7,40 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
+find_package(cdf_msgs REQUIRED)
 
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/AxResult.msg"
-  "msg/Buttons.msg"
-  "msg/DebugLidar.msg"
-  "msg/Evitement.msg"
-  "msg/LidarLoc.msg"
-  "msg/MergedData.msg"
-  "msg/PicAction.msg"
-  "msg/RobotData.msg"
-  "msg/ServoDebug.msg"
-  "msg/TCPmessage.msg"
-  "msg/Trajectoire.msg"
-  "msg/Obstacles.msg"
-  "msg/CircleObstacle.msg"
-  "msg/SegmentObstacle.msg"
-  "msg/GoalDetection.msg"
-  "msg/CamCommand.msg"
-  "action/ActionSequencer.action"
-  "action/MoveTo.action"
-  DEPENDENCIES std_msgs geometry_msgs
+include_directories(include)
+
+install(DIRECTORY
+  launch
+  config
+  images
+  DESTINATION share/${PROJECT_NAME}/
 )
 
+# #Create cpp executable
+# add_executable(beacon_detector src/beacon_detector.cpp)
+# ament_target_dependencies(beacon_detector rclcpp std_msgs)
+
+# # Install cpp executables
+# install(TARGETS
+#   beacon_detector
+#   DESTINATION lib/${PROJECT_NAME}
+# )
+
+ament_python_install_package(${PROJECT_NAME})
+
+
+# Install Python executables
+install(PROGRAMS
+  scripts/dev_gui.py
+  scripts/test_dev.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
