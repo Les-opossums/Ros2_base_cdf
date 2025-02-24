@@ -40,8 +40,9 @@ ament_python_install_package(${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
   scripts/beacon_detector.py
-  scripts/beacon_generator.py
   scripts/on_board_robot_detector.py
+  scripts/lidar_simulation.py
+  scripts/nav_simulation.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

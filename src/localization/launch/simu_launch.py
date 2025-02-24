@@ -14,14 +14,22 @@ def generate_launch_description():
     config = os.path.join(
         get_package_share_directory("localization"),
         "config",
-        "lidar_config.yaml",
+        "simu_config.yaml",
     )
 
-    node_beacon_generator = Node(
+    node_lidar_simulation = Node(
         package="localization",
         namespace=namespace,
-        executable="beacon_generator.py",
-        name="beacon_generator_node",
+        executable="lidar_simulation.py",
+        name="lidar_simulation_node",
+        parameters=[config],
+    )
+
+    node_nav_simulation = Node(
+        package="localization",
+        namespace=namespace,
+        executable="nav_simulation.py",
+        name="nav_simulation_node",
         parameters=[config],
     )
 
@@ -33,7 +41,8 @@ def generate_launch_description():
         parameters=[config],
     )
 
-    ld.add_action(node_beacon_generator)
+    ld.add_action(node_lidar_simulation)
+    ld.add_action(node_nav_simulation)
     ld.add_action(node_beacon_detector)
 
     print(LaunchIntrospector().format_launch_description(ld))

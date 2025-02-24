@@ -159,22 +159,25 @@ class MapViewRosConnected(QtWidgets.QGraphicsView):
         map_rect = self.map_item.boundingRect()
         width = map_rect.width()
         height = map_rect.height()
-        return 2 * x / width, 3 * y / height
+        # return 3 * x / width, 2 * (y / height)
+        return 3 * x / width, 2 * (1 - y / height)
     
+    @QtCore.pyqtSlot(Point)
     def update_robot_position(self, msg):
         map_rect = self.map_item.boundingRect()
         width = map_rect.width()
         height = map_rect.height()
-        posx = int(width * msg.x / 2 - self.icon_width / 2) 
-        posy = int(height * msg.y / 3 - self.icon_height / 2) 
+        posx = width * msg.x / 3 - self.icon_width / 2
+        posy =  height *(1 - msg.y / 2)  -  self.icon_height / 2
+        self.node.get_logger().info(f"Position reçue: {msg.x}, {msg.y}")
         # Récupération de la position actuelle de l'icône
-        current_pos = self.icon_item.pos()
+        # current_pos = self.icon_item.pos()
         # Création d'une nouvelle position en ajoutant 10 pixels à la coordonnée x
         new_pos = QtCore.QPointF(posx, posy)
         # new_pos = QtCore.QPointF(current_pos.x() + 10, current_pos.y())
         self.icon_item.setPos(new_pos)
         print(f"Icône déplacée vers {new_pos}")
-        current_rotation = self.icon_item.rotation()
+        # current_rotation = self.icon_item.rotation()
         # new_rotation = current_rotation + 15
         new_rotation = msg.z * 180 / np.pi
         self.icon_item.setRotation(new_rotation)
@@ -247,11 +250,6 @@ class MyWindow(QtWidgets.QMainWindow):
     def on_button_clicked(self):
         # Lors du clic, on publie un message sur le topic 'chatter'
         self.ros_node.publish_message("Hello ROS2!")
-
-    # @QtCore.pyqtSlot(float)
-    def update_label(self, text: float):
-        # Mise à jour du label avec le texte reçu
-        self.label.setText(str(text))
 
 def main():
     rclpy.init(args=None)
