@@ -1,8 +1,9 @@
 import tkinter as tk
 from tkinter import messagebox
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageSequence
 import os
 from pathlib import Path
+from itertools import count, cycle
 
 class ColorChoiceApp():
     def __init__(self):
@@ -238,6 +239,8 @@ class ScoreApp:
         # Création de la frame
         self.create_frame()
         # Lancer la boucle principale
+        au = True
+        self.update_au(au)
         self.root.mainloop()
 
     def create_frame(self):
@@ -252,6 +255,56 @@ class ScoreApp:
             fg="black"
         )
         self.zero_label.pack(expand=True)
+
+    def update_au(self, au):
+        if au:
+            root = tk.Toplevel()
+            current_dir = Path(__file__).resolve().parent
+            gif_path = os.path.join(current_dir, "boulette.gif")
+            lbl = ImageLabel(root)
+            lbl.pack()
+            lbl.load(gif_path)
+            root.mainloop()
+        else:
+            pass
+
+class ImageLabel(tk.Label):
+    """
+    A Label that displays images, and plays them if they are gifs
+    :im: A PIL Image instance or a string filename
+    """
+    def load(self, im):
+        if isinstance(im, str):
+            im = Image.open(im)
+        frames = []
+ 
+        try:
+            for i in count(1):
+                frames.append(ImageTk.PhotoImage(im.copy()))
+                im.seek(i)
+        except EOFError:
+            pass
+        self.frames = cycle(frames)
+ 
+        try:
+            self.delay = im.info['duration']
+        except:
+            self.delay = 100
+ 
+        if len(frames) == 1:
+            self.config(image=next(self.frames))
+        else:
+            self.next_frame()
+ 
+    def unload(self):
+        self.config(image=None)
+        self.frames = None
+ 
+    def next_frame(self):
+        if self.frames:
+            self.config(image=next(self.frames))
+            self.after(self.delay, self.next_frame)
+
 
 class GUI:
     def __init__(self):
@@ -289,7 +342,7 @@ class GUI:
 
     def update_au(self, au):
         assert self.initialized
-        # self.score_app.update_au(au)
+        self.score_app.update_au(au)
 
     def update_timer(self, enable_timer):
         assert self.initialized
