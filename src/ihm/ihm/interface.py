@@ -239,8 +239,6 @@ class ScoreApp:
         # Création de la frame
         self.create_frame()
         # Lancer la boucle principale
-        au = True
-        self.update_au(au)
         self.root.mainloop()
 
     def create_frame(self):
