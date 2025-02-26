@@ -92,7 +92,7 @@ class ImageApp():
         width_factor = window_width / img_width
         height_factor = window_height / img_height
         # Choisir le plus petit facteur pour conserver le ratio
-        scale_factor = min(width_factor, height_factor)
+        scale_factor = min(width_factor, height_factor) * 0.9
         # Redimensionner l'image en maintenant le ratio
         new_width = int(img_width * scale_factor)
         new_height = int(img_height * scale_factor)
@@ -107,8 +107,8 @@ class ImageApp():
         # Bind pour obtenir les coordonnées du clic
         self.canvas.bind("<Button-1>", self.get_coordinates)
         # Label pour afficher les coordonnées
-        # self.label = tk.Label(self.root, text=f"Color: {self.color}")
-        # self.label.pack(pady=10)
+        self.label = tk.Label(self.root, text=f"Color: {self.color}")
+        self.label.pack(pady=10)
         
         self.button_reload = tk.Button(self.root, 
                                        text="Reload", 
@@ -132,9 +132,12 @@ class ImageApp():
 
     def get_coordinates(self, event):
         x, y = event.x, event.y
-        #self.label.config(text=f"Couleur: {self.color} | x={x}, y={y})")
+        self.label.config(text=f"Couleur: {self.color} | x={x}, y={y})")
         print(f"Couleur choisie: {self.color}, Coordonnées: ({x}, {y})")
-        self.selected_script = 1
+        if y < 100:
+            self.selected_script = 16
+        else:
+            self.selected_script = 17
         
     def reload_ihm(self):
         self.root.destroy()
