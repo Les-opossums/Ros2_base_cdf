@@ -340,6 +340,7 @@ class GUI:
 
     def update_au(self, au):
         assert self.initialized
+        assert self.score_app is not None
         self.score_app.update_au(au)
 
     def update_timer(self, enable_timer):
