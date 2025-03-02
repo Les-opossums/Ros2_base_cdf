@@ -20,7 +20,7 @@ import collections
 
 class PositionSender(Node):
     def __init__(self, nav_simu_node):
-        super().__init__("position_sender")
+        super().__init__("position_sender_node")
         self.nav_simu_node = nav_simu_node
         self._init_parameters()
         self._init_publishers()

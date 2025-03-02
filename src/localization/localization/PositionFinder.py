@@ -1,7 +1,6 @@
 import numpy as np
 from .math_lidar import *
 
-
 class PositionFinder:
 
     def __init__(
@@ -16,29 +15,17 @@ class PositionFinder:
         self.tour_reinit = 0
         self.tour_test = 0
         self.precision = precision
-        self.BaliseA = fixed_beacons[0]
-        self.BaliseB = fixed_beacons[1]
-        self.BaliseC = fixed_beacons[2]
-        self.BaliseD = fixed_beacons[3]
         self.boundaries = boundaries
         self.fixed_beacons = fixed_beacons
         if init_position is not None:
-            self.previous_robot = RobotDatas()
-            self.previous_robot.position = Point(
-                x=init_position[0], y=init_position[1], z=np.pi * init_position[2] / 180
+            self.previous_robot = {}
+            self.previous_robot["position"] = np.array(
+                [init_position[0], init_position[1], np.pi * init_position[2] / 180]
             )
-            self.previous_robot.balise_A = chgt_base_plateau_to_robot(
-                self.fixed_beacons[0], self.previous_robot.position
-            )
-            self.previous_robot.balise_B = chgt_base_plateau_to_robot(
-                self.fixed_beacons[1], self.previous_robot.position
-            )
-            self.previous_robot.balise_C = chgt_base_plateau_to_robot(
-                self.fixed_beacons[2], self.previous_robot.position
-            )
-            self.previous_robot.balise_D = chgt_base_plateau_to_robot(
-                self.fixed_beacons[3], self.previous_robot.position
-            )
+            self.previous_robot["beacons"] = [
+                chgt_base_plateau_to_robot(beacon, self.previous_robot["position"])
+                for beacon in fixed_beacons
+            ]
             self.initialisation = True
 
     # 1
@@ -55,16 +42,16 @@ class PositionFinder:
             self.tour_reinit += 1
 
     # 3
-    def _compare_previous_found_positions(self, potential_robot_datas) -> RobotDatas:
+    def _compare_previous_found_positions(self, potential_robot_datas):
         robot_datas = potential_robot_datas.copy()
-        dst_min = robot_datas[0].erreur
+        dst_min = robot_datas[0]["err"]
         best_match = robot_datas[0]
         for robot_data in robot_datas[1:]:
-            dst_test = robot_data.erreur
+            dst_test = robot_data["err"]
             if dst_test < dst_min:
                 dst_min = dst_test
                 best_match = robot_data
-        if dt(self.previous_robot.position, best_match.position) < self.precision:
+        if dt(self.previous_robot["position"], best_match["position"]) < self.precision:
             self.current_robot = best_match
             self.true_valor = True
         else:
@@ -72,65 +59,34 @@ class PositionFinder:
             self.current_robot = self.previous_robot
 
     # 4
-    def _recreate_balise(self) -> None:
-        if self.current_robot.position.z is not None:
-            if self.current_robot.balise_A is None:
-                self.current_robot.balise_A = chgt_base_plateau_to_robot(
-                    self.BaliseA, self.current_robot.position
-                )
-            if self.current_robot.balise_B is None:
-                self.current_robot.balise_B = chgt_base_plateau_to_robot(
-                    self.BaliseB, self.current_robot.position
-                )
-            if self.current_robot.balise_C is None:
-                self.current_robot.balise_C = chgt_base_plateau_to_robot(
-                    self.BaliseC, self.current_robot.position
-                )
-            if self.current_robot.balise_D is None:
-                self.current_robot.balise_D = chgt_base_plateau_to_robot(
-                    self.BaliseD, self.current_robot.position
+    def _recreate_beacons(self) -> None:
+        for i in range(4):
+            if self.current_robot["beacons"][i] is None:
+                self.current_robot["beacons"][i] = chgt_base_plateau_to_robot(
+                    self.fixed_beacons[i], self.current_robot["position"]
                 )
 
     # 5
     def _find_robots_on_plateau(self, obstacles) -> None:
-        self.current_robot.other_robots = []
-        cos_theta = np.cos(self.current_robot.position.z)
-        sin_theta = np.sin(self.current_robot.position.z)
+        cos_theta = np.cos(self.current_robot["position"][2])
+        sin_theta = np.sin(self.current_robot["position"][2])
+        OtoR = np.array(
+            [
+                [cos_theta, -sin_theta, self.current_robot["position"][0]],
+                [sin_theta, cos_theta, self.current_robot["position"][1]],
+                [0, 0, 1],
+            ]
+        )
+        self.current_robot["other_robots"] = []
         for obstacle in obstacles:
-            x, y = obstacle.x, obstacle.y
-            x1, y1 = (cos_theta * x - sin_theta * y + self.current_robot.position.x), (
-                cos_theta * y + sin_theta * x + self.current_robot.position.y
-            )
+            oP = OtoR @ np.array([obstacle[0], obstacle[1], 1])
             if (
-                (x1 > self.boundaries[0])
-                and (x1 < self.boundaries[1])
-                and (y1 > self.boundaries[2])
-                and (y1 < self.boundaries[3])
+                oP[0] > self.boundaries[0]
+                and oP[0] < self.boundaries[1]
+                and oP[1] > self.boundaries[2]
+                and oP[1] < self.boundaries[3]
             ):
-                if (
-                    (
-                        not approx(
-                            dt(obstacle, self.current_robot.balise_A), precision=0.01
-                        )
-                    )
-                    and (
-                        not approx(
-                            dt(obstacle, self.current_robot.balise_B), precision=0.01
-                        )
-                    )
-                    and (
-                        not approx(
-                            dt(obstacle, self.current_robot.balise_C), precision=0.01
-                        )
-                    )
-                    and (
-                        not approx(
-                            dt(obstacle, self.current_robot.balise_D), precision=0.01
-                        )
-                    )
-                ):
-                    positionement = np.array([x1, y1, 1])
-                    self.current_robot.other_robots.append(positionement)
+                self.current_robot["other_robots"].append(oP)
 
     # 2
     def _init_finding(self, potential_robot_datas) -> None:
@@ -143,15 +99,16 @@ class PositionFinder:
                 for element in liste_tool_globale:
                     if not ver:
                         if (
-                            abs(element[0].position.x - bal.position.x) < self.precision
-                            and abs(element[0].position.y - bal.position.y)
+                            abs(element[0]["position"][0] - bal["position"][0])
+                            < self.precision
+                            and abs(element[0]["position"][1] - bal["position"][1])
                             < self.precision
                         ):
                             ver = True
                             element[1] += 1
-                            element[0].position.x = (
-                                element[0].position.x * (element[1] - 1)
-                                + bal.position.x
+                            element[0]["position"][0] = (
+                                element[0]["position"][0] * (element[1] - 1)
+                                + bal["position"][0]
                             ) / element[1]
                 if not ver:
                     liste_tool_globale.append([bal, 1])
@@ -168,28 +125,29 @@ class PositionFinder:
                 for element in liste_tool_globale:
                     if not ver:
                         if (
-                            abs(element[0].position.x - bal.position.x) < self.precision
-                            and abs(element[0].position.y - bal.position.y)
+                            abs(element[0]["position"][0] - bal["position"][0])
+                            < self.precision
+                            and abs(element[0]["position"][1] - bal["position"][1])
                             < self.precision
                         ):
                             ver = True
                             element[1] += 1
-                            element[0].position.x = (
-                                element[0].position.x * (element[1] - 1)
-                                + bal.position.x
+                            element[0]["position"][0] = (
+                                element[0]["position"][0] * (element[1] - 1)
+                                + bal["position"][0]
                             ) / element[1]
                 if not ver:
                     for element in liste_prev:
                         if not ver:
                             if (
-                                abs(element[0].position.x - bal.position.x)
+                                abs(element[0]["position"][0] - bal["position"][0])
                                 < self.precision
-                                and abs(element[0].position.y - bal.position.y)
+                                and abs(element[0]["position"][1] - bal["position"][1])
                                 < self.precision
                             ):
                                 ver = True
                                 liste_tool_globale.append([bal, 1 + element[1]])
-                                liste_rm.remove(element)
+                                removearray(liste_rm, element)
                 if not ver:
                     liste_tool_globale.append([bal, 1])
                 liste_prev = liste_rm.copy()
@@ -205,14 +163,13 @@ class PositionFinder:
                         if balise[1] > max:
                             max = balise[1]
                             donnees = balise[0]
-                    donnees.position.z = find_angle_31a(
-                        donnees,
-                        donnees.position.x,
-                        donnees.position.y,
+                    donnees["position"][2] = find_angle(
+                        donnees["position"],
+                        donnees["beacons"],
                         self.fixed_beacons,
                     )
                     self.current_robot = donnees
-                    self._recreate_balise()
+                    self._recreate_beacons()
                     self.true_valor = True
                     self.initialisation = True
             self.tour_reinit = 0
@@ -220,26 +177,22 @@ class PositionFinder:
             self.registre_init = []
 
     # Used in beacon_detector_node.py
-    def donnees_finales(
-        self, nb_potential_beacons, potential_beacons, obstacles
-    ) -> None:
+    def search_pos(self, nb_potential_beacons, potential_beacons, obstacles) -> None:
         self._update_data()
-        if nb_potential_beacons > 0:
-            potential_robot_datas, _, _, _ = compute_potential_positions(
-                potential_beacons,
-                self.fixed_beacons,
-                nb_potential_beacons,
-                self.boundaries,
-            )
-
-            if len(potential_robot_datas) > 0:
-                if not self.initialisation:
-                    self._init_finding(potential_robot_datas)
-                else:
-                    self._compare_previous_found_positions(potential_robot_datas)
-                if self.initialisation and self.true_valor:
-                    self._recreate_balise()
-                    self._find_robots_on_plateau(obstacles)
-                    return self.current_robot
+        potential_robot_datas = find_position(
+            potential_beacons,
+            self.fixed_beacons,
+            nb_potential_beacons,
+            self.boundaries,
+        )
+        if len(potential_robot_datas) > 0:
+            if not self.initialisation:
+                self._init_finding(potential_robot_datas)
+            else:
+                self._compare_previous_found_positions(potential_robot_datas)
+            if self.initialisation and self.true_valor:
+                self._recreate_beacons()
+                self._find_robots_on_plateau(obstacles)
+                return self.current_robot
         self.true_valor = False
         return None

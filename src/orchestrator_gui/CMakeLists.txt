@@ -37,8 +37,7 @@ ament_python_install_package(${PROJECT_NAME})
 
 # Install Python executables
 install(PROGRAMS
-  scripts/dev_gui.py
-  scripts/test_dev.py
+  scripts/orchestrator_gui_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

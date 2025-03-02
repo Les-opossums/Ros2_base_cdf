@@ -4,7 +4,6 @@ import time
 from typing import *
 
 # from tf.transformations import quaternion_from_euler
-from .objet import ChooseColor, RobotDatas
 from .math_lidar import chgt_base_robot_to_plateau
 
 # Import des messages
@@ -13,7 +12,14 @@ from visualization_msgs.msg import Marker, MarkerArray
 from cdf_msgs.msg import LidarLoc
 
 
-def publicate_donnees_lidar(robot_datas, value: bool = True) -> None:
+class ChooseColor:
+    def __init__(self, red, green, blue):
+        self.red = red
+        self.green = green
+        self.blue = blue
+
+
+def publicate_donnees_lidar(robot_datas) -> None:
     """
     Paramètres:
         - donnees:      PositionFinder,     données qu'on a déterminées
@@ -22,30 +28,31 @@ def publicate_donnees_lidar(robot_datas, value: bool = True) -> None:
     Effectue:
         - donnees va affecter toutes ses données à emission
     """
-    finish_position = LidarLoc()
-    value_approx = 100
-    finish_position.robot_position.x = (
-        int(value_approx * robot_datas.position.x) / value_approx
+    rdatas = LidarLoc()
+    value_approx = 10000
+    rdatas.robot_position.x = (
+        int(value_approx * robot_datas["position"][0]) / value_approx
     )
-    finish_position.robot_position.y = (
-        int(value_approx * robot_datas.position.y) / value_approx
+    rdatas.robot_position.y = (
+        int(value_approx * robot_datas["position"][1]) / value_approx
     )
-    finish_position.robot_position.z = robot_datas.position.z
-    finish_position.other_robot_position = []
-    finish_position.balises = [
-        robot_datas.balise_A,
-        robot_datas.balise_B,
-        robot_datas.balise_C,
-        robot_datas.balise_D,
+    rdatas.robot_position.z = robot_datas["position"][2]
+    rdatas.other_robot_position = []
+    rdatas.balises = [
+        Point(x=robot_datas["beacons"][0][0], y=robot_datas["beacons"][0][1]),
+        Point(x=robot_datas["beacons"][1][0], y=robot_datas["beacons"][1][1]),
+        Point(x=robot_datas["beacons"][2][0], y=robot_datas["beacons"][2][1]),
+        Point(x=robot_datas["beacons"][3][0], y=robot_datas["beacons"][3][1]),
     ]
-    for i in robot_datas.other_robots:
+    for i in robot_datas["other_robots"]:
         tmp_stock = Point()
         tmp_stock.x = int(value_approx * i[0]) / value_approx
         tmp_stock.y = int(value_approx * i[1]) / value_approx
-        finish_position.other_robot_position.append(tmp_stock)
-    return finish_position
+        rdatas.other_robot_position.append(tmp_stock)
+    return rdatas
 
-def publicate_donnees_zc(list_robots) -> None:
+
+def publicate_donnees_zc(objects) -> None:
     """
     Paramètres:
         - donnees:      PositionFinder,     données qu'on a déterminées
@@ -54,27 +61,27 @@ def publicate_donnees_zc(list_robots) -> None:
     Effectue:
         - donnees va affecter toutes ses données à emission
     """
-    finish_position = LidarLoc()
-    for i in list_robots:
+    rdatas = LidarLoc()
+    for obj in objects:
         tmp_stock = Point()
-        tmp_stock.x = i[0]
-        tmp_stock.y = i[1]
-        finish_position.other_robot_position.append(tmp_stock)
-    return finish_position
+        tmp_stock.x = obj[0]
+        tmp_stock.y = obj[1]
+        rdatas.other_robot_position.append(tmp_stock)
+    return rdatas
 
 
-def display_lidar_position(robot_datas: RobotDatas, id=0) -> None:
+def display_lidar_position(robot_datas, id=0) -> None:
     marker_array = MarkerArray()
     main_marker = Marker()
     color = ChooseColor(0.7, 0.1, 0.1)
     marker_pos_robot = create_marker(
         id_1=id,
         type_1=main_marker.CUBE,
-        angle=robot_datas.position.z,
+        angle=robot_datas["position"][2],
         scale_x=0.15,
         scale_y=0.35,
-        pos_x=robot_datas.position.x,
-        pos_y=robot_datas.position.y,
+        pos_x=robot_datas["position"][0],
+        pos_y=robot_datas["position"][1],
         color=color,
         scale_z=0.35,
         frame_id="laser",
@@ -107,7 +114,7 @@ def display_other_robots_positions(other_robots) -> None:
 def diplay_fixed_beacons_positions(fixed_beacons: list[Point]) -> None:
     marker_array = MarkerArray()
     main_marker = Marker()
-    for i, bal in enumerate(fixed_beacons):
+    for i, fb in enumerate(fixed_beacons):
         color = ChooseColor(0.0, 1.0, 0.5)
         marker_bal = create_marker(
             id_1=20 + i,
@@ -115,8 +122,8 @@ def diplay_fixed_beacons_positions(fixed_beacons: list[Point]) -> None:
             angle=0,
             scale_x=0.1,
             scale_y=0.1,
-            pos_x=bal.x,
-            pos_y=bal.y,
+            pos_x=fb[0],
+            pos_y=fb[1],
             color=color,
             scale_z=0.6,
             frame_id="laser",
@@ -125,14 +132,14 @@ def diplay_fixed_beacons_positions(fixed_beacons: list[Point]) -> None:
     return marker_array
 
 
-def diplay_beacons_positions_found(robot_datas: RobotDatas):
+def diplay_beacons_positions_found(robot_datas):
     marker_array = MarkerArray()
     main_marker = Marker()
     liste = [
-        chgt_base_robot_to_plateau(robot_datas.balise_A, robot_datas.position),
-        chgt_base_robot_to_plateau(robot_datas.balise_B, robot_datas.position),
-        chgt_base_robot_to_plateau(robot_datas.balise_C, robot_datas.position),
-        chgt_base_robot_to_plateau(robot_datas.balise_D, robot_datas.position),
+        chgt_base_robot_to_plateau(robot_datas["beacons"][0], robot_datas["position"]),
+        chgt_base_robot_to_plateau(robot_datas["beacons"][1], robot_datas["position"]),
+        chgt_base_robot_to_plateau(robot_datas["beacons"][2], robot_datas["position"]),
+        chgt_base_robot_to_plateau(robot_datas["beacons"][3], robot_datas["position"]),
     ]
     for i, bal in enumerate(liste):
         color = ChooseColor(1, 0.2, 0.3)
@@ -142,8 +149,8 @@ def diplay_beacons_positions_found(robot_datas: RobotDatas):
             angle=0,
             scale_x=0.1,
             scale_y=0.1,
-            pos_x=bal.x,
-            pos_y=bal.y,
+            pos_x=bal[0],
+            pos_y=bal[1],
             color=color,
             scale_z=0.6,
             frame_id="laser",
@@ -174,6 +181,7 @@ def display_playground(boundaries: list[float]) -> None:
     )
     marker_array.markers.append(marker_floor)
     return marker_array
+
 
 def create_marker(
     id_1: int,
@@ -228,16 +236,6 @@ def create_marker(
     return marker
 
 
-# def remove_marker(id: int):
-#     marker_to_remove_1, marker_to_remove_2 = Marker(), Marker()
-#     marker_to_remove_1.id = 100 + id
-#     marker_to_remove_2.id = 200 + id
-#     marker_to_remove_1.action = marker_to_remove_1.DELETE
-#     marker_to_remove_2.action = marker_to_remove_2.DELETE
-
-#     return marker_to_remove_1, marker_to_remove_2
-
-
 def transform_to_quaternion(point: Point):
     module = np.sqrt(point.x**2 + point.y**2)
     if module > 0.01:
@@ -249,32 +247,6 @@ def transform_to_quaternion(point: Point):
     else:
         sign = np.pi
     return module, sign, ang
-
-
-# def publish_debug(lidar_t: ListeT, pub: rospy.Publisher, debug_nb_bal: int, debug_nb_liste_bal: int, debug_positions_pot: list, rangement: RangementBalise):
-#     data_to_send = DebugLidar()
-#     data_to_send.distance_AB.data = dt(tool_glob.BaliseA, tool_glob.BaliseB)
-#     data_to_send.distance_AC.data = dt(tool_glob.BaliseA, tool_glob.BaliseC)
-#     data_to_send.distance_BC.data = dt(tool_glob.BaliseB, tool_glob.BaliseC)
-#     data_to_send.distance_AD.data = dt(tool_glob.BaliseA, tool_glob.BaliseD)
-#     data_to_send.distance_BD.data = dt(tool_glob.BaliseB, tool_glob.BaliseD)
-#     data_to_send.distance_CD.data = dt(tool_glob.BaliseC, tool_glob.BaliseD)
-#     if lidar_t is not None:
-#         data_to_send.distance_AB_test.data = dt(lidar_t.balises[0], lidar_t.balises[1])
-#         data_to_send.distance_AC_test.data = dt(lidar_t.balises[0], lidar_t.balises[2])
-#         data_to_send.distance_BC_test.data = dt(lidar_t.balises[1], lidar_t.balises[2])
-#         data_to_send.distance_AD_test.data = dt(lidar_t.balises[0], lidar_t.balises[3])
-#         data_to_send.distance_BD_test.data = dt(lidar_t.balises[1], lidar_t.balises[3])
-#         data_to_send.distance_CD_test.data = dt(lidar_t.balises[2], lidar_t.balises[3])
-#     if rangement is not None:
-#         data_to_send.pot_BA = rangement.liste_balise_A
-#         data_to_send.pot_BB = rangement.liste_balise_B
-#         data_to_send.pot_BC = rangement.liste_balise_C
-#         data_to_send.pot_BD = rangement.liste_balise_D
-#         data_to_send.nb_balises.data = debug_nb_bal
-#         data_to_send.nb_liste_balises.data = debug_nb_liste_bal
-#         data_to_send.positions_pot = debug_positions_pot
-#     pub.publish(data_to_send)
 
 
 def get_quaternion_from_euler(roll, pitch, yaw):

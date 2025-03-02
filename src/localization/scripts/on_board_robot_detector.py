@@ -23,7 +23,6 @@ from localization.publisher import (
     diplay_beacons_positions_found,
     display_other_robots_positions,
 )
-from localization.objet import RobotDatas
 
 
 """ 
@@ -92,18 +91,18 @@ class OnboardRobotDetectorNode(Node):
         self._init_subscribers()
 
     def object_callback(self, msg: Obstacles) -> None:
-        obstacles = [
-            circle.center
+        new_objects = [
+            np.array([circle.center.x, circle.center.y])
             for circle in msg.circles
             if (circle.center.x**2 + circle.center.y**2) < 12.5
         ]
-        robots = self.onboard_robot_finder.get_onboard_robot(obstacles)
-        msg = publicate_donnees_zc(robots)
+        objects = self.onboard_robot_finder.get_onboard_robot(new_objects)
+        msg = publicate_donnees_zc(objects)
         self.pub_lidar_loc.publish(msg)
         if self.test:
             self.pub_debug.publish(String(data="Position trouvée"))
             self.pub_display.publish(display_playground(self.boundaries))
-            self.pub_display.publish(display_other_robots_positions(robots))
+            self.pub_display.publish(display_other_robots_positions(objects))
             self.pub_display.publish(diplay_fixed_beacons_positions(self.fixed_beacons))
 
     def _init_parameters(self) -> None:
@@ -123,7 +122,7 @@ class OnboardRobotDetectorNode(Node):
                 beacons[i] = self.boundaries[3] - beacons[i]
             self.init_position[1] = 3 - self.init_position[1]
         self.fixed_beacons = [
-            make_point([beacons[i], beacons[i + 1]]) for i in range(0, len(beacons), 2)
+            np.array([beacons[i], beacons[i + 1]]) for i in range(0, len(beacons), 2)
         ]
         self.onboard_robot_finder = OnboardRobotFinder(
             self.boundaries,

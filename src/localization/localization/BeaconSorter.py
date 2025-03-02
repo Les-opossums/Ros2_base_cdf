@@ -1,485 +1,252 @@
-from .objet import RobotDatas
 from .math_lidar import *
 
+class BeaconSorter():
 
-class BeaconSorter:
+    def __init__(
+        self,
+        dst_beacons: dict[str, float],
+        sign_vect_product: list[float],
+        ang_tol: float,
+        dst_tol: float,
+    ) -> None:
+        """
+        This class is used to sort the detected objects and
+        find the possible beacons
 
-    def __init__(self, dst_beacons, sign_vect_product, ang_tol, dst_tol) -> None:
+        :param dst_beacons: The distances between the beacons
+        :type dst_beacons: dict
+        :param sign_vect_product: The sign of the vectorial product
+        between the beacons
+        :type sign_vect_product: list
+        :param ang_tol: The tolerance on the angle
+        :type ang_tol: float
+        :param dst_tol: The tolerance on the distance
+        :type dst_tol: float
+        """
         self._dst_beacons = dst_beacons
         self._sign_vect_product = sign_vect_product
         self._ang_tol = ang_tol
         self._dst_tol = dst_tol
 
-    def _sort_comparison(self, beacons, new_objects_detected) -> bool:
+    def _sort_comparison(
+        self, beacons: list[np.array], new_objects_detected: list[np.array]
+    ) -> dict[str, list[np.array]]:
+        """
+        This function is used to associate the detected objects
+        with the beacons known from past detections
+
+        :param beacons: The beacons
+        :type beacons: list
+        :param new_objects_detected: The detected objects
+        :type new_objects_detected: list
+
+        :return: The sorted objects
+        :rtype: dict
+        """
         beacons_ang = []
         beacons_dst = []
         for i in range(4):
-            a, d = cartesian_to_polar(beacons[i].x, beacons[i].y)
+            a, d = cartesian_to_polar(beacons[i][0], beacons[i][1])
             beacons_ang.append((a - self._ang_tol, a + self._ang_tol))
             beacons_dst.append(d)
         sorting_list = {"A": [], "B": [], "C": [], "D": []}
         for obstacle in new_objects_detected:
-            for i, key in enumerate(sorting_list.keys()):
-                angle, distance = cartesian_to_polar(obstacle.x, obstacle.y)
-                if abs(distance - beacons_dst[i]) < self._dst_tol and angle_in_range(
-                    angle, beacons_ang[i][0], beacons_ang[i][1]
+            for val, bang, bdst in zip(sorting_list.values(), beacons_ang, beacons_dst):
+                angle, distance = cartesian_to_polar(obstacle[0], obstacle[1])
+                if abs(distance - bdst) < self._dst_tol and angle_in_range(
+                    angle, bang[0], bang[1]
                 ):
-                    sorting_list[key].append(obstacle)
-        return sorting_list
+                    val.append(obstacle)
+        return {
+            key: [np.array([-100, -100])] if not val else val
+            for key, val in sorting_list.items()
+        }
 
-    def _find_beacons_prev(self, beacons, new_objects_detected) -> list[RobotDatas]:
+    def _find_beacons_prev(
+        self, beacons: list[np.array], new_objects_detected: list[np.array]
+    ) -> tuple[int, list[list[np.array]]]:
+        """
+        This function is used to find the possible beacons
+        using the previous detected beacons
+
+        :param beacons: The previous detected beacons
+        :type beacons: list
+        :param new_objects_detected: The detected objects
+        :type new_objects_detected: list
+
+        :return: The number of beacons found and the list of the possible beacons
+        :rtype: tuple
+        """
         sorting_list = self._sort_comparison(beacons, new_objects_detected)
-        pot_balise_2, pot_balise_3, pot_balise_4 = [], [], []
-        for i, baliseA in enumerate(sorting_list["A"]):
-            for j, baliseB in enumerate(sorting_list["B"]):
-                for baliseC in sorting_list["C"]:
-                    for baliseD in sorting_list["D"]:
-                        (
-                            value_AB,
-                            value_AC,
-                            value_AD,
-                            value_BC,
-                            value_BD,
-                            value_CD,
-                        ) = (False, False, False, False, False, False)
-                        if approx(
-                            dt(baliseA, baliseB),
-                            self._dst_beacons["AB"],
-                            self._dst_tol,
-                        ):
-                            value_AB = True
-                            pot_balise_2.append(
-                                RobotDatas(baliseA, baliseB, None, None)
-                            )
-                        if approx(
-                            dt(baliseA, baliseC),
-                            self._dst_beacons["AC"],
-                            self._dst_tol,
-                        ):
-                            value_AC = True
-                            pot_balise_2.append(
-                                RobotDatas(baliseA, None, baliseC, None)
-                            )
-                        if approx(
-                            dt(baliseA, baliseD),
-                            self._dst_beacons["AD"],
-                            self._dst_tol,
-                        ):
-                            value_AD = True
-                            pot_balise_2.append(
-                                RobotDatas(baliseA, None, None, baliseD)
-                            )
-                        if approx(
-                            dt(baliseB, baliseC),
-                            self._dst_beacons["BC"],
-                            self._dst_tol,
-                        ):
-                            value_BC = True
-                            if i == 0:
-                                pot_balise_2.append(
-                                    RobotDatas(None, baliseB, baliseC, None)
-                                )
-                        if approx(
-                            dt(baliseB, baliseD),
-                            self._dst_beacons["BD"],
-                            self._dst_tol,
-                        ):
-                            value_BD = True
-                            if i == 0:
-                                pot_balise_2.append(
-                                    RobotDatas(None, baliseB, None, baliseD)
-                                )
-                        if approx(
-                            dt(baliseC, baliseD),
-                            self._dst_beacons["CD"],
-                            self._dst_tol,
-                        ):
-                            value_CD = True
-                            if i == 0 and j==0:
-                                pot_balise_2.append(
-                                    RobotDatas(None, None, baliseC, baliseD)
-                                )
-                        if value_AB and value_AC and value_BC:
-                            pot_balise_3.append(
-                                RobotDatas(baliseA, baliseB, baliseC, None)
-                            )
-                        if value_AB and value_AD and value_BD:
-                            pot_balise_3.append(
-                                RobotDatas(baliseA, baliseB, None, baliseD)
-                            )
-                        if value_AC and value_AD and value_CD:
-                            pot_balise_3.append(
-                                RobotDatas(baliseA, None, baliseC, baliseD)
-                            )
-                        if value_BC and value_BD and value_CD and i==0:
-                            pot_balise_3.append(
-                                RobotDatas(None, baliseB, baliseC, baliseD)
-                            )
-                        if value_AB and value_AC and value_AD and value_BC:
-                            pot_balise_4.append(
-                                RobotDatas(baliseA, baliseB, baliseC, baliseD)
-                            )
-        if pot_balise_4 != []:
-            pot_bal_copy = pot_balise_4.copy()
-            for pot in pot_bal_copy:
-                pot_sign_vect_product = []
-                pot_sign_vect_product = [
-                    get_sign_vect_product(pot.balise_A, pot.balise_B, pot.balise_C), 
-                    get_sign_vect_product(pot.balise_A, pot.balise_B, pot.balise_D),
-                    get_sign_vect_product(pot.balise_A, pot.balise_C, pot.balise_D),
-                    get_sign_vect_product(pot.balise_B, pot.balise_C, pot.balise_D),
-                ]
-                if pot_sign_vect_product != self._sign_vect_product:
-                    pot_balise_4.remove(pot)
-            if pot_balise_4 != []:
-                return 4, pot_balise_4
+        beacon_list2, beacon_list3, beacon_list4 = [], [], []
+        beacons = {}
+        flags = {
+            ("A", "B"): False,
+            ("A", "C"): False, 
+            ("B", "C"): False, 
+            ("A", "D"): False, 
+            ("B", "D"): False, 
+            ("C", "D"): False, 
+        }
+        for beacons["A"] in sorting_list["A"]:
+            for beacons["B"] in sorting_list["B"]:
+                flags[("A", "B")] = False
+                if approx(dt(beacons["A"], beacons["B"]), self._dst_beacons[("A", "B")], self._dst_tol):
+                    flags[("A", "B")] = True
+                    beacon_list2.append([beacons["A"], beacons["B"], None, None])
+                for beacons["C"] in sorting_list["C"]:
+                    for key in list(flags.keys())[1:3]:
+                        flags[key] = False
+                        if approx(dt(beacons[key[0]], beacons[key[1]]), self._dst_beacons[key], self._dst_tol):
+                            flags[key] = True
+                            tlist = [None] * 4
+                            tlist[toint(key[0])] = beacons[key[0]]
+                            tlist[toint(key[1])] = beacons[key[1]]
+                            beacon_list2.append(tlist)
+                    if flags[("A", "B")] and flags[("A", "C")] and flags[("B", "C")]:
+                        beacon_list3.append([beacons["A"], beacons["B"], beacons["C"], None])
+                    for beacons["D"] in sorting_list["D"]:
+                        for key in list(flags.keys())[3:]:
+                            flags[key] = False
+                            if approx(dt(beacons[key[0]], beacons[key[1]]), self._dst_beacons[key], self._dst_tol):
+                                flags[key] = True
+                                tlist = [None] * 4
+                                tlist[toint(key[0])] = beacons[key[0]]
+                                tlist[toint(key[1])] = beacons[key[1]]
+                                beacon_list2.append(tlist)
+                        if flags[("A", "B")] and flags[("A", "D")] and flags[("B", "D")]:
+                            beacon_list3.append([beacons["A"], beacons["B"], None, beacons["D"]])
+                        if flags[("A", "C")] and flags[("A", "D")] and flags[("C", "D")]:
+                            beacon_list3.append([beacons["A"], None, beacons["C"], beacons["D"]])
+                        if flags[("B", "C")] and flags[("B", "D")] and flags[("C", "D")]:
+                            beacon_list3.append([None, beacons["B"], beacons["C"], beacons["D"]])
+                        if flags[("A", "B")] and flags[("A", "C")] and flags[("B", "C")] and flags[("A", "D")] and flags[("B", "D")] and flags[("C", "D")]:
+                            beacon_list4.append([beacons["A"], beacons["B"], beacons["C"], beacons["D"]])
+        if beacon_list4 != []:
+            beacons_list = beacon_list4.copy()
+            for beacons in beacons_list:
+                sign_res = [get_vp_sign([beacons[i] for i in range(4) if i != 3 - j]) for j in range(4)]
+                if sign_res != self._sign_vect_product:
+                    removearray(beacon_list4, beacons)
 
-        if pot_balise_3 != []:
-            pot_bal_copy = pot_balise_3.copy()
-            for pot in pot_bal_copy:
-                if pot.balise_D is None:
-                    pot_sign_vect_product = get_sign_vect_product(pot.balise_A, pot.balise_B, pot.balise_C)
-                    if pot_sign_vect_product != self._sign_vect_product[0]:
-                        pot_balise_3.remove(pot)
-                elif pot.balise_C is None:
-                    pot_sign_vect_product = get_sign_vect_product(pot.balise_A, pot.balise_B, pot.balise_D)
-                    if pot_sign_vect_product != self._sign_vect_product[1]:
-                        pot_balise_3.remove(pot)
-                elif pot.balise_B is None:
-                    pot_sign_vect_product = get_sign_vect_product(pot.balise_A, pot.balise_C, pot.balise_D)
-                    if pot_sign_vect_product != self._sign_vect_product[2]:
-                        pot_balise_3.remove(pot)
-                else:
-                    pot_sign_vect_product = get_sign_vect_product(pot.balise_B, pot.balise_C, pot.balise_D)
-                    if pot_sign_vect_product != self._sign_vect_product[3]:
-                        pot_balise_3.remove(pot)
-            if pot_balise_3 != []:
-                return 3, pot_balise_3
+            if beacon_list4 != []:
+                return 4, beacon_list4
 
-        if pot_balise_2 != []:
-            return 2, pot_balise_2
+        if beacon_list3 != []:
+            beacon_list3 = [
+                beacons for beacons in beacon_list3 if get_vp_sign([beacon for beacon in beacons if beacon is not None])
+                == self._sign_vect_product[[3 - i for i in range(len(beacons)) if beacons[i] is None][0]]
+            ]
+            if beacon_list3 != []:
+                return 3, beacon_list3
+
+        if beacon_list2 != []:
+            return 2, beacon_list2
 
         else:
             return 0, []
 
-    def _find_beacons_naive(self, new_objects_detected) -> list[RobotDatas]:
-        liste_obstacle = new_objects_detected.copy()
-        pot_balise_4, pot_balise_3, pot_balise_2 = [], [], []
-        while len(liste_obstacle) >= 2:
-            (
-                index_to_verif_AB,
-                index_to_verif_AC,
-                index_to_verif_AD,
-                index_to_verif_BC,
-                index_to_verif_BD,
-                index_to_verif_CD,
-            ) = ([], [], [], [], [], [])
-            balise1 = liste_obstacle.pop()
-            for index, cercle in enumerate(liste_obstacle):
-                distance = dt(balise1, cercle)
-                if approx(distance, self._dst_beacons["AB"], self._dst_tol):
-                    index_to_verif_AB.append(index)
-                    pot_balise_2.append(RobotDatas(balise1, cercle, None, None))
-                    pot_balise_2.append(RobotDatas(cercle, balise1, None, None))
-                if approx(distance, self._dst_beacons["AC"], self._dst_tol):
-                    index_to_verif_AC.append(index)
-                    pot_balise_2.append(RobotDatas(balise1, None, cercle, None))
-                    pot_balise_2.append(RobotDatas(cercle, None, balise1, None))
-                if approx(distance, self._dst_beacons["AD"], self._dst_tol):
-                    index_to_verif_AD.append(index)
-                    pot_balise_2.append(RobotDatas(balise1, None, None, cercle))
-                    pot_balise_2.append(RobotDatas(cercle, None, None, balise1))
-                if approx(distance, self._dst_beacons["BC"], self._dst_tol):
-                    index_to_verif_BC.append(index)
-                    pot_balise_2.append(RobotDatas(None, balise1, cercle, None))
-                    pot_balise_2.append(RobotDatas(None, cercle, balise1, None))
-                if approx(distance, self._dst_beacons["BD"], self._dst_tol):
-                    index_to_verif_BD.append(index)
-                    pot_balise_2.append(RobotDatas(balise1, None, None, cercle))
-                    pot_balise_2.append(RobotDatas(cercle, None, None, balise1))
-                if approx(distance, self._dst_beacons["CD"], self._dst_tol):
-                    index_to_verif_CD.append(index)
-                    pot_balise_2.append(RobotDatas(None, None, cercle, balise1))
-                    pot_balise_2.append(RobotDatas(None, None, balise1, cercle))
-            for i in index_to_verif_AB:
-                for j in index_to_verif_AC:
-                    value_BC = False
-                    if approx(
-                        dt(new_objects_detected[i], new_objects_detected[j]),
-                        self._dst_beacons["BC"],
-                        self._dst_tol,
-                    ):
-                        value_BC = True
-                        pot_balise_3.append(
-                            RobotDatas(
-                                balise1,
-                                new_objects_detected[i],
-                                new_objects_detected[j],
-                                None,
-                            )
-                        )
-                    for k in index_to_verif_AD:
-                        value_BD = False
-                        value_CD = False
-                        if approx(
-                            dt(new_objects_detected[i], new_objects_detected[k]),
-                            self._dst_beacons["BD"],
-                            self._dst_tol,
-                        ):
-                            value_BD = True
-                            pot_balise_3.append(
-                                RobotDatas(
-                                    balise1,
-                                    new_objects_detected[i],
-                                    None,
-                                    new_objects_detected[k],
-                                )
-                            )
-                        if approx(
-                            dt(new_objects_detected[j], new_objects_detected[k]),
-                            self._dst_beacons["CD"],
-                            self._dst_tol,
-                        ):
-                            value_CD = True
-                            pot_balise_3.append(
-                                RobotDatas(
-                                    balise1,
-                                    None,
-                                    new_objects_detected[j],
-                                    new_objects_detected[k],
-                                )
-                            )
-                        if value_BC and value_BD and value_CD:
-                            pot_balise_4.append(
-                                RobotDatas(
-                                    balise1,
-                                    new_objects_detected[i],
-                                    new_objects_detected[j],
-                                    new_objects_detected[k],
-                                )
-                            )
+    def _find_beacons_naive(
+        self, new_objects_detected: list[np.array]
+    ) -> tuple[int, list[list[np.array]]]:
+        """
+        This function is used to find the possible beacons using a
+        naive approach when no past detection is available
 
-                for j in index_to_verif_BC:
-                    value_AC = False
-                    if approx(
-                        dt(new_objects_detected[i], new_objects_detected[j]),
-                        self._dst_beacons["AC"],
-                        self._dst_tol,
-                    ):
-                        value_AC = True
-                        pot_balise_3.append(
-                            RobotDatas(
-                                new_objects_detected[i],
-                                balise1,
-                                new_objects_detected[j],
-                                None,
-                            )
-                        )
-                    for k in index_to_verif_BD:
-                        value_AD = False
-                        value_CD = False
-                        if approx(
-                            dt(new_objects_detected[i], new_objects_detected[k]),
-                            self._dst_beacons["AD"],
-                            self._dst_tol,
-                        ):
-                            value_AD = True
-                            pot_balise_3.append(
-                                RobotDatas(
-                                    new_objects_detected[i],
-                                    balise1,
-                                    None,
-                                    new_objects_detected[k],
-                                )
-                            )
-                        if approx(
-                            dt(new_objects_detected[j], new_objects_detected[k]),
-                            self._dst_beacons["CD"],
-                            self._dst_tol,
-                        ):
-                            value_CD = True
-                            pot_balise_3.append(
-                                RobotDatas(
-                                    None,
-                                    balise1,
-                                    new_objects_detected[j],
-                                    new_objects_detected[k],
-                                )
-                            )
-                        if value_AC and value_AD and value_CD:
-                            pot_balise_4.append(
-                                RobotDatas(
-                                    new_objects_detected[i],
-                                    balise1,
-                                    new_objects_detected[j],
-                                    new_objects_detected[k],
-                                )
-                            )
+        :param new_objects_detected: The detected objects
+        :type new_objects_detected: list
 
-            for i in index_to_verif_CD:
-                for j in index_to_verif_AC:
-                    value_DA = False
-                    if approx(
-                        dt(new_objects_detected[i], new_objects_detected[j]),
-                        self._dst_beacons["AD"],
-                        self._dst_tol,
-                    ):
-                        value_DA = True
-                        pot_balise_3.append(
-                            RobotDatas(
-                                new_objects_detected[j],
-                                None,
-                                balise1,
-                                new_objects_detected[i],
-                            )
-                        )
-                    for k in index_to_verif_BC:
-                        value_DB = False
-                        value_AB = False
-                        if approx(
-                            dt(new_objects_detected[i], new_objects_detected[k]),
-                            self._dst_beacons["BD"],
-                            self._dst_tol,
-                        ):
-                            value_DB = True
-                            pot_balise_3.append(
-                                RobotDatas(
-                                    None,
-                                    new_objects_detected[k],
-                                    balise1,
-                                    new_objects_detected[i],
-                                )
-                            )
-                        if approx(
-                            dt(new_objects_detected[j], new_objects_detected[k]),
-                            self._dst_beacons["AB"],
-                            self._dst_tol,
-                        ):
-                            value_AB = True
-                            pot_balise_3.append(
-                                RobotDatas(
-                                    new_objects_detected[j],
-                                    new_objects_detected[k],
-                                    balise1,
-                                    None,
-                                )
-                            )
-                        if value_DA and value_DB and value_AB:
-                            pot_balise_4.append(
-                                RobotDatas(
-                                    new_objects_detected[j],
-                                    new_objects_detected[k],
-                                    balise1,
-                                    new_objects_detected[i],
-                                )
-                            )
+        :return: The number of beacons found and the list of the possible beacons
+        :rtype: tuple"""
 
-                for j in index_to_verif_AD:
-                    value_CA = False
-                    if approx(
-                        dt(new_objects_detected[i], new_objects_detected[j]),
-                        self._dst_beacons["AC"],
-                        self._dst_tol,
-                    ):
-                        value_CA = True
-                        pot_balise_3.append(
-                            RobotDatas(
-                                new_objects_detected[j],
-                                None,
-                                new_objects_detected[i],
-                                balise1,
-                            )
-                        )
-                    for k in index_to_verif_BD:
-                        value_CB = False
-                        value_AB = False
-                        if approx(
-                            dt(new_objects_detected[i], new_objects_detected[k]),
-                            self._dst_beacons["BC"],
-                            self._dst_tol,
-                        ):
-                            value_CB = True
-                            pot_balise_3.append(
-                                RobotDatas(
-                                    None,
-                                    new_objects_detected[k],
-                                    new_objects_detected[i],
-                                    balise1,
-                                )
-                            )
-                        if approx(
-                            dt(new_objects_detected[j], new_objects_detected[k]),
-                            self._dst_beacons["AB"],
-                            self._dst_tol,
-                        ):
-                            value_AB = True
-                            pot_balise_3.append(
-                                RobotDatas(
-                                    new_objects_detected[j],
-                                    new_objects_detected[k],
-                                    None,
-                                    balise1,
-                                )
-                            )
-                        if value_CA and value_CB and value_AB:
-                            pot_balise_4.append(
-                                RobotDatas(
-                                    new_objects_detected[j],
-                                    new_objects_detected[k],
-                                    new_objects_detected[i],
-                                    balise1,
-                                )
-                            )
-        if pot_balise_4 != []:
-            pot_bal_copy = pot_balise_4.copy()
-            for pot in pot_bal_copy:
-                pot_sign_vect_product = []
-                pot_sign_vect_product = [
-                    get_sign_vect_product(pot.balise_A, pot.balise_B, pot.balise_C), 
-                    get_sign_vect_product(pot.balise_A, pot.balise_B, pot.balise_D),
-                    get_sign_vect_product(pot.balise_A, pot.balise_C, pot.balise_D),
-                    get_sign_vect_product(pot.balise_B, pot.balise_C, pot.balise_D),
-                ]
-                if pot_sign_vect_product != self._sign_vect_product:
-                    pot_balise_4.remove(pot)
-            if pot_balise_4 != []:
-                return 4, pot_balise_4
+        olist = new_objects_detected.copy()
+        beacon_list4, beacon_list3, beacon_list2 = [], [], []
+        letters = ['A', 'B', 'C', 'D']
+        # While all the ocjects detected by the lidar have not been analysed, we loop
+        while len(olist) >= 2:
+            # Creation of dictionnary to keep the link between the current object and all the others
+            beacon1 = olist.pop()
+            dict_indexes = {
+                (letters[i], letters[j]): []
+                for i in range(4)
+                for j in range(i + 1, 4)
+            }
+            # We compare it to the other ojects and look at the distance between the two 
+            # and if corresponding to distance between 2 beacons
+            for index, cercle in enumerate(olist):
+                distance = dt(beacon1, cercle)
+                for key in dict_indexes.keys():
+                    if approx(distance, self._dst_beacons[key], self._dst_tol):
+                        dict_indexes[key].append(index)
+                        duo_beacons = [None] * 4
+                        duo_beacons[toint(key[0])] = beacon1
+                        duo_beacons[toint(key[1])] = cercle
+                        beacon_list2.append(duo_beacons.copy())
+                        duo_beacons[toint(key[1])] = beacon1
+                        duo_beacons[toint(key[0])] = cercle
+                        beacon_list2.append(duo_beacons.copy())
+            # We now will study our current object as each of the beacon.
+            for clet in letters:
+                # Here are the other obejct we will consider as other beacons and study their distances
+                olet = [j for j in letters if j != clet]
+                for i in range(3):
+                    for ind1 in dict_indexes[sorttuple(clet, olet[i])]:
+                        for ind2 in dict_indexes[sorttuple(clet, olet[(i + 1) % 3])]:
+                            # Loop now to see if 3 points can correspond to beacons. For example before we considered the object with others
+                            # Lets suppose the current object is considered beacon A, Maybe it had links with another as B, and another as D. 
+                            # We now compute the distance between the "considered B beacon" and "D" one. If the "BD distance" is right and the orientation of the angle is right, 
+                            # we save the 3 beacons as possible beacons. 
+                            if approx(dt(olist[ind1], olist[ind2]), self._dst_beacons[sorttuple(olet[i], olet[(i + 1) % 3])], self._dst_tol):
+                                temp_list = [None] * 4
+                                temp_list[toint(clet)] = beacon1
+                                temp_list[toint(olet[i])] = olist[ind1]
+                                temp_list[toint(olet[(i + 1) % 3])] = olist[
+                                    ind2
+                                ]
+                                none_index = next((i for i, x in enumerate(temp_list) if x is None), None)
+                                if get_vp_sign([b for b in temp_list if b is not None]) == self._sign_vect_product[3 - none_index]:
+                                    beacon_list3.append(temp_list.copy())
+                                if i == 0:
+                                    # Here, we chack if 4 objects can represent the 4 beacons. That is the reason why we only iterate for the first A beacon. 
+                                    # Because lets suppose we have 4 objects, we would have 3 times the same 4-beacon combination so we do it only for the first one. 
+                                    for ind3 in dict_indexes[sorttuple(clet, olet[(i + 2) % 3])]:
+                                        if approx(dt(olist[ind1], olist[ind3]), self._dst_beacons[sorttuple(olet[i], olet[(i + 2) % 3])], self._dst_tol) \
+                                            and approx(dt(olist[ind2], olist[ind3]), self._dst_beacons[sorttuple(olet[(i + 1) % 3], olet[(i + 2) % 3])], self._dst_tol):
+                                            temp_list[toint(olet[(i + 2) % 3])] = olist[ind3]
+                                            sign_res = [get_vp_sign([temp_list[p] for p in range(4) if p != 3 - m]) for m in range(4)]
+                                            if sign_res == self._sign_vect_product:
+                                                beacon_list4.append(temp_list.copy())
+        if beacon_list4 != []:
+            return 4, beacon_list4
 
-        if pot_balise_3 != []:
-            pot_bal_copy = pot_balise_3.copy()
-            for pot in pot_bal_copy:
-                if pot.balise_D is None:
-                    pot_sign_vect_product = get_sign_vect_product(pot.balise_A, pot.balise_B, pot.balise_C)
-                    if pot_sign_vect_product != self._sign_vect_product[0]:
-                        pot_balise_3.remove(pot)
-                elif pot.balise_C is None:
-                    pot_sign_vect_product = get_sign_vect_product(pot.balise_A, pot.balise_B, pot.balise_D)
-                    if pot_sign_vect_product != self._sign_vect_product[1]:
-                        pot_balise_3.remove(pot)
-                elif pot.balise_B is None:
-                    pot_sign_vect_product = get_sign_vect_product(pot.balise_A, pot.balise_C, pot.balise_D)
-                    if pot_sign_vect_product != self._sign_vect_product[2]:
-                        pot_balise_3.remove(pot)
-                else:
-                    pot_sign_vect_product = get_sign_vect_product(pot.balise_B, pot.balise_C, pot.balise_D)
-                    if pot_sign_vect_product != self._sign_vect_product[3]:
-                        pot_balise_3.remove(pot)
-            if pot_balise_3 != []:
-                return 3, pot_balise_3
+        elif beacon_list3 != []:
+            return 3, beacon_list3
 
-        if pot_balise_2 != []:
-            return 2, pot_balise_2
+        elif beacon_list2 != []:
+            return 2, beacon_list2
+
         else:
             return 0, []
 
-    def _find_possible_beacons(self, previous_beacons, new_objects_detected) -> None:
+    def _find_possible_beacons(
+        self, previous_beacons: list[np.array], new_objects_detected: list[np.array]
+    ) -> tuple[int, list[list[np.array]]]:
+        """
+        This function is used to find the possible beacons
+
+        :param previous_beacons: The previous detected beacons
+        :type previous_beacons: list
+        :param new_objects_detected: The detected objects
+        :type new_objects_detected: list
+
+        :return: The number of beacons found and the list of the possible beacons
+        :rtype: tuple
+        """
         if previous_beacons is not None:
-            nb, beacons = self._find_beacons_prev(
+            beacons_data = self._find_beacons_prev(
                 previous_beacons, new_objects_detected
             )
-            if nb == 0:
-                nb, beacons = self._find_beacons_naive(new_objects_detected)
-            return nb, beacons
-        else:
-            nb, beacons = self._find_beacons_naive(new_objects_detected)
-            return nb, beacons
+            if beacons_data[0] > 1:
+                return beacons_data
+        beacons_data = self._find_beacons_naive(new_objects_detected)
+        return beacons_data

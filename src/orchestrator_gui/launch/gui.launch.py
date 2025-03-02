@@ -17,15 +17,15 @@ def generate_launch_description():
         "gui_config.yaml",
     )
 
-    node_gui = Node(
+    node_orchestrator_gui = Node(
         package="orchestrator_gui",
         namespace=namespace,
-        executable="test_dev.py",
+        executable="orchestrator_gui_node.py",
         name="dev_gui_node",
         parameters=[config],
     )
 
-    ld.add_action(node_gui)
+    ld.add_action(node_orchestrator_gui)
 
     print(LaunchIntrospector().format_launch_description(ld))
     return ld
