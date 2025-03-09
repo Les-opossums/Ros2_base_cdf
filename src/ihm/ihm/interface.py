@@ -338,7 +338,6 @@ class GUI:
 
     def update_score(self, score):
         assert self.initialized
-        self.get_logger().info(f"Score: {score}")
         #self.score_app.zero_label.config(text=str(score))
 
     def update_au(self, au):
