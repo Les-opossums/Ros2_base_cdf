@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 from itertools import count, cycle
 from ament_index_python.packages import get_package_share_directory
+from rclpy.logging import get_logger
+
 
 class ColorChoiceApp():
     def __init__(self):
@@ -233,6 +235,7 @@ class ScoreApp:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Score")
+        self.score = 0
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         if (screen_width==480 and screen_height==800):
@@ -244,6 +247,7 @@ class ScoreApp:
 
         # Création de la frame
         self.create_frame()
+        self.update_score()
         # Lancer la boucle principale
         self.root.mainloop()
 
@@ -251,9 +255,12 @@ class ScoreApp:
         frame = tk.Frame(self.root, bg="lightgray", relief="solid", bd=2)
         frame.pack(expand=True, fill="both", padx=20, pady=20)
 
+        self.display_score = tk.StringVar()
+        self.display_score.set("0")
+
         self.zero_label = tk.Label(
             frame,
-            text="0",
+            textvariable=self.display_score,
             font=("Arial", 120, "bold"),
             bg="lightgray",
             fg="black"
@@ -272,6 +279,17 @@ class ScoreApp:
         else:
             pass
 
+    def update_score(self):
+        """Met à jour le score toutes les 500ms"""
+        self.score += 1  # Incrémentation du score (remplace par ta logique)
+        logger = get_logger("opossum_ihm")
+        logger.info(f"Score: {self.score}")
+        self.display_score.set(str(self.score))  # Mise à jour du texte
+        self.zero_label.update_idletasks()
+
+        # Planifier la prochaine mise à jour dans 500ms
+        self.root.after(50, self.update_score)
+        
 class ImageLabel(tk.Label):
     """
     A Label that displays images, and plays them if they are gifs
