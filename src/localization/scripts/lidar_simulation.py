@@ -73,6 +73,7 @@ class LidarSimulation(Node):
             self.get_parameter("object_topic").get_parameter_value().string_value
         )
         self.pub_object = self.create_publisher(Obstacles, self.object_topic, 10)
+
     def _init_subscribers(self) -> None:
         self.real_position_topic = (
             self.get_parameter("real_position_topic").get_parameter_value().string_value
@@ -94,6 +95,7 @@ class LidarSimulation(Node):
         self.new_beacons = [
             np.linalg.inv(self.OtoR) @ beacon for beacon in self.fixed_beacons
         ]
+
         # self.new_ennemis = np.linalg.inv(self.OtoR) @ self.random_ennemi
 
     def _publish_objects(self, msg) -> None:

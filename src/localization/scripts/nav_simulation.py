@@ -125,7 +125,6 @@ class NavSimulation(Node):
         with self._goal_lock:
             # This server only allows one goal at a time
             if self._goal_handle is not None and self._goal_handle.is_active:
-                self.get_logger().info('Aborting previous goal')
                 # Abort the existing goal
                 self._goal_handle.abort()
             self._goal_handle = goal_handle
@@ -138,7 +137,6 @@ class NavSimulation(Node):
             if self._current_goal is not None:
                 # Put incoming goal in the queue
                 self._goal_queue.append(goal_handle)
-                self.get_logger().info('Goal put in the queue')
             else:
                 # Start goal execution right away
                 self._current_goal = goal_handle
@@ -146,12 +144,10 @@ class NavSimulation(Node):
     
     def goal_callback(self, goal_request):
         """Accept or reject a client request to begin an action."""
-        self.get_logger().info('Received goal request')
         return GoalResponse.ACCEPT
     
     def cancel_callback(self, goal_handle):
         """Accept or reject a client request to cancel an action."""
-        self.get_logger().info('Received cancel request')
         return CancelResponse.ACCEPT
     
     def destroy(self):
@@ -161,8 +157,6 @@ class NavSimulation(Node):
     def execute_callback(self, goal_handle):
         try:
             self.real_time = time.time()
-            self.get_logger().info("Executing Goal... ")
-            self.get_logger().info(f"Goal: {goal_handle.request.goal}")
             self.preempt_request = False
             self.current_goal_handle = goal_handle
             reached_position = (self.position[0] == goal_handle.request.goal.x and
@@ -176,11 +170,9 @@ class NavSimulation(Node):
             while not reached_position:
                 if goal_handle.is_cancel_requested:
                     goal_handle.canceled()
-                    self.get_logger().info('Goal cancelled by user.')
                     return MoveTo.Result()
                 if not self.blocking:
                     if not goal_handle.is_active:
-                        self.get_logger().info('Goal aborted.')
                         return MoveTo.Result()
                 self._ordered_moves()
                 moveto_feedback.current_position.x = float(self.position[0])
@@ -192,11 +184,9 @@ class NavSimulation(Node):
                 # goal_handle.publish_feedback(moveto_feedback)
                 self.real_time = time.time()
                 time.sleep(self.compute_period)
-            self.get_logger().info("Done Goal... ")
             if not self.blocking:
                 with self._goal_lock:
                     if not goal_handle.is_active:
-                        self.get_logger().info('Goal aborted')
                         return MoveTo.Result()
                     goal_handle.succeed()
             else:
@@ -212,7 +202,6 @@ class NavSimulation(Node):
                     try:
                         # Start execution of the next goal in the queue.
                         self._current_goal = self._goal_queue.popleft()
-                        self.get_logger().info('Next goal pulled from the queue')
                         self._current_goal.execute()
                     except IndexError:
                         # No goal in the queue.

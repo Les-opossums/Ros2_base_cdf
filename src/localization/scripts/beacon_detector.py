@@ -188,7 +188,6 @@ class BeaconDetectorNode(Node):
             for i in range(len(self.fixed_beacons))
             for j in range(i + 1, len(self.fixed_beacons))
         }
-
         self.beacon_sorter = BeaconSorter(
             dst_beacons,
             self.sign_vect_product,
@@ -289,7 +288,7 @@ class BeaconDetectorNode(Node):
         )
         new_objects_detected = [
             np.array([c.center.x, c.center.y])
-            for c in msg.circles if c.center.x**2 + c.center.y**2 < 12.5
+            for c in msg.circles if c.center.x**2 + c.center.y**2 < 13.5
         ]
         nb_potential_beacons, potential_beacons = (
             self.beacon_sorter._find_possible_beacons(
@@ -297,7 +296,8 @@ class BeaconDetectorNode(Node):
                 new_objects_detected,
             )
         )
-        self.get_logger().info(f"Nb of beacons: {nb_potential_beacons}")
+        if nb_potential_beacons < 4:
+            self.get_logger().info(f"Nb of beacons: {nb_potential_beacons}")
         if nb_potential_beacons > 0:
             position_found = self.position_finder.search_pos(
                 nb_potential_beacons,
