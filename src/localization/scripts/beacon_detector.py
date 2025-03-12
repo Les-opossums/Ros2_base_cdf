@@ -98,9 +98,10 @@ class BeaconDetectorNode(Node):
         :param msg: The message containing the color of the team
         :type msg: String
         """
-        if msg.data.lower() not in self._available_colors:
+        color = msg.data.lower()
+        if color not in self._available_colors:
             raise ValueError("Invalid team color")
-        self.team_color = msg.data.lower()
+        self.team_color = color
         self._init_parameters()
         self._init_publishers()
         self._init_subscribers()
@@ -287,9 +288,8 @@ class BeaconDetectorNode(Node):
             else None
         )
         new_objects_detected = [
-            np.array([circle.center.x, circle.center.y])
-            for circle in msg.circles
-            if (circle.center.x**2 + circle.center.y**2) < 12.5
+            np.array([c.center.x, c.center.y])
+            for c in msg.circles if c.center.x**2 + c.center.y**2 < 12.5
         ]
         nb_potential_beacons, potential_beacons = (
             self.beacon_sorter._find_possible_beacons(
@@ -297,6 +297,7 @@ class BeaconDetectorNode(Node):
                 new_objects_detected,
             )
         )
+        self.get_logger().info(f"Nb of beacons: {nb_potential_beacons}")
         if nb_potential_beacons > 0:
             position_found = self.position_finder.search_pos(
                 nb_potential_beacons,
@@ -326,18 +327,21 @@ class BeaconDetectorNode(Node):
         :param msg: The message containing the position of the robot
         :type msg: MergedData
         """
-        if self.position_finder.previous_robot is None:
-            self.position_finder.previous_robot = {}
-        self.position_finder.previous_robot["position"] = np.array(
-            [msg.robots[0].x, msg.robots[0].y, msg.robots[0].z]
-        )
-        self.position_finder.previous_robot["beacons"] = [
-            chgt_base_plateau_to_robot(
-                fb, self.position_finder.previous_robot["position"]
-            )
-            for fb in self.fixed_beacons
-        ]
-
+        # if self.position_finder.previous_robot is None:
+        #     self.position_finder.previous_robot = {}
+        # self.position_finder.previous_robot["position"] = np.array(
+        #     [msg.robots[0].x, msg.robots[0].y, msg.robots[0].z]
+        # )
+        # self.position_finder.previous_robot["beacons"] = [
+        #     chgt_base_plateau_to_robot(
+        #         fb, self.position_finder.previous_robot["position"]
+        #     )
+        #     for fb in self.fixed_beacons
+        # ]
+        self.position_finder.previous_robot = {
+            "position": np.array([msg.robots[0].x, msg.robots[0].y, msg.robots[0].z]),
+            "beacons": [chgt_base_plateau_to_robot(fb, np.array([msg.robots[0].x, msg.robots[0].y, msg.robots[0].z])) for fb in self.fixed_beacons]
+        }
 
 # Main function, used as endpoint in the launch file
 def main(args=None):

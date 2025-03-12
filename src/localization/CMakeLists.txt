@@ -12,6 +12,9 @@ find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(cdf_msgs REQUIRED)
+find_package(vision_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 #include cpp include directory
 include_directories(include)
@@ -22,15 +25,38 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}/
 )
 
+add_library(math_lidar src/math_lidar.cpp)
+target_include_directories(math_lidar PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${EIGEN3_INCLUDE_DIRS}
+)
+
+add_library(publisher src/publisher.cpp)
+target_include_directories(publisher PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${EIGEN3_INCLUDE_DIRS}
+)
+ament_target_dependencies(publisher geometry_msgs rclcpp std_msgs cdf_msgs vision_msgs)
+
+add_library(BeaconSorter src/BeaconSorter.cpp)
+target_include_directories(BeaconSorter PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${EIGEN3_INCLUDE_DIRS}
+)
+ament_target_dependencies(BeaconSorter geometry_msgs rclcpp std_msgs cdf_msgs vision_msgs)
+
 #Create cpp executable
-add_executable(beacon_detector src/beacon_detector.cpp)
-ament_target_dependencies(beacon_detector rclcpp std_msgs)
+# add_executable(beacon_detector src/beacon_detector.cpp)
+# ament_target_dependencies(beacon_detector rclcpp std_msgs)
 
 
 
 # Install cpp executables
 install(TARGETS
-  beacon_detector
+  # beacon_detector
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -47,15 +73,32 @@ install(PROGRAMS
 )
 
 if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
+  # find_package(ament_lint_auto REQUIRED)
+  # set(ament_cmake_copyright_FOUND TRUE)
+  # set(ament_cmake_cpplint_FOUND TRUE)
+  # ament_lint_auto_find_test_dependencies()
+
+  # # Unit tests
+  # find_package(ament_cmake_gtest REQUIRED)
+  # ament_add_gtest(unit_vector test/unit_vector.cpp)
+  # # target_include_directories(${PROJECT_NAME} PUBLIC
+  # #   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  # #   $<INSTALL_INTERFACE:include>
+  # # )
+  
+  # if(TARGET unit_vector)
+  #   target_include_directories(unit_vector PUBLIC
+  #     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  #     $<BUILD_INTERFACE:${EIGEN3_INCLUDE_DIRS}>
+  #     $<INSTALL_INTERFACE:include>
+  #   )
+    
+  #   # If the test depends on other packages:
+  #   # ament_target_dependencies(unit_vector rclcpp std_msgs ...)
+  # endif()
+  # if(TARGET test_unit_vector AND TARGET math_lidar)
+  #   target_link_libraries(test_unit_vector PRIVATE math_lidar)
+  # endif()
 endif()
 
 ament_package()

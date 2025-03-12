@@ -78,8 +78,7 @@ class BeaconSorter():
         :rtype: tuple
         """
         sorting_list = self._sort_comparison(beacons, new_objects_detected)
-        beacon_list2, beacon_list3, beacon_list4 = [], [], []
-        beacons = {}
+        indexes2, indexes3, indexes4 = [], [], []
         flags = {
             ("A", "B"): False,
             ("A", "C"): False, 
@@ -88,60 +87,80 @@ class BeaconSorter():
             ("B", "D"): False, 
             ("C", "D"): False, 
         }
-        for beacons["A"] in sorting_list["A"]:
-            for beacons["B"] in sorting_list["B"]:
+        for i, bA in enumerate(sorting_list["A"]):
+            for j, bB in enumerate(sorting_list["B"]):
                 flags[("A", "B")] = False
-                if approx(dt(beacons["A"], beacons["B"]), self._dst_beacons[("A", "B")], self._dst_tol):
+                if approx(dt(bA, bB), self._dst_beacons[("A", "B")], self._dst_tol):
                     flags[("A", "B")] = True
-                    beacon_list2.append([beacons["A"], beacons["B"], None, None])
-                for beacons["C"] in sorting_list["C"]:
+                    indexes2.append([i, j, -1, -1])
+                for k, bC in enumerate(sorting_list["C"]):
                     for key in list(flags.keys())[1:3]:
                         flags[key] = False
-                        if approx(dt(beacons[key[0]], beacons[key[1]]), self._dst_beacons[key], self._dst_tol):
-                            flags[key] = True
-                            tlist = [None] * 4
-                            tlist[toint(key[0])] = beacons[key[0]]
-                            tlist[toint(key[1])] = beacons[key[1]]
-                            beacon_list2.append(tlist)
+                    if approx(dt(bA, bC), self._dst_beacons[("A", "C")], self._dst_tol):
+                        flags[("A", "C")] = True
+                        indexes2.append([i, -1, j, -1])
+                    if approx(dt(bB, bC), self._dst_beacons[("B", "C")], self._dst_tol):
+                        flags[("B", "C")] = True
+                        indexes2.append([-1, i, j, -1])
                     if flags[("A", "B")] and flags[("A", "C")] and flags[("B", "C")]:
-                        beacon_list3.append([beacons["A"], beacons["B"], beacons["C"], None])
-                    for beacons["D"] in sorting_list["D"]:
+                        indexes3.append([bA, bB, bC, -1])
+                    for l, bD in enumerate(sorting_list["D"]):
                         for key in list(flags.keys())[3:]:
                             flags[key] = False
-                            if approx(dt(beacons[key[0]], beacons[key[1]]), self._dst_beacons[key], self._dst_tol):
-                                flags[key] = True
-                                tlist = [None] * 4
-                                tlist[toint(key[0])] = beacons[key[0]]
-                                tlist[toint(key[1])] = beacons[key[1]]
-                                beacon_list2.append(tlist)
+                        if approx(dt(bA, bD), self._dst_beacons[("A", "D")], self._dst_tol):
+                            flags[("A", "D")] = True
+                            indexes2.append([i, -1, -1, l])
+                        if approx(dt(bB, bD), self._dst_beacons[("B", "D")], self._dst_tol):
+                            flags[("B", "D")] = True
+                            indexes2.append([-1, j, -1, l])
+                        if approx(dt(bC, bD), self._dst_beacons[("C", "D")], self._dst_tol):
+                            flags[("C", "D")] = True
+                            indexes2.append([-1, -1, k, l])
                         if flags[("A", "B")] and flags[("A", "D")] and flags[("B", "D")]:
-                            beacon_list3.append([beacons["A"], beacons["B"], None, beacons["D"]])
+                            indexes3.append([i, j, -1, l])
                         if flags[("A", "C")] and flags[("A", "D")] and flags[("C", "D")]:
-                            beacon_list3.append([beacons["A"], None, beacons["C"], beacons["D"]])
+                            indexes3.append([i, -1, k, l])
                         if flags[("B", "C")] and flags[("B", "D")] and flags[("C", "D")]:
-                            beacon_list3.append([None, beacons["B"], beacons["C"], beacons["D"]])
+                            indexes3.append([None, j, k, l])
                         if flags[("A", "B")] and flags[("A", "C")] and flags[("B", "C")] and flags[("A", "D")] and flags[("B", "D")] and flags[("C", "D")]:
-                            beacon_list4.append([beacons["A"], beacons["B"], beacons["C"], beacons["D"]])
-        if beacon_list4 != []:
-            beacons_list = beacon_list4.copy()
+                            indexes4.append([i, j, k, l])
+        if indexes4 != []:
+            unique_indexes4 = np.unique(np.array(indexes4), axis=0)
+            indexes4 = unique_indexes4.tolist()
+            clean_beacons4 = []
+            for index in indexes4:
+                clean_beacons4.append([sorting_list[chr(i + 65)][index[i]] for i in range(4)])
+
+            beacons_list = clean_beacons4.copy()
             for beacons in beacons_list:
                 sign_res = [get_vp_sign([beacons[i] for i in range(4) if i != 3 - j]) for j in range(4)]
                 if sign_res != self._sign_vect_product:
-                    removearray(beacon_list4, beacons)
+                    removearray(clean_beacons4, beacons)
 
-            if beacon_list4 != []:
-                return 4, beacon_list4
+            if clean_beacons4 != []:
+                return 4, clean_beacons4
 
-        if beacon_list3 != []:
-            beacon_list3 = [
-                beacons for beacons in beacon_list3 if get_vp_sign([beacon for beacon in beacons if beacon is not None])
+        if indexes3 != []:
+            unique_indexes3 = np.unique(np.array(indexes3), axis=0)
+            indexes3 = unique_indexes3.tolist()
+            clean_beacons3 = []
+            for index in indexes3:
+                clean_beacons3.append([sorting_list[chr(i + 65)][index[i]] if index[i] >= 0 else None for i in range(4)])
+
+            clean_beacons3 = [
+                beacons for beacons in clean_beacons3 if get_vp_sign([beacon for beacon in beacons if beacon is not None])
                 == self._sign_vect_product[[3 - i for i in range(len(beacons)) if beacons[i] is None][0]]
             ]
-            if beacon_list3 != []:
-                return 3, beacon_list3
+            if clean_beacons3 != []:
+                return 3, clean_beacons3
 
-        if beacon_list2 != []:
-            return 2, beacon_list2
+        if indexes2 != []:
+            unique_indexes2 = np.unique(np.array(indexes2), axis=0)
+            indexes2 = unique_indexes2.tolist()
+            clean_beacons2 = []
+            for index in indexes2:
+                clean_beacons2.append([sorting_list[chr(i + 65)][index[i]] if index[i] >= 0 else None for i in range(4)])
+            return 2, clean_beacons2
 
         else:
             return 0, []
