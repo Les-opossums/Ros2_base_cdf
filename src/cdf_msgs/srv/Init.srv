@@ -2,6 +2,7 @@
 string team_color  
 int32 script_number
 bool debug_mode
+int32 current_score
 ---
 # Réponse
 bool success
