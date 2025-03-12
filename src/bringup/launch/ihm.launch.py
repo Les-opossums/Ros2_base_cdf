@@ -15,18 +15,39 @@ def generate_launch_description():
         "lidar_params.yaml",
     )
 
+    # node_ihm = Node(
+    #     package="ihm",
+    #     namespace=namespace,
+    #     executable="ihm_node",
+    #     name="node_ihm",
+    #     parameters=[]
+    # )
+
+    # param_server = Node(
+    #     package="ihm",
+    #     namespace=namespace,
+    #     executable="parameters_server",
+    #     name="param_server",
+    #     parameters=[
+    #         {"team_color": "blue",
+    #          "script_number": 1,
+    #          "debug_mode": False
+    #          }
+    #     ]
+    # )
+
     node_ihm = Node(
-        package="ihm",
+        package="opossum_ihm",
         namespace=namespace,
-        executable="ihm_node",
+        executable="ihm_node.py",
         name="node_ihm",
         parameters=[]
     )
 
     param_server = Node(
-        package="ihm",
+        package="opossum_ihm",
         namespace=namespace,
-        executable="parameters_server",
+        executable="parameters_server.py",
         name="param_server",
         parameters=[
             {"team_color": "blue",
