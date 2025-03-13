@@ -46,12 +46,27 @@ target_include_directories(BeaconSorter PUBLIC
   $<INSTALL_INTERFACE:include>
   ${EIGEN3_INCLUDE_DIRS}
 )
+
 ament_target_dependencies(BeaconSorter geometry_msgs rclcpp std_msgs cdf_msgs vision_msgs)
 
-#Create cpp executable
-# add_executable(beacon_detector src/beacon_detector.cpp)
-# ament_target_dependencies(beacon_detector rclcpp std_msgs)
+# add_library(PositionFinder src/PositionFinder.cpp)
+# target_include_directories(PositionFinder PUBLIC
+#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+#   $<INSTALL_INTERFACE:include>
+#   ${EIGEN3_INCLUDE_DIRS}
+# )
 
+# ament_target_dependencies(PositionFinder geometry_msgs rclcpp std_msgs cdf_msgs vision_msgs)
+
+#Create cpp executable
+add_executable(beacon_detector src/beacon_detector.cpp src/math_lidar.cpp src/BeaconSorter.cpp src/PositionFinder.cpp src/publisher.cpp)
+ament_target_dependencies(beacon_detector rclcpp std_msgs cdf_msgs)
+target_include_directories(beacon_detector PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${EIGEN3_INCLUDE_DIRS}
+)
+# target_link_libraries(beacon_detector ${catkin_LIBRARIES})
 
 
 # Install cpp executables
