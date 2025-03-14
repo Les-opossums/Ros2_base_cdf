@@ -71,7 +71,7 @@ target_include_directories(beacon_detector PUBLIC
 
 # Install cpp executables
 install(TARGETS
-  # beacon_detector
+  beacon_detector
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -84,6 +84,7 @@ install(PROGRAMS
   scripts/on_board_robot_detector.py
   scripts/lidar_simulation.py
   scripts/nav_simulation.py
+  scripts/position_sender.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

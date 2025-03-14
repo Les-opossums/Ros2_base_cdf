@@ -22,6 +22,7 @@ void BeaconDetectorNode::init_main_parameters()
     this->declare_parameter("object_topic", "");
     this->declare_parameter("robot_position_topic", "");
     this->declare_parameter("position_topic", "");
+    RCLCPP_ERROR(this->get_logger(), "Invalid team color");
 
     // Get parameters
     enable_wait_color_ = this->get_parameter("enable_wait_color").as_bool();
@@ -105,6 +106,7 @@ void BeaconDetectorNode::init_parameters()
         dt(fixed_beacons_[2], fixed_beacons_[3])};
 
     beacon_sorter_ = std::make_shared<BeaconSorter>(dst_beacons, angle_sign, angle_tolerance_, distance_tolerance_);
+    RCLCPP_INFO(this->get_logger(), "Initialized beacon_detector_node");
 }
 
 void BeaconDetectorNode::init_publishers()
@@ -129,7 +131,21 @@ void BeaconDetectorNode::init_subscribers()
 void BeaconDetectorNode::object_callback(const cdf_msgs::msg::Obstacles::SharedPtr msg)
 {
     RCLCPP_INFO(this->get_logger(), "Processing obstacle data...");
-    // Add beacon detection logic here
+    // if (!enable_robot_position_reception_)
+    // {
+    // }
+    std::array<std::optional<Eigen::Vector2d>, 4> previous_beacons = {std::nullopt};
+    std::vector<Eigen::Vector2d> new_objects_detected;
+    for (std::size_t i = 0; i < msg->circles.size(); i++)
+    {
+        if (pow(msg->circles[i].center.x, 2) + pow(msg->circles[i].center.y, 2) < 13.5)
+        {
+            new_objects_detected.push_back({msg->circles[i].center.x, msg->circles[i].center.y});
+        }
+    }
+    std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> beacons_result;
+    beacons_result = beacon_sorter_->find_possible_beacons(previous_beacons, new_objects_detected);
+    RCLCPP_INFO(this->get_logger(), "Got %d beacons found", beacons_result.first);
 }
 
 void BeaconDetectorNode::robot_position_callback(const cdf_msgs::msg::MergedData::SharedPtr msg)

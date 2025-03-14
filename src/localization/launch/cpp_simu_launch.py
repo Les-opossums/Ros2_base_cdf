@@ -24,6 +24,14 @@ def generate_launch_description():
         name="lidar_simulation_node",
         parameters=[config],
     )
+    
+    node_position_sender = Node(
+        package="localization",
+        namespace=namespace,
+        executable="position_sender.py",
+        name="position_sender_node",
+        parameters=[config],
+    )
 
     node_nav_simulation = Node(
         package="localization",
@@ -33,26 +41,18 @@ def generate_launch_description():
         parameters=[config],
     )
 
-    node_position_sender = Node(
-        package="localization",
-        namespace=namespace,
-        executable="position_sender.py",
-        name="position_sender_node",
-        parameters=[config],
-    )
-
-    node_beacon_detector = Node(
-        package="localization",
-        namespace=namespace,
-        executable="beacon_detector.py",
-        name="beacon_detector_node",
-        parameters=[config],
-    )
+    # node_beacon_detector = Node(
+    #     package="localization",
+    #     namespace=namespace,
+    #     executable="beacon_detector",
+    #     name="beacon_detector_node",
+    #     parameters=[config],
+    # )
 
     ld.add_action(node_lidar_simulation)
     ld.add_action(node_nav_simulation)
-    ld.add_action(node_beacon_detector)
     ld.add_action(node_position_sender)
+    # ld.add_action(node_beacon_detector)
 
     print(LaunchIntrospector().format_launch_description(ld))
     return ld

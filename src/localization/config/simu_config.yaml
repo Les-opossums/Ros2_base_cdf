@@ -31,10 +31,15 @@ main_robot:
   nav_simulation_node:
     ros__parameters:
       moveto_action: moveto
-      real_position_topic: real_position
+      update_position_topic: update_position
       random_moves: False
       boundaries:  [0.0, 3.0, 0.0, 2.0]
       compute_period: 0.1
-      update_period: 0.1
       angular_velocity: 0.4
       linear_velocity: 0.15
+
+  position_sender_node:
+    ros__parameters:
+      real_position_topic: real_position
+      update_position_topic: update_position
+      update_period: 0.1
