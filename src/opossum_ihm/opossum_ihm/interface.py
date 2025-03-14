@@ -4,6 +4,7 @@ from PIL import Image, ImageTk, ImageSequence
 import os
 from pathlib import Path
 from itertools import count, cycle
+import time
 from ament_index_python.packages import get_package_share_directory
 from rclpy.logging import get_logger
 
@@ -51,7 +52,6 @@ class ColorChoiceApp():
         self.button_quit = tk.Button(self.root, text="Quit", command=self.root.destroy)
         self.button_quit.pack(pady=20)
         self.root.mainloop()
-
 
     def chs_clr(self, color):
         self.selected_color = color
@@ -149,7 +149,7 @@ class ImageApp():
         self.reload = True
 
 class ValidationApp():
-    def __init__(self,color,script):
+    def __init__(self, color, script):
         self.color = color
         self.script = script
         self.reload = False
@@ -232,10 +232,13 @@ class ValidationApp():
         self.root.destroy()
 
 class ScoreApp:
-    def __init__(self):
+    def __init__(self, color):
         self.root = tk.Tk()
         self.root.title("Score")
+        self.color = color
         self.score = 0
+        self.is_match = False
+        self.is_au = False
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         if (screen_width==480 and screen_height==800):
@@ -243,13 +246,10 @@ class ScoreApp:
             self.root.attributes("-fullscreen", True)
         else :
             self.root.geometry("480x800")
-        self.root.configure(bg="white")
+        self.root.configure(bg=self.color)  # Couleur de fond
 
         # Création de la frame
         self.create_frame()
-        # self.update_score()
-        # Lancer la boucle principale
-        # self.root.mainloop()
 
     def create_frame(self):
         frame = tk.Frame(self.root, bg="lightgray", relief="solid", bd=2)
@@ -267,17 +267,24 @@ class ScoreApp:
         )
         self.zero_label.pack(expand=True)
 
-    def update_au(self, au):
-        if au:
-            root = tk.Toplevel()
-            current_dir = Path(__file__).resolve().parent
-            gif_path = os.path.join(current_dir, "boulette.gif")
-            lbl = ImageLabel(root)
-            lbl.pack()
-            lbl.load(gif_path)
-            root.mainloop()
+    def update_au(self):
+        if self.is_au :
+            self.root.configure(bg="red")
+            if self.is_match:
+                root = tk.Toplevel()
+                gif_path = os.path.join(
+                                        get_package_share_directory("opossum_ihm"),
+                                        "images",
+                                        "boulette.gif",
+                                        )
+                lbl = ImageLabel(root)
+                lbl.pack()
+                lbl.load(gif_path)
+                root.after(3000, root.destroy)
+                root.mainloop()
         else:
-            pass
+            self.root.configure(bg=self.color)
+        self.root.after(500, self.update_au)
 
     def update_score(self):
         """Met à jour le score toutes les 500ms"""
@@ -355,20 +362,8 @@ class GUI:
         self.reload = self.validation_app.reload
 
     def run_score(self):
-        self.score_app = ScoreApp()
+        self.score_app = ScoreApp(self.color_app.selected_color)
 
-    def update_score(self, score):
-        assert self.initialized
-        #self.score_app.zero_label.config(text=str(score))
-
-    def update_au(self, au):
-        assert self.initialized
-        assert self.score_app is not None
-        self.score_app.update_au(au)
-
-    def update_timer(self, enable_timer):
-        assert self.initialized
-        # self.score_app.update_timer(enable_timer)
 
 # if __name__ == '__main__':
 #     main()
