@@ -54,7 +54,8 @@ class IhmNode(Node):
 
         self.gui.initialized = True
         self.gui.run_score()
-        self.gui.start_score()
+        self.gui.score_app.update_score()
+        self.gui.score_app.root.mainloop()
 
     def update_parameters(self):
         """Met à jour les paramètres via un service ROS 2."""
@@ -105,10 +106,10 @@ class IhmNode(Node):
         """Callback pour le topic 'score'."""
         self.get_logger().info(f"Score received: {msg.data}")
         if self.gui.initialized:
-            self.current_score += msg.data
-            self.gui.score = self.current_score
-            #self.gui.update_score(msg.data)
-            self.get_logger().info(f"Score received: {msg.data}, current_score={self.current_score}")
+            self.gui.score_app.score += msg.data
+            # self.gui.score = self.current_score
+            # self.gui.update_score(msg.data)
+            self.get_logger().info(f"Score received: {msg.data}, current_score={self.gui.score_app.score}")
 
     def au_callback(self, msg):
         """Callback pour le topic 'au'."""

@@ -247,9 +247,9 @@ class ScoreApp:
 
         # Création de la frame
         self.create_frame()
-        self.update_score()
+        # self.update_score()
         # Lancer la boucle principale
-        self.root.mainloop()
+        # self.root.mainloop()
 
     def create_frame(self):
         frame = tk.Frame(self.root, bg="lightgray", relief="solid", bd=2)
@@ -281,14 +281,14 @@ class ScoreApp:
 
     def update_score(self):
         """Met à jour le score toutes les 500ms"""
-        self.score += 1  # Incrémentation du score (remplace par ta logique)
+        # self.score = score  # Incrémentation du score (remplace par ta logique)
         logger = get_logger("opossum_ihm")
         logger.info(f"Score: {self.score}")
         self.display_score.set(str(self.score))  # Mise à jour du texte
         self.zero_label.update_idletasks()
 
         # Planifier la prochaine mise à jour dans 500ms
-        self.root.after(50, self.update_score)
+        self.root.after(500, self.update_score)
         
 class ImageLabel(tk.Label):
     """
