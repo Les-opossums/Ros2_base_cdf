@@ -18,8 +18,8 @@ class BeaconSorter
 {
 public:
     BeaconSorter(
-        const std::array<double, 6>& dst_beacons,
-        const std::array<bool, 4>& angle_sign,
+        const std::array<double, 6>& dst_beacons, // AB, AC, BC, AD, BD, CD
+        const std::array<bool, 4>& angle_sign, // ABC, ABD, ACD, BCD
         double ang_tol,
         double dst_tol);
 

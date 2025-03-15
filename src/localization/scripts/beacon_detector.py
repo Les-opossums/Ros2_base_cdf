@@ -12,7 +12,6 @@ from localization.PositionFinder import PositionFinder
 from localization.publisher import *
 
 # Msgs import
-from visualization_msgs.msg import MarkerArray
 from cdf_msgs.msg import Obstacles, LidarLoc, MergedData
 from std_msgs.msg import String
 
@@ -23,8 +22,8 @@ class BeaconDetectorNode(Node):
         This class is the node that will be used to detect the beacons and estimate the best matching position of the robot.
         """
         super().__init__("beacon_detector_node")
-        self.test = True
         self._init_main_parameters()
+        self.get_logger().info("Beacon detector node initialized.")
 
     def _init_main_parameters(self: Node) -> None:
         """
@@ -59,18 +58,9 @@ class BeaconDetectorNode(Node):
                 ("object_topic", rclpy.Parameter.Type.STRING),
                 ("robot_position_topic", rclpy.Parameter.Type.STRING),
                 ("position_topic", rclpy.Parameter.Type.STRING),
-                ("debug_topic", rclpy.Parameter.Type.STRING),
-                ("display_topic", rclpy.Parameter.Type.STRING),
             ],
         )
-        self._available_colors = [
-            color.lower()
-            for color in (
-                self.get_parameter("available_colors")
-                .get_parameter_value()
-                .string_array_value
-            )
-        ]
+        self._available_colors = self.get_parameter("available_colors").get_parameter_value().string_array_value
         if self.get_parameter("enable_wait_color").get_parameter_value().bool_value:
             self.color_topic = (
                 self.get_parameter("color_topic").get_parameter_value().string_value
@@ -188,7 +178,6 @@ class BeaconDetectorNode(Node):
             for i in range(len(self.fixed_beacons))
             for j in range(i + 1, len(self.fixed_beacons))
         }
-
         self.beacon_sorter = BeaconSorter(
             dst_beacons,
             self.sign_vect_product,
@@ -239,10 +228,6 @@ class BeaconDetectorNode(Node):
         :type pub_location: Publisher
         :param test: If the node is in test mode. Used to display and check the results
         :type test: bool
-        :param debug_topic: The topic where the debug message is published
-        :type debug_topic: str
-        :param pub_debug: The publisher to the debug topic
-        :type pub_debug: Publisher
         :param display_topic: The topic where the display message is published
         :type display_topic: str
         :param pub_display: The publisher to the display topic
@@ -253,18 +238,6 @@ class BeaconDetectorNode(Node):
             self.get_parameter("position_topic").get_parameter_value().string_value
         )
         self.pub_location = self.create_publisher(LidarLoc, self.position_topic, 10)
-        if self.test:
-            self.debug_topic = (
-                self.get_parameter("debug_topic").get_parameter_value().string_value
-            )
-            self.display_topic = (
-                self.get_parameter("display_topic").get_parameter_value().string_value
-            )
-            self.pub_debug = self.create_publisher(String, self.debug_topic, 10)
-            self.pub_display = self.create_publisher(
-                MarkerArray, self.display_topic, 10
-            )
-            self.pub_debug.publish(String(data="Initialisation"))
 
     def object_callback(self: Node, msg: Obstacles) -> None:
         """
@@ -289,7 +262,7 @@ class BeaconDetectorNode(Node):
         )
         new_objects_detected = [
             np.array([c.center.x, c.center.y])
-            for c in msg.circles if c.center.x**2 + c.center.y**2 < 12.5
+            for c in msg.circles if c.center.x**2 + c.center.y**2 < 13.5
         ]
         nb_potential_beacons, potential_beacons = (
             self.beacon_sorter._find_possible_beacons(
@@ -297,7 +270,6 @@ class BeaconDetectorNode(Node):
                 new_objects_detected,
             )
         )
-        self.get_logger().info(f"Nb of beacons: {nb_potential_beacons}")
         if nb_potential_beacons > 0:
             position_found = self.position_finder.search_pos(
                 nb_potential_beacons,
@@ -306,19 +278,6 @@ class BeaconDetectorNode(Node):
             )
             if position_found is not None:
                 self.pub_location.publish(publicate_donnees_lidar(position_found))
-                if self.test:
-                    self.pub_debug.publish(String(data="Position found"))
-                    self.pub_display.publish(display_lidar_position(position_found))
-                    self.pub_display.publish(
-                        diplay_beacons_positions_found(position_found)
-                    )
-                    self.pub_display.publish(display_playground(self.boundaries))
-                    self.pub_display.publish(
-                        diplay_fixed_beacons_positions(self.fixed_beacons)
-                    )
-                    self.pub_display.publish(
-                        display_other_robots_positions(position_found["other_robots"])
-                    )
 
     def robot_position_callback(self: Node, msg: MergedData) -> None:
         """
