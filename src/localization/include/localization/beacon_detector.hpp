@@ -9,8 +9,6 @@
 #include <cdf_msgs/msg/merged_data.hpp>
 #include <vector>
 #include <string>
-#include <array>
-#include <Eigen/Dense>
 
 #include "localization/math_lidar.hpp"
 #include "localization/BeaconSorter.hpp"
@@ -39,10 +37,9 @@ private:
     bool enable_initial_position_;
     double distance_tolerance_;
     double angle_tolerance_;
-    std::array<double, 4> boundaries_;
-    std::array<double, 3> init_position_;
-    std::array<Eigen::Vector2d, 4> fixed_beacons_;
-    std::array<bool, 4> angle_sign;
+    std::vector<double> boundaries_;
+    std::vector<std::vector<double>> fixed_beacons_;
+    std::vector<int> sign_vect_product_;
 
     // Team color handling
     bool enable_wait_color_;
@@ -67,7 +64,7 @@ private:
     rclcpp::Subscription<cdf_msgs::msg::MergedData>::SharedPtr sub_robot_position_;
 
     // Localization Objects
-    // std::shared_ptr<PositionFinder> position_finder_;
+    std::shared_ptr<PositionFinder> position_finder_;
     std::shared_ptr<BeaconSorter> beacon_sorter_;
 };
 

@@ -22,7 +22,8 @@ void BeaconDetectorNode::init_main_parameters()
     this->declare_parameter("object_topic", "");
     this->declare_parameter("robot_position_topic", "");
     this->declare_parameter("position_topic", "");
-    RCLCPP_ERROR(this->get_logger(), "Invalid team color");
+    this->declare_parameter("debug_topic", "");
+    this->declare_parameter("display_topic", "");
 
     // Get parameters
     enable_wait_color_ = this->get_parameter("enable_wait_color").as_bool();
@@ -58,24 +59,10 @@ void BeaconDetectorNode::init_parameters()
 {
     enable_robot_position_reception_ = this->get_parameter("enable_robot_position_reception").as_bool();
     enable_initial_position_ = this->get_parameter("enable_initial_position").as_bool();
-    auto init_pos = this->get_parameter("init_position").as_double_array();
-    if (init_pos.size() != 3) {
-        throw std::runtime_error("init_position must have exactly 3 elements");
-    }
-    std::copy(init_pos.begin(), init_pos.end(), init_position_.begin());
     distance_tolerance_ = this->get_parameter("distance_tolerance").as_double();
     angle_tolerance_ = this->get_parameter("angle_tolerance").as_double();
-    auto bound = this->get_parameter("boundaries").as_double_array();
-    if (bound.size() != 4) {
-        throw std::runtime_error("boundaries must have exactly 4 elements");
-    }
-    std::copy(bound.begin(), bound.end(), boundaries_.begin());
+    boundaries_ = this->get_parameter("boundaries").as_double_array();
     std::vector<double> beacons = this->get_parameter("beacons").as_double_array();
-
-    if (std::find(available_colors_.begin(), available_colors_.end(), team_color_) == available_colors_.end()) {
-        RCLCPP_ERROR(this->get_logger(), "Invalid team color");
-        return;
-    }
 
     if (team_color_ == "blue") {
         for (size_t i = 1; i < beacons.size(); i += 2) {
@@ -84,29 +71,9 @@ void BeaconDetectorNode::init_parameters()
     }
 
     // Convert beacons into a vector of points
-    for (size_t i = 0; i < 4; i++) {
-        fixed_beacons_[i] = {beacons[2 * i], beacons[2 * i + 1]};
+    for (size_t i = 0; i < beacons.size(); i += 2) {
+        fixed_beacons_.emplace_back(std::vector<double>{beacons[i], beacons[i + 1]});
     }
-
-    std::array<std::optional<Eigen::Vector2d>, 3> signABC = {fixed_beacons_[0], fixed_beacons_[1], fixed_beacons_[2]};
-    std::array<std::optional<Eigen::Vector2d>, 3> signABD = {fixed_beacons_[0], fixed_beacons_[1], fixed_beacons_[3]};
-    std::array<std::optional<Eigen::Vector2d>, 3> signACD = {fixed_beacons_[0], fixed_beacons_[2], fixed_beacons_[3]};
-    std::array<std::optional<Eigen::Vector2d>, 3> signBCD = {fixed_beacons_[1], fixed_beacons_[2], fixed_beacons_[3]};
-    angle_sign[0] = getAngleSign(signABC);
-    angle_sign[1] = getAngleSign(signABD);
-    angle_sign[2] = getAngleSign(signACD);
-    angle_sign[3] = getAngleSign(signBCD);
-
-    // SKIP POSITION FINDER FOR NOW 
-    std::array<double, 6> dst_beacons = {dt(fixed_beacons_[0], fixed_beacons_[1]), 
-        dt(fixed_beacons_[0], fixed_beacons_[2]), 
-        dt(fixed_beacons_[1], fixed_beacons_[2]), 
-        dt(fixed_beacons_[0], fixed_beacons_[3]), 
-        dt(fixed_beacons_[1], fixed_beacons_[3]), 
-        dt(fixed_beacons_[2], fixed_beacons_[3])};
-
-    beacon_sorter_ = std::make_shared<BeaconSorter>(dst_beacons, angle_sign, angle_tolerance_, distance_tolerance_);
-    RCLCPP_INFO(this->get_logger(), "Initialized beacon_detector_node");
 }
 
 void BeaconDetectorNode::init_publishers()
@@ -120,46 +87,12 @@ void BeaconDetectorNode::init_subscribers()
     object_topic_ = this->get_parameter("object_topic").as_string();
     sub_object_ = this->create_subscription<cdf_msgs::msg::Obstacles>(
         object_topic_, 10, std::bind(&BeaconDetectorNode::object_callback, this, std::placeholders::_1));
-    if (enable_robot_position_reception_)
-    {
-        robot_position_topic_ = this->get_parameter("robot_position_topic").as_string();
-        sub_robot_position_ = this->create_subscription<cdf_msgs::msg::MergedData>(
-            robot_position_topic_, 10, std::bind(&BeaconDetectorNode::robot_position_callback, this, std::placeholders::_1));
-    }
 }
 
 void BeaconDetectorNode::object_callback(const cdf_msgs::msg::Obstacles::SharedPtr msg)
 {
     RCLCPP_INFO(this->get_logger(), "Processing obstacle data...");
-    // if (!enable_robot_position_reception_)
-    // {
-    // }
-    std::array<std::optional<Eigen::Vector2d>, 4> previous_beacons = {std::nullopt};
-    std::vector<Eigen::Vector2d> new_objects_detected;
-    for (std::size_t i = 0; i < msg->circles.size(); i++)
-    {
-        if (pow(msg->circles[i].center.x, 2) + pow(msg->circles[i].center.y, 2) < 13.5)
-        {
-            new_objects_detected.push_back({msg->circles[i].center.x, msg->circles[i].center.y});
-        }
-    }
-    std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> beacons_result;
-    beacons_result = beacon_sorter_->find_possible_beacons(previous_beacons, new_objects_detected);
-    RCLCPP_INFO(this->get_logger(), "Got %d beacons found with size %ld", beacons_result.first, beacons_result.second.size());
-    for (std::size_t i = 0; i < beacons_result.second.size(); i++){
-        for (int j = 0; j < 4; j++)
-        {
-            if (beacons_result.second[i][j].has_value())
-            {
-                auto vec = beacons_result.second[i][j].value();
-                RCLCPP_INFO(this->get_logger(), "For %d: (%f, %f)", j, vec.x(), vec.y());
-            }
-            else
-            {
-                RCLCPP_INFO(this->get_logger(), "No INFO For %d", j);
-            }
-        }
-    }
+    // Add beacon detection logic here
 }
 
 void BeaconDetectorNode::robot_position_callback(const cdf_msgs::msg::MergedData::SharedPtr msg)
