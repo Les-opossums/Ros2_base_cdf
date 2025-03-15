@@ -23,6 +23,7 @@ class BeaconDetectorNode(Node):
         """
         super().__init__("beacon_detector_node")
         self._init_main_parameters()
+        self.get_logger().info("Beacon detector node initialized.")
 
     def _init_main_parameters(self: Node) -> None:
         """
@@ -269,8 +270,6 @@ class BeaconDetectorNode(Node):
                 new_objects_detected,
             )
         )
-        if nb_potential_beacons < 4:
-            self.get_logger().info(f"Nb of beacons: {nb_potential_beacons}")
         if nb_potential_beacons > 0:
             position_found = self.position_finder.search_pos(
                 nb_potential_beacons,

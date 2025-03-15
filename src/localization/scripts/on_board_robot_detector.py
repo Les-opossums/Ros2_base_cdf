@@ -40,6 +40,7 @@ class OnboardRobotDetectorNode(Node):
         super().__init__("onboard_robot_detector_node")
         self.test = True
         self._init_main_parameters()
+        self.get_logger().info("On board robot detector node initialized.")
 
     def _init_main_parameters(self):
         self.declare_parameters(
@@ -82,7 +83,6 @@ class OnboardRobotDetectorNode(Node):
             self._init_subscribers()
 
     def _init_color(self, msg) -> None:
-        self.get_logger().info(f"Team color received: {msg.data}")
         if msg.data not in ["blue", "yellow"]:
             raise ValueError("Invalid team color")
         self.team_color = msg.data

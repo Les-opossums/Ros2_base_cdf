@@ -1,5 +1,4 @@
 from .math_lidar import *
-from rclpy.logging import get_logger
 
 class BeaconSorter():
     def __init__(
@@ -265,7 +264,5 @@ class BeaconSorter():
             )
             if beacons_data[0] > 2:
                 return beacons_data
-        logger = get_logger("Info")
-        logger.info(f"Running naive")
         beacons_data = self._find_beacons_naive(new_objects_detected)
         return beacons_data

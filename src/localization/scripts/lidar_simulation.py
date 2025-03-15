@@ -25,6 +25,8 @@ class LidarSimulation(Node):
         self._init_publishers()
         self._init_subscribers()
         self._init_services()
+        self.get_logger().info("Lidar simulation node initialized.")
+
 
     def _init_parameters(self) -> None:
         self.declare_parameters(
