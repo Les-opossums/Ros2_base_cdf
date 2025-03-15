@@ -1,7 +1,6 @@
 from .math_lidar import *
 
 class BeaconSorter():
-
     def __init__(
         self,
         dst_beacons: dict[str, float],
@@ -98,12 +97,12 @@ class BeaconSorter():
                         flags[key] = False
                     if approx(dt(bA, bC), self._dst_beacons[("A", "C")], self._dst_tol):
                         flags[("A", "C")] = True
-                        indexes2.append([i, -1, j, -1])
+                        indexes2.append([i, -1, k, -1])
                     if approx(dt(bB, bC), self._dst_beacons[("B", "C")], self._dst_tol):
                         flags[("B", "C")] = True
-                        indexes2.append([-1, i, j, -1])
+                        indexes2.append([-1, j, k, -1])
                     if flags[("A", "B")] and flags[("A", "C")] and flags[("B", "C")]:
-                        indexes3.append([bA, bB, bC, -1])
+                        indexes3.append([i, j, k, -1])
                     for l, bD in enumerate(sorting_list["D"]):
                         for key in list(flags.keys())[3:]:
                             flags[key] = False
@@ -121,14 +120,14 @@ class BeaconSorter():
                         if flags[("A", "C")] and flags[("A", "D")] and flags[("C", "D")]:
                             indexes3.append([i, -1, k, l])
                         if flags[("B", "C")] and flags[("B", "D")] and flags[("C", "D")]:
-                            indexes3.append([None, j, k, l])
+                            indexes3.append([-1, j, k, l])
                         if flags[("A", "B")] and flags[("A", "C")] and flags[("B", "C")] and flags[("A", "D")] and flags[("B", "D")] and flags[("C", "D")]:
                             indexes4.append([i, j, k, l])
+                            
         if indexes4 != []:
             unique_indexes4 = np.unique(np.array(indexes4), axis=0)
-            indexes4 = unique_indexes4.tolist()
             clean_beacons4 = []
-            for index in indexes4:
+            for index in unique_indexes4:
                 clean_beacons4.append([sorting_list[chr(i + 65)][index[i]] for i in range(4)])
 
             beacons_list = clean_beacons4.copy()
@@ -142,9 +141,8 @@ class BeaconSorter():
 
         if indexes3 != []:
             unique_indexes3 = np.unique(np.array(indexes3), axis=0)
-            indexes3 = unique_indexes3.tolist()
             clean_beacons3 = []
-            for index in indexes3:
+            for index in unique_indexes3:
                 clean_beacons3.append([sorting_list[chr(i + 65)][index[i]] if index[i] >= 0 else None for i in range(4)])
 
             clean_beacons3 = [
@@ -156,9 +154,8 @@ class BeaconSorter():
 
         if indexes2 != []:
             unique_indexes2 = np.unique(np.array(indexes2), axis=0)
-            indexes2 = unique_indexes2.tolist()
             clean_beacons2 = []
-            for index in indexes2:
+            for index in unique_indexes2:
                 clean_beacons2.append([sorting_list[chr(i + 65)][index[i]] if index[i] >= 0 else None for i in range(4)])
             return 2, clean_beacons2
 
@@ -265,7 +262,7 @@ class BeaconSorter():
             beacons_data = self._find_beacons_prev(
                 previous_beacons, new_objects_detected
             )
-            if beacons_data[0] > 1:
+            if beacons_data[0] > 2:
                 return beacons_data
         beacons_data = self._find_beacons_naive(new_objects_detected)
         return beacons_data

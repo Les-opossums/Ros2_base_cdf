@@ -8,7 +8,6 @@ import time
 from ament_index_python.packages import get_package_share_directory
 from rclpy.logging import get_logger
 
-
 class ColorChoiceApp():
     def __init__(self):
         self.reload = False
@@ -247,7 +246,6 @@ class ScoreApp:
         else :
             self.root.geometry("480x800")
         self.root.configure(bg=self.color)  # Couleur de fond
-
         # Création de la frame
         self.create_frame()
 
@@ -363,7 +361,3 @@ class GUI:
 
     def run_score(self):
         self.score_app = ScoreApp(self.color_app.selected_color)
-
-
-# if __name__ == '__main__':
-#     main()

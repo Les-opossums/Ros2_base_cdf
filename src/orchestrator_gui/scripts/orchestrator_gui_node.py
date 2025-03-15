@@ -19,10 +19,10 @@ from cdf_msgs.action import MoveTo
 class MyROSNode(Node):
     def __init__(self, update_callback):
         super().__init__('gui_node')
-        self.get_logger().info("GUI Node created")
         self._init_parameters()
         self._init_subscriber()
         self._init_client_action()
+        self.get_logger().info("Orchestrator GUI node initialized.")
         
         self.update_callback = update_callback
 
@@ -72,11 +72,8 @@ class MyROSNode(Node):
         msg = String()
         msg.data = message_text
         self.publisher_.publish(msg)
-        # self.get_logger().info(f"Message publié : {message_text}")
 
     def position_callback(self, msg):
-        # self.get_logger().info(f"Message reçu: {msg.robot_position.x}")
-        # Appeler la fonction de mise à jour de l'interface
         self.update_callback(msg.robot_position)
 
 class MapView(QtWidgets.QGraphicsView):
@@ -169,19 +166,11 @@ class MapViewRosConnected(QtWidgets.QGraphicsView):
         height = map_rect.height()
         posx = width * msg.x / 3 - self.icon_width / 2
         posy =  height *(1 - msg.y / 2)  -  self.icon_height / 2
-        self.node.get_logger().info(f"Position reçue: {msg.x}, {msg.y}")
-        # Récupération de la position actuelle de l'icône
-        # current_pos = self.icon_item.pos()
-        # Création d'une nouvelle position en ajoutant 10 pixels à la coordonnée x
         new_pos = QtCore.QPointF(posx, posy)
-        # new_pos = QtCore.QPointF(current_pos.x() + 10, current_pos.y())
         self.icon_item.setPos(new_pos)
         print(f"Icône déplacée vers {new_pos}")
-        # current_rotation = self.icon_item.rotation()
-        # new_rotation = current_rotation + 15
         new_rotation = msg.z * 180 / np.pi
         self.icon_item.setRotation(new_rotation)
-        # print(f"Icône pivotée vers {new_rotation} degrés")
 
 class DraggablePixmapItem(QtWidgets.QGraphicsPixmapItem):
     def __init__(self, pixmap, parent=None):
