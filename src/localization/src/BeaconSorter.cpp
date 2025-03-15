@@ -1,4 +1,5 @@
 #include "localization/BeaconSorter.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 BeaconSorter::BeaconSorter(
     const std::array<double, 6>& dst_beacons,
@@ -275,6 +276,8 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
     {
         Eigen::Vector2d beacon1 = olist.back();
         olist.pop_back();
+        RCLCPP_INFO(rclcpp::get_logger("node"), "Beacon x:%f, y:%f", beacon1.x(), beacon1.y());
+        RCLCPP_INFO(rclcpp::get_logger("node"), "olist len: %d", olist.size());
         for (std::size_t i0 = 0; i0 < olist.size(); i0++)
         {
             int i = static_cast<int>(i0);
@@ -348,6 +351,7 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
                         double distance = dt(olist[test_indexesA[k]], olist[indexes[3][j]]);
                         if (approx(distance, dst_beacons_[5]))
                         {
+                            RCLCPP_INFO(rclcpp::get_logger("node"), "A");
                             beacon_list4.push_back({beacon1, olist[indexes[0][i]], olist[test_indexesA[k]], olist[indexes[3][j]]});
                         }
                     }
@@ -400,6 +404,7 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
                         double distance = dt(olist[test_indexesB[k]], olist[indexes[4][j]]);
                         if (approx(distance, dst_beacons_[5]))
                         {
+                            RCLCPP_INFO(rclcpp::get_logger("node"), "B");
                             beacon_list4.push_back({olist[indexes[0][i]], beacon1, olist[test_indexesB[k]], olist[indexes[4][j]]});
                         }
                     }
@@ -452,6 +457,7 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
                         double distance = dt(olist[test_indexesC[k]], olist[indexes[5][j]]);
                         if (approx(distance, dst_beacons_[4]))
                         {
+                            RCLCPP_INFO(rclcpp::get_logger("node"), "C");
                             beacon_list4.push_back({olist[indexes[1][i]], olist[test_indexesC[k]], beacon1, olist[indexes[5][j]]});
                         }
                     }
@@ -505,6 +511,10 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
                         double distance = dt(olist[test_indexesD[k]], olist[indexes[5][j]]);
                         if (approx(distance, dst_beacons_[2]))
                         {
+                            RCLCPP_INFO(rclcpp::get_logger("node"), "D");
+                            RCLCPP_INFO(rclcpp::get_logger("node"), "%d", indexes[3][i]);
+                            RCLCPP_INFO(rclcpp::get_logger("node"), "%d", test_indexesD[k]);
+                            RCLCPP_INFO(rclcpp::get_logger("node"), "%d", indexes[5][j]);
                             beacon_list4.push_back({olist[indexes[3][i]], olist[test_indexesD[k]], olist[indexes[5][j]], beacon1});
                         }
                     }
@@ -527,6 +537,7 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
     }
     if (!beacon_list4.empty())
     {
+        RCLCPP_INFO(rclcpp::get_logger("node"), "Beacon num: %d", beacon_list4.size());
         for (int i = beacon_list4.size() - 1; i>=0; i--)
         {
             std::array<std::optional<Eigen::Vector2d>, 3> signABC = {beacon_list4[i][0], beacon_list4[i][1], beacon_list4[i][2]};

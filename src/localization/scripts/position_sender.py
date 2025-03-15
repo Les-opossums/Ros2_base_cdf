@@ -44,7 +44,6 @@ class PositionSender(Node):
         self.current_state = msg
 
     def _publish_position(self):
-        self.get_logger().info(f"IM updating now")
         if self.current_state is None:
             return 
         self.pub_real_position.publish(self.current_state)

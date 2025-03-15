@@ -145,7 +145,21 @@ void BeaconDetectorNode::object_callback(const cdf_msgs::msg::Obstacles::SharedP
     }
     std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> beacons_result;
     beacons_result = beacon_sorter_->find_possible_beacons(previous_beacons, new_objects_detected);
-    RCLCPP_INFO(this->get_logger(), "Got %d beacons found", beacons_result.first);
+    RCLCPP_INFO(this->get_logger(), "Got %d beacons found with size %ld", beacons_result.first, beacons_result.second.size());
+    for (std::size_t i = 0; i < beacons_result.second.size(); i++){
+        for (int j = 0; j < 4; j++)
+        {
+            if (beacons_result.second[i][j].has_value())
+            {
+                auto vec = beacons_result.second[i][j].value();
+                RCLCPP_INFO(this->get_logger(), "For %d: (%f, %f)", j, vec.x(), vec.y());
+            }
+            else
+            {
+                RCLCPP_INFO(this->get_logger(), "No INFO For %d", j);
+            }
+        }
+    }
 }
 
 void BeaconDetectorNode::robot_position_callback(const cdf_msgs::msg::MergedData::SharedPtr msg)
