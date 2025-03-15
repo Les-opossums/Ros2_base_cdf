@@ -16,6 +16,7 @@ class IhmNode(Node):
 
         # Initialisation des abonnements
         self._init_subscribers()
+        self.current_score = 0
 
         # Initialisation de l'interface graphique
         self.gui = GUI()
@@ -53,6 +54,9 @@ class IhmNode(Node):
 
         self.gui.initialized = True
         self.gui.run_score()
+        self.gui.score_app.update_score()
+        self.gui.score_app.update_au()
+        self.gui.score_app.root.mainloop()
 
     def update_parameters(self):
         """Met à jour les paramètres via un service ROS 2."""
@@ -63,6 +67,7 @@ class IhmNode(Node):
         request = Init.Request()
         request.team_color = self.clr
         request.script_number = self.scr
+        request.current_score = self.current_score
 
         future = client.call_async(request)
         future.add_done_callback(self.handle_service_response)
@@ -102,18 +107,19 @@ class IhmNode(Node):
         """Callback pour le topic 'score'."""
         self.get_logger().info(f"Score received: {msg.data}")
         if self.gui.initialized:
-            self.gui.update_score(msg.data)
+            self.gui.score_app.score += msg.data
+            self.get_logger().info(f"Score received: {msg.data}, current_score={self.gui.score_app.score}")
 
     def au_callback(self, msg):
         """Callback pour le topic 'au'."""
         if self.gui.initialized:
-            self.gui.update_au(msg.data)
+            self.gui.score_app.is_au = msg.data
             self.get_logger().info(f"AU received: {msg.data}")
 
     def enable_timer_callback(self, msg):
         """Callback pour le topic 'enable_timer'."""
         if self.gui.initialized:
-            self.gui.update_timer(msg.data)
+            self.gui.score_app.is_match = msg.data 
             self.get_logger().info(f"Enable Timer received: {msg.data}")
 
 
