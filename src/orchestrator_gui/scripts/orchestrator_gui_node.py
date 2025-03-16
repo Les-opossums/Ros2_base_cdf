@@ -116,15 +116,10 @@ class MapView(QtWidgets.QGraphicsView):
         self.icon_item.setRotation(new_rotation)
         print(f"Icône pivotée vers {new_rotation} degrés")
 
-class EzNode(Node):
-    def __init__(self):
-        super().__init__('nam_she')
-
 class MapViewRosConnected(QtWidgets.QGraphicsView):
     def __init__(self, parent=None):
         super().__init__()
         self.parent = parent
-        self.node = EzNode()
         image_path = os.path.join(get_package_share_directory("orchestrator_gui"), "images")
         map = os.path.join(image_path, "plateau.png")
         icon = os.path.join(image_path, "robot.png")

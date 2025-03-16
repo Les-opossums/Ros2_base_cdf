@@ -306,9 +306,13 @@ class BeaconDetectorNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     beacon_detector_node = BeaconDetectorNode()
-    rclpy.spin(beacon_detector_node)
-    beacon_detector_node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(beacon_detector_node)
+    except:
+        pass
+    finally:
+        beacon_detector_node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

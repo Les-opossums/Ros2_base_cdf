@@ -84,6 +84,7 @@ install(PROGRAMS
   scripts/on_board_robot_detector.py
   scripts/lidar_simulation.py
   scripts/nav_simulation.py
+  scripts/position_sender.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

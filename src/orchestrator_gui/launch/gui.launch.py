@@ -21,7 +21,7 @@ def generate_launch_description():
         package="orchestrator_gui",
         namespace=namespace,
         executable="orchestrator_gui_node.py",
-        name="dev_gui_node",
+        name="orchestrator_gui_node",
         parameters=[config],
     )
 

@@ -35,7 +35,7 @@ class LidarSimulation(Node):
                 ("beacons", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("boundaries", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("object_topic", rclpy.Parameter.Type.STRING),
-                ("real_position_topic", rclpy.Parameter.Type.STRING),
+                ("update_position_topic", rclpy.Parameter.Type.STRING),
                 ("color_service", rclpy.Parameter.Type.STRING),
                 ("team_color", rclpy.Parameter.Type.STRING),
             ],
@@ -77,11 +77,11 @@ class LidarSimulation(Node):
         self.pub_object = self.create_publisher(Obstacles, self.object_topic, 10)
 
     def _init_subscribers(self) -> None:
-        self.real_position_topic = (
-            self.get_parameter("real_position_topic").get_parameter_value().string_value
+        self.update_position_topic = (
+            self.get_parameter("update_position_topic").get_parameter_value().string_value
         )
         self.sub_real_position = self.create_subscription(
-            Point, self.real_position_topic, self._publish_objects, 10
+            Point, self.update_position_topic, self._publish_objects, 10
         )
 
     def _update(self, msg) -> None:
@@ -119,9 +119,13 @@ class LidarSimulation(Node):
 def main(args=None):
     rclpy.init(args=args)
     lidar_simulation_node = LidarSimulation()
-    rclpy.spin(lidar_simulation_node)
-    lidar_simulation_node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(lidar_simulation_node)
+    except:
+        pass
+    finally:
+        lidar_simulation_node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()
