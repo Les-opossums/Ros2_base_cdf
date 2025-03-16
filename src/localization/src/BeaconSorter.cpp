@@ -13,7 +13,7 @@ BeaconSorter::BeaconSorter(
 }
 
 std::map<char, std::vector<Eigen::Vector2d>> BeaconSorter::sort_comparison(
-    const std::array<std::optional<Eigen::Vector2d>, 4>& beacons,
+    const std::array<Eigen::Vector2d, 4>& beacons,
     const std::vector<Eigen::Vector2d>& new_objects_detected)
 {
     std::map<char, std::vector<Eigen::Vector2d>> sort_list = {
@@ -25,7 +25,7 @@ std::map<char, std::vector<Eigen::Vector2d>> BeaconSorter::sort_comparison(
     for (int i = 0; i < 4; i++)
     {
         double angle, distance;
-        std::tie(angle, distance) = cartesian_to_polar(beacons[i]->x(), beacons[i]->y());
+        std::tie(angle, distance) = cartesian_to_polar(beacons[i].x(), beacons[i].y());
         beacons_ang[i] = {angle - ang_tol_, angle + ang_tol_};
         beacons_dst[i] = distance;
     }
@@ -58,9 +58,10 @@ std::map<char, std::vector<Eigen::Vector2d>> BeaconSorter::sort_comparison(
 }
 
 std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> BeaconSorter::find_beacons_prev(
-    const std::array<std::optional<Eigen::Vector2d>, 4>& beacons,
+    const std::array<Eigen::Vector2d, 4>& beacons,
     const std::vector<Eigen::Vector2d>& new_objects_detected)
 {
+
     auto sort_list = sort_comparison(beacons, new_objects_detected);
     std::vector<std::array<int, 4>> indexes2, indexes3, indexes4;
     bool flags[6] = {false}; // AB, AC, BC, AD, BD, CD
@@ -141,14 +142,14 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
             }
         }
     }
-
     if (!indexes4.empty())
     {
+
         std::sort(indexes4.begin(), indexes4.end());
         auto last = std::unique(indexes4.begin(), indexes4.end());
         indexes4.erase(last, indexes4.end());
         std::vector<std::array<std::optional<Eigen::Vector2d>, 4>> clean_beacons4;
-        for (auto const& index: indexes4) 
+        for (auto const& index: indexes4)
         {
             std::array<std::optional<Eigen::Vector2d>, 4> beacon;
             for (int i = 0; i < 4; i++)
@@ -160,11 +161,11 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
         }
         for (int i = clean_beacons4.size() - 1; i >= 0; i--)
         {
-            std::array<std::optional<Eigen::Vector2d>, 3> signABC = {clean_beacons4[i][0], clean_beacons4[i][1], clean_beacons4[i][2]};
-            std::array<std::optional<Eigen::Vector2d>, 3> signABD = {clean_beacons4[i][0], clean_beacons4[i][1], clean_beacons4[i][3]};
-            std::array<std::optional<Eigen::Vector2d>, 3> signACD = {clean_beacons4[i][0], clean_beacons4[i][2], clean_beacons4[i][3]};
-            std::array<std::optional<Eigen::Vector2d>, 3> signBCD = {clean_beacons4[i][1], clean_beacons4[i][2], clean_beacons4[i][3]};
-            if (getAngleSign(signABC) != angle_sign_[0] || getAngleSign(signABD) != angle_sign_[1] 
+            std::array<Eigen::Vector2d, 3> signABC = {clean_beacons4[i][0].value(), clean_beacons4[i][1].value(), clean_beacons4[i][2].value()};
+            std::array<Eigen::Vector2d, 3> signABD = {clean_beacons4[i][0].value(), clean_beacons4[i][1].value(), clean_beacons4[i][3].value()};
+            std::array<Eigen::Vector2d, 3> signACD = {clean_beacons4[i][0].value(), clean_beacons4[i][2].value(), clean_beacons4[i][3].value()};
+            std::array<Eigen::Vector2d, 3> signBCD = {clean_beacons4[i][1].value(), clean_beacons4[i][2].value(), clean_beacons4[i][3].value()};
+            if (getAngleSign(signABC) != angle_sign_[0] || getAngleSign(signABD) != angle_sign_[1]
             || getAngleSign(signACD) != angle_sign_[2] || getAngleSign(signBCD) != angle_sign_[3])
             {
                 clean_beacons4.erase(clean_beacons4.begin() + i);
@@ -174,16 +175,17 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
     }
     if (!indexes3.empty())
     {
+
         std::sort(indexes3.begin(), indexes3.end());
         auto last = std::unique(indexes3.begin(), indexes3.end());
         indexes3.erase(last, indexes3.end());
         std::vector<std::array<std::optional<Eigen::Vector2d>, 4>> clean_beacons3;
-        for (auto const& index: indexes3) 
+        for (auto const& index: indexes3)
         {
             std::array<std::optional<Eigen::Vector2d>, 4> beacon;
             for (int i = 0; i < 4; i++)
             {
-                if (index[i] >= 0) 
+                if (index[i] >= 0)
                 {
                     char let = 'A' + i;
                     beacon[i] = sort_list[let][index[i]];
@@ -192,43 +194,49 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
             }
             clean_beacons3.push_back(beacon);
         }
+
         for (int i = clean_beacons3.size() - 1; i >= 0; i--)
         {
-            if (!clean_beacons3[i][0].has_value())
+            if (!clean_beacons3[i][3].has_value())
             {
-                std::array<std::optional<Eigen::Vector2d>, 3> signABC = {clean_beacons3[i][0], clean_beacons3[i][1], clean_beacons3[i][2]};
+
+                std::array<Eigen::Vector2d, 3> signABC = {clean_beacons3[i][0].value(), clean_beacons3[i][1].value(), clean_beacons3[i][2].value()};
                 if (getAngleSign(signABC) != angle_sign_[0]) clean_beacons3.erase(clean_beacons3.begin() + i);
-            }
-            else if (!clean_beacons3[i][1].has_value())
-            {
-                std::array<std::optional<Eigen::Vector2d>, 3> signABD = {clean_beacons3[i][0], clean_beacons3[i][1], clean_beacons3[i][3]};
-                if (getAngleSign(signABD) != angle_sign_[1]) clean_beacons3.erase(clean_beacons3.begin() + i);
             }
             else if (!clean_beacons3[i][2].has_value())
             {
-                std::array<std::optional<Eigen::Vector2d>, 3> signACD = {clean_beacons3[i][0], clean_beacons3[i][2], clean_beacons3[i][3]};
+                std::array<Eigen::Vector2d, 3> signABD = {clean_beacons3[i][0].value(), clean_beacons3[i][1].value(), clean_beacons3[i][3].value()};
+                if (getAngleSign(signABD) != angle_sign_[1]) clean_beacons3.erase(clean_beacons3.begin() + i);
+            }
+            else if (!clean_beacons3[i][1].has_value())
+            {
+
+                std::array<Eigen::Vector2d, 3> signACD = {clean_beacons3[i][0].value(), clean_beacons3[i][2].value(), clean_beacons3[i][3].value()};
                 if (getAngleSign(signACD) != angle_sign_[2]) clean_beacons3.erase(clean_beacons3.begin() + i);
             }
-            else if (!clean_beacons3[i][3].has_value())
+            else if (!clean_beacons3[i][0].has_value())
             {
-                std::array<std::optional<Eigen::Vector2d>, 3> signBCD = {clean_beacons3[i][1], clean_beacons3[i][2], clean_beacons3[i][3]};
+
+                std::array<Eigen::Vector2d, 3> signBCD = {clean_beacons3[i][1].value(), clean_beacons3[i][2].value(), clean_beacons3[i][3].value()};
                 if (getAngleSign(signBCD) != angle_sign_[3]) clean_beacons3.erase(clean_beacons3.begin() + i);
             }
         }
+
         if (!clean_beacons3.empty()) return {3, clean_beacons3};
     }
     if (!indexes2.empty())
     {
+
         std::sort(indexes2.begin(), indexes2.end());
         auto last = std::unique(indexes2.begin(), indexes2.end());
         indexes2.erase(last, indexes2.end());
         std::vector<std::array<std::optional<Eigen::Vector2d>, 4>> clean_beacons2;
-        for (auto const& index: indexes2) 
+        for (auto const& index: indexes2)
         {
             std::array<std::optional<Eigen::Vector2d>, 4> beacon;
             for (int i = 0; i < 4; i++)
             {
-                if (index[i] >= 0) 
+                if (index[i] >= 0)
                 {
                     char let = 'A' + i;
                     beacon[i] = sort_list[let][index[i]];
@@ -245,11 +253,13 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
 
 
 std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> BeaconSorter::find_possible_beacons(
-    const std::array<std::optional<Eigen::Vector2d>, 4>& previous_beacons,
+    const std::optional<std::array<Eigen::Vector2d, 4>>& previous_beacons,
     const std::vector<Eigen::Vector2d>& new_objects_detected) {
-        std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> beacons_data; 
-    if (previous_beacons[0].has_value()) {
-        beacons_data = find_beacons_prev(previous_beacons, new_objects_detected);
+    std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> beacons_data;
+
+    if (previous_beacons.has_value()) {
+        beacons_data = find_beacons_prev(previous_beacons.value(), new_objects_detected);
+
         if (beacons_data.first > 2) {
             return beacons_data;
         }
@@ -321,7 +331,7 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
         }
         ///
         /// A TEST
-        /// 
+        ///
         // The list of AB links or BA, but test as if the current was A
         for (std::size_t i = 0; i < indexes[0].size(); i++)
         {
@@ -373,7 +383,7 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
 
         ///
         /// B TEST
-        /// 
+        ///
         // The list of AB, but test as if the current was B
         for (std::size_t i = 0; i < indexes[0].size(); i++)
         {
@@ -425,7 +435,7 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
 
         ///
         /// C TEST
-        /// 
+        ///
         // The list of AC, but test as if the current was C
         for (std::size_t i = 0; i < indexes[1].size(); i++)
         {
@@ -477,7 +487,7 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
 
         ///
         /// D TEST
-        /// 
+        ///
         // The list of AD, but test as if the current was D
         for (std::size_t i = 0; i < indexes[3].size(); i++)
         {
@@ -532,11 +542,11 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
     {
         for (int i = beacon_list4.size() - 1; i>=0; i--)
         {
-            std::array<std::optional<Eigen::Vector2d>, 3> signABC = {beacon_list4[i][0], beacon_list4[i][1], beacon_list4[i][2]};
-            std::array<std::optional<Eigen::Vector2d>, 3> signABD = {beacon_list4[i][0], beacon_list4[i][1], beacon_list4[i][3]};
-            std::array<std::optional<Eigen::Vector2d>, 3> signACD = {beacon_list4[i][0], beacon_list4[i][2], beacon_list4[i][3]};
-            std::array<std::optional<Eigen::Vector2d>, 3> signBCD = {beacon_list4[i][1], beacon_list4[i][2], beacon_list4[i][3]};
-            if (getAngleSign(signABC) != angle_sign_[0] || getAngleSign(signABD) != angle_sign_[1] 
+            std::array<Eigen::Vector2d, 3> signABC = {beacon_list4[i][0].value(), beacon_list4[i][1].value(), beacon_list4[i][2].value()};
+            std::array<Eigen::Vector2d, 3> signABD = {beacon_list4[i][0].value(), beacon_list4[i][1].value(), beacon_list4[i][3].value()};
+            std::array<Eigen::Vector2d, 3> signACD = {beacon_list4[i][0].value(), beacon_list4[i][2].value(), beacon_list4[i][3].value()};
+            std::array<Eigen::Vector2d, 3> signBCD = {beacon_list4[i][1].value(), beacon_list4[i][2].value(), beacon_list4[i][3].value()};
+            if (getAngleSign(signABC) != angle_sign_[0] || getAngleSign(signABD) != angle_sign_[1]
             || getAngleSign(signACD) != angle_sign_[2] || getAngleSign(signBCD) != angle_sign_[3])
             {
                 beacon_list4.erase(beacon_list4.begin() + i);
@@ -550,22 +560,22 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
         {
             if (!beacon_list3[i][3].has_value())
             {
-                std::array<std::optional<Eigen::Vector2d>, 3> signABC = {beacon_list3[i][0], beacon_list3[i][1], beacon_list3[i][2]};
+                std::array<Eigen::Vector2d, 3> signABC = {beacon_list3[i][0].value(), beacon_list3[i][1].value(), beacon_list3[i][2].value()};
                 if (getAngleSign(signABC) != angle_sign_[0]) beacon_list3.erase(beacon_list3.begin() + i);
             }
             else if (!beacon_list3[i][2].has_value())
             {
-                std::array<std::optional<Eigen::Vector2d>, 3> signABD = {beacon_list3[i][0], beacon_list3[i][1], beacon_list3[i][3]};
+                std::array<Eigen::Vector2d, 3> signABD = {beacon_list3[i][0].value(), beacon_list3[i][1].value(), beacon_list3[i][3].value()};
                 if (getAngleSign(signABD) != angle_sign_[1]) beacon_list3.erase(beacon_list3.begin() + i);
             }
             else if (!beacon_list3[i][1].has_value())
             {
-                std::array<std::optional<Eigen::Vector2d>, 3> signACD = {beacon_list3[i][0], beacon_list3[i][2], beacon_list3[i][3]};
+                std::array<Eigen::Vector2d, 3> signACD = {beacon_list3[i][0].value(), beacon_list3[i][2].value(), beacon_list3[i][3].value()};
                 if (getAngleSign(signACD) != angle_sign_[2]) beacon_list3.erase(beacon_list3.begin() + i);
             }
             else if (!beacon_list3[i][0].has_value())
             {
-                std::array<std::optional<Eigen::Vector2d>, 3> signBCD = {beacon_list3[i][1], beacon_list3[i][2], beacon_list3[i][3]};
+                std::array<Eigen::Vector2d, 3> signBCD = {beacon_list3[i][1].value(), beacon_list3[i][2].value(), beacon_list3[i][3].value()};
                 if (getAngleSign(signBCD) != angle_sign_[3]) beacon_list3.erase(beacon_list3.begin() + i);
             }
         }

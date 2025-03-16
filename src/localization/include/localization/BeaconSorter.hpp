@@ -25,7 +25,7 @@ public:
         double dst_tol);
 
         std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> find_possible_beacons(
-            const std::array<std::optional<Eigen::Vector2d>, 4>& previous_beacons,
+            const std::optional<std::array<Eigen::Vector2d, 4>>& previous_beacons,
             const std::vector<Eigen::Vector2d>& new_objects_detected);
 
 private:
@@ -35,11 +35,11 @@ private:
     double dst_tol_;
 
     std::map<char, std::vector<Eigen::Vector2d>> sort_comparison(
-        const std::array<std::optional<Eigen::Vector2d>, 4>& previous_beacons,
+        const std::array<Eigen::Vector2d, 4>& previous_beacons,
         const std::vector<Eigen::Vector2d>& new_objects_detected);
 
     std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> find_beacons_prev(
-        const std::array<std::optional<Eigen::Vector2d>, 4>& previous_beacons,
+        const std::array<Eigen::Vector2d, 4>& previous_beacons,
         const std::vector<Eigen::Vector2d>& new_objects_detected);
 
     std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> find_beacons_naive(

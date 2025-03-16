@@ -26,7 +26,7 @@ install(DIRECTORY
 )
 
 #Create cpp executable
-add_executable(beacon_detector src/beacon_detector.cpp)
+add_executable(beacon_detector src/beacon_detector.cpp src/math_lidar.cpp src/BeaconSorter.cpp src/PositionFinder.cpp src/publisher.cpp)
 ament_target_dependencies(beacon_detector rclcpp std_msgs cdf_msgs vision_msgs)
 target_include_directories(beacon_detector PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
