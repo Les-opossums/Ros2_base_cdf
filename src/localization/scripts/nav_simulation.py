@@ -6,65 +6,26 @@ from rclpy.node import Node
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 import time
 import numpy as np
-import matplotlib.pyplot as plt
 from rclpy.executors import MultiThreadedExecutor
-from rclpy.executors import ExternalShutdownException
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 # Import des messages
 from cdf_msgs.action import MoveTo
+from cdf_msgs.srv import PosTrigger
 from geometry_msgs.msg import Point
 import threading
-import asyncio
 import collections
-
-class PositionSender(Node):
-    def __init__(self, nav_simu_node):
-        super().__init__("position_sender_node")
-        self.nav_simu_node = nav_simu_node
-        self._init_parameters()
-        self._init_publishers()
-        self.init_subscribers()
-        self.get_logger().info("Position sender node initialized.")
-
-    def _init_parameters(self) -> None:
-        self.declare_parameters(
-            namespace="",
-            parameters=[
-                ("real_position_topic", rclpy.Parameter.Type.STRING),
-                ("update_period", rclpy.Parameter.Type.DOUBLE),
-            ],
-        )
-        self.update_period = (
-            self.get_parameter("update_period").get_parameter_value().double_value
-        )
-
-    def _init_publishers(self) -> None:
-        self.real_position_topic = (
-            self.get_parameter("real_position_topic").get_parameter_value().string_value
-        )
-        self.pub_real_position = self.create_publisher(Point, self.real_position_topic, 10)
-
-    def init_subscribers(self):
-        self.create_timer(self.update_period, self._publish_position)
-
-    def _publish_position(self):
-        msg = Point()
-        msg.x = float(self.nav_simu_node.position[0])
-        msg.y = float(self.nav_simu_node.position[1])
-        msg.z = self.nav_simu_node.angle
-        self.pub_real_position.publish(msg)
 
 class NavSimulation(Node):
 
     def __init__(self):
         super().__init__("nav_simulation_node")
-        self.count = 0
-
         self._init_parameters()
         self._randomize_position()
+        self._init_publishers()
         self._init_server_actions()
-        self.get_logger().info("Nav simulation node initialized.")
+        self._init_services()
+        self.get_logger().info(f"Nav simulation node initialized.")
 
 
     def _init_parameters(self) -> None:
@@ -73,6 +34,7 @@ class NavSimulation(Node):
             parameters=[
                 ("boundaries", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("real_position_topic", rclpy.Parameter.Type.STRING),
+                ("trigger_position_srv", rclpy.Parameter.Type.STRING),
                 ("random_moves", rclpy.Parameter.Type.BOOL),
                 ("moveto_action", rclpy.Parameter.Type.STRING),
                 ("compute_period", rclpy.Parameter.Type.DOUBLE),
@@ -106,6 +68,12 @@ class NavSimulation(Node):
             self._goal_handle = None
             self.handle_accepted_callback = self._single_handle_accepted_callback
 
+    def _init_publishers(self):
+        self.real_position_topic = (
+            self.get_parameter("real_position_topic").get_parameter_value().string_value
+        )
+        self.pub_real_position = self.create_publisher(Point, self.real_position_topic, 10)
+
     def _init_server_actions(self):
         if not self.random_moves:
             self.moveto_action = (
@@ -124,6 +92,18 @@ class NavSimulation(Node):
         else:
             self.create_timer(self.compute_period, self._random_moves)
 
+    def _init_services(self):
+        self.trigger_position_srv = (
+                self.get_parameter("trigger_position_srv").get_parameter_value().string_value
+            )
+        self.srv_trigger_position = self.create_service(PosTrigger, self.trigger_position_srv, self._send_position)
+
+    def _send_position(self, request, response):
+        response.pos.x = float(self.position[0])
+        response.pos.y = float(self.position[1])
+        response.pos.z = float(self.angle)
+        return response
+    
     def _single_handle_accepted_callback(self, goal_handle):
         with self._goal_lock:
             # This server only allows one goal at a time
@@ -186,6 +166,7 @@ class NavSimulation(Node):
                                     self.angle == goal_handle.request.goal.z) 
                 # goal_handle.publish_feedback(moveto_feedback)
                 self.real_time = time.time()
+                self.pub_real_position.publish(moveto_feedback.current_position)
                 time.sleep(self.compute_period)
             if not self.blocking:
                 with self._goal_lock:
@@ -239,33 +220,18 @@ class NavSimulation(Node):
         self.angle = (self.angle + real_delta * va 
             if abs(real_delta * va) < abs(dangle)
             else self.obj[2])
-        
-    def plot_positions(self):
-        plt.xlim(0, 2)
-        plt.ylim(0, 3)
-        plt.plot(
-            self.position[0],
-            self.position[1],
-            "go",
-        )
-        ax = plt.gca()
-        ax.set_aspect('equal', adjustable='box')
-        plt.show()
-
-def timer_executor(node):
-    rclpy.spin(node)
 
 def main(args=None):
+    rclpy.init(args=args)
+    nav_simu_node = NavSimulation()
+    executor = MultiThreadedExecutor()
     try:
-        rclpy.init(args=args)
-        nav_simu_node = NavSimulation()
-        timer_node = PositionSender(nav_simu_node)
-        timer_thread = threading.Thread(target=timer_executor, args=(timer_node,), daemon=True)
-        timer_thread.start()
-        executor = MultiThreadedExecutor()
         rclpy.spin(nav_simu_node, executor=executor)
-    except (KeyboardInterrupt, ExternalShutdownException):
+    except Exception:
         pass
+    finally:
+        nav_simu_node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
