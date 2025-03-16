@@ -103,10 +103,11 @@ class LidarSimulation(Node):
     def _publish_objects(self, msg) -> None:
         self._update(msg)
         msg = Obstacles()
-        for beacon in [self.new_beacons[0], self.new_beacons[1], self.new_beacons[2], self.new_beacons[3]]:
+        for i in [2, 3 ,0, 1]:
+            self.get_logger().info(f"ind {i}: x={self.new_beacons[i][0, 0]}, y={self.new_beacons[i][1, 0]}")
             circle = CircleObstacle()
-            circle.center.x = beacon[0, 0]
-            circle.center.y = beacon[1, 0]
+            circle.center.x = self.new_beacons[i][0, 0]
+            circle.center.y = self.new_beacons[i][1, 0]
             circle.radius = 0.1
             msg.circles.append(circle)
         # circle = CircleObstacle()

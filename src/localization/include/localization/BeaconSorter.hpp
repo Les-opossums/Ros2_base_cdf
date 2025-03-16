@@ -12,6 +12,7 @@
 #include <cmath>
 #include <Eigen/Dense>
 
+#include "rclcpp/rclcpp.hpp"
 #include "localization/math_lidar.hpp"
 
 class BeaconSorter
