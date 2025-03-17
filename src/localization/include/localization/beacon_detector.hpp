@@ -61,13 +61,12 @@ private:
     // ROS 2 communication
     rclcpp::Publisher<cdf_msgs::msg::LidarLoc>::SharedPtr pub_location_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_debug_;
-    // rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_display_;
 
     rclcpp::Subscription<cdf_msgs::msg::Obstacles>::SharedPtr sub_object_;
     rclcpp::Subscription<cdf_msgs::msg::MergedData>::SharedPtr sub_robot_position_;
 
     // Localization Objects
-    // std::shared_ptr<PositionFinder> position_finder_;
+    std::shared_ptr<PositionFinder> position_finder_;
     std::shared_ptr<BeaconSorter> beacon_sorter_;
 };
 

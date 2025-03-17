@@ -1,7 +1,16 @@
+"""Compute the position of the robot using the beacons estmated with the lidar."""
 import numpy as np
-from .math_lidar import *
+from .math_lidar import (
+    chgt_base_plateau_to_robot,
+    dt,
+    removearray,
+    find_angle,
+    find_position,
+)
+
 
 class PositionFinder:
+    """Find the best estimation of the position."""
 
     def __init__(
         self, fixed_beacons, boundaries, precision=0.1, init_position=None
@@ -30,6 +39,7 @@ class PositionFinder:
 
     # 1
     def _update_data(self) -> None:
+        """Update all data of the node before starting the computation."""
         self.tour_repr += 1
         if not self.true_valor and self.initialisation:
             self.tour_test += 1
@@ -38,11 +48,14 @@ class PositionFinder:
         if self.tour_test >= 30:
             self.tour_test = 0
             self.initialisation = False
+            self.current_robot = None
+            self.previous_robot = None
         if not self.initialisation:
             self.tour_reinit += 1
 
     # 3
     def _compare_previous_found_positions(self, potential_robot_datas):
+        """Compare estimated positions with the previous position obtained."""
         robot_datas = potential_robot_datas.copy()
         dst_min = robot_datas[0]["err"]
         best_match = robot_datas[0]
@@ -60,6 +73,7 @@ class PositionFinder:
 
     # 4
     def _recreate_beacons(self) -> None:
+        """Recreate beacons from the known position and beacons in world frame."""
         for i in range(4):
             if self.current_robot["beacons"][i] is None:
                 self.current_robot["beacons"][i] = chgt_base_plateau_to_robot(
@@ -68,6 +82,7 @@ class PositionFinder:
 
     # 5
     def _find_robots_on_plateau(self, obstacles) -> None:
+        """Find other robots on board using its current position."""
         cos_theta = np.cos(self.current_robot["position"][2])
         sin_theta = np.sin(self.current_robot["position"][2])
         OtoR = np.array(
@@ -90,6 +105,7 @@ class PositionFinder:
 
     # 2
     def _init_finding(self, potential_robot_datas) -> None:
+        """Initialize the position (Fixing)."""
         if len(self.registre_init) == 0:
             liste_tool_globale = []
             liste_balise = potential_robot_datas.copy()
@@ -178,6 +194,7 @@ class PositionFinder:
 
     # Used in beacon_detector_node.py
     def search_pos(self, nb_potential_beacons, potential_beacons, obstacles) -> None:
+        """Look for the best estimation of the robot position."""
         self._update_data()
         potential_robot_datas = find_position(
             potential_beacons,

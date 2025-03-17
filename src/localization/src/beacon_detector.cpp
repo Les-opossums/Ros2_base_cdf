@@ -22,7 +22,6 @@ void BeaconDetectorNode::init_main_parameters()
     this->declare_parameter("object_topic", "");
     this->declare_parameter("robot_position_topic", "");
     this->declare_parameter("position_topic", "");
-    RCLCPP_ERROR(this->get_logger(), "Invalid team color");
 
     // Get parameters
     enable_wait_color_ = this->get_parameter("enable_wait_color").as_bool();
@@ -30,7 +29,7 @@ void BeaconDetectorNode::init_main_parameters()
     available_colors_ = this->get_parameter("available_colors").as_string_array();
     default_color_ = this->get_parameter("default_color").as_string();
     team_color_ = default_color_;
-    
+
     // Subscribe to color topic if enabled
     if (enable_wait_color_) {
         this->create_subscription<std_msgs::msg::String>(
@@ -88,25 +87,27 @@ void BeaconDetectorNode::init_parameters()
         fixed_beacons_[i] = {beacons[2 * i], beacons[2 * i + 1]};
     }
 
-    std::array<std::optional<Eigen::Vector2d>, 3> signABC = {fixed_beacons_[0], fixed_beacons_[1], fixed_beacons_[2]};
-    std::array<std::optional<Eigen::Vector2d>, 3> signABD = {fixed_beacons_[0], fixed_beacons_[1], fixed_beacons_[3]};
-    std::array<std::optional<Eigen::Vector2d>, 3> signACD = {fixed_beacons_[0], fixed_beacons_[2], fixed_beacons_[3]};
-    std::array<std::optional<Eigen::Vector2d>, 3> signBCD = {fixed_beacons_[1], fixed_beacons_[2], fixed_beacons_[3]};
+    std::array<Eigen::Vector2d, 3> signABC = {fixed_beacons_[0], fixed_beacons_[1], fixed_beacons_[2]};
+    std::array<Eigen::Vector2d, 3> signABD = {fixed_beacons_[0], fixed_beacons_[1], fixed_beacons_[3]};
+    std::array<Eigen::Vector2d, 3> signACD = {fixed_beacons_[0], fixed_beacons_[2], fixed_beacons_[3]};
+    std::array<Eigen::Vector2d, 3> signBCD = {fixed_beacons_[1], fixed_beacons_[2], fixed_beacons_[3]};
     angle_sign[0] = getAngleSign(signABC);
     angle_sign[1] = getAngleSign(signABD);
     angle_sign[2] = getAngleSign(signACD);
     angle_sign[3] = getAngleSign(signBCD);
 
-    // SKIP POSITION FINDER FOR NOW 
-    std::array<double, 6> dst_beacons = {dt(fixed_beacons_[0], fixed_beacons_[1]), 
-        dt(fixed_beacons_[0], fixed_beacons_[2]), 
-        dt(fixed_beacons_[1], fixed_beacons_[2]), 
-        dt(fixed_beacons_[0], fixed_beacons_[3]), 
-        dt(fixed_beacons_[1], fixed_beacons_[3]), 
+    // SKIP POSITION FINDER FOR NOW
+    std::array<double, 6> dst_beacons = {dt(fixed_beacons_[0], fixed_beacons_[1]),
+        dt(fixed_beacons_[0], fixed_beacons_[2]),
+        dt(fixed_beacons_[1], fixed_beacons_[2]),
+        dt(fixed_beacons_[0], fixed_beacons_[3]),
+        dt(fixed_beacons_[1], fixed_beacons_[3]),
         dt(fixed_beacons_[2], fixed_beacons_[3])};
 
     beacon_sorter_ = std::make_shared<BeaconSorter>(dst_beacons, angle_sign, angle_tolerance_, distance_tolerance_);
-    RCLCPP_INFO(this->get_logger(), "Initialized beacon_detector_node");
+    position_finder_ = std::make_shared<PositionFinder>(fixed_beacons_, boundaries_, distance_tolerance_, init_position_);
+
+    RCLCPP_INFO(this->get_logger(), "Initialized beacon_detector_node.");
 }
 
 void BeaconDetectorNode::init_publishers()
@@ -130,11 +131,21 @@ void BeaconDetectorNode::init_subscribers()
 
 void BeaconDetectorNode::object_callback(const cdf_msgs::msg::Obstacles::SharedPtr msg)
 {
-    RCLCPP_INFO(this->get_logger(), "Processing obstacle data...");
-    // if (!enable_robot_position_reception_)
-    // {
-    // }
-    std::array<std::optional<Eigen::Vector2d>, 4> previous_beacons = {std::nullopt};
+    if ((!enable_robot_position_reception_ || !position_finder_->previous_robot.has_value()) && position_finder_->current_robot.has_value())
+    {
+        position_finder_->previous_robot = position_finder_->current_robot;
+    }
+    std::optional<std::array<Eigen::Vector2d, 4>> previous_beacons;
+
+    if (position_finder_->previous_robot.has_value())
+    {
+        previous_beacons = position_finder_->recreate_beacons(position_finder_->previous_robot.value());
+    }
+    else
+    {
+        previous_beacons = {std::nullopt};
+    }
+
     std::vector<Eigen::Vector2d> new_objects_detected;
     for (std::size_t i = 0; i < msg->circles.size(); i++)
     {
@@ -145,20 +156,32 @@ void BeaconDetectorNode::object_callback(const cdf_msgs::msg::Obstacles::SharedP
     }
     std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> beacons_result;
     beacons_result = beacon_sorter_->find_possible_beacons(previous_beacons, new_objects_detected);
-    RCLCPP_INFO(this->get_logger(), "Got %d beacons found with size %ld", beacons_result.first, beacons_result.second.size());
-    for (std::size_t i = 0; i < beacons_result.second.size(); i++){
-        for (int j = 0; j < 4; j++)
+    // RCLCPP_INFO(this->get_logger(), "Got %d beacons found with size %ld", beacons_result.first, beacons_result.second.size());
+    // for (std::size_t i = 0; i < beacons_result.second.size(); i++){
+    //     for (int j = 0; j < 4; j++)
+    //     {
+    //         if (beacons_result.second[i][j].has_value())
+    //         {
+    //             auto vec = beacons_result.second[i][j].value();
+    //             RCLCPP_INFO(this->get_logger(), "For %d: (%f, %f)", j, vec.x(), vec.y());
+    //         }
+    //     }
+    // }
+
+    if (beacons_result.first > 1)
+    {
+        std::optional<Eigen::Vector3d> position_found = position_finder_->search_pos(beacons_result.first, beacons_result.second, new_objects_detected);
+        if (position_found.has_value())
         {
-            if (beacons_result.second[i][j].has_value())
-            {
-                auto vec = beacons_result.second[i][j].value();
-                RCLCPP_INFO(this->get_logger(), "For %d: (%f, %f)", j, vec.x(), vec.y());
-            }
-            else
-            {
-                RCLCPP_INFO(this->get_logger(), "No INFO For %d", j);
-            }
+            // RCLCPP_INFO(this->get_logger(), "Result: %f %f %f", position_found->x(), position_found->y(), position_found->z());
+            std::vector<Eigen::Vector2d> others;
+            cdf_msgs::msg::LidarLoc msg = publicate_donnees_lidar(position_found.value(), others);
+            pub_location_->publish(msg);
         }
+        // else
+        // {
+        //     RCLCPP_INFO(this->get_logger(), "UNLUCKY BUT COMPILE!");
+        // }
     }
 }
 

@@ -25,42 +25,9 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}/
 )
 
-add_library(math_lidar src/math_lidar.cpp)
-target_include_directories(math_lidar PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-  ${EIGEN3_INCLUDE_DIRS}
-)
-
-add_library(publisher src/publisher.cpp)
-target_include_directories(publisher PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-  ${EIGEN3_INCLUDE_DIRS}
-)
-ament_target_dependencies(publisher geometry_msgs rclcpp std_msgs cdf_msgs vision_msgs)
-
-add_library(BeaconSorter src/BeaconSorter.cpp)
-target_include_directories(BeaconSorter PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-  ${EIGEN3_INCLUDE_DIRS}
-)
-
-ament_target_dependencies(BeaconSorter geometry_msgs rclcpp std_msgs cdf_msgs vision_msgs)
-
-# add_library(PositionFinder src/PositionFinder.cpp)
-# target_include_directories(PositionFinder PUBLIC
-#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-#   $<INSTALL_INTERFACE:include>
-#   ${EIGEN3_INCLUDE_DIRS}
-# )
-
-# ament_target_dependencies(PositionFinder geometry_msgs rclcpp std_msgs cdf_msgs vision_msgs)
-
 #Create cpp executable
 add_executable(beacon_detector src/beacon_detector.cpp src/math_lidar.cpp src/BeaconSorter.cpp src/PositionFinder.cpp src/publisher.cpp)
-ament_target_dependencies(beacon_detector rclcpp std_msgs cdf_msgs)
+ament_target_dependencies(beacon_detector rclcpp std_msgs cdf_msgs vision_msgs)
 target_include_directories(beacon_detector PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
@@ -101,14 +68,14 @@ if(BUILD_TESTING)
   # #   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   # #   $<INSTALL_INTERFACE:include>
   # # )
-  
+
   # if(TARGET unit_vector)
   #   target_include_directories(unit_vector PUBLIC
   #     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   #     $<BUILD_INTERFACE:${EIGEN3_INCLUDE_DIRS}>
   #     $<INSTALL_INTERFACE:include>
   #   )
-    
+
   #   # If the test depends on other packages:
   #   # ament_target_dependencies(unit_vector rclcpp std_msgs ...)
   # endif()

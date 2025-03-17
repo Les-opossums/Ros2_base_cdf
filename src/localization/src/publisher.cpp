@@ -1,20 +1,19 @@
 #include "localization/publisher.hpp"
 
-cdf_msgs::msg::Poses2D publicate_donnees_lidar(const std::vector<Eigen::Vector3d>& robot_datas) {
-    cdf_msgs::msg::Poses2D rdatas;
-    rdatas.rpos.position.x = robot_datas[0].x();
-    rdatas.rpos.position.y = robot_datas[0].y();
-    rdatas.rpos.theta = robot_datas[0].z();
+cdf_msgs::msg::LidarLoc publicate_donnees_lidar(const Eigen::Vector3d& robot_position, const std::vector<Eigen::Vector2d>& others) {
+    cdf_msgs::msg::LidarLoc pos;
+    pos.robot_position.x = robot_position.x();
+    pos.robot_position.y = robot_position.y();
+    pos.robot_position.z = robot_position.z();
 
-    if (robot_datas.size() > 5){
-        for (long unsigned int i=5; i<robot_datas.size(); i++) {
-            vision_msgs::msg::Point2D opos;
-            opos.x = robot_datas[i].x();
-            opos.y = robot_datas[i].y();
-            rdatas.opos.push_back(opos);
-        }    
+
+    for (std::size_t i=0; i < others.size(); i++) {
+        geometry_msgs::msg::Point opos;
+        opos.x = others[i].x();
+        opos.y = others[i].y();
+        pos.other_robot_position.push_back(opos);
     }
-    return rdatas;
+    return pos;
 }
 
 cdf_msgs::msg::Poses2D publicate_donnees_zc(const std::vector<Eigen::Vector2d>& objects) {
