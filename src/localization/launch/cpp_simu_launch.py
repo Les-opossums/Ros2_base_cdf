@@ -3,23 +3,19 @@ from ament_index_python.packages import get_package_share_directory  # type: ign
 from launch import LaunchDescription
 from launch import LaunchIntrospector  # noqa: E402
 from launch_ros.actions import Node  # type: ignore
-import yaml
 
 
 def generate_launch_description():
     ld = LaunchDescription()
-
-    namespace = "main_robot"
 
     config = os.path.join(
         get_package_share_directory("localization"),
         "config",
         "simu_config.yaml",
     )
-    
+
     node_nav_simulation = Node(
         package="localization",
-        namespace=namespace,
         executable="nav_simulation.py",
         name="nav_simulation_node",
         parameters=[config],
@@ -27,7 +23,6 @@ def generate_launch_description():
 
     node_position_sender = Node(
         package="localization",
-        namespace=namespace,
         executable="position_sender.py",
         name="position_sender_node",
         parameters=[config],
@@ -35,7 +30,6 @@ def generate_launch_description():
 
     node_lidar_simulation = Node(
         package="localization",
-        namespace=namespace,
         executable="lidar_simulation.py",
         name="lidar_simulation_node",
         parameters=[config],
@@ -43,7 +37,6 @@ def generate_launch_description():
 
     node_beacon_detector = Node(
         package="localization",
-        namespace=namespace,
         executable="beacon_detector",
         name="beacon_detector_node",
         parameters=[config],

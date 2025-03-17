@@ -173,15 +173,15 @@ void BeaconDetectorNode::object_callback(const cdf_msgs::msg::Obstacles::SharedP
         std::optional<Eigen::Vector3d> position_found = position_finder_->search_pos(beacons_result.first, beacons_result.second, new_objects_detected);
         if (position_found.has_value())
         {
-            RCLCPP_INFO(this->get_logger(), "Result: %f %f %f", position_found->x(), position_found->y(), position_found->z());
+            // RCLCPP_INFO(this->get_logger(), "Result: %f %f %f", position_found->x(), position_found->y(), position_found->z());
             std::vector<Eigen::Vector2d> others;
             cdf_msgs::msg::LidarLoc msg = publicate_donnees_lidar(position_found.value(), others);
             pub_location_->publish(msg);
         }
-        else
-        {
-            RCLCPP_INFO(this->get_logger(), "UNLUCKY BUT COMPILE!");
-        }
+        // else
+        // {
+        //     RCLCPP_INFO(this->get_logger(), "UNLUCKY BUT COMPILE!");
+        // }
     }
 }
 

@@ -37,11 +37,11 @@ class LidarSimulation(Node):
                 ("object_topic", rclpy.Parameter.Type.STRING),
                 ("update_position_topic", rclpy.Parameter.Type.STRING),
                 ("color_service", rclpy.Parameter.Type.STRING),
-                ("team_color", rclpy.Parameter.Type.STRING),
+                ("default_color", rclpy.Parameter.Type.STRING),
             ],
         )
         self.team_color = (
-            self.get_parameter("team_color").get_parameter_value().string_value
+            self.get_parameter("default_color").get_parameter_value().string_value
         )
         self.boundaries = (
             self.get_parameter("boundaries").get_parameter_value().double_array_value
@@ -112,17 +112,17 @@ class LidarSimulation(Node):
         self._update(msg)
         msg = Obstacles()
         for i in [2, 3, 0]:
-            self.get_logger().info(
-                f"ind {i}: x={self.new_beacons[i][0, 0]}, y={self.new_beacons[i][1, 0]}"
-            )
+            # self.get_logger().info(
+            #     f"ind {i}: x={self.new_beacons[i][0, 0]}, y={self.new_beacons[i][1, 0]}"
+            # )
             circle = CircleObstacle()
             circle.center.x = self.new_beacons[i][0, 0]
             circle.center.y = self.new_beacons[i][1, 0]
             circle.radius = 0.1
             msg.circles.append(circle)
-        self.get_logger().info(
-            f"x: {self.position[0]}, y: {self.position[1]}: z:{self.angle}"
-        )
+        # self.get_logger().info(
+        #     f"x: {self.position[0]}, y: {self.position[1]}: z:{self.angle}"
+        # )
         # circle = CircleObstacle()
         # circle.center.x = self.new_ennemis[0, 0]
         # circle.center.y = self.new_ennemis[1, 0]

@@ -1,5 +1,4 @@
-main_robot:
-  orchestrator_gui_node:
-    ros__parameters:
-      position_topic: position_out
-      moveto_action: moveto
+orchestrator_gui_node:
+  ros__parameters:
+    position_topic: position_out
+    moveto_action: moveto
