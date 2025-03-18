@@ -30,6 +30,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/GoalDetection.msg"
   "msg/CamCommand.msg"
   "msg/Poses2D.msg"
+  "msg/PositionMap.msg"
   "action/ActionSequencer.action"
   "action/MoveTo.action"
   "srv/Init.srv"

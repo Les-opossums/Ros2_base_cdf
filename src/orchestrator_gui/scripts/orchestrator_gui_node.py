@@ -17,109 +17,70 @@ from cdf_msgs.action import MoveTo
 
 
 class MyROSNode(Node):
-    def __init__(self, update_callback):
+    def __init__(self, parent=None):
         super().__init__('gui_node')
+        self.parent = parent
         self._init_parameters()
         self._init_subscriber()
         self._init_client_action()
         self.get_logger().info("Orchestrator GUI node initialized.")
         
-        self.update_callback = update_callback
-
     def _init_parameters(self) -> None:
         self.declare_parameters(
             namespace="",
             parameters=[
                 ("position_topic", rclpy.Parameter.Type.STRING),
                 ("moveto_action", rclpy.Parameter.Type.STRING),
+                ("robot_names", rclpy.Parameter.Type.STRING_ARRAY),
             ],
         )
+        self.robot_names = self.get_parameter("robot_names").get_parameter_value().string_array_value
 
     def _init_subscriber(self):
         self.position_topic = (
             self.get_parameter("position_topic").get_parameter_value().string_value
         )
-        self.sub_position = self.create_subscription(
-            LidarLoc,
-            self.position_topic,
-            self.position_callback,
-            10
-        )
+        for name in self.robot_names:
+            self.create_subscription(
+                LidarLoc,
+                name + '/' + self.position_topic,
+                lambda msg: self.position_callback(msg, name),
+                10
+            )
 
     def _init_client_action(self):
         self.moveto_action = (
             self.get_parameter("moveto_action").get_parameter_value().string_value
         )
-        self.moveto_client = ActionClient(self, MoveTo, self.moveto_action)
+        self.get_logger().info(f"Im sending information to {'/' + self.robot_names[0] + '/' + self.moveto_action} ")
 
-    def send_goal(self, x, y):
+        self.moveto_client = {name: ActionClient(self, MoveTo, name + '/' + self.moveto_action) for name in self.robot_names}
+
+    def send_goal(self, x, y, name):
         goal_msg = MoveTo.Goal()
         goal_msg.goal = Point()
         goal_msg.goal.x = x
         goal_msg.goal.y = y
         goal_msg.goal.z = 0.
+        self.get_logger().info(f"sending to {name}")
+        self.moveto_client[name].wait_for_server()
 
-        self.moveto_client.wait_for_server()
+        return self.moveto_client[name].send_goal_async(goal_msg)
 
-        return self.moveto_client.send_goal_async(goal_msg)
-
-    def send_future_position(self, x, y):
-        future = self.send_goal(x, y)
+    def send_future_position(self, x, y, name):
+        self.get_logger().info(f"Im sending information")
+        future = self.send_goal(x, y, name)
 
         rclpy.spin_until_future_complete(self, future)
 
-    def publish_message(self, message_text: str):
-        msg = String()
-        msg.data = message_text
-        self.publisher_.publish(msg)
-
-    def position_callback(self, msg):
-        self.update_callback(msg.robot_position)
-
-class MapView(QtWidgets.QGraphicsView):
-    def __init__(self, parent=None):
-        image_path = os.path.join(get_package_share_directory("orchestrator_gui"), "images")
-        map = os.path.join(image_path, "plateau.png")
-        icon = os.path.join(image_path, "robot.png")
-        super().__init__(parent)
-        # Création de la scène
-        self.scene = QtWidgets.QGraphicsScene(self)
-        self.setScene(self.scene)
-        
-        # Chargement de l'image de la carte
-        self.map_pixmap = QtGui.QPixmap(map).scaled(1000, 1000, QtCore.Qt.KeepAspectRatio)
-        self.map_item = QtWidgets.QGraphicsPixmapItem(self.map_pixmap)
-        self.scene.addItem(self.map_item)
-        
-        # Chargement de l'icône et ajout d'un item déplaçable
-        self.icon_pixmap = QtGui.QPixmap(icon).scaled(100, 100, QtCore.Qt.KeepAspectRatio)
-        self.icon_item = DraggablePixmapItem(self.icon_pixmap)
-        self.icon_item.setPos(5, 5)  # Position initiale
-        self.scene.addItem(self.icon_item)
-        
-        # Timer pour déplacer l'icône toutes les 3 secondes
-        self.move_timer = QtCore.QTimer(self)
-        self.move_timer.timeout.connect(self.move_icon)
-        self.move_timer.start(3000)  # 3000 millisecondes = 3 secondes
-        
-        self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
-
-    def move_icon(self):
-        # Récupération de la position actuelle de l'icône
-        current_pos = self.icon_item.pos()
-        # Création d'une nouvelle position en ajoutant 10 pixels à la coordonnée x
-        new_pos = QtCore.QPointF(current_pos.x() + 10, current_pos.y())
-        self.icon_item.setPos(new_pos)
-        print(f"Icône déplacée vers {new_pos}")
-        current_rotation = self.icon_item.rotation()
-        new_rotation = current_rotation + 15
-        self.icon_item.setRotation(new_rotation)
-        print(f"Icône pivotée vers {new_rotation} degrés")
+    def position_callback(self, msg, name):
+        self.parent.update_robot_position(msg.robot_position, name)
 
 class MapViewRosConnected(QtWidgets.QGraphicsView):
-    def __init__(self, parent=None):
+    def __init__(self, name, parent=None):
         super().__init__()
         self.parent = parent
+        self.name = name
         image_path = os.path.join(get_package_share_directory("orchestrator_gui"), "images")
         map = os.path.join(image_path, "plateau.png")
         icon = os.path.join(image_path, "robot.png")
@@ -130,7 +91,7 @@ class MapViewRosConnected(QtWidgets.QGraphicsView):
         # Chargement de l'image de la carte
         self.map_pixmap = QtGui.QPixmap(map).scaled(800, 800, QtCore.Qt.KeepAspectRatio)
         self.map_item = QtWidgets.QGraphicsPixmapItem(self.map_pixmap)
-        self.map_item.mousePressEvent = self.send_pos_goal
+        self.map_item.mousePressEvent = lambda event: self.send_pos_goal(event, self.name)
         self.scene.addItem(self.map_item)
         
         # Chargement de l'icône et ajout d'un item déplaçable
@@ -143,9 +104,9 @@ class MapViewRosConnected(QtWidgets.QGraphicsView):
         self.scene.addItem(self.icon_item)
         self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
 
-    def send_pos_goal(self, event):
+    def send_pos_goal(self, event, name):
         x, y = self.get_real_pos(event.pos().x(), event.pos().y())
-        self.parent.send_future_position(x, y)
+        self.parent.send_future_position(x, y, name)
 
     def get_real_pos(self, x, y):
         map_rect = self.map_item.boundingRect()
@@ -179,8 +140,9 @@ class DraggablePixmapItem(QtWidgets.QGraphicsPixmapItem):
 class MyWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        p2 = MapViewRosConnected(self)
-        self.ros_node = MyROSNode(p2.update_robot_position)
+        self.p2 = {}
+        self.p2["main_robot"] = MapViewRosConnected("main_robot", self)
+        self.ros_node = MyROSNode(self)
 
         self.setWindowTitle("Subscriber ROS2 - Mise à jour d'un texte")
         self.setGeometry(0, 0, 800, 500)
@@ -194,30 +156,27 @@ class MyWindow(QtWidgets.QMainWindow):
         # Add Pages for need
         self.comboBox = QtWidgets.QComboBox()
         self.pageComboBox = QtWidgets.QComboBox()
-        self.comboBox.addItems(["Page 1", "Page 2", "Page 3"])
+        self.comboBox.addItems(["Page 1", "Page 2"])
         self.comboBox.currentIndexChanged.connect(self.change_page)
 
         p1 = MyWidget('Heyooo')
-        p3 = MapView()
-        self.pages = [p1, p2, p3]
+        self.pages = [p1, self.p2["main_robot"]]
 
         self.label = QtWidgets.QLabel("En attente de message...", self)
-        self.button = QtWidgets.QPushButton("Publier un message ROS")
-        self.button.clicked.connect(self.on_button_clicked)
 
-        self.layout.addWidget(self.button)
         self.layout.addWidget(self.label)
         self.layout.addWidget(self.comboBox)
         self.layout.addWidget(self.stackedWidgets)
 
         self.stackedWidgets.addWidget(p1)
-        self.stackedWidgets.addWidget(p2)
-        self.stackedWidgets.addWidget(p3)
-
+        self.stackedWidgets.addWidget(self.p2["main_robot"])
         self._connect_to_ros()
-        
-    def send_future_position(self, x, y):
-        self.ros_node.send_future_position(x, y)
+    
+    def update_robot_position(self, msg, name):
+        self.p2[name].update_robot_position(msg)
+
+    def send_future_position(self, x, y, name):
+        self.ros_node.send_future_position(x, y, name)
 
     def _connect_to_ros(self):
         # QTimer pour intégrer le traitement ROS2 dans la boucle Qt
@@ -230,10 +189,6 @@ class MyWindow(QtWidgets.QMainWindow):
         
     def spin_ros(self):
         rclpy.spin_once(self.ros_node, timeout_sec=0.001)
-
-    def on_button_clicked(self):
-        # Lors du clic, on publie un message sur le topic 'chatter'
-        self.ros_node.publish_message("Hello ROS2!")
 
 def main():
     rclpy.init(args=None)

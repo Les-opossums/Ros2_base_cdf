@@ -11,7 +11,7 @@ def generate_launch_description():
         "config",
         "simu_config.yaml",
     )
-
+    
     nodes = []
     with open(param_file, 'r') as file:
         params = yaml.safe_load(file)
@@ -25,6 +25,14 @@ def generate_launch_description():
             parameters=[param_file, {"robot_names": top_keys}],
     )
     nodes.append(node_position_sender)
+
+    node_orchestrator_gui = Node(
+        package="orchestrator_gui",
+        executable="orchestrator_gui_node.py",
+        name="orchestrator_gui_node",
+        parameters=[param_file, {"robot_names": top_keys}],
+    )
+    nodes.append(node_orchestrator_gui)
 
     for key in top_keys:
         node_lidar_simulation = Node(
