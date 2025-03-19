@@ -246,7 +246,7 @@ class BeaconDetectorNode(Node):
         :param msg: The message containing the detected objects
         :type msg: Obstacles
         """
-
+        # begin = self.get_clock().now()
         if (
             not self.enable_robot_position_reception
             or self.position_finder.previous_robot is None
@@ -278,6 +278,8 @@ class BeaconDetectorNode(Node):
             )
             if position_found is not None:
                 self.pub_location.publish(publicate_donnees_lidar(position_found))
+        # now = self.get_clock().now()
+        # self.get_logger().info(f"Diff time: {now.nanoseconds - begin.nanoseconds}")
 
     def robot_position_callback(self: Node, msg: MergedData) -> None:
         """

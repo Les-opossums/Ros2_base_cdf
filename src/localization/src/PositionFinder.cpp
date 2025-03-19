@@ -102,7 +102,9 @@ std::vector<Eigen::Vector2d> PositionFinder::find_robots_on_plateau(const std::v
     {
         Eigen::Vector3d oP = OtoR * Eigen::Vector3d(obstacle.x(), obstacle.y(), 1);
         if (oP.x() > boundaries_[0] && oP.x() < boundaries_[1] &&
-            oP.y() > boundaries_[2] && oP.y() < boundaries_[3])
+            oP.y() > boundaries_[2] && oP.y() < boundaries_[3] &&
+            !(abs(oP.x() - current_robot->x()) < 0.2 &&
+            abs(oP.y() - current_robot->y()) < 0.2 ))
         {
             Eigen::Vector2d other(oP.x(), oP.y());
             other_robots.push_back(other);

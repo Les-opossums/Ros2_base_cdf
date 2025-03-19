@@ -9,8 +9,9 @@ from rclpy.node import Node
 import numpy as np
 
 # Import des messages
+from rclpy.executors import ExternalShutdownException
 from geometry_msgs.msg import Point
-from cdf_msgs.msg import Obstacles, CircleObstacle
+from cdf_msgs.msg import Obstacles, CircleObstacle, PositionMap
 from std_srvs.srv import Trigger
 
 
@@ -87,13 +88,13 @@ class LidarSimulation(Node):
             .string_value
         )
         self.sub_real_position = self.create_subscription(
-            Point, self.update_position_topic, self._publish_objects, 10
+            PositionMap, self.update_position_topic, self._publish_objects, 10
         )
 
     def _update(self, msg) -> None:
         """Update the position and beacons in robot frame."""
-        self.position = np.array([[msg.x], [msg.y], [1]])
-        self.angle = msg.z
+        self.position = np.array([[msg.robot.x], [msg.robot.y], [1]])
+        self.angle = msg.robot.z
         self.OtoR = np.array(
             [
                 [np.cos(self.angle), -np.sin(self.angle), self.position[0, 0]],
@@ -105,7 +106,10 @@ class LidarSimulation(Node):
             np.linalg.inv(self.OtoR) @ beacon for beacon in self.fixed_beacons
         ]
 
-        # self.new_ennemis = np.linalg.inv(self.OtoR) @ self.random_ennemi
+        self.new_ennemis = []
+        for e in msg.ennemis:
+            e_w = np.array([[e.x], [e.y], [1]])
+            self.new_ennemis.append(np.linalg.inv(self.OtoR) @ e_w)
 
     def _publish_objects(self, msg) -> None:
         """Publish all the objects displayed."""
@@ -120,12 +124,17 @@ class LidarSimulation(Node):
             circle.center.y = self.new_beacons[i][1, 0]
             circle.radius = 0.1
             msg.circles.append(circle)
+
+        for e in self.new_ennemis:
+            circle = CircleObstacle()
+            circle.center.x = e[0, 0]
+            circle.center.y = e[1, 0]
+            circle.radius = 0.1
+            msg.circles.append(circle)
         # self.get_logger().info(
         #     f"x: {self.position[0]}, y: {self.position[1]}: z:{self.angle}"
         # )
         # circle = CircleObstacle()
-        # circle.center.x = self.new_ennemis[0, 0]
-        # circle.center.y = self.new_ennemis[1, 0]
         # circle.radius = 0.1
         # msg.circles.append(circle)
         self.pub_object.publish(msg)
@@ -137,7 +146,7 @@ def main(args=None):
     lidar_simulation_node = LidarSimulation()
     try:
         rclpy.spin(lidar_simulation_node)
-    except Exception:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         lidar_simulation_node.destroy_node()

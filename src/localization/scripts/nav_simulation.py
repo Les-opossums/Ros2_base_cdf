@@ -79,10 +79,12 @@ class NavSimulation(Node):
             self.moveto_action = (
                 self.get_parameter("moveto_action").get_parameter_value().string_value
             )
+            self.get_logger().info(f"REceiving on {self.moveto_action}")
+            self.get_logger().info(f"Should receive on {self.get_namespace()}")
             self.moveto_server = ActionServer(
                 self,
                 MoveTo, 
-                self.moveto_action,
+                self.get_namespace() + '/' + self.moveto_action,
                 self.execute_callback,
                 handle_accepted_callback=self.handle_accepted_callback,
                 goal_callback=self.goal_callback, 
@@ -105,6 +107,7 @@ class NavSimulation(Node):
         return response
     
     def _single_handle_accepted_callback(self, goal_handle):
+        self.get_logger().info(f"Im here")
         with self._goal_lock:
             # This server only allows one goal at a time
             if self._goal_handle is not None and self._goal_handle.is_active:
@@ -138,6 +141,7 @@ class NavSimulation(Node):
         super().destroy_node()
     
     def execute_callback(self, goal_handle):
+        self.get_logger().info(f"Im executing now")
         try:
             self.real_time = time.time()
             self.preempt_request = False
