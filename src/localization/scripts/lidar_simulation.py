@@ -10,9 +10,10 @@ import numpy as np
 
 # Import des messages
 from rclpy.executors import ExternalShutdownException
-from geometry_msgs.msg import Point
 from cdf_msgs.msg import Obstacles, CircleObstacle, PositionMap
 from std_srvs.srv import Trigger
+from localization.math_lidar import lidar_scan
+from sensor_msgs.msg import LaserScan
 
 
 class LidarSimulation(Node):
@@ -36,9 +37,14 @@ class LidarSimulation(Node):
                 ("beacons", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("boundaries", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("object_topic", rclpy.Parameter.Type.STRING),
+                ("scan_topic", rclpy.Parameter.Type.STRING),
                 ("update_position_topic", rclpy.Parameter.Type.STRING),
                 ("color_service", rclpy.Parameter.Type.STRING),
                 ("default_color", rclpy.Parameter.Type.STRING),
+                ("use_lidar_points", rclpy.Parameter.Type.BOOL),
+                ("radius", rclpy.Parameter.Type.DOUBLE),
+                ("num_points", rclpy.Parameter.Type.INTEGER),
+                ("lidar_range", rclpy.Parameter.Type.DOUBLE),
             ],
         )
         self.team_color = (
@@ -47,6 +53,17 @@ class LidarSimulation(Node):
         self.boundaries = (
             self.get_parameter("boundaries").get_parameter_value().double_array_value
         )
+        self.radius = self.get_parameter("radius").get_parameter_value().double_value
+        self.use_lidar_points = (
+            self.get_parameter("use_lidar_points").get_parameter_value().bool_value
+        )
+        self.lidar_range = (
+            self.get_parameter("lidar_range").get_parameter_value().double_value
+        )
+        num_points = (
+            self.get_parameter("num_points").get_parameter_value().integer_value
+        )
+        self.angle_range = np.linspace(0, 2 * np.pi, num_points)
         beacons = self.get_parameter("beacons").get_parameter_value().double_array_value
         if self.team_color not in ["blue", "yellow"]:
             raise ValueError("Invalid team color")
@@ -75,10 +92,16 @@ class LidarSimulation(Node):
 
     def _init_publishers(self) -> None:
         """Initialize publishers."""
-        self.object_topic = (
-            self.get_parameter("object_topic").get_parameter_value().string_value
-        )
-        self.pub_object = self.create_publisher(Obstacles, self.object_topic, 10)
+        if self.use_lidar_points:
+            self.scan_topic = (
+                self.get_parameter("scan_topic").get_parameter_value().string_value
+            )
+            self.pub_scan = self.create_publisher(LaserScan, self.scan_topic, 10)
+        else:
+            self.object_topic = (
+                self.get_parameter("object_topic").get_parameter_value().string_value
+            )
+            self.pub_object = self.create_publisher(Obstacles, self.object_topic, 10)
 
     def _init_subscribers(self) -> None:
         """Initialize subscribers."""
@@ -114,30 +137,38 @@ class LidarSimulation(Node):
     def _publish_objects(self, msg) -> None:
         """Publish all the objects displayed."""
         self._update(msg)
-        msg = Obstacles()
-        for i in [2, 3, 0]:
-            # self.get_logger().info(
-            #     f"ind {i}: x={self.new_beacons[i][0, 0]}, y={self.new_beacons[i][1, 0]}"
-            # )
-            circle = CircleObstacle()
-            circle.center.x = self.new_beacons[i][0, 0]
-            circle.center.y = self.new_beacons[i][1, 0]
-            circle.radius = 0.1
-            msg.circles.append(circle)
+        if self.use_lidar_points:
+            msg = LaserScan()
+            objects = []
+            for beacon in self.new_beacons:
+                objects.append(
+                    {"type": "circle", "center": beacon[:2, 0], "radius": self.radius}
+                )
+            for e in self.new_ennemis:
+                objects.append(
+                    {"type": "circle", "center": e[:2, 0], "radius": self.radius}
+                )
+            scan_result = lidar_scan(self.angle_range, objects, self.lidar_range)
+            msg.angle_min = 0.0
+            msg.angle_increment = self.angle_range[1]
+            msg.ranges = scan_result
+            self.pub_scan.publish(msg)
+        else:
+            msg = Obstacles()
+            for beacon in self.new_beacons:
+                circle = CircleObstacle()
+                circle.center.x = beacon[0, 0]
+                circle.center.y = beacon[1, 0]
+                circle.radius = self.radius
+                msg.circles.append(circle)
 
-        for e in self.new_ennemis:
-            circle = CircleObstacle()
-            circle.center.x = e[0, 0]
-            circle.center.y = e[1, 0]
-            circle.radius = 0.1
-            msg.circles.append(circle)
-        # self.get_logger().info(
-        #     f"x: {self.position[0]}, y: {self.position[1]}: z:{self.angle}"
-        # )
-        # circle = CircleObstacle()
-        # circle.radius = 0.1
-        # msg.circles.append(circle)
-        self.pub_object.publish(msg)
+            for e in self.new_ennemis:
+                circle = CircleObstacle()
+                circle.center.x = e[0, 0]
+                circle.center.y = e[1, 0]
+                circle.radius = self.radius
+                msg.circles.append(circle)
+            self.pub_object.publish(msg)
 
 
 def main(args=None):

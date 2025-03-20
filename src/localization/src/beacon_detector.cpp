@@ -133,7 +133,7 @@ void BeaconDetectorNode::object_callback(const cdf_msgs::msg::Obstacles::SharedP
 {
     // rclcpp::Time begin = this->now();
     // int64_t ns_begin = begin.nanoseconds();
-  
+
     if ((!enable_robot_position_reception_ || !position_finder_->previous_robot.has_value()) && position_finder_->current_robot.has_value())
     {
         position_finder_->previous_robot = position_finder_->current_robot;
@@ -167,7 +167,7 @@ void BeaconDetectorNode::object_callback(const cdf_msgs::msg::Obstacles::SharedP
             // RCLCPP_INFO(this->get_logger(), "Result: %f %f %f", position_found->x(), position_found->y(), position_found->z());
             std::vector<Eigen::Vector2d> others;
             others = position_finder_->find_robots_on_plateau(new_objects_detected);
-            cdf_msgs::msg::LidarLoc msg = publicate_donnees_lidar(position_found.value(), others);
+            cdf_msgs::msg::LidarLoc msg = publish_pose_from_lidar(position_found.value(), others);
             pub_location_->publish(msg);
         }
         // else

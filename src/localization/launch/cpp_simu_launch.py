@@ -1,51 +1,59 @@
+"""Launch the cpp beacon detector node and simulation for lidars."""
+
 import os
-from ament_index_python.packages import get_package_share_directory  # type: ignore
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch import LaunchIntrospector  # noqa: E402
-from launch_ros.actions import Node  # type: ignore
+from launch_ros.actions import Node
+import yaml
 
 
 def generate_launch_description():
-    ld = LaunchDescription()
-
-    config = os.path.join(
+    """Generate launch description for cpp simulation."""
+    param_file = os.path.join(
         get_package_share_directory("localization"),
         "config",
         "simu_config.yaml",
     )
 
-    node_nav_simulation = Node(
-        package="localization",
-        executable="nav_simulation.py",
-        name="nav_simulation_node",
-        parameters=[config],
-    )
+    nodes = []
+    with open(param_file, "r") as file:
+        params = yaml.safe_load(file)
 
+    top_keys = [key for key in params.keys() if not key.endswith("node")]
+    print(top_keys)
     node_position_sender = Node(
         package="localization",
-        executable="position_sender.py",
+        executable="position_sender",
         name="position_sender_node",
-        parameters=[config],
+        parameters=[param_file, {"robot_names": top_keys}],
     )
+    nodes.append(node_position_sender)
 
-    node_lidar_simulation = Node(
-        package="localization",
-        executable="lidar_simulation.py",
-        name="lidar_simulation_node",
-        parameters=[config],
-    )
+    for key in top_keys:
+        node_lidar_simulation = Node(
+            namespace=key,
+            package="localization",
+            executable="lidar_simulation.py",
+            name="lidar_simulation_node",
+            parameters=[param_file],
+        )
 
-    node_beacon_detector = Node(
-        package="localization",
-        executable="beacon_detector",
-        name="beacon_detector_node",
-        parameters=[config],
-    )
+        node_nav_simulation = Node(
+            namespace=key,
+            package="localization",
+            executable="nav_simulation.py",
+            name="nav_simulation_node",
+            parameters=[param_file],
+        )
 
-    ld.add_action(node_nav_simulation)
-    ld.add_action(node_position_sender)
-    ld.add_action(node_lidar_simulation)
-    ld.add_action(node_beacon_detector)
-
-    print(LaunchIntrospector().format_launch_description(ld))
-    return ld
+        node_beacon_detector = Node(
+            namespace=key,
+            package="localization",
+            executable="beacon_detector",
+            name="beacon_detector_node",
+            parameters=[param_file],
+        )
+        nodes.append(node_lidar_simulation)
+        nodes.append(node_nav_simulation)
+        nodes.append(node_beacon_detector)
+    return LaunchDescription(nodes)

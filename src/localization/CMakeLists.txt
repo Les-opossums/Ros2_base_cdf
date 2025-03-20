@@ -25,20 +25,21 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}/
 )
 
-#Create cpp executable
+add_executable(position_sender src/position_sender.cpp)
+ament_target_dependencies(position_sender rclcpp cdf_msgs geometry_msgs)
+
 add_executable(beacon_detector src/beacon_detector.cpp src/math_lidar.cpp src/BeaconSorter.cpp src/PositionFinder.cpp src/publisher.cpp)
-ament_target_dependencies(beacon_detector rclcpp std_msgs cdf_msgs vision_msgs)
+ament_target_dependencies(beacon_detector rclcpp std_msgs cdf_msgs vision_msgs geometry_msgs)
 target_include_directories(beacon_detector PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
   ${EIGEN3_INCLUDE_DIRS}
 )
-# target_link_libraries(beacon_detector ${catkin_LIBRARIES})
-
 
 # Install cpp executables
 install(TARGETS
   beacon_detector
+  position_sender
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -48,7 +49,6 @@ ament_python_install_package(${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
   scripts/beacon_detector.py
-  scripts/on_board_robot_detector.py
   scripts/lidar_simulation.py
   scripts/nav_simulation.py
   scripts/position_sender.py

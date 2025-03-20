@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
+"""Detect beacons and return the best position match."""
 
 # Libraries import
 import rclpy
 from rclpy.node import Node
 import copy
+import numpy as np
 
 # Relative imports
-from localization.math_lidar import *
+from localization.math_lidar import get_angle_sign, dt, convert_world_to_robot
 from localization.BeaconSorter import BeaconSorter
+from rclpy.executors import ExternalShutdownException
 from localization.PositionFinder import PositionFinder
-from localization.publisher import *
+from localization.publisher import publish_pose_from_lidar
 
 # Msgs import
 from cdf_msgs.msg import Obstacles, LidarLoc, MergedData
@@ -17,17 +20,17 @@ from std_msgs.msg import String
 
 
 class BeaconDetectorNode(Node):
+    """Detect the beacons and estimate the best matching position of the robot."""
+
     def __init__(self: Node) -> None:
-        """
-        This class is the node that will be used to detect the beacons and estimate the best matching position of the robot.
-        """
+
         super().__init__("beacon_detector_node")
         self._init_main_parameters()
         self.get_logger().info("Beacon detector node initialized.")
 
     def _init_main_parameters(self: Node) -> None:
         """
-        This function is used to initialise the main parameters of the node given by the launch file and its yaml config file.
+        Initialise the main parameters of the node given by the launch file and its yaml config file.
 
         :param enable_wait_color: Enable the wait for the color message
         :type enable_wait_color: bool
@@ -60,7 +63,11 @@ class BeaconDetectorNode(Node):
                 ("position_topic", rclpy.Parameter.Type.STRING),
             ],
         )
-        self._available_colors = self.get_parameter("available_colors").get_parameter_value().string_array_value
+        self._available_colors = (
+            self.get_parameter("available_colors")
+            .get_parameter_value()
+            .string_array_value
+        )
         if self.get_parameter("enable_wait_color").get_parameter_value().bool_value:
             self.color_topic = (
                 self.get_parameter("color_topic").get_parameter_value().string_value
@@ -83,7 +90,7 @@ class BeaconDetectorNode(Node):
 
     def _init_color_callback(self: Node, msg: String) -> None:
         """
-        This callback wait for the reception of the color message and set all the parameters once the message has been received.
+        Wait for the reception of the color message and set all the parameters once the message has been received.
 
         :param msg: The message containing the color of the team
         :type msg: String
@@ -98,7 +105,7 @@ class BeaconDetectorNode(Node):
 
     def _init_parameters(self: Node) -> None:
         """
-        This function is used to initialise the parameters of the node given by the launch file and its yaml config file.
+        Initialise the parameters of the node given by the launch file and its yaml config file.
 
         :param enable_robot_position_reception: Enable the reception of the robot position once he's merged
         :type enable_robot_position_reception: bool
@@ -158,7 +165,7 @@ class BeaconDetectorNode(Node):
             np.array([beacons[i], beacons[i + 1]]) for i in range(0, len(beacons), 2)
         ]
         self.sign_vect_product = [
-            get_vp_sign(
+            get_angle_sign(
                 [
                     self.fixed_beacons[j]
                     for j in range(len(self.fixed_beacons))
@@ -187,7 +194,7 @@ class BeaconDetectorNode(Node):
 
     def _init_subscribers(self: Node) -> None:
         """
-        This function is used to initialise the subscribers of the node given by the launch file and its yaml config file.
+        Initialise the subscribers of the node given by the launch file and its yaml config file.
 
         :param object_topic: The topic where the object message is published
         :type object_topic: str
@@ -220,7 +227,7 @@ class BeaconDetectorNode(Node):
 
     def _init_publishers(self: Node) -> None:
         """
-        This function is used to initialise the publishers of the node given by the launch file and its yaml config file.
+        Initialise the publishers of the node given by the launch file and its yaml config file.
 
         :param position_topic: The topic where the position message is published
         :type position_topic: str
@@ -241,7 +248,7 @@ class BeaconDetectorNode(Node):
 
     def object_callback(self: Node, msg: Obstacles) -> None:
         """
-        This callback is used to detect the beacons and estimate the best matching position of the robot.
+        Detect the beacons and estimate the best matching position of the robot.
 
         :param msg: The message containing the detected objects
         :type msg: Obstacles
@@ -262,13 +269,15 @@ class BeaconDetectorNode(Node):
         )
         new_objects_detected = [
             np.array([c.center.x, c.center.y])
-            for c in msg.circles if c.center.x**2 + c.center.y**2 < 13.5
+            for c in msg.circles
+            if c.center.x**2 + c.center.y**2 < 13.5
         ]
-        nb_potential_beacons, potential_beacons = (
-            self.beacon_sorter._find_possible_beacons(
-                previous_beacons,
-                new_objects_detected,
-            )
+        (
+            nb_potential_beacons,
+            potential_beacons,
+        ) = self.beacon_sorter._find_possible_beacons(
+            previous_beacons,
+            new_objects_detected,
         )
         if nb_potential_beacons > 0:
             position_found = self.position_finder.search_pos(
@@ -277,13 +286,11 @@ class BeaconDetectorNode(Node):
                 new_objects_detected,
             )
             if position_found is not None:
-                self.pub_location.publish(publicate_donnees_lidar(position_found))
-        # now = self.get_clock().now()
-        # self.get_logger().info(f"Diff time: {now.nanoseconds - begin.nanoseconds}")
+                self.pub_location.publish(publish_pose_from_lidar(position_found))
 
     def robot_position_callback(self: Node, msg: MergedData) -> None:
         """
-        This callback is used to update the previous position of the robot with the previous merged data.
+        Update the previous position of the robot with the previous merged data.
 
         :param msg: The message containing the position of the robot
         :type msg: MergedData
@@ -294,27 +301,35 @@ class BeaconDetectorNode(Node):
         #     [msg.robots[0].x, msg.robots[0].y, msg.robots[0].z]
         # )
         # self.position_finder.previous_robot["beacons"] = [
-        #     chgt_base_plateau_to_robot(
+        #     convert_world_to_robot(
         #         fb, self.position_finder.previous_robot["position"]
         #     )
         #     for fb in self.fixed_beacons
         # ]
         self.position_finder.previous_robot = {
             "position": np.array([msg.robots[0].x, msg.robots[0].y, msg.robots[0].z]),
-            "beacons": [chgt_base_plateau_to_robot(fb, np.array([msg.robots[0].x, msg.robots[0].y, msg.robots[0].z])) for fb in self.fixed_beacons]
+            "beacons": [
+                convert_world_to_robot(
+                    fb, np.array([msg.robots[0].x, msg.robots[0].y, msg.robots[0].z])
+                )
+                for fb in self.fixed_beacons
+            ],
         }
+
 
 # Main function, used as endpoint in the launch file
 def main(args=None):
+    """Run main loop."""
     rclpy.init(args=args)
     beacon_detector_node = BeaconDetectorNode()
     try:
         rclpy.spin(beacon_detector_node)
-    except:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         beacon_detector_node.destroy_node()
         rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

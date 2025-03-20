@@ -1,7 +1,7 @@
 """Compute the position of the robot using the beacons estmated with the lidar."""
 import numpy as np
 from .math_lidar import (
-    chgt_base_plateau_to_robot,
+    convert_world_to_robot,
     dt,
     removearray,
     find_angle,
@@ -32,7 +32,7 @@ class PositionFinder:
                 [init_position[0], init_position[1], np.pi * init_position[2] / 180]
             )
             self.previous_robot["beacons"] = [
-                chgt_base_plateau_to_robot(beacon, self.previous_robot["position"])
+                convert_world_to_robot(beacon, self.previous_robot["position"])
                 for beacon in fixed_beacons
             ]
             self.initialisation = True
@@ -76,7 +76,7 @@ class PositionFinder:
         """Recreate beacons from the known position and beacons in world frame."""
         for i in range(4):
             if self.current_robot["beacons"][i] is None:
-                self.current_robot["beacons"][i] = chgt_base_plateau_to_robot(
+                self.current_robot["beacons"][i] = convert_world_to_robot(
                     self.fixed_beacons[i], self.current_robot["position"]
                 )
 

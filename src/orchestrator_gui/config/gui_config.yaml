@@ -2,4 +2,4 @@ orchestrator_gui_node:
   ros__parameters:
     position_topic: position_out
     moveto_action: moveto
-    robot_names: ["main_robot"]
+    robot_names: ["ennemi_robot", "main_robot", "new_robot"]

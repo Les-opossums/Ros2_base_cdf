@@ -83,7 +83,7 @@ std::array<Eigen::Vector2d, 4> PositionFinder::recreate_beacons(const Eigen::Vec
     std::array<Eigen::Vector2d, 4> robot_beacons;
     for (int i = 0; i < 4; ++i)
     {
-        robot_beacons[i] = chgt_base_plateau_to_robot(fixed_beacons_[i], robot_frame).head<2>();
+        robot_beacons[i] = convert_world_to_robot(fixed_beacons_[i], robot_frame).head<2>();
     }
     return robot_beacons;
 }

@@ -52,7 +52,7 @@ bool angle_in_range(double alpha, double low, double up) {
     return (low <= alpha && alpha <= up) || (low > up && (low <= alpha || alpha <= up));
 }
 
-Eigen::Vector3d chgt_base_plateau_to_robot(const Eigen::Vector2d& pt, const Eigen::Vector3d& robot_frame) {
+Eigen::Vector3d convert_world_to_robot(const Eigen::Vector2d& pt, const Eigen::Vector3d& robot_frame) {
     double cos_angle = std::cos(robot_frame.z());
     double sin_angle = std::sin(robot_frame.z());
 
@@ -64,7 +64,7 @@ Eigen::Vector3d chgt_base_plateau_to_robot(const Eigen::Vector2d& pt, const Eige
     return OtoR.inverse() * Eigen::Vector3d(pt.x(), pt.y(), 1);
 }
 
-Eigen::Vector3d chgt_base_robot_to_plateau(const Eigen::Vector2d& pt, const Eigen::Vector3d& robot_frame) {
+Eigen::Vector3d convert_robot_to_world(const Eigen::Vector2d& pt, const Eigen::Vector3d& robot_frame) {
     double cos_angle = std::cos(robot_frame.z());
     double sin_angle = std::sin(robot_frame.z());
 
@@ -76,7 +76,7 @@ Eigen::Vector3d chgt_base_robot_to_plateau(const Eigen::Vector2d& pt, const Eige
     return OtoR * Eigen::Vector3d(pt.x(), pt.y(), 1);
 }
 
-double _calcul_erreur(const std::array<std::optional<Eigen::Vector2d>, 4>& beacons,
+double _compute_error(const std::array<std::optional<Eigen::Vector2d>, 4>& beacons,
     const Eigen::Vector3d& position,
     const std::array<Eigen::Vector2d, 4>& fixed_beacons)
 {
@@ -85,7 +85,7 @@ double sum = 0.0;
 for (size_t i = 0; i < beacons.size(); ++i) {
 if (beacons[i].has_value()) {
 // Transformation du beacon du repère robot vers le repère plateau
-Eigen::Vector2d transformed = chgt_base_robot_to_plateau(beacons[i].value(), position).head<2>();
+Eigen::Vector2d transformed = convert_robot_to_world(beacons[i].value(), position).head<2>();
 // Accumulation de l'erreur (distance au carré entre la position transformée et le beacon fixe)
 sum += dt2(transformed, fixed_beacons[i]);
 }
@@ -289,14 +289,14 @@ std::vector<std::pair<Eigen::Vector3d, double>> find_position(
 
         // 1. Calcul initial de la position optimisée et de l'erreur associée
         Eigen::Vector3d position_found = _find_position_opti(beacons, fixed_beacons);
-        double dt_min = _calcul_erreur(beacons, position_found, fixed_beacons);
+        double dt_min = _compute_error(beacons, position_found, fixed_beacons);
         err.push_back(dt_min);
 
         // 2. Calcul de l'angle et mise à jour de la position
         Eigen::Vector3d position = position_found;  // copie de la position trouvée
         Eigen::Vector2d xyPos = position.head<2>();
         position(2) = find_angle(xyPos, beacons, fixed_beacons);
-        double dt = _calcul_erreur(beacons, position, fixed_beacons);
+        double dt = _compute_error(beacons, position, fixed_beacons);
         if (dt < dt_min) {
             position_found(2) = position(2);
             dt_min = dt;
@@ -306,7 +306,7 @@ std::vector<std::pair<Eigen::Vector3d, double>> find_position(
         // 3. Si le nombre de beacons est supérieur à 2, on essaie une autre méthode
         if (nombre > 2) {
             position = _find_position_eq(beacons, fixed_beacons);
-            dt = _calcul_erreur(beacons, position, fixed_beacons);
+            dt = _compute_error(beacons, position, fixed_beacons);
             err.push_back(dt);
             if (dt < dt_min) {
                 position_found = position;
