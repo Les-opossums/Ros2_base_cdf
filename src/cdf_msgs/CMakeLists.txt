@@ -11,6 +11,7 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(action_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/AxResult.msg"
@@ -35,7 +36,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/MoveTo.action"
   "srv/Init.srv"
   "srv/PosTrigger.srv"
-  DEPENDENCIES std_msgs geometry_msgs vision_msgs
+  DEPENDENCIES std_msgs geometry_msgs vision_msgs action_msgs
 )
 
 
