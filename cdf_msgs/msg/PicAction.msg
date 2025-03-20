@@ -1,0 +1,2 @@
+string action_destination
+string action_msg
