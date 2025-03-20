@@ -18,11 +18,11 @@ Create a new `ydlidar_ports.rules` file and write the corresponding serial port 
 ```shell
 sudo gedit /etc/udev/rules.d/ydlidar_ports.rules
 ```
-or 
+or
 ```shell
 sudo vim /etc/udev/rules.d/ydlidar_ports.rules
 ```
-### Query serial port number through udevadm 
+### Query serial port number through udevadm
 ```shell
 udevadm info -a -n /dev/ttyUSB0 | grep KERNELS
 ```
@@ -47,7 +47,7 @@ Save the file and close it. Then as root, tell systemd-udevd to reload the rules
 ```shell
 sudo udevadm control --reload
 ```
-and 
+and
 ```shell
 sudo service udev reload
 sudo service udev restart

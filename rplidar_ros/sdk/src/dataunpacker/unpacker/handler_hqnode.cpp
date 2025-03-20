@@ -41,20 +41,20 @@
 #include "../dataunnpacker_internal.h"
 
 #ifdef CONF_NO_BOOST_CRC_SUPPORT
-#include "sl_crc.h" 
+#include "sl_crc.h"
 #endif
 
 #include "handler_hqnode.h"
 
 BEGIN_DATAUNPACKER_NS()
-	
+
 namespace unpacker{
 
 
 static _u64 _getSampleDelayOffsetInHQMode(const SlamtecLidarTimingDesc& timing)
 {
     // FIXME: to eval
-    // 
+    //
     // guess channel baudrate by LIDAR model ....
     const _u64 channelBaudRate = timing.native_baudrate? timing.native_baudrate:1000000;
 
@@ -111,7 +111,7 @@ void UnpackerHandler_HQNode::onData(LIDARSampleDataUnpackerInner* engine, const 
 
         case sizeof(rplidar_response_hq_capsule_measurement_nodes_t) - 1 - 4:    // get bytes to calculate crc ready
         {
-           
+
         }
         break;
 
@@ -137,7 +137,7 @@ void UnpackerHandler_HQNode::onData(LIDARSampleDataUnpackerInner* engine, const 
                 crcInputData.push_back(0);
             mycrc.process_bytes(&crcInputData[0], crcInputData.size());
             _u32 crcCalc = mycrc.checksum();
-            
+
 #endif
 
             _u32 recvCRC = nodesData->crc32;
@@ -157,7 +157,7 @@ void UnpackerHandler_HQNode::onData(LIDARSampleDataUnpackerInner* engine, const 
                     engine->publishHQNode(engine->getCurrentTimestamp_uS() - _getSampleDelayOffsetInHQMode(_cachedTimingDesc), &hqNode);
                 }
             }
-            else  //crc check not passed 
+            else  //crc check not passed
             {
                 engine->publishDecodingErrorMsg(LIDARSampleDataUnpacker::ERR_EVENT_ON_EXP_CHECKSUM_ERR
                     , RPLIDAR_ANS_TYPE_MEASUREMENT_HQ, nodesData, sizeof(*nodesData));

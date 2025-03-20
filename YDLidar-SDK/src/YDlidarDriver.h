@@ -171,7 +171,7 @@ class YDlidarDriver : public DriverInterface {
    */
   virtual result_t getDeviceInfo(device_info &info,
                                  uint32_t timeout = DEFAULT_TIMEOUT);
-  
+
   //获取设备信息
   virtual bool getDeviceInfoEx(device_info &info, int type=EPT_Module);
 
@@ -579,8 +579,8 @@ class YDlidarDriver : public DriverInterface {
 
   //解析点云数据包头
   result_t parseHeader(
-    uint8_t &zero, 
-    uint32_t &headPos, 
+    uint8_t &zero,
+    uint32_t &headPos,
     uint32_t timeout = DEFAULT_TIMEOUT / 2);
   //解析点云数据并判断带不带强度信息
   virtual result_t getIntensityFlag();

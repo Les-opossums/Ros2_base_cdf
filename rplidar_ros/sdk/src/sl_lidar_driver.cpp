@@ -41,7 +41,7 @@
 #include "hal/waiter.h"
 #include "hal/byteorder.h"
 #include "sl_lidar_driver.h"
-#include "sl_crc.h" 
+#include "sl_crc.h"
 #include <algorithm>
 #include <memory>
 #include <atomic>
@@ -118,7 +118,7 @@ namespace sl {
     {
         return node.dist_mm_q2;
     }
-   
+
     template <class TNode>
     static bool angleLessThan(const TNode& a, const TNode& b)
     {
@@ -190,7 +190,7 @@ namespace sl {
         RawSampleNodeHolder(size_t maxcount = 8192)
             : _max_count(maxcount)
         {
-           
+
         }
         void clear()
         {
@@ -231,14 +231,14 @@ namespace sl {
         rp::hal::Locker _locker;
         rp::hal::Event  _data_waiter;
         std::deque<T>   _data_queue;
-        
+
     };
 
     template<typename T>
     class ScanDataHolder
     {
     public:
-        ScanDataHolder(size_t maxcount = 8192) 
+        ScanDataHolder(size_t maxcount = 8192)
             : _scan_node_buffer_size(maxcount)
             , _scan_node_available_id(-1)
             , _new_scan_ready(false)
@@ -275,7 +275,7 @@ namespace sl {
 
             int  operationBufID = _getOperationBufferID_locked();
             auto operationalBuf = &_scanbuffer[operationBufID];
-            
+
             if (hqNode->flag & RPLIDAR_RESP_HQ_FLAG_SYNCBIT) {
                 if (operationalBuf->size()) {
                     operationBufID = _finishCurrentScanAndSwap_locked();
@@ -286,7 +286,7 @@ namespace sl {
                     _data_waiter.set();
 
                 }
-                
+
                 assert(operationalBuf->size() == 0);
 
                 //store the timestamp info
@@ -360,7 +360,7 @@ namespace sl {
         rp::hal::Locker _locker;
         rp::hal::Event  _data_waiter;
 
-        
+
 
         _u64   _scan_begin_timestamp_uS[2];
         size_t _scan_node_buffer_size;
@@ -370,7 +370,7 @@ namespace sl {
         std::vector<T> _scanbuffer[2];
     };
 
-    class SlamtecLidarDriver : 
+    class SlamtecLidarDriver :
         public ILidarDriver, internal::IProtocolMessageListener, internal::LIDARSampleDataListener
     {
     public:
@@ -479,8 +479,8 @@ namespace sl {
             _rawSampleNodeHolder.clear();
 
             sl_result ans;
-            
-       
+
+
             ans = (sl_result)_transeiver->openChannelAndBind(channel);
 
             if (IS_OK(ans)) {
@@ -488,7 +488,7 @@ namespace sl {
                 // the first dev info local cache will be taken here
                 checkMotorCtrlSupport(_isSupportingMotorCtrl, 500);
             }
-            
+
             return ans;
         }
 
@@ -511,7 +511,7 @@ namespace sl {
         sl_result reset(sl_u32 timeoutInMs = DEFAULT_TIMEOUT)
         {
             rp::hal::AutoLocker l(_op_locker);
-            // send reset message 
+            // send reset message
             return (sl_result)_sendCommandWithoutResponse(SL_LIDAR_CMD_RESET);
         }
 
@@ -550,7 +550,7 @@ namespace sl {
                 return ans;
             }
 
-            return ans;        
+            return ans;
         }
 
         sl_result getTypicalScanMode(sl_u16& outMode, sl_u32 timeoutInMs = DEFAULT_TIMEOUT)
@@ -580,7 +580,7 @@ namespace sl {
                 return ans;
             }
             return ans;
-    
+
         }
 
         sl_result startScan(bool force, bool useTypicalScan, sl_u32 options = 0, LidarScanMode* outUsedScanMode = nullptr)
@@ -698,7 +698,7 @@ namespace sl {
             if (!ans) return SL_RESULT_INVALID_DATA;
 
 
-            
+
             outUsedScanMode->id = scanMode;
             if (ifSupportLidarConf) {
                 ans = getLidarSampleDuration(outUsedScanMode->us_per_sample, outUsedScanMode->id);
@@ -735,7 +735,7 @@ namespace sl {
                 // redirect to the correct function...
                 return startScanNormal(force, timeout);
             }
-            
+
             _updateTimingDesc(_cached_DevInfo, outUsedScanMode->us_per_sample);
             startMotor();
 
@@ -770,13 +770,13 @@ namespace sl {
             _disableDataGrabbing();
 
             if (IS_FAIL(ans)) return ans;
-            
+
 
             delay(100);
 
             if(_isSupportingMotorCtrl == MotorCtrlSupportPwm)
                 setMotorSpeed(0);
-  
+
             return SL_RESULT_OK;
         }
 
@@ -909,7 +909,7 @@ namespace sl {
             memcpy(&conf, &answer[0], len);
             return ans;
         }
-       
+
         sl_result getHealth(sl_lidar_response_device_health_t& health, sl_u32 timeout = DEFAULT_TIMEOUT)
         {
             rp::hal::AutoLocker l(_op_locker);
@@ -972,7 +972,7 @@ namespace sl {
 
 
             Result<nullptr_t> ans = SL_RESULT_OK;
-            
+
             if(speed == DEFAULT_MOTOR_SPEED){
                 sl_lidar_response_desired_rot_speed_t desired_speed;
                 ans = getDesiredSpeed(desired_speed);
@@ -1131,7 +1131,7 @@ namespace sl {
 
 
                     cachedChannel->close();
-                    // restart the transiever 
+                    // restart the transiever
                     ans = _transeiver->openChannelAndBind(cachedChannel);
                     if (IS_FAIL(ans)) return ans;
 
@@ -1236,7 +1236,7 @@ namespace sl {
                 return ans;
             }
 
-            //check if returned size is even less than sizeof(type) 
+            //check if returned size is even less than sizeof(type)
             if (ans_frame->getPayloadSize() < sizeof(rplidar_response_set_lidar_conf_t)) {
                 return RESULT_INVALID_DATA;
             }
@@ -1277,7 +1277,7 @@ namespace sl {
             if (IS_FAIL(ans)) {
                 return ans;
             }
-            //check if returned size is even less than sizeof(type) 
+            //check if returned size is even less than sizeof(type)
             if (ans_frame->getPayloadSize() < offsetof(rplidar_response_get_lidar_conf_t, payload)) {
                 return SL_RESULT_INVALID_DATA;
             }
@@ -1455,15 +1455,15 @@ namespace sl {
         }
 
     protected:
-        
+
         void _disableDataGrabbing()
         {
             _dataunpacker->disable();
             _protocolHandler->exitLoopMode(); // exit loop mode
         }
-        
 
-   
+
+
         bool _checkNDMagicNumber(_u8 model)
         {
             return ((model >> 4) >= NEWDESIGN_MINUM_MAJOR_ID);
@@ -1474,14 +1474,14 @@ namespace sl {
 
         u_result _detectLIDARNativeInterfaceType(LIDARInterfaceType & outputType, const rplidar_response_device_info_t& devInfo, sl_u32 timeout = DEFAULT_TIMEOUT)
         {
-            
+
             LIDARMajorType majorType = ParseLIDARMajorTypeByModelID(devInfo.model);
-            
+
             switch (majorType) {
             case LIDAR_MAJOR_TYPE_A_SERIES:
             case LIDAR_MAJOR_TYPE_M_SERIES:
             case LIDAR_MAJOR_TYPE_C_SERIES:
-          
+
                 outputType = LIDAR_INTERFACE_UART;
                 return SL_RESULT_OK;
 
@@ -1528,7 +1528,7 @@ namespace sl {
                 return 256000;
             case 7: //model ID of S2
             case 8: //model ID of S3
-                if (devInfo.model == (0x82)) return 460800; 
+                if (devInfo.model == (0x82)) return 460800;
                 return 1000000;
             default:
                 return 0; //0 as unknown
@@ -1539,11 +1539,11 @@ namespace sl {
         {
             _timing_desc.native_baudrate = _getNativeBaudRate(devInfo);
             _detectLIDARNativeInterfaceType(_timing_desc.native_interface_type, devInfo, 500);
-            
+
             _timing_desc.sample_duration_uS = (_u64)(selectedSampleDuration + 0.5f);
 
             //FIXME: will be changed in future releases
-            _timing_desc.native_timestamp_support = false; 
+            _timing_desc.native_timestamp_support = false;
             _timing_desc.linkage_delay_uS = 0;
 
 
@@ -1555,7 +1555,7 @@ namespace sl {
 
         u_result _getLegacySampleDuration_uS(rplidar_response_sample_rate_t& rateInfo, _u32 timeout)
         {
-            
+
             static const _u32 LEGACY_SAMPLE_DURATION = 476;
 
             rplidar_response_device_info_t devinfo;
@@ -1639,7 +1639,7 @@ namespace sl {
                 }
             } while (1);
         }
-        
+
     public:
 
         virtual void onHQNodeDecoded(_u64 timestamp_uS, const rplidar_response_measurement_node_hq_t* node)
@@ -1668,7 +1668,7 @@ namespace sl {
                 _data_locker.unlock();
             }
 
-            
+
         }
     private:
 

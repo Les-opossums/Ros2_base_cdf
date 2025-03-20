@@ -60,4 +60,3 @@ public:
 %include "../core/base/typedef.h"
 %include "../core/common/ydlidar_datatype.h"
 %include "../core/common/ydlidar_def.h"
-

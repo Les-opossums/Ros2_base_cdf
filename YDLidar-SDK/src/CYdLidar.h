@@ -148,7 +148,7 @@ class YDLIDAR_API CYdLidar {
    * @return 成功返回true，否则返回false
    */
   bool setWorkMode(int mode, uint8_t addr=0x00);
-  
+
   /**
    * @brief 是否开启阳光噪点过滤功能
    * @param[in] e true开启，false关闭
@@ -397,5 +397,3 @@ YDLIDAR_API void os_shutdown();
 YDLIDAR_API std::map<std::string, std::string> lidarPortList();
 
 }
-
-

@@ -87,7 +87,7 @@ GSLidarDriver::GSLidarDriver(uint8_t type)
     bias[2] = 0;
 }
 
-GSLidarDriver::~GSLidarDriver() 
+GSLidarDriver::~GSLidarDriver()
 {
     m_isScanning = false;
     isAutoReconnect = false;
@@ -113,7 +113,7 @@ GSLidarDriver::~GSLidarDriver()
     }
 }
 
-result_t GSLidarDriver::connect(const char *port_path, uint32_t baudrate) 
+result_t GSLidarDriver::connect(const char *port_path, uint32_t baudrate)
 {
     m_baudrate = baudrate;
     m_port = string(port_path);
@@ -201,7 +201,7 @@ void GSLidarDriver::disconnect() {
     m_isConnected = false;
 }
 
-void GSLidarDriver::disableDataGrabbing() 
+void GSLidarDriver::disableDataGrabbing()
 {
     if (m_isScanning) {
         m_isScanning = false;
@@ -241,7 +241,7 @@ result_t GSLidarDriver::sendCommand(uint8_t cmd,
 //    checksum += cmd;
 //    checksum += 0xff&header->size;
 //    checksum += 0xff&(header->size>>8);
-    
+
 //    if (payloadsize && payload) {
 //      for (size_t pos = 0; pos < payloadsize; ++pos) {
 //        checksum += ((uint8_t *)payload)[pos];
@@ -249,7 +249,7 @@ result_t GSLidarDriver::sendCommand(uint8_t cmd,
 //      uint8_t sizebyte = (uint8_t)(payloadsize);
 //      sendData((const uint8_t *)payload, sizebyte);
 //    }
-    
+
 //    sendData(&checksum, 1);
 
 //    return RESULT_OK;
@@ -305,10 +305,10 @@ result_t GSLidarDriver::sendData(const uint8_t *data, size_t size) {
 
     size_t r;
 
-    while (size) 
+    while (size)
     {
         r = _comm->writeData(data, size);
-        if (!r) 
+        if (!r)
         {
             return RESULT_FAIL;
         }
@@ -360,29 +360,29 @@ result_t GSLidarDriver::waitResponseHeader(gs_package_head *header,
     uint8_t  recvBuffer[sizeof(gs_package_head)];
     uint8_t  *headerBuffer = reinterpret_cast<uint8_t *>(header);
     uint32_t waitTime = 0;
-    
+
     while ((waitTime = getms() - startTs) <= timeout) {
       size_t remainSize = sizeof(gs_package_head) - recvPos;
       size_t recvSize = 0;
       result_t ans = waitForData(remainSize, timeout - waitTime, &recvSize);
-    
+
       if (!IS_OK(ans)) {
         return ans;
       }
-    
+
       if (recvSize > remainSize) {
         recvSize = remainSize;
       }
-    
+
       ans = getData(recvBuffer, recvSize);
-    
+
       if (IS_FAIL(ans)) {
         return RESULT_FAIL;
       }
-    
+
       for (size_t pos = 0; pos < recvSize; ++pos) {
         uint8_t currentByte = recvBuffer[pos];
-    
+
         switch (recvPos) {
             case 0:
               if (currentByte != LIDAR_ANS_SYNC_BYTE1) {
@@ -390,34 +390,34 @@ result_t GSLidarDriver::waitResponseHeader(gs_package_head *header,
                   continue;
               }
               break;
-    
+
             case 1:
               if (currentByte != LIDAR_ANS_SYNC_BYTE1) {
                   recvPos = 0;
                   continue;
               }
               break;
-    
+
             case 2:
               if (currentByte != LIDAR_ANS_SYNC_BYTE1) {
                   recvPos = 0;
                   continue;
               }
               break;
-    
+
             case 3:
               if (currentByte != LIDAR_ANS_SYNC_BYTE1) {
                   recvPos = 0;
                   continue;
               }
               break;
-    
+
             default:
               break;
         }
-    
+
         headerBuffer[recvPos++] = currentByte;
-    
+
         if (recvPos == sizeof(gs_package_head)) {
           return RESULT_OK;
         }
@@ -428,8 +428,8 @@ result_t GSLidarDriver::waitResponseHeader(gs_package_head *header,
 }
 
 result_t GSLidarDriver::waitResponseHeaderEx(
-    gs_package_head *header, 
-    uint8_t cmd, 
+    gs_package_head *header,
+    uint8_t cmd,
     uint32_t timeout)
 {
     int recvPos = 0;
@@ -456,7 +456,7 @@ result_t GSLidarDriver::waitResponseHeaderEx(
             return RESULT_FAIL;
         }
 
-        for (size_t pos = 0; pos < recvSize; ++pos) 
+        for (size_t pos = 0; pos < recvSize; ++pos)
         {
             uint8_t currentByte = recvBuffer[pos];
             switch (recvPos) {
@@ -520,7 +520,7 @@ result_t GSLidarDriver::waitForData(size_t data_count, uint32_t timeout,
     return (result_t)_comm->waitfordata(data_count, timeout, returned_size);
 }
 
-result_t GSLidarDriver::checkAutoConnecting() 
+result_t GSLidarDriver::checkAutoConnecting()
 {
     result_t ans = RESULT_FAIL;
     isAutoconnting = true;
@@ -528,7 +528,7 @@ result_t GSLidarDriver::checkAutoConnecting()
     if (m_driverErrno != BlockError)
         setDriverError(TimeoutError);
 
-    while (isAutoReconnect && isAutoconnting) 
+    while (isAutoReconnect && isAutoconnting)
     {
         {
             ScopedLocker l(_cmd_lock);
@@ -542,7 +542,7 @@ result_t GSLidarDriver::checkAutoConnecting()
             }
         }
         retryCount ++;
-        if (retryCount > 100) 
+        if (retryCount > 100)
             retryCount = 100;
 
         delay(100);
@@ -564,7 +564,7 @@ result_t GSLidarDriver::checkAutoConnecting()
             return RESULT_FAIL;
         }
         //判断是否已重连，如是则尝试启动雷达
-        if (isconnected()) 
+        if (isconnected())
         {
             delay(100);
             {
@@ -640,8 +640,8 @@ int GSLidarDriver::cacheScanData()
                     return RESULT_FAIL;
                 }
             }
-        } 
-        else 
+        }
+        else
         {
             timeout_count = 0;
             retryCount = 0;
@@ -807,7 +807,7 @@ PARSEHEAD:
                             packageBuffer[package_recvPos + pos] = globalRecvBuffer[j];
                             pos ++;
                         }
-                        
+
                         if (pos == package_Sample_Num)
                         {
                             pos = 0;
@@ -843,7 +843,7 @@ PARSEHEAD:
     } //end if (nodeIndex == 0)
 
     (*node).stamp = getTime();
-    
+
     if (CheckSumResult)
     {
         //第1个点时间戳使用上一帧的最后1个点的时间戳
@@ -888,13 +888,13 @@ PARSEHEAD:
         if (node->dist > 0)
         {
             if (YDLIDAR_GS1 == model)
-                angTransform2((*node).dist, nodeIndex, 
+                angTransform2((*node).dist, nodeIndex,
                     &sampleAngle, &(*node).dist);
             else if (YDLIDAR_GS6 == model)
-                angTransform2((*node).dist, nodeCount - nodeIndex, 
+                angTransform2((*node).dist, nodeCount - nodeIndex,
                     &sampleAngle, &(*node).dist);
             else
-                angTransform((*node).dist, nodeIndex, 
+                angTransform((*node).dist, nodeIndex,
                     &sampleAngle, &(*node).dist);
         }
 
@@ -942,7 +942,7 @@ PARSEHEAD:
         else if (1 == nodeIndex)
             (*node).is = package.env >> 8;
 
-        // printf("%u 0x%X %.02f %.02f\n", nodeIndex, 
+        // printf("%u 0x%X %.02f %.02f\n", nodeIndex,
         //     package.nodes[nodeIndex].dist,
         //     sampleAngle, node->dist/1.0);
     }
@@ -967,9 +967,9 @@ PARSEHEAD:
 }
 
 void GSLidarDriver::angTransform(
-    uint16_t dist, 
-    int n, 
-    double *dstTheta, 
+    uint16_t dist,
+    int n,
+    double *dstTheta,
     uint16_t *dstDist)
 {
     double pixelU = n, Dist, theta, tempTheta, tempDist, tempX, tempY;
@@ -986,9 +986,9 @@ void GSLidarDriver::angTransform(
       }
       tempDist = (dist - Angle_Px) / cos(((m_pitchAngle + bias[mdNum]) - (tempTheta)) * M_PI / 180);
       tempTheta = tempTheta * M_PI / 180;
-      tempX = cos((m_pitchAngle + bias[mdNum]) * M_PI / 180) * tempDist * cos(tempTheta) + 
+      tempX = cos((m_pitchAngle + bias[mdNum]) * M_PI / 180) * tempDist * cos(tempTheta) +
         sin((m_pitchAngle + bias[mdNum]) * M_PI / 180) * (tempDist * sin(tempTheta));
-      tempY = -sin((m_pitchAngle + bias[mdNum]) * M_PI / 180) * tempDist * cos(tempTheta) + 
+      tempY = -sin((m_pitchAngle + bias[mdNum]) * M_PI / 180) * tempDist * cos(tempTheta) +
         cos((m_pitchAngle + bias[mdNum]) * M_PI / 180) * (tempDist * sin(tempTheta));
       tempX = tempX + Angle_Px;
       tempY = tempY - Angle_Py; //5.315
@@ -1008,9 +1008,9 @@ void GSLidarDriver::angTransform(
       }
       tempDist = (dist - Angle_Px) / cos(((m_pitchAngle + bias[mdNum]) + (tempTheta)) * M_PI / 180);
       tempTheta = tempTheta * M_PI / 180;
-      tempX = cos(-(m_pitchAngle + bias[mdNum]) * M_PI / 180) * tempDist * cos(tempTheta) + 
+      tempX = cos(-(m_pitchAngle + bias[mdNum]) * M_PI / 180) * tempDist * cos(tempTheta) +
         sin(-(m_pitchAngle + bias[mdNum]) * M_PI / 180) * (tempDist * sin(tempTheta));
-      tempY = -sin(-(m_pitchAngle + bias[mdNum]) * M_PI / 180) * tempDist * cos(tempTheta) + 
+      tempY = -sin(-(m_pitchAngle + bias[mdNum]) * M_PI / 180) * tempDist * cos(tempTheta) +
         cos(-(m_pitchAngle + bias[mdNum]) * M_PI / 180) * (tempDist * sin(tempTheta));
       tempX = tempX + Angle_Px;
       tempY = tempY + Angle_Py; //5.315
@@ -1028,9 +1028,9 @@ void GSLidarDriver::angTransform(
 }
 
 void GSLidarDriver::angTransform2(
-    uint16_t dist, 
-    int n, 
-    double *dstTheta, 
+    uint16_t dist,
+    int n,
+    double *dstTheta,
     uint16_t *dstDist)
 {
     double pixelU = nodeCount - n, Dist, theta, tempTheta;
@@ -1064,7 +1064,7 @@ result_t GSLidarDriver::waitScanData(
     uint32_t waitTime = 0;
     result_t ans = RESULT_FAIL;
 
-    while ((waitTime = getms() - startTs) < timeout && 
+    while ((waitTime = getms() - startTs) < timeout &&
         recvNodeCount < count)
     {
         node_info node;
@@ -1133,8 +1133,8 @@ result_t GSLidarDriver::grabScanData(
     //   if (!IS_OK(ans))
     //   {
     //     return ans; //失败时直接返回
-    //   } 
-    //   else 
+    //   }
+    //   else
     //   {
     //     count = packCount;
     //     memcpy(nodes, packNodes, count * SDKNODESIZE);
@@ -1283,7 +1283,7 @@ result_t GSLidarDriver::getDevicePara(gs_device_para &info, uint32_t timeout) {
           return RESULT_FAIL;
         }
         getData(reinterpret_cast<uint8_t *>(&info), sizeof(info));
-        
+
         crcSum = 0;
         crcSum += h.address;
         crcSum += h.type;
@@ -1306,7 +1306,7 @@ result_t GSLidarDriver::getDevicePara(gs_device_para &info, uint32_t timeout) {
         b1[mdNum] = info.b1 / 10000.00;
         bias[mdNum] = double(info.bias) * 0.1;
 
-        // debug("k0 %lf k1 %lf b0 %lf b1 %lf bias %lf", 
+        // debug("k0 %lf k1 %lf b0 %lf b1 %lf bias %lf",
             // k0[mdNum], k1[mdNum], b0[mdNum], b1[mdNum], bias[mdNum]);
         delay(5);
     }
@@ -1348,7 +1348,7 @@ result_t GSLidarDriver::setDeviceAddress(uint32_t timeout)
 /************************************************************************/
 /* the set to signal quality                                            */
 /************************************************************************/
-void GSLidarDriver::setIntensities(const bool &isintensities) 
+void GSLidarDriver::setIntensities(const bool &isintensities)
 {
     if (m_intensities != isintensities) {
         if (globalRecvBuffer) {
@@ -1373,12 +1373,12 @@ void GSLidarDriver::setIntensities(const bool &isintensities)
 *     true	开启
 *	  false 关闭
 */
-void GSLidarDriver::setAutoReconnect(const bool &enable) 
+void GSLidarDriver::setAutoReconnect(const bool &enable)
 {
     isAutoReconnect = enable;
 }
 
-void GSLidarDriver::checkTransDelay() 
+void GSLidarDriver::checkTransDelay()
 {
     //采样率
     trans_delay = _comm->getByteTime();
@@ -1389,7 +1389,7 @@ void GSLidarDriver::checkTransDelay()
 /************************************************************************/
 /*  start to scan                                                       */
 /************************************************************************/
-result_t GSLidarDriver::startScan(bool force, uint32_t timeout) 
+result_t GSLidarDriver::startScan(bool force, uint32_t timeout)
 {
     result_t ans;
 
@@ -1431,7 +1431,7 @@ result_t GSLidarDriver::startScan(bool force, uint32_t timeout)
     return ans;
 }
 
-result_t GSLidarDriver::stopScan(uint32_t timeout) 
+result_t GSLidarDriver::stopScan(uint32_t timeout)
 {
     UNUSED(timeout);
     result_t  ans;
@@ -1502,7 +1502,7 @@ result_t GSLidarDriver::startAutoScan(bool force, uint32_t timeout) {
 /************************************************************************/
 /*   stop scan                                                   */
 /************************************************************************/
-result_t GSLidarDriver::stop() 
+result_t GSLidarDriver::stop()
 {
     if (isAutoconnting) {
         isAutoReconnect = false;
@@ -1550,7 +1550,7 @@ std::map<std::string, std::string> GSLidarDriver::lidarPortList() {
     return ports;
 }
 
-const char *GSLidarDriver::DescribeError(bool isTCP) 
+const char *GSLidarDriver::DescribeError(bool isTCP)
 {
   if (_comm) {
     return _comm->DescribeError();
@@ -1558,7 +1558,7 @@ const char *GSLidarDriver::DescribeError(bool isTCP)
   return nullptr;
 }
 
-result_t GSLidarDriver::getHealth(device_health &, uint32_t) 
+result_t GSLidarDriver::getHealth(device_health &, uint32_t)
 {
   return RESULT_OK;
 }
@@ -1603,7 +1603,7 @@ result_t GSLidarDriver::getDeviceInfo(device_info &info, uint32_t timeout)
         }
         gs_device_info di = {0};
         getData(reinterpret_cast<uint8_t*>(&di), sizeof(di));
-        
+
         info.hardware_version = di.hwVersion;
         info.firmware_version = uint16_t((di.fwVersion & 0xFF) << 8) +
             uint16_t(di.fwVersion >> 8);
@@ -1670,7 +1670,7 @@ result_t GSLidarDriver::getDeviceInfo(
         ret = waitResponseHeaderEx(&head, GS_LIDAR_CMD_GET_VERSION, timeout);
         if (!IS_OK(ret))
             return ret;
-        if (head.size < GSDEVINFOSIZE) 
+        if (head.size < GSDEVINFOSIZE)
         {
             ret = RESULT_FAIL;
             break;
@@ -1871,7 +1871,7 @@ bool GSLidarDriver::execOta(uint8_t addr, const std::vector<uint8_t>& data)
     bool ret = false;
     // 计算固件分成的数据包数
     int n = data.size() % DATA_LEN_PER_FRAME;
-    int m = data.size() / DATA_LEN_PER_FRAME + (n ? 1 : 0); 
+    int m = data.size() / DATA_LEN_PER_FRAME + (n ? 1 : 0);
 
     int percent = -1;
     for (int j = 0; j < m; ++j)
@@ -2037,7 +2037,7 @@ bool GSLidarDriver::sendData(
         dataRecv = dRecv;
         ret = true;
     }
-        
+
     return ret;
 }
 

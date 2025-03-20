@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
   //   int id = 0;
   //   for (it = ports.begin(); it != ports.end(); it++)
   //   {
-  //     printf("[%d] %s %s\n", 
+  //     printf("[%d] %s %s\n",
   //       id, it->first.c_str(), it->second.c_str());
   //     id++;
   //   }
@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
   int baudrate = 921600; //默认串口号
 
   bool isSingleChannel = false;
-  
+
   CYdLidar laser;
   //////////////////////string property/////////////////
   /// lidar port

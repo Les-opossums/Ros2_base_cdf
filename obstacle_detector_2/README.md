@@ -23,9 +23,9 @@ The package requires [Armadillo C++](http://arma.sourceforge.net) library for co
 -----------------------
 
 1. The nodes and nodelets
-  1.1 The scans_merger 
-  1.2 The obstacle_extractor 
-  1.3 The obstacle_tracker 
+  1.1 The scans_merger
+  1.2 The obstacle_extractor
+  1.3 The obstacle_tracker
   1.4 The obstacle_publisher
 2. The messages
 3. Launch files
@@ -37,9 +37,9 @@ The package provides separate nodes/nodelets to perform separate tasks. In gener
 
 `two laser scans` -> `scans merger` -> `merged scan or pcl` -> `obstacle extractor` -> `obstacles` -> `obstacle tracker` -> `refined obstacles`
 
-For some scenarios the pure obstacle extraction directly from a laser scan (without tracking) might be sufficient. 
+For some scenarios the pure obstacle extraction directly from a laser scan (without tracking) might be sufficient.
 
-The nodes are configurable with the use of ROS parameter server. All of the nodes provide a private `params` service, which allows the process to get the latest parameters from the parameter server. 
+The nodes are configurable with the use of ROS parameter server. All of the nodes provide a private `params` service, which allows the process to get the latest parameters from the parameter server.
 
 All of the nodes can be in either active or sleep mode, triggered by setting the appropriate variable in the parameter server and calling `params` service. In the sleep mode, any subscribers or publishers are shut down and the node does nothing until activated again.
 
@@ -92,9 +92,9 @@ The package comes with Rviz panel for this node (**not yet ported**).
 
 -----------------------
 
-### 1.2. The obstacle_extractor node 
+### 1.2. The obstacle_extractor node
 
-This node converts messages of type `sensor_msgs/LaserScan` from topic `scan` or messages of type `sensor_msgs/PointCloud` from topic `pcl` into obstacles which are published as messages of custom type `obstacles_detector/Obstacles` under topic `raw_obstacles`. The PCL message must be ordered in the angular fashion, because the algorithm exploits the polar nature of laser scanners. 
+This node converts messages of type `sensor_msgs/LaserScan` from topic `scan` or messages of type `sensor_msgs/PointCloud` from topic `pcl` into obstacles which are published as messages of custom type `obstacles_detector/Obstacles` under topic `raw_obstacles`. The PCL message must be ordered in the angular fashion, because the algorithm exploits the polar nature of laser scanners.
 
 -----------------------
 <p align="center">
@@ -278,4 +278,3 @@ For better visual effects, appropriate Rviz display for `Obstacles` messages was
 
 Author:
 _Mateusz Przybyla_
-

@@ -56,4 +56,3 @@ _u64 rp_getms();
 
 #define getms() rp::arch::rp_getms()
 #define getus() rp::arch::rp_getus()
-

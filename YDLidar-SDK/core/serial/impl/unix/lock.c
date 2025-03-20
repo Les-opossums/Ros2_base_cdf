@@ -793,4 +793,3 @@ int is_device_locked(const char *port_filename) {
   return 0;
 }
 #endif /* WIN32 */
-

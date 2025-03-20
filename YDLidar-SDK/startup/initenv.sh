@@ -8,4 +8,3 @@ echo  'KERNEL=="ttyUSB*", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", MOD
 service udev reload
 sleep 2
 service udev restart
-

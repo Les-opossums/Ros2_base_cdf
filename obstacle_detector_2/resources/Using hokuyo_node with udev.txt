@@ -23,7 +23,7 @@ sudo chmod +x /etc/ros/run.sh
 4. Fill the file with the following:
 
 #!/bin/sh
-. /opt/ros/hydro/setup.sh 
+. /opt/ros/hydro/setup.sh
 rosrun $@
 
 (change the distribution of ROS to the one that you use - it was Hydromedusa in my case).
@@ -33,4 +33,3 @@ rosrun $@
 sudo udevadm control --reload-rules
 
 From now on, after plugging in the usb Hokuyo laser scanner, the /dev/ folder should not only contain ttyACMn links, but also /sensors/hokuyo_<serial_number> links, with which you can unambiguously determine which device are you using. Good luck!
-

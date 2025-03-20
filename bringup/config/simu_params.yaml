@@ -3,7 +3,7 @@ main_robot:
     ros__parameters:
       enable_robot_position_reception: False
       object_topic: "object"
-      position_topic: "top_lidar_position" 
+      position_topic: "top_lidar_position"
       debug_topic: "debug"
       color_topic: "init/team_color"
       default_color: "yellow"
@@ -52,7 +52,7 @@ main_robot:
       robot_position_topic: "robot_position"
       enable_wait_color: True
       enable_initial_position: False
-  
+
   beacon_generator_node:
     ros__parameters:
       object_topic: "object"

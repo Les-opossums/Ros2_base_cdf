@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
   ydlidar::os_init();
 
   bool ret = false;
- 
+
   CYdLidar lidarS2; //S2雷达
   {
     bool isSingleChannel = false;

@@ -42,10 +42,10 @@ ObstaclePublisher::ObstaclePublisher(std::shared_ptr<rclcpp::Node> nh, std::shar
     nh_ = nh;
   nh_local_ = nh_local;
   p_active_ = false;
-//   params_srv_ = nh_->create_service<std_srvs::srv::Empty>("params", 
+//   params_srv_ = nh_->create_service<std_srvs::srv::Empty>("params",
 //                                                           std::bind(
 //                                                                 &ObstaclePublisher::updateParams,
-//                                                                 this, 
+//                                                                 this,
 //                                                                 std::placeholders::_1,
 //                                                                 std::placeholders::_2,
 //                                                                 std::placeholders::_3
@@ -131,7 +131,7 @@ void ObstaclePublisher::updateParamsUtil() {
 }
 
 void ObstaclePublisher::updateParams(const std::shared_ptr<rmw_request_id_t> request_header,
-                                     const std::shared_ptr<std_srvs::srv::Empty::Request> &req, 
+                                     const std::shared_ptr<std_srvs::srv::Empty::Request> &req,
                                      const std::shared_ptr<std_srvs::srv::Empty::Response> &res) {
   updateParamsUtil();
 }

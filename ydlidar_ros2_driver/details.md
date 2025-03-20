@@ -32,7 +32,7 @@
 
 ## Baudrate Table
 
-| LiDAR                					| baudrate               | 
+| LiDAR                					| baudrate               |
 |-----------------------------------------------|-----------------------|
 |F4/S2/X2/X2L/S4/TX8/TX20/G4C 		| 115200			|
 |X4                   					| 128000			|
@@ -44,7 +44,7 @@
 
 ## SingleChannel Table
 
-| LiDAR                							| isSingleChannel       | 
+| LiDAR                							| isSingleChannel       |
 |-----------------------------------------------------------|-----------------------|
 |G1/G2/G4/G5/G6/G7/F4/F4PRO/S4/S4B/X4/R2/G4C 	| false			|
 |S2/X2/X2L                   					| true			|
@@ -55,7 +55,7 @@
 
 ## LidarType Table
 
-| LiDAR                									| lidar_type             | 
+| LiDAR                									| lidar_type             |
 |-----------------------------------------------------------------------|-----------------------|
 |G1/G2/G4/G5/G6/G7/F4/F4PRO/S4/S4B/X4/R2/G4C/S2/X2/X2L 	| TYPE_TRIANGLE			|
 |TG15/TG30/TG50/TX8/TX20                   				| TYPE_TOF			|
@@ -63,7 +63,7 @@
 
 ## DeviceType Table
 
-| LiDAR                									| lidar_type             | 
+| LiDAR                									| lidar_type             |
 |-----------------------------------------------------------------------|-----------------------|
 |G1/G2/G4/G5/G6/G7/F4/F4PRO/S4/S4B/X4/R2/G4C/S2/X2/X2L 	| YDLIDAR_TYPE_SERIAL			|
 |TG15/TG30/TG50/TX8/TX20                   				| YDLIDAR_TYPE_SERIAL			|
@@ -72,7 +72,7 @@
 
 ## Sampling Rate Table
 
-| LiDAR                		| sample_rate             | 
+| LiDAR                		| sample_rate             |
 |-----------------------------|------------------------|
 |G4/G5/F4                   | 4,8,9			 |
 |F4PRO                   	| 4,6   	     |
@@ -87,7 +87,7 @@
 
 ## Frequency Table
 
-| LiDAR                					| frequency             | 
+| LiDAR                					| frequency             |
 |-----------------------------------------------|------------------------|
 |G1/G2/R2/G6/G7/G4/G5/G4PRO/F4/F4PRO	| 5-12Hz			 |
 |S4/S4B/S2/TX8/TX20/X4 			        | Not Support		 |

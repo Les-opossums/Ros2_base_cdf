@@ -44,7 +44,7 @@
 #include "handler_normalnode.h"
 
 BEGIN_DATAUNPACKER_NS()
-	
+
 namespace unpacker{
 
 
@@ -128,8 +128,8 @@ void UnpackerHandler_NormalNode::onData(LIDARSampleDataUnpackerInner* engine, co
             hqNode.dist_mm_q2 = node->distance_q2;
             hqNode.flag = (node->sync_quality & RPLIDAR_RESP_MEASUREMENT_SYNCBIT);  // trasfer syncbit to HQ flag field
             hqNode.quality = (node->sync_quality >> RPLIDAR_RESP_MEASUREMENT_QUALITY_SHIFT) << RPLIDAR_RESP_MEASUREMENT_QUALITY_SHIFT;  //remove the last two bits and then make quality from 0-63 to 0-255
-            
-            
+
+
             engine->publishHQNode(engine->getCurrentTimestamp_uS() - _getSampleDelayOffsetInLegacyMode(_cachedTimingDesc), &hqNode);
             continue;
 

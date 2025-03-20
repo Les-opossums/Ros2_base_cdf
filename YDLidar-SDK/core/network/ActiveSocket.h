@@ -97,4 +97,3 @@ class CActiveSocket : public CSimpleSocket {
 }//namespace ydlidar
 
 #endif /*  __ACTIVESOCKET_H__  */
-

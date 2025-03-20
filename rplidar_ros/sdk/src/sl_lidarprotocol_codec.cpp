@@ -43,7 +43,7 @@
 #include "hal/event.h"
 
 #include "sl_lidar_driver.h"
-#include "sl_crc.h" 
+#include "sl_crc.h"
 #include <algorithm>
 
 #include "sl_async_transceiver.h"
@@ -190,7 +190,7 @@ void RPLidarProtocolCodec::onDecodeData(const void* buffer, size_t size)
         }
         break;
         case STATUS_WAIT_TYPE:
-            // save the type field as a cmd 
+            // save the type field as a cmd
             _decodingMessage.cmd = currentByte;
 
             // recv payload...
@@ -198,7 +198,7 @@ void RPLidarProtocolCodec::onDecodeData(const void* buffer, size_t size)
                 | STATUS_RECV_PAYLOAD;
 
             if (!_decodingMessage.getPayloadSize()) {
-                // zero payload packet? 
+                // zero payload packet?
                 _working_states = STATUS_WAIT_SYNC1;
             }
             break;

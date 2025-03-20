@@ -38,14 +38,16 @@ def generate_launch_description():
         executable="rplidar_node",
         name="rp_lidar_top",
         parameters=[
-            {"serial_port": "/dev/LidarHaut",
-             "serial_baudrate": 256000,
-             "channel_type": "serial",
-             "frame_id": "laser",
-             "inverted": False,
-             "angle_compensate": True,
-             "scan_mode": "Sensitivity"}
-        ]
+            {
+                "serial_port": "/dev/LidarHaut",
+                "serial_baudrate": 256000,
+                "channel_type": "serial",
+                "frame_id": "laser",
+                "inverted": False,
+                "angle_compensate": True,
+                "scan_mode": "Sensitivity",
+            }
+        ],
     )
 
     ld.add_action(node_obj_detector_haut)

@@ -7,7 +7,7 @@
 
 ## Install CMake
 The installation procedures in Ubuntu 18.04/16.04/14.04 LTS and Windows 7/10 are shown here as examples. For Ubuntu 18.04/16.04/14.04 32-bit LTS and Mac, you can get it in [YDLidar-SDK wiki](https://github.com/YDLIDAR/YDLidar-SDK/wiki).
-YDLidar SDK requires [CMake 2.8.2+](https://cmake.org/) as dependencies. 
+YDLidar SDK requires [CMake 2.8.2+](https://cmake.org/) as dependencies.
 ### Ubuntu 18.04/16.04/14.04 LTS
 You can install these packages using apt:
 ```shell
@@ -80,7 +80,7 @@ eg:
 
 #### Compile YDLidar SDK
 You can now compile the YDLidar SDK in Visual Studio.
-Note: 
+Note:
 * For more windows build and Run, Please refer to [How to gerenrate Vs Project by CMake](how_to_gerenrate_vs_project_by_cmake.md)
 * For VS2017 or higher, Please refer to [CMake projects in visual studio](https://docs.microsoft.com/zh-cn/cpp/build/cmake-projects-in-visual-studio?view=vs-2019)
 
@@ -131,10 +131,10 @@ We provide the following program options for connecting the specific units :
 Here is the example:
 ```
 __   ______  _     ___ ____    _    ____
-\ \ / /  _ \| |   |_ _|  _ \  / \  |  _ \ 
- \ V /| | | | |    | || | | |/ _ \ | |_) | 
+\ \ / /  _ \| |   |_ _|  _ \  / \  |  _ \
+ \ V /| | | | |    | || | | |/ _ \ | |_) |
   | | | |_| | |___ | || |_| / ___ \|  _ <
-  |_| |____/|_____|___|____/_/   \_\_| \_\ 
+  |_| |____/|_____|___|____/_/   \_\_| \_\
 
 Baudrate:
 0. 115200
@@ -168,18 +168,18 @@ sudo dpkg -i <file>.deb
 sudo apt-get install -f # Install dependencies
 ```
 ### Start VSCode
-Start VSCode with the following command: 
+Start VSCode with the following command:
 ```bash
 code
 ```
 ### Open the YDLidar-SDK project in VSCode
-Use the keyboard shortcut **(Ctrl+K Ctrl+O)** to open the YDLidar-SDK project. 
+Use the keyboard shortcut **(Ctrl+K Ctrl+O)** to open the YDLidar-SDK project.
 ### Build the YDLidar-SDK project in VSCode
-Use the keyboard shortcut **(Ctrl+Shift+B)** to build the YDLidar-SDK project. 
+Use the keyboard shortcut **(Ctrl+Shift+B)** to build the YDLidar-SDK project.
 ### Run all unit tests for the YDLidar-SDK project in VSCode
-Select the "Tasks->Run Tasks..." menu command and click "run all unit tests for the YDLidar-SDK project" from a popup menu to check the code style for the YDLidar-SDK project. 
+Select the "Tasks->Run Tasks..." menu command and click "run all unit tests for the YDLidar-SDK project" from a popup menu to check the code style for the YDLidar-SDK project.
 
 ### Run a code style check task for the YDLidar-SDK project in VSCode
-Select the "Tasks->Run Tasks..." menu command and click "code style check for the YDLidar-SDK project" from a popup menu to check the code style for the YDLidar-SDK project. 
+Select the "Tasks->Run Tasks..." menu command and click "code style check for the YDLidar-SDK project" from a popup menu to check the code style for the YDLidar-SDK project.
 ### Clean the YDLidar-SDK project in VSCode
-Select the "Tasks->Run Tasks..." menu command and click "clean the YDLidar-SDK project" from a popup menu to clean the YDLidar-SDK project. 
+Select the "Tasks->Run Tasks..." menu command and click "clean the YDLidar-SDK project" from a popup menu to clean the YDLidar-SDK project.

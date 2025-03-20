@@ -45,7 +45,7 @@ namespace rp{ namespace hal{
 Thread Thread::create(thread_proc_t proc, void * data)
 {
     Thread newborn(proc, data);
-    
+
     // tricky code, we assume pthread_t is not a structure but a word size value
     assert( sizeof(newborn._handle) >= sizeof(pthread_t));
 
@@ -57,7 +57,7 @@ Thread Thread::create(thread_proc_t proc, void * data)
 u_result Thread::terminate()
 {
     if (!this->_handle) return RESULT_OK;
-    
+
     return pthread_cancel((pthread_t)this->_handle)==0?RESULT_OK:RESULT_OPERATION_FAIL;
 }
 
@@ -76,7 +76,7 @@ u_result Thread::SetSelfPriority( priority_val_t p)
     {
         // cannot retreieve values
         return RESULT_OPERATION_FAIL;
-    }   
+    }
 
     int pthread_priority_min;
 
@@ -122,9 +122,9 @@ u_result Thread::SetSelfPriority( priority_val_t p)
 
     current_param.__sched_priority = pthread_priority;
 
-  
 
-    
+
+
     // do not use pthread version as it will make the priority be inherited by a thread child
 	if ( (ans = sched_setscheduler(selfTid, current_policy , &current_param)) )
 	{
@@ -142,7 +142,7 @@ u_result Thread::SetSelfPriority( priority_val_t p)
             return RESULT_OPERATION_FAIL;
         }
     }
-    
+
 
 	return  RESULT_OK;
 }
@@ -157,7 +157,7 @@ Thread::priority_val_t Thread::getPriority()
     {
         // cannot retreieve values
         return PRIORITY_NORMAL;
-    }   
+    }
 
     int pthread_priority_max = sched_get_priority_max(SCHED_RR);
     int pthread_priority_min = sched_get_priority_min(SCHED_RR);
@@ -176,7 +176,7 @@ Thread::priority_val_t Thread::getPriority()
 u_result Thread::join(unsigned long timeout)
 {
     if (!this->_handle) return RESULT_OK;
-    
+
     pthread_join((pthread_t)(this->_handle), NULL);
     this->_handle = 0;
     return RESULT_OK;

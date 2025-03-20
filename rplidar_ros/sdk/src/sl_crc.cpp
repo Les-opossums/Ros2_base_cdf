@@ -30,10 +30,10 @@
   *
   */
 
-#include "sl_crc.h"  
+#include "sl_crc.h"
 
 namespace sl {namespace crc32 {
-    
+
     static sl_u32 table[256];//crc32_table
     sl_u32 bitrev(sl_u32 input, sl_u16 bw)
     {
@@ -89,7 +89,7 @@ namespace sl {namespace crc32 {
         return crc ^ 0xffffffff;
     }
 
-    sl_result getResult(sl_u8 *ptr, sl_u32 len) 
+    sl_result getResult(sl_u8 *ptr, sl_u32 len)
     {
         static sl_u8 tmp;
         if (tmp != 1) {

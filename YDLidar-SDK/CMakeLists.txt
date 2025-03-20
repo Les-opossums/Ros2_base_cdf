@@ -146,7 +146,7 @@ if(${SWIG_FOUND} AND ${PYTHONLIBS_FOUND})
 endif()
 
 ##############################################
-# build ydlidar sdk c# 
+# build ydlidar sdk c#
 if(WIN32)
 if(BUILD_CSHARP)
     message(STATUS "build csharp API....")

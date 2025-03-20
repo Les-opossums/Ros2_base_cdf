@@ -20,7 +20,7 @@ def generate_launch_description():
         namespace=namespace,
         executable="action_sequencer_node",
         name="action_sequencer",
-        parameters=[config]
+        parameters=[config],
     )
 
     node_big_brother = Node(
@@ -28,7 +28,7 @@ def generate_launch_description():
         namespace=namespace,
         executable="big_brother_node",
         name="big_brother",
-        parameters=[config]
+        parameters=[config],
     )
 
     ld.add_action(node_action_sequencer)

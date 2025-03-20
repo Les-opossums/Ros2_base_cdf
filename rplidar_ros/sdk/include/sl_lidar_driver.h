@@ -157,7 +157,7 @@ namespace sl {
 
         sl_u32  sample_duration_uS;
         sl_u32  native_baudrate;
-        
+
         sl_u32  linkage_delay_uS;
 
         LIDARInterfaceType native_interface_type;
@@ -201,7 +201,7 @@ namespace sl {
 
         /**
         * Wait for some data
-        * \param size_hint Byte count may available to retrieve without beening blocked 
+        * \param size_hint Byte count may available to retrieve without beening blocked
         * \param timeoutInMs Wait timeout (in microseconds, -1 for forever)
         * \return RESULT_OK if there is data available for receiving
         *         RESULT_OPERATION_TIMEOUT if the given timeout duration is exceed
@@ -296,7 +296,7 @@ namespace sl {
         // Desire speed
         sl_u16 desired_speed;
 
-        // Max speed 
+        // Max speed
         sl_u16 max_speed;
 
         // Min speed
@@ -320,7 +320,7 @@ namespace sl {
         * Disconnect from the LIDAR
         */
         virtual void disconnect() = 0;
-        
+
         /**
         * Check if the connection is established
         */
@@ -366,20 +366,20 @@ namespace sl {
         ///
         /// \param health        The health status info returned from the RPLIDAR
         ///
-        /// \param timeout       The operation timeout value (in millisecond) for the serial port communication     
+        /// \param timeout       The operation timeout value (in millisecond) for the serial port communication
         virtual sl_result getHealth(sl_lidar_response_device_health_t& health, sl_u32 timeout = DEFAULT_TIMEOUT) = 0;
 
         /// Get the device information of the RPLIDAR include the serial number, firmware version, device model etc.
-        /// 
+        ///
         /// \param info          The device information returned from the RPLIDAR
-        /// \param timeout       The operation timeout value (in millisecond) for the serial port communication  
+        /// \param timeout       The operation timeout value (in millisecond) for the serial port communication
         virtual sl_result getDeviceInfo(sl_lidar_response_device_info_t& info, sl_u32 timeout = DEFAULT_TIMEOUT) = 0;
 
         /// Check whether the device support motor control
         /// Note: this API will disable grab.
-        /// 
+        ///
         /// \param motorCtrlSupport Return the result.
-        /// \param timeout          The operation timeout value (in millisecond) for the serial port communication. 
+        /// \param timeout          The operation timeout value (in millisecond) for the serial port communication.
         virtual sl_result checkMotorCtrlSupport(MotorCtrlSupport& motorCtrlSupport, sl_u32 timeout = DEFAULT_TIMEOUT) = 0;
 
         /// Calculate LIDAR's current scanning frequency from the given scan data
@@ -396,13 +396,13 @@ namespace sl {
 		/// \param conf             Network parameter that LPX series lidar owned
 		/// \param timeout          The operation timeout value (in millisecond) for the ethernet udp communication
 		virtual sl_result setLidarIpConf(const sl_lidar_ip_conf_t& conf, sl_u32 timeout = DEFAULT_TIMEOUT) = 0;
-       
+
         ///Get LPX and S2E series lidar's static IP address
         ///
         /// \param conf             Network parameter that LPX series lidar owned
         /// \param timeout          The operation timeout value (in millisecond) for the ethernet udp communication
         virtual sl_result getLidarIpConf( sl_lidar_ip_conf_t& conf, sl_u32 timeout = DEFAULT_TIMEOUT) = 0;
-  // 
+  //
 		/////Get LPX series lidar's MAC address
 		///
 		/// \param macAddrArray         The device MAC information returned from the LPX series lidar
@@ -412,10 +412,10 @@ namespace sl {
 
         /// Ask the LIDAR core system to stop the current scan operation and enter idle state. The background thread will be terminated
         ///
-        /// \param timeout       The operation timeout value (in millisecond) for the serial port communication 
+        /// \param timeout       The operation timeout value (in millisecond) for the serial port communication
         virtual sl_result stop(sl_u32 timeout = DEFAULT_TIMEOUT) = 0;
 
-        /// Wait and grab a complete 0-360 degree scan data previously received. 
+        /// Wait and grab a complete 0-360 degree scan data previously received.
         /// The grabbed scan data returned by this interface always has the following charactistics:
         ///
         /// 1) The first node of the grabbed data array (nodebuffer[0]) must be the first sample of a scan, i.e. the start_bit == 1
@@ -429,7 +429,7 @@ namespace sl {
         ///
         /// \param timeout        Max duration allowed to wait for a complete scan data, nothing will be stored to the nodebuffer if a complete 360-degrees' scan data cannot to be ready timely.
         ///
-        /// The interface will return SL_RESULT_OPERATION_TIMEOUT to indicate that no complete 360-degrees' scan can be retrieved withing the given timeout duration. 
+        /// The interface will return SL_RESULT_OPERATION_TIMEOUT to indicate that no complete 360-degrees' scan can be retrieved withing the given timeout duration.
         ///
         /// \The caller application can set the timeout value to Zero(0) to make this interface always returns immediately to achieve non-block operation.
         virtual sl_result grabScanDataHq(sl_lidar_response_measurement_node_hq_t* nodebuffer, size_t& count, sl_u32 timeout = DEFAULT_TIMEOUT) = 0;
@@ -437,15 +437,15 @@ namespace sl {
 
 
         /// Wait and grab a complete 0-360 degree scan data previously received with timestamp support.
-        /// 
+        ///
         /// The returned timestamp belongs to the first data point of the scan data (begining of the scan).
         /// Its value is represented based on the current machine's time domain with the unit of microseconds (uS).
-        /// 
-        /// If the currently connected LIDAR supports hardware timestamp mechanism, this timestamp will use 
-        /// the actual data emitted by the LIDAR device and remap it to the current machine's time domain. 
-        /// 
-        /// For other models that do not support hardware timestamps, this data will be deducted through estimation, 
-        /// and there may be a slight deviation from the actual situation. 
+        ///
+        /// If the currently connected LIDAR supports hardware timestamp mechanism, this timestamp will use
+        /// the actual data emitted by the LIDAR device and remap it to the current machine's time domain.
+        ///
+        /// For other models that do not support hardware timestamps, this data will be deducted through estimation,
+        /// and there may be a slight deviation from the actual situation.
         ///
         /// The grabbed scan data returned by this interface always has the following charactistics:
         ///
@@ -461,7 +461,7 @@ namespace sl {
         /// \param timestamp_uS   The reference used to store the timestamp value.
         /// \param timeout        Max duration allowed to wait for a complete scan data, nothing will be stored to the nodebuffer if a complete 360-degrees' scan data cannot to be ready timely.
         ///
-        /// The interface will return SL_RESULT_OPERATION_TIMEOUT to indicate that no complete 360-degrees' scan can be retrieved withing the given timeout duration. 
+        /// The interface will return SL_RESULT_OPERATION_TIMEOUT to indicate that no complete 360-degrees' scan can be retrieved withing the given timeout duration.
         ///
         /// \The caller application can set the timeout value to Zero(0) to make this interface always returns immediately to achieve non-block operation.
         virtual sl_result grabScanDataHqWithTimeStamp(sl_lidar_response_measurement_node_hq_t* nodebuffer, size_t& count, sl_u64 & timestamp_uS, sl_u32 timeout = DEFAULT_TIMEOUT) = 0;
@@ -473,7 +473,7 @@ namespace sl {
         ///
         /// \param count          The caller must initialize this parameter to set the max data count of the provided buffer (in unit of rplidar_response_measurement_node_t).
         ///                       Once the interface returns, this parameter will store the actual received data count.
-        /// The interface will return SL_RESULT_OPERATION_FAIL when all the scan data is invalid. 
+        /// The interface will return SL_RESULT_OPERATION_FAIL when all the scan data is invalid.
         virtual sl_result ascendScanData(sl_lidar_response_measurement_node_hq_t* nodebuffer, size_t count) = 0;
 
         /// Return received scan points even if it's not complete scan
@@ -482,7 +482,7 @@ namespace sl {
         ///
         /// \param count          Once the interface returns, this parameter will store the actual received data count.
         ///
-        /// The interface will return SL_RESULT_OPERATION_TIMEOUT to indicate that not even a single node can be retrieved since last call. 
+        /// The interface will return SL_RESULT_OPERATION_TIMEOUT to indicate that not even a single node can be retrieved since last call.
         virtual sl_result getScanDataWithIntervalHq(sl_lidar_response_measurement_node_hq_t* nodebuffer, size_t& count) = 0;
         /// Set lidar motor speed
         /// The host system can use this operation to set lidar motor speed.
@@ -491,18 +491,18 @@ namespace sl {
         ///
         ///Note: The function will stop scan if speed is DEFAULT_MOTOR_SPEED.
         virtual sl_result setMotorSpeed(sl_u16 speed = DEFAULT_MOTOR_SPEED) = 0;
-        
+
         /// Get the motor information of the RPLIDAR include the max speed, min speed, desired speed.
-        /// 
+        ///
         /// \param motorInfo          The motor information returned from the RPLIDAR
         virtual sl_result getMotorInfo(LidarMotorInfo &motorInfo, sl_u32 timeoutInMs = DEFAULT_TIMEOUT) = 0;
-    
+
 
         /// Ask the LIDAR to use a new baudrate for serial communication
         /// The target LIDAR system must support such feature to work.
         /// This function does NOT check whether the target LIDAR works with the requiredBaudRate or not.
         /// In order to verifiy the result, use getDeviceInfo or other getXXXX functions instead.
-        /// 
+        ///
         /// \param requiredBaudRate   The new baudrate required to be used. It MUST matches with the baudrate of the binded channel.
         /// \param baudRateDetected   The actual baudrate detected by the LIDAR system
         virtual sl_result negotiateSerialBaudRate(sl_u32 requiredBaudRate, sl_u32* baudRateDetected = NULL) = 0;
@@ -510,16 +510,16 @@ namespace sl {
 
 
         /// Get the technology of the LIDAR's measurement system
-        /// 
-        /// 
+        ///
+        ///
         /// \param devInfo   The device info used to deduct the result
         ///                  If NULL is specified, a driver cached version of the connected LIDAR will be used
         virtual LIDARTechnologyType getLIDARTechnologyType(const sl_lidar_response_device_info_t* devInfo = nullptr) = 0;
-        
-        
+
+
         /// Get the Major Type (Series Info) of the LIDAR
-        /// 
-        /// 
+        ///
+        ///
         /// \param devInfo   The device info used to deduct the result
         ///                  If NULL is specified, a driver cached version of the connected LIDAR will be used
         virtual LIDARMajorType getLIDARMajorType(const sl_lidar_response_device_info_t* devInfo = nullptr) = 0;
@@ -527,9 +527,9 @@ namespace sl {
 
         /// Get the Model Name of the LIDAR
         /// The result will be somthing like: "A1M8" or "S1M1" or "A3M1-R1"
-        /// 
+        ///
         /// \param out_description   The output string that contains the generated model name
-        ///                          
+        ///
         /// \param fetchAliasName    If set to true, a communication will be taken to ask if there is any Alias name availabe
         /// \param devInfo           The device info used to deduct the result
         ///                          If NULL is specified, a driver cached version of the connected LIDAR will be used

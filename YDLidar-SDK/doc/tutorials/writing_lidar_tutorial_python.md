@@ -8,7 +8,7 @@ Next Tutorial: [Examining the simple lidar tutorial](examine_the_simple_lidar_tu
 - [Writing a Simple lidar tutorial (Python)](#writing-a-simple-lidar-tutorial-(python))
     - [create beginner_tutorials directories](#create-beginner_tutorials-directories)
     - [The Code Explained](#the-code-explained)
-    
+
 ## Writing a Simple lidar tutorial (Python)
 Description: This tutorial covers how to write a LiDAR data console program in Python.
 Tutorial Level: BEGINNER
@@ -18,7 +18,7 @@ Tutorial Level: BEGINNER
 mkdir beginner_tutorials
 cd beginner_tutorials
 ```
-### Create the lidar_tutorial.py file within the beginner_tutorials project and paste the following inside it: 
+### Create the lidar_tutorial.py file within the beginner_tutorials project and paste the following inside it:
 [https://github.com/YDLIDAR/ydlidar_tutorials/blob/master/pyhton_tutorials/lidar_tutorial/lidar_tutorial.py](https://github.com/YDLIDAR/ydlidar_tutorials/blob/master/python_tutorials/lidar_tutorial/lidar_tutorial.py)
 
 ```python
@@ -55,11 +55,11 @@ if __name__ == "__main__":
 ```
 
 ### The Code Explained
-Now, let's break the code down. 
+Now, let's break the code down.
 ```python
 import ydlidar
 ```
-You need to import ydlidar if you are writing a YDLIDAR SDK.  
+You need to import ydlidar if you are writing a YDLIDAR SDK.
 
 ```python
   ydlidar.os_init();
@@ -69,7 +69,7 @@ Initialize system signal. install a SIGINT handler which provides Ctrl-C handlin
 ```python
   laser = ydlidar.CYdLidar();
 ```
-Create a handle to this Lidar. 
+Create a handle to this Lidar.
 
 ```python
     ports = ydlidar.lidarPortList();
@@ -102,7 +102,7 @@ Initialize the SDK and LiDAR.
 + Lidar baud rate settings error.
 + Incorrect Lidar type setting.
 
-```python 
+```python
       if ret:
         ret = laser.turnOn();
 ```
@@ -114,7 +114,7 @@ Start the device scanning routine which runs on a separate thread and enable mot
 
 
 ```python
-  // Turn On success and loop  
+  // Turn On success and loop
   while ret and ydlidar.os_isOk() :
 ```
 By `ydlidar.os_isOk()` will install a SIGINT handler which provides Ctrl-C handling which will cause `ydlidar.os_isOk()` to return false if that happens.
@@ -147,4 +147,4 @@ Stop the device scanning thread and disable motor.
 Uninitialize the SDK and Disconnect the LiDAR.
 
 
-Now that you have written a simple lidar tutorial, let's [examine the simple lidar tutorial](examine_the_simple_lidar_tutorial.md). 
+Now that you have written a simple lidar tutorial, let's [examine the simple lidar tutorial](examine_the_simple_lidar_tutorial.md).

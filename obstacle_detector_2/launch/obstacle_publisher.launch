@@ -1,5 +1,5 @@
 <!-- Reusable launch file for obstacle detection -->
-<launch> 
+<launch>
   <node name="obstacle_publisher" pkg="obstacle_detector" exec="obstacle_publisher_node">
     <param name="active"           value="true"/>
     <param name="reset"            value="false"/>
@@ -15,7 +15,7 @@
     <param name="r_vector" value="0.5, 0.5, 1.5, 0.5, 0.7, 0.5, 1.5, 0.7, 0.7, 1.0, 0.5, 1.0" value-sep=","/>
     <param name="vx_vector" value="0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0" value-sep=","/>
     <param name="vy_vector" value="0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0" value-sep=","/>
-    
+
     <param name="frame_id"         value="map"/>
   </node>
 

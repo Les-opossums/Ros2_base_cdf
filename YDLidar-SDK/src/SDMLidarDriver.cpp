@@ -41,7 +41,7 @@ using namespace impl;
 namespace ydlidar
 {
 
-SDMLidarDriver::SDMLidarDriver() 
+SDMLidarDriver::SDMLidarDriver()
     : _serial(NULL)
 {
     // 串口配置参数

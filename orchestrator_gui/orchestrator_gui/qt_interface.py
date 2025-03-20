@@ -8,36 +8,36 @@ import os
 BSIZE_X = 3
 BSIZE_Y = 2
 
+
 class MyPoorWidget(QtWidgets.QWidget):
-    def __init__(self, text='Hey'):
+    def __init__(self, text="Hey"):
         super().__init__()
         self.hello = text
         self.layout2 = QtWidgets.QVBoxLayout(self)
         self.button = QtWidgets.QPushButton("Click me!")
-        self.text = QtWidgets.QLabel(self.hello,
-                                     alignment=QtCore.Qt.AlignCenter)
+        self.text = QtWidgets.QLabel(self.hello, alignment=QtCore.Qt.AlignCenter)
         self.layout2.addWidget(self.text)
         self.layout2.addWidget(self.button)
-        
+
 
 class MyWidget(QtWidgets.QWidget):
-    def __init__(self, text='Hey'):
+    def __init__(self, text="Hey"):
         super().__init__()
         self.x, self.y, self.theta = None, None, None
         self.hello = text
 
         self.button = QtWidgets.QPushButton("Click me!")
-        self.text = QtWidgets.QLabel(self.hello,
-                                     alignment=QtCore.Qt.AlignCenter)
-        self.pos0 = QtWidgets.QLabel("--:--:--",
-                                     alignment=QtCore.Qt.AlignCenter)
+        self.text = QtWidgets.QLabel(self.hello, alignment=QtCore.Qt.AlignCenter)
+        self.pos0 = QtWidgets.QLabel("--:--:--", alignment=QtCore.Qt.AlignCenter)
         config = os.path.join(
             get_package_share_directory("orchestrator_gui"),
-                                    "images",
-                                    "plateau.png",
-            )
+            "images",
+            "plateau.png",
+        )
         self.image = QtWidgets.QLabel()
-        self.image.setPixmap(QtGui.QPixmap(config).scaled(640, 480, QtCore.Qt.KeepAspectRatio))
+        self.image.setPixmap(
+            QtGui.QPixmap(config).scaled(640, 480, QtCore.Qt.KeepAspectRatio)
+        )
         self.img_width = self.image.width()
         self.img_height = self.image.height()
         self.image.setObjectName("image")
@@ -45,7 +45,7 @@ class MyWidget(QtWidgets.QWidget):
         self.x_edit = QtWidgets.QLineEdit(parent=self)
         self.y_edit = QtWidgets.QLineEdit(parent=self)
         self.theta_edit = QtWidgets.QLineEdit(parent=self)
-         
+
         self.layout2 = QtWidgets.QVBoxLayout(self)
         self.layout2.addWidget(self.text)
         self.layout2.addWidget(self.button)
@@ -71,7 +71,7 @@ class MyWidget(QtWidgets.QWidget):
 
     def update_label_theta(self):
         self.theta = self.theta_edit.text()
-        
+
     def getPos(self, event):
         self.x, self.y = self.get_real_pos(event.pos().x(), event.pos().y())
         self.theta = self.theta if self.theta is not None else 0
@@ -79,13 +79,14 @@ class MyWidget(QtWidgets.QWidget):
         self.x_edit.setText(f"{self.x}")
         self.y_edit.setText(f"{self.y}")
         self.theta_edit.setText(f"{self.theta}")
-    
+
     def get_real_pos(self, x, y):
         return BSIZE_X * x / self.img_width, BSIZE_Y * (1 - y / self.img_height)
 
+
 class MyStackWidgetMain(QtWidgets.QWidget):
     def __init__(self):
-        
+
         super().__init__()
         self.layout2 = QtWidgets.QVBoxLayout(self)
         self.comboBox = QtWidgets.QComboBox()
@@ -96,7 +97,7 @@ class MyStackWidgetMain(QtWidgets.QWidget):
 
         self.stackedWidgets = QtWidgets.QStackedWidget()
         self.layout2.addWidget(self.stackedWidgets)
-        p1 = MyWidget('Heyooo')
+        p1 = MyWidget("Heyooo")
         # p2 = MyWidget('Hello')
         # p3 = MyWidget('Hi')
         self.stackedWidgets.addWidget(p1)
@@ -108,6 +109,7 @@ class MyStackWidgetMain(QtWidgets.QWidget):
 
     def change_page(self, index):
         self.stackedWidgets.setCurrentIndex(index)
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

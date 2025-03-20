@@ -17,12 +17,12 @@ namespace rp{ namespace hal{
 	class Waiter : public Event
 	{
 	public:
-		Waiter() 
+		Waiter()
 			: Event()
 		{
 		}
 
-		~Waiter() 
+		~Waiter()
 		{}
 
 		ResultT waitForResult()

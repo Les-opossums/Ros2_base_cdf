@@ -9,7 +9,7 @@ class FilterInterface
 public:
     FilterInterface() {}
     virtual ~FilterInterface() {}
-    
+
     virtual void filter(const LaserScan &in,
                          int lidarType,
                          int version,

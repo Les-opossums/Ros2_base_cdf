@@ -86,7 +86,7 @@ namespace sl {
 			sl_result getScanDataWithIntervalHq(sl_lidar_response_measurement_node_hq_t * nodebuffer, size_t & count);
 			sl_result setMotorSpeed(sl_u16 speed = DEFAULT_MOTOR_PWM);//
 			sl_result negotiateSerialBaudRate(sl_u32 requiredBaudRate, sl_u32* baudRateDetected = NULL);
-	
+
 	protected:
 			sl_result startMotor();
 			sl_result checkSupportConfigCommands(bool& outSupport, sl_u32 timeoutInMs = DEFAULT_TIMEOUT);
@@ -118,7 +118,7 @@ namespace sl {
 			void _ultra_dense_capsuleToNormal(const sl_lidar_response_ultra_dense_capsule_measurement_nodes_t& capslue, sl_lidar_response_measurement_node_hq_t* nodebuffer, size_t& nodeCount);
 			sl_result _waitUltraDenseCapsuledNode(sl_lidar_response_ultra_dense_capsule_measurement_nodes_t& node, sl_u32 timeout = DEFAULT_TIMEOUT);
 			sl_result _cacheUltraDenseCapsuledScanData();
-			
+
 
 			sl_result _waitHqNode(sl_lidar_response_hq_capsule_measurement_nodes_t & node, sl_u32 timeout = DEFAULT_TIMEOUT);
 			void _HqToNormal(const sl_lidar_response_hq_capsule_measurement_nodes_t & node_hq, sl_lidar_response_measurement_node_hq_t *nodebuffer, size_t &nodeCount);

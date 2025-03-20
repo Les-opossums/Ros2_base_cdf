@@ -45,4 +45,3 @@
 #include <core/base/thread.h>
 #include <core/base/locker.h>
 #include <core/base/timer.h>
-

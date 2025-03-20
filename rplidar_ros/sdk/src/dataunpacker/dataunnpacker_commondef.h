@@ -49,12 +49,10 @@
 #include "hal/waiter.h"
 #include "hal/byteorder.h"
 #include "sl_lidar_driver.h"
-#include "sl_crc.h" 
+#include "sl_crc.h"
 #include <algorithm>
 #include <memory>
 
 #define CONF_NO_BOOST_CRC_SUPPORT
 
 #include "dataupacker_namespace.h"
-
-

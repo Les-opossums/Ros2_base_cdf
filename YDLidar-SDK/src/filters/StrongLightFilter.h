@@ -9,7 +9,7 @@ class YDLIDAR_API StrongLightFilter : public FilterInterface
 public:
     StrongLightFilter();
     virtual ~StrongLightFilter();
-    
+
     virtual void filter(const LaserScan &in,
                 int lidarType,
                 int version,

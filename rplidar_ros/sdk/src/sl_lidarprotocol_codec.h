@@ -69,7 +69,7 @@ public:
 
     virtual void   onDecodeReset();
     virtual void   onDecodeData(const void* buffer, size_t size);
-    
+
     void setMessageListener(IProtocolMessageListener* l);
 
 protected:
@@ -77,12 +77,9 @@ protected:
     IProtocolMessageListener* _listener;
     ProtocolMessage          _decodingMessage;
     rp::hal::Locker          _op_locker;
-                            
+
     _u32                     _working_states;
     int                      _rx_pos;
 };
 
 }}
-
-
-

@@ -688,4 +688,3 @@ class CSimpleSocket : public ChannelDevice {
 
 
 #endif /*  __SOCKET_H__  */
-

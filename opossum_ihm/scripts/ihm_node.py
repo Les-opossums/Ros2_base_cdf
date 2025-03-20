@@ -11,7 +11,7 @@ import threading
 
 class IhmNode(Node):
     def __init__(self):
-        super().__init__('ihm_node')
+        super().__init__("ihm_node")
         self.get_logger().info("Initializing IHM Node")
 
         # Initialisation des abonnements
@@ -60,7 +60,7 @@ class IhmNode(Node):
 
     def update_parameters(self):
         """Met à jour les paramètres via un service ROS 2."""
-        client = self.create_client(Init, 'set_parameters')
+        client = self.create_client(Init, "set_parameters")
         while not client.wait_for_service(timeout_sec=1.0):
             self.get_logger().warn("Waiting for 'set_parameters' service...")
 
@@ -85,22 +85,11 @@ class IhmNode(Node):
         self.get_logger().info("Setting up subscribers...")
 
         self.sub_score_topic = self.create_subscription(
-            Int32,
-            'score',
-            self.score_callback,
-            10
+            Int32, "score", self.score_callback, 10
         )
-        self.sub_au_topic = self.create_subscription(
-            Bool,
-            'au',
-            self.au_callback,
-            10
-        )
+        self.sub_au_topic = self.create_subscription(Bool, "au", self.au_callback, 10)
         self.sub_enable_timer_topic = self.create_subscription(
-            Bool,
-            'enable_timer',
-            self.enable_timer_callback,
-            10
+            Bool, "enable_timer", self.enable_timer_callback, 10
         )
 
     def score_callback(self, msg):
@@ -108,7 +97,9 @@ class IhmNode(Node):
         self.get_logger().info(f"Score received: {msg.data}")
         if self.gui.initialized:
             self.gui.score_app.score += msg.data
-            self.get_logger().info(f"Score received: {msg.data}, current_score={self.gui.score_app.score}")
+            self.get_logger().info(
+                f"Score received: {msg.data}, current_score={self.gui.score_app.score}"
+            )
 
     def au_callback(self, msg):
         """Callback pour le topic 'au'."""
@@ -119,7 +110,7 @@ class IhmNode(Node):
     def enable_timer_callback(self, msg):
         """Callback pour le topic 'enable_timer'."""
         if self.gui.initialized:
-            self.gui.score_app.is_match = msg.data 
+            self.gui.score_app.is_match = msg.data
             self.get_logger().info(f"Enable Timer received: {msg.data}")
 
 
@@ -136,5 +127,5 @@ def main(args=None):
         node.get_logger().info("Shutting down IHM Node")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -4,6 +4,7 @@ from launch import LaunchDescription
 from launch import LaunchIntrospector  # noqa: E402
 from launch_ros.actions import Node  # type: ignore
 
+
 def generate_launch_description():
     ld = LaunchDescription()
 

@@ -41,7 +41,7 @@ Thread Thread::create(thread_proc_t proc, void * data)
 {
     Thread newborn(proc, data);
 
-    newborn._handle = (_word_size_t)( 
+    newborn._handle = (_word_size_t)(
         _beginthreadex(NULL, 0, (unsigned int (_stdcall * )( void * ))proc,
                         data, 0, NULL));
     return newborn;
@@ -64,7 +64,7 @@ u_result Thread::terminate()
 u_result Thread::SetSelfPriority( priority_val_t p)
 {
     HANDLE selfHandle = GetCurrentThread();
-	
+
 	int win_priority =  THREAD_PRIORITY_NORMAL;
 	switch(p)
 	{
@@ -96,7 +96,7 @@ Thread::priority_val_t Thread::getPriority()
 {
 	if (!this->_handle) return PRIORITY_NORMAL;
 	int win_priority =  ::GetThreadPriority(reinterpret_cast<HANDLE>(this->_handle));
-	
+
 	if (win_priority == THREAD_PRIORITY_ERROR_RETURN)
 	{
 		return PRIORITY_NORMAL;
@@ -107,7 +107,7 @@ Thread::priority_val_t Thread::getPriority()
 		return PRIORITY_REALTIME;
 	}
 	else if (win_priority<THREAD_PRIORITY_TIME_CRITICAL && win_priority>=THREAD_PRIORITY_ABOVE_NORMAL)
-	{	
+	{
 		return PRIORITY_HIGH;
 	}
 	else if (win_priority<THREAD_PRIORITY_ABOVE_NORMAL && win_priority>THREAD_PRIORITY_BELOW_NORMAL)

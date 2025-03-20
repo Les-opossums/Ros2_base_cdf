@@ -113,8 +113,8 @@ if($Distance_{i}$ == 0) {
 }
 
 In the data packet, the 4th to 8th bytes are `28 E5 6F BD 79`, so `LSN = 0x28 = 40(dec)`, `FSA = 0x6FE5`, `LSA = 0x79BD`, and bring in the first-level solution formula, and get:
-$Angle_{FSA} = 223.78^{°}$ 
-$Angle_{LSA} = 243.47^{°}$ 
+$Angle_{FSA} = 223.78^{°}$
+$Angle_{LSA} = 243.47^{°}$
 $diff(Angle) = Angle_{LSA} - Angle_{FSA} = 243.47^{°} - 223.78^{°} = 19.69^{°}$
 $Angle_{i} = \frac{19.69^{°}}{39}*(i -1) + 223.78^{°}$  ($1,2,\ldots,LSN$)
 Assume that in the frame data:
@@ -135,7 +135,7 @@ for(int i = 0; i < LSN; i++) {
     }
     if(Angle[i] >= 360) {
         Angle[i] -= 360;
-    }   
+    }
 }
 ```
 Note:
@@ -153,14 +153,14 @@ $$ CS = XOR \sum_{i=1}^{n}(C^i)$$
 
 CS Sequence
 <table>
-    <tr><th>PH        <th> C(1)    
-    <tr><th>FSA       <th> C(2)    
-    <tr><th>S1        <th> C(3)    
-    <tr><th>S2        <th> C(4)   
-    <tr><th>...       <th> ..   
-    <tr><th>Sn        <th> C(n-2)  
-    <tr><th>[CT | LSN]  <th> C(n-1)   
-    <tr><th>LSA       <th> C(n)   
+    <tr><th>PH        <th> C(1)
+    <tr><th>FSA       <th> C(2)
+    <tr><th>S1        <th> C(3)
+    <tr><th>S2        <th> C(4)
+    <tr><th>...       <th> ..
+    <tr><th>Sn        <th> C(n-2)
+    <tr><th>[CT | LSN]  <th> C(n-1)
+    <tr><th>LSA       <th> C(n)
 </table>
 
 * Note: XOR(end) indicates the XOR of the element from subscript 1 to end. However, XOR satisfies the exchange law, and the actual solution may not need to follow the XOR sequence.
@@ -176,7 +176,7 @@ for(int i = 0; i < 2 * LSN; i = i +2 ) {
 checksumcal ^= uint16_t(LSN << 8 | CT);
 checksumcal ^= LSA;
 
-## uint16_t : unsigned short 
+## uint16_t : unsigned short
 
 ```
 Intensity Si(3B):
@@ -190,7 +190,7 @@ for(int i = 0; i < 3 * LSN; i = i + 3) {
 checksumcal ^= uint16_t(LSN << 8 | CT);
 checksumcal ^= LSA;
 
-## uint16_t : unsigned short 
+## uint16_t : unsigned short
 
 ```
 
@@ -200,7 +200,7 @@ No Intensity:
 
 <table>
     <tr><th>Name              <th> Size(Byte)       <th> Value               <th>  Contant                     <th> Buffer
-    <tr><th rowspan="2" >PH   <td rowspan="2" > 2   <td rowspan="2"> 0x55AA  <td rowspan="2">  Header  	       <td> 0xAA <tr> <td> 0x55 
+    <tr><th rowspan="2" >PH   <td rowspan="2" > 2   <td rowspan="2"> 0x55AA  <td rowspan="2">  Header  	       <td> 0xAA <tr> <td> 0x55
     <tr><th>CT                <td> 1                <td> 0x01              <td> Type  	                       <td> 0x01
     <tr><th>LSN               <td> 1                <td> 0x01              <td> Number  	                   <td> 0x01
     <tr><th rowspan="2" >FSA <td rowspan="2" > 2   <td rowspan="2"> 0xAE53  <td rowspan="2">  Starting Angle   <td> 0x53 <tr> <td> 0xAE
@@ -265,14 +265,14 @@ if(check_code == CS) {
         }
     }
 }
- 
+
 ```
 
 Intensity:
 
 <table>
     <tr><th>Name              <th> Size(Byte)       <th> Value               <th>  Contant                     <th> Buffer
-    <tr><th rowspan="2" >PH   <td rowspan="2" > 2   <td rowspan="2"> 0x55AA  <td rowspan="2">  Header  	       <td> 0xAA <tr> <td> 0x55 
+    <tr><th rowspan="2" >PH   <td rowspan="2" > 2   <td rowspan="2"> 0x55AA  <td rowspan="2">  Header  	       <td> 0xAA <tr> <td> 0x55
     <tr><th>CT                <td> 1                <td> 0x01              <td> Type  	                       <td> 0x01
     <tr><th>LSN               <td> 1                <td> 0x01              <td> Number  	                   <td> 0x01
     <tr><th rowspan="2" >FSA <td rowspan="2" > 2   <td rowspan="2"> 0xAE53  <td rowspan="2">  Starting Angle   <td> 0x53 <tr> <td> 0xAE
@@ -340,7 +340,7 @@ if(check_code == CS) {
         }
     }
 }
- 
+
 ```
 
 For more details and usage examples, Refer to [Communication Protocol](https://github.com/YDLIDAR/ydlidar_tutorials/blob/master/CommunicationProtocol/README.md)

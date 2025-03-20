@@ -36,7 +36,7 @@ note over UserProgram: Initialize SDK
 UserProgram->Command: Get LiDAR Information
 Command-->UserProgram: Device connected and Devce Information recevied
 note over UserProgram: TurnOn
-UserProgram->Command: Start LiDAR 
+UserProgram->Command: Start LiDAR
 Command-->UserProgram: LiDAR Started successfully
 UserProgram->LaserScan: Get Laser Scan Data
 LaserScan-->UserProgram:  Laser Scan Data Recvied
@@ -45,7 +45,7 @@ loop Laser Scan Data
   LaserScan->UserProgram: doProcessSimple
 end
 note over UserProgram: TurnOff
-UserProgram->Command: TurnOff 
+UserProgram->Command: TurnOff
 note over UserProgram: disconnecting
 UserProgram->Command: disconnecting
 ```

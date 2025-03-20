@@ -61,7 +61,7 @@ bool raw_serial::open()
 }
 
 bool raw_serial::bind(const char * portname, _u32 baudrate, _u32 flags)
-{   
+{
     strncpy(_portName, portname, sizeof(_portName));
     _baudrate = baudrate;
     _flags    = flags;
@@ -76,7 +76,7 @@ bool raw_serial::open(const char * portname, _u32 baudrate, _u32 flags)
 #endif
 
     if (isOpened()) close();
-    
+
     _serial_handle = CreateFile(
 #ifdef _UNICODE
         wportname,
@@ -98,7 +98,7 @@ bool raw_serial::open(const char * portname, _u32 baudrate, _u32 flags)
         close();
         return false;
     }
-    
+
     _dcb.BaudRate = baudrate;
     _dcb.ByteSize = 8;
     _dcb.Parity   = NOPARITY;
@@ -129,7 +129,7 @@ bool raw_serial::open(const char * portname, _u32 baudrate, _u32 flags)
         return false;
     }
 
-    Sleep(30); 
+    Sleep(30);
     _is_serial_opened = true;
 
     //Clear the DTR bit set DTR=high
@@ -145,7 +145,7 @@ void raw_serial::close()
 
     CloseHandle(_serial_handle);
     _serial_handle = INVALID_HANDLE_VALUE;
-    
+
     _is_serial_opened = false;
 }
 
@@ -156,7 +156,7 @@ int raw_serial::senddata(const unsigned char * data, size_t size)
     if (!isOpened()) return ANS_DEV_ERR;
 
     if (data == NULL || size ==0) return 0;
-    
+
     if(ClearCommError(_serial_handle, &error, NULL) && error > 0)
         PurgeComm(_serial_handle, PURGE_TXABORT | PURGE_TXCLEAR);
 
@@ -175,7 +175,7 @@ int raw_serial::recvdata(unsigned char * data, size_t size)
 
     if(!ReadFile(_serial_handle, data, (DWORD)size, &r_len, &_ro))
     {
-        if(GetLastError() == ERROR_IO_PENDING) 
+        if(GetLastError() == ERROR_IO_PENDING)
         {
             if(!GetOverlappedResult(_serial_handle, &_ro, &r_len, FALSE))
             {
@@ -242,7 +242,7 @@ int raw_serial::waitfordata(size_t data_count, _u32 timeout, size_t * returned_s
 
     if (returned_size==NULL) returned_size=(size_t *)&dummy_length;
 
-    
+
     if ( isOpened()) {
         size_t rxqueue_remaining =  rxqueue_count();
         if (rxqueue_remaining >= data_count) {

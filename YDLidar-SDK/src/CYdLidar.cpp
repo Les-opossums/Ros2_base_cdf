@@ -632,7 +632,7 @@ bool CYdLidar::doProcessSimple(LaserScan &outscan)
     outscan.config.min_angle = math::from_degrees(m_MinAngle);
     outscan.config.max_angle = math::from_degrees(m_MaxAngle);
     //将首末点采集时间差作为采集时长
-    // outscan.config.scan_time = static_cast<float>((global_nodes[count - 1].stamp - 
+    // outscan.config.scan_time = static_cast<float>((global_nodes[count - 1].stamp -
     //   global_nodes[0].stamp)) / 1e9;
     // outscan.config.scan_time = sys_scan_time / 1e9;
     if (lastStamp > 0 && global_nodes[0].stamp > 0)
@@ -679,7 +679,7 @@ bool CYdLidar::doProcessSimple(LaserScan &outscan)
     {
       const node_info& node = global_nodes[i];
 
-      // printf("%lu a:%.01f d:%u\n", 
+      // printf("%lu a:%.01f d:%u\n",
       //   i, float(node.angle) / 128.0f, node.dist);
 
       if (isNetTOFLidar(m_LidarType))
@@ -706,7 +706,7 @@ bool CYdLidar::doProcessSimple(LaserScan &outscan)
       }
       else
       {
-        if (isTOFLidar(m_LidarType) || 
+        if (isTOFLidar(m_LidarType) ||
           isNetTOFLidar(m_LidarType) ||
           isGSLidar(m_LidarType) ||
           isSDMLidar(m_LidarType) ||
@@ -738,7 +738,7 @@ bool CYdLidar::doProcessSimple(LaserScan &outscan)
         else if (isTEALidar(lidar_model) ||
           isGSLidar(m_LidarType)) //TEA雷达转速范围10~30，无缩放
         {
-          scanfrequency = global_nodes[i].scanFreq; 
+          scanfrequency = global_nodes[i].scanFreq;
         }
       }
 
@@ -1043,7 +1043,7 @@ bool CYdLidar::getDeviceInfoByPackage(const LaserDebug &debug)
                     resample
 -------------------------------------------------------------*/
 void CYdLidar::resample(
-  int frequency, int count, 
+  int frequency, int count,
   uint64_t tim_scan_end,
   uint64_t tim_scan_start)
 {
@@ -1094,12 +1094,12 @@ bool CYdLidar::checkLidarAbnormal()
 
   result_t ret = RESULT_FAIL;
   std::vector<int> data;
-  
+
   while (checkCount < m_AbnormalCheckCount)
   {
     // printf("checkLidarAbnormal %d\n", checkCount);
 
-    // Ensure that the voltage is insufficient or the motor resistance is high, 
+    // Ensure that the voltage is insufficient or the motor resistance is high,
     //causing an abnormality.
     if (checkCount)
       delay(500);
@@ -1121,7 +1121,7 @@ bool CYdLidar::checkLidarAbnormal()
       ret = lidarPtr->grabScanData(global_nodes, count);
       end_time = getTime();
       scan_time = 1.0 * static_cast<int64_t>(end_time - start_time) / 1e9;
-      
+
       if (IS_OK(ret))
       {
         // 获取CT信息
@@ -1311,7 +1311,7 @@ bool CYdLidar::calcSampleRate(int count, double scan_time)
     if (!m_SingleChannel)
       // m_FixedSize = m_SampleRate * 1000 / (m_ScanFrequency - 0.1); //不知转速为何要减少0.1
       m_FixedSize = m_SampleRate * 1000 / (m_ScanFrequency);
-    
+
     printf("[YDLIDAR] Scan Frequency: %.02fHz\n", m_ScanFrequency);
     if (!isSDMLidar(m_LidarType)) //非SDM雷达才打印Fixed Size
       printf("[YDLIDAR] Fixed Size: %d\n", m_FixedSize);
@@ -1469,8 +1469,8 @@ bool CYdLidar::getDeviceInfo()
 
   // printf("LIDAR get device info finished, Elapsed time %u ms\n", getms() - t);
   //检查转速
-  if (hasScanFrequencyCtrl(di.model) || 
-    ((isTOFLidar(m_LidarType)) && !m_SingleChannel) || 
+  if (hasScanFrequencyCtrl(di.model) ||
+    ((isTOFLidar(m_LidarType)) && !m_SingleChannel) ||
       isNetTOFLidar(m_LidarType))
   {
     checkScanFrequency();
@@ -1745,7 +1745,7 @@ bool CYdLidar::checkCalibrationAngle(const std::string &serialNumber)
 bool CYdLidar::checkCOMMs()
 {
   //如果雷达类型有变化则需要先删除旧对象
-  if (lidarPtr && 
+  if (lidarPtr &&
     lidarPtr->getLidarType() != m_LidarType)
   {
     delete lidarPtr;
@@ -1828,7 +1828,7 @@ bool CYdLidar::checkCOMMs()
   lidarPtr->setOtaName(otaName);
   lidarPtr->setOtaEncode(otaEncode);
 
-  printf("[YDLIDAR] Lidar successfully connected [%s:%d]\n", 
+  printf("[YDLIDAR] Lidar successfully connected [%s:%d]\n",
     m_SerialPort.c_str(), m_SerialBaudrate);
   return true;
 }

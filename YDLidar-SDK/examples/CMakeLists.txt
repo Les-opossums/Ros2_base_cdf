@@ -36,4 +36,3 @@ foreach(child ${C_APP_LIST})
     RUNTIME DESTINATION bin
   )
 endforeach()
-

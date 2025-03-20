@@ -48,7 +48,7 @@
 		auto newBorn = new unpacker::_c_();   \
 		if (!newBorn) return false; \
 		handlerList.push_back(newBorn); \
-	} 
+	}
 
 // How to include new handlers?
 // 1. add extra include line below if a new handle is to be included
@@ -112,7 +112,7 @@ public:
 
 	virtual void updateUnpackerContext(UnpackerContextType type, const void* data, size_t size)
 	{
-	
+
 		// notify the handlers ...
 		for (auto itr = _handlerMap.begin(); itr != _handlerMap.end(); ++itr)
 		{
@@ -134,7 +134,7 @@ public:
 			else {
 				onSelectHandler(ansType, nullptr);
 			}
-			
+
 		}
 
 		if (_lastActiveHandler) {
@@ -225,7 +225,7 @@ protected:
 LIDARSampleDataUnpacker* LIDARSampleDataUnpacker::CreateInstance(LIDARSampleDataListener& listener)
 {
 	LIDARSampleDataUnpackerImpl* impl = new LIDARSampleDataUnpackerImpl(listener);
-	
+
 	std::vector<IDataUnpackerHandler*> list;
 	if (!_registerDataUnpackerHandlers(list)) {
 		delete  impl;
@@ -249,7 +249,7 @@ LIDARSampleDataUnpacker::~LIDARSampleDataUnpacker() {
 
 }
 
-LIDARSampleDataUnpacker::LIDARSampleDataUnpacker(LIDARSampleDataListener& l) 
+LIDARSampleDataUnpacker::LIDARSampleDataUnpacker(LIDARSampleDataListener& l)
 	: _listener(l)
 {
 

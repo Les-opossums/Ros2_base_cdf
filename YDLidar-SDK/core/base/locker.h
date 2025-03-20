@@ -222,14 +222,14 @@ class Event {
     release();
   }
 
-  void set(bool isSignal = true) 
+  void set(bool isSignal = true)
   {
     if (isSignal) {
 #ifdef _WIN32
       SetEvent(_event);
 #else
       pthread_mutex_lock(&_cond_locker);
-      if (!_is_signalled) 
+      if (!_is_signalled)
       {
         _is_signalled = true;
         pthread_cond_signal(&_cond_var);
@@ -267,7 +267,7 @@ class Event {
     unsigned long ans = EVENT_OK;
     pthread_mutex_lock(&_cond_locker);
 
-    if (!_is_signalled) 
+    if (!_is_signalled)
     {
       if (timeout == 0xFFFFFFFF) {
         pthread_cond_wait(&_cond_var, &_cond_locker);
@@ -282,7 +282,7 @@ class Event {
           wait_time.tv_nsec -= 1000000000;
         }
 
-        switch (pthread_cond_timedwait(&_cond_var, &_cond_locker, &wait_time)) 
+        switch (pthread_cond_timedwait(&_cond_var, &_cond_locker, &wait_time))
         {
           case 0:
             // signalled
@@ -355,5 +355,3 @@ class ScopedLocker {
 }//base
 }//core
 }//ydlidar
-
-

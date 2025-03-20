@@ -24,7 +24,7 @@ This document provides an extensive technical deep dive into how to create, mani
 
 The first part of demonstrating YDLIDAR SDK API is to understand the ydlidar_test/tof_test/etlidar_Test example. Following are one optinal concepts:  `ydlidar::os_init()` (basic unit) of the example.
 
-### Create A System State 
+### Create A System State
 
 In the YDLIDAR SDK, the `ydlidar::os_init()` is optinal unit, If you need to accept `Ctrl + C` or other system abnormal signals. you can use it to create a system state, and check whether the system is normal by `ydlidar::os_isOk()`.
 The system signal creation interface is as follows:
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
     fflush(stderr);
   }
 
-  // Turn On success and loop  
+  // Turn On success and loop
   while (ret && ydlidar::os_isOk()) {
     LaserScan scan;
     if (laser.doProcessSimple(scan)) {
@@ -240,7 +240,7 @@ int main(int argc, char *argv[]) {
     fflush(stderr);
   }
 
-  // Turn On success and loop  
+  // Turn On success and loop
   while (ret && ydlidar::os_isOk()) {
     LaserScan scan;
     if (laser.doProcessSimple(scan)) {
@@ -338,7 +338,7 @@ There are two ways to integrate YDLIDAR SDK into your project.
 * [Add source code to the Project](#add-source-code-to-the-project).
     - [Copy YDLIDAR SDK to your project](#copy-ydlidar-sdk-to-your-project)
     - [Add YDLIDAR SDK project to the CMakeLists file of your project](#add-ydlidar-sdk-project-to-the-cmakelists-file-of-your-project)
-  
+
 
 ### Calling a compliled library
 The implementation of the demo mainly includes the following steps.
@@ -410,7 +410,7 @@ target_link_libraries(${PROJECT_NAME} ydlidar_sdk)
 
 ############## YDLIDAR SDK END#####################################
 ```
-Note: 
+Note:
 * If you do not want to generate samples in YDLidar-SDK, Add the following options when compiling:
 ```shell
 $cmake -DBUILD_EXAMPLES=OFF ../ && make

@@ -9,4 +9,3 @@
 
 ## Others
 - [YDLidar-SDK software installation guide](ydlidar_sdk_software_installation_guide.md)
-

@@ -44,7 +44,7 @@ The YDLidar LiDAR sensors can be connected to host directly by serial or through
 
 ## Installation
 
-* [Fork and then Clone YDLidar-SDK's GitHub code](https://github.com/YDLIDAR/YDLidar-SDK) 
+* [Fork and then Clone YDLidar-SDK's GitHub code](https://github.com/YDLIDAR/YDLidar-SDK)
 
 * [Build and Install](doc/howto/how_to_build_and_install.md) - This step is required
 
@@ -57,11 +57,11 @@ The YDLidar LiDAR sensors can be connected to host directly by serial or through
 
 * [YDLIDAR SDK Communication Protocol](doc/YDLidar-SDK-Communication-Protocol.md): All you need to know about YDLiDAR-SDK Communication Protocol.
 
-* [HowTo](doc/howto/README.md): Brief technical solutions to common problems that developers face during the installation and use of the YDLidar-SDk 
+* [HowTo](doc/howto/README.md): Brief technical solutions to common problems that developers face during the installation and use of the YDLidar-SDk
 
 * [Tutorials](doc/Tutorials.md): Quick Tutorials
 
-* [FAQs](doc/FAQs/README.md) 
+* [FAQs](doc/FAQs/README.md)
 
 ## Support
 

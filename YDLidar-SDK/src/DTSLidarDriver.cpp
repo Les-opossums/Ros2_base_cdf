@@ -149,8 +149,8 @@ result_t DTSLidarDriver::stop()
  * @return
  */
 result_t DTSLidarDriver::grabScanData(
-    node_info *nodebuffer, 
-    size_t &count, 
+    node_info *nodebuffer,
+    size_t &count,
     uint32_t timeout)
 {
     result_t ret = RESULT_FAIL;
@@ -188,7 +188,7 @@ result_t DTSLidarDriver::grabScanData(
  */
 result_t DTSLidarDriver::waitScanData(
     node_info *nodes,
-    size_t &count, 
+    size_t &count,
     uint32_t timeout)
 {
     result_t ret = RESULT_FAIL;
@@ -204,7 +204,7 @@ result_t DTSLidarDriver::waitScanData(
     uint32_t wt = 0;
 
     //循环等待接收节点数据
-    while ((wt = getms() - st) < timeout && 
+    while ((wt = getms() - st) < timeout &&
         recvCount < count)
     {
         node_info node;
@@ -991,4 +991,3 @@ uint16_t DTSLidarDriver::calculateCrc(const vector<uint8_t> &data)
 }
 
 }
-

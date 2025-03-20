@@ -6,6 +6,6 @@ add_to_ydlidar_sources(${SRCS})
 
 IF (WIN32)
 add_to_ydlidar_libraries(Winmm)
-ELSE()                   
+ELSE()
 add_to_ydlidar_libraries(pthread)
-ENDIF()                                      
+ENDIF()

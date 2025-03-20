@@ -3,7 +3,7 @@
 *
 * sl_types.h
 *
-* Copyright (c) 2020 Shanghai Slamtec Co., Ltd. 
+* Copyright (c) 2020 Shanghai Slamtec Co., Ltd.
 */
 
 /*

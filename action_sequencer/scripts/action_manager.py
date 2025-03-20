@@ -44,29 +44,25 @@ class ActionManager(Node):
             self.handle_accept_callback = self._single_handle_accept_callback
 
     def _init_publishers(self):
-        self.pub_real_position = self.create_publisher(
-            Point,
-            'real_position_topic',
-            10
-        )
+        self.pub_real_position = self.create_publisher(Point, "real_position_topic", 10)
 
     def _init_server_actions(self):
         self.get_logger().info("Receiving on moveto_action")
         self.moveto_server = ActionServer(
             self,
             ActionSequencer,
-            self.get_namespace() + '/' + 'moveto_action',
+            self.get_namespace() + "/" + "moveto_action",
             self.execute_callback,
             handle_accept_callback=self.handle_accept_callback,
             goal_callback=self.goal_callback,
             cancel_callback=self.cancel_callback,
-            callback_group=ReentrantCallbackGroup()
+            callback_group=ReentrantCallbackGroup(),
         )
 
     def _init_services(self):
-        self.srv_trigger_position = self.create_service(PosTrigger,
-                                                        'trigger_position_srv',
-                                                        self._send_position)
+        self.srv_trigger_position = self.create_service(
+            PosTrigger, "trigger_position_srv", self._send_position
+        )
 
     def _send_position(self, request, response):
         response.pos.x = float(self.position[0])
@@ -125,5 +121,5 @@ def main(args=None):
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

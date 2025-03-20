@@ -55,7 +55,7 @@ void StrongLightFilter::filter(
         const LaserPoint &p = out.points.at(i % size);
         if (i != 0)
         {
-            
+
             Point p1 = Point::polar2Angular(Point(p.angle, p.range));
             Point p2 = Point::polar2Angular(Point(lastP.angle, lastP.range));
             Point p3 = Point(0, 0); //原点
@@ -76,7 +76,7 @@ void StrongLightFilter::filter(
             // 如果点的距离是在增加的，且当前距离小于2倍标准，且角度小于标准，则认为是拖尾点
             else if (-1 != startI &&
                 p.range > lastP.range &&
-                d < maxDist * 2 && 
+                d < maxDist * 2 &&
                 a < maxAngle)
             {
                 // 无处理
@@ -205,7 +205,7 @@ float StrongLightFilter::Point::calcAngle(
     Point v2(p4.x - p3.x, p4.y - p3.y); //向量2
     //计算两向量夹角（锐角）
     float theta = calcDot(v1, v2) / (calcLen(v1) * calcLen(v2));
-    float a = acos(theta) * 180.0f / M_PI; 
+    float a = acos(theta) * 180.0f / M_PI;
     if (a < .0f)
         a = -a;
     if (a > 90.0f)

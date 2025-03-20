@@ -1074,4 +1074,3 @@ int Serial::SerialImpl::writeUnlock() {
 }//core
 }//ydlidar
 #endif // #if defined(_WIN32)
-

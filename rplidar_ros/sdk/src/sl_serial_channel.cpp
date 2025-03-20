@@ -36,7 +36,7 @@
 
 
 namespace sl {
-    
+
     class SerialPortChannel : public ISerialPortChannel
     {
     public:
@@ -118,7 +118,7 @@ namespace sl {
 
         void clearReadCache()
         {
-           
+
         }
 
         void setDTR(bool dtr)

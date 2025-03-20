@@ -5,4 +5,3 @@ ELSE()
 add_subdirectory(unix)
 include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/unix)
 ENDIF()
-

@@ -36,7 +36,7 @@
 
 
 namespace sl {
-    
+
     class TcpChannel : public IChannel
     {
     public:
@@ -56,7 +56,7 @@ namespace sl {
             if(!bind(_ip, _port))
                 return false;
             return IS_OK(_binded_socket->connect(_socket));
-            
+
         }
 
         void close()
@@ -66,7 +66,7 @@ namespace sl {
         }
         void flush()
         {
-        
+
         }
 
         sl_result waitForDataExt(size_t& size_hint, sl_u32 timeoutInMs)

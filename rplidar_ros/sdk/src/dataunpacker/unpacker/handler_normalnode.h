@@ -39,7 +39,7 @@
 #pragma once
 
 BEGIN_DATAUNPACKER_NS()
-	
+
 namespace unpacker{
 
 class UnpackerHandler_NormalNode : public IDataUnpackerHandler {

@@ -2,18 +2,18 @@
       <title>YDLidar-SDK-Communication-Protocol</title>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      
-      <link rel="stylesheet" href="file:////home/tony/.vscode/extensions/shd101wyy.markdown-preview-enhanced-0.5.2/node_modules/@shd101wyy/mume/dependencies/katex/katex.min.css">
-      
-      
 
-      
-      
-      
-      
-      
-      
-      
+      <link rel="stylesheet" href="file:////home/tony/.vscode/extensions/shd101wyy.markdown-preview-enhanced-0.5.2/node_modules/@shd101wyy/mume/dependencies/katex/katex.min.css">
+
+
+
+
+
+
+
+
+
+
 
       <style>
       /**
@@ -233,7 +233,7 @@ pre[data-line] .line-highlight {
   white-space: pre;
 }
 
-pre[data-line] .line-highlight:before, 
+pre[data-line] .line-highlight:before,
 pre[data-line] .line-highlight[data-end]:after {
   content: attr(data-start);
   position: absolute;
@@ -385,7 +385,7 @@ Similarly, <span class="katex"><span class="katex-mathml"><math xmlns="http://ww
     }
     if(Angle[i] &gt;= 360) {
         Angle[i] -= 360;
-    }   
+    }
 }
 </code></pre><p>Note:</p>
 <ul>
@@ -401,14 +401,14 @@ check code solution formula is:</p>
 <p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>C</mi><mi>S</mi><mo>=</mo><mi>X</mi><mi>O</mi><mi>R</mi><munderover><mo>&#x2211;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><mo stretchy="false">(</mo><msup><mi>C</mi><mi>i</mi></msup><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">CS = XOR \sum_{i=1}^{n}(C^i)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.68333em;vertical-align:0em;"></span><span class="mord mathdefault" style="margin-right:0.07153em;">C</span><span class="mord mathdefault" style="margin-right:0.05764em;">S</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span></span><span class="base"><span class="strut" style="height:2.929066em;vertical-align:-1.277669em;"></span><span class="mord mathdefault" style="margin-right:0.07847em;">X</span><span class="mord mathdefault" style="margin-right:0.02778em;">O</span><span class="mord mathdefault" style="margin-right:0.00773em;">R</span><span class="mspace" style="margin-right:0.16666666666666666em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.6513970000000002em;"><span style="top:-1.872331em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathdefault mtight">i</span><span class="mrel mtight">=</span><span class="mord mtight">1</span></span></span></span><span style="top:-3.050005em;"><span class="pstrut" style="height:3.05em;"></span><span><span class="mop op-symbol large-op">&#x2211;</span></span></span><span style="top:-4.3000050000000005em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathdefault mtight">n</span></span></span></span></span><span class="vlist-s">&#x200B;</span></span><span class="vlist-r"><span class="vlist" style="height:1.277669em;"><span></span></span></span></span></span><span class="mopen">(</span><span class="mord"><span class="mord mathdefault" style="margin-right:0.07153em;">C</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8746639999999999em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathdefault mtight">i</span></span></span></span></span></span></span></span><span class="mclose">)</span></span></span></span></span></p>
 <p>CS Sequence</p>
 <table>
-    <tbody><tr><th>PH        </th><th> C(1)    
-    </th></tr><tr><th>FSA       </th><th> C(2)    
-    </th></tr><tr><th>S1        </th><th> C(3)    
-    </th></tr><tr><th>S2        </th><th> C(4)   
-    </th></tr><tr><th>...       </th><th> ..   
-    </th></tr><tr><th>Sn        </th><th> C(n-2)  
-    </th></tr><tr><th>[CT | LSN]  </th><th> C(n-1)   
-    </th></tr><tr><th>LSA       </th><th> C(n)   
+    <tbody><tr><th>PH        </th><th> C(1)
+    </th></tr><tr><th>FSA       </th><th> C(2)
+    </th></tr><tr><th>S1        </th><th> C(3)
+    </th></tr><tr><th>S2        </th><th> C(4)
+    </th></tr><tr><th>...       </th><th> ..
+    </th></tr><tr><th>Sn        </th><th> C(n-2)
+    </th></tr><tr><th>[CT | LSN]  </th><th> C(n-1)
+    </th></tr><tr><th>LSA       </th><th> C(n)
 </th></tr></tbody></table>
 <ul>
 <li>Note: XOR(end) indicates the XOR of the element from subscript 1 to end. However, XOR satisfies the exchange law, and the actual solution may not need to follow the XOR sequence.</li>
@@ -424,7 +424,7 @@ for(int i = 0; i &lt; 2 * LSN; i = i +2 ) {
 checksumcal ^= uint16_t(LSN &lt;&lt; 8 | CT);
 checksumcal ^= LSA;
 
-## uint16_t : unsigned short 
+## uint16_t : unsigned short
 
 </code></pre><p>Intensity Si(3B):</p>
 <pre data-role="codeBlock" data-info class="language-"><code>uint16_t checksumcal = PH;
@@ -436,14 +436,14 @@ for(int i = 0; i &lt; 3 * LSN; i = i + 3) {
 checksumcal ^= uint16_t(LSN &lt;&lt; 8 | CT);
 checksumcal ^= LSA;
 
-## uint16_t : unsigned short 
+## uint16_t : unsigned short
 
 </code></pre><h3 class="mume-header" id="example">example</h3>
 
 <p>No Intensity:</p>
 <table>
     <tbody><tr><th>Name              </th><th> Size(Byte)       </th><th> Value               </th><th>  Contant                     </th><th> Buffer
-    </th></tr><tr><th rowspan="2">PH   </th><td rowspan="2"> 2   </td><td rowspan="2"> 0x55AA  </td><td rowspan="2">  Header  	       </td><td> 0xAA </td></tr><tr> <td> 0x55 
+    </th></tr><tr><th rowspan="2">PH   </th><td rowspan="2"> 2   </td><td rowspan="2"> 0x55AA  </td><td rowspan="2">  Header  	       </td><td> 0xAA </td></tr><tr> <td> 0x55
     </td></tr><tr><th>CT                </th><td> 1                </td><td> 0x01              </td><td> Type  	                       </td><td> 0x01
     </td></tr><tr><th>LSN               </th><td> 1                </td><td> 0x01              </td><td> Number  	                   </td><td> 0x01
     </td></tr><tr><th rowspan="2">FSA </th><td rowspan="2"> 2   </td><td rowspan="2"> 0xAE53  </td><td rowspan="2">  Starting Angle   </td><td> 0x53 </td></tr><tr> <td> 0xAE
@@ -502,11 +502,11 @@ if(check_code == CS) {
         }
     }
 }
- 
+
 </code></pre><p>Intensity:</p>
 <table>
     <tbody><tr><th>Name              </th><th> Size(Byte)       </th><th> Value               </th><th>  Contant                     </th><th> Buffer
-    </th></tr><tr><th rowspan="2">PH   </th><td rowspan="2"> 2   </td><td rowspan="2"> 0x55AA  </td><td rowspan="2">  Header  	       </td><td> 0xAA </td></tr><tr> <td> 0x55 
+    </th></tr><tr><th rowspan="2">PH   </th><td rowspan="2"> 2   </td><td rowspan="2"> 0x55AA  </td><td rowspan="2">  Header  	       </td><td> 0xAA </td></tr><tr> <td> 0x55
     </td></tr><tr><th>CT                </th><td> 1                </td><td> 0x01              </td><td> Type  	                       </td><td> 0x01
     </td></tr><tr><th>LSN               </th><td> 1                </td><td> 0x01              </td><td> Number  	                   </td><td> 0x01
     </td></tr><tr><th rowspan="2">FSA </th><td rowspan="2"> 2   </td><td rowspan="2"> 0xAE53  </td><td rowspan="2">  Starting Angle   </td><td> 0x53 </td></tr><tr> <td> 0xAE
@@ -567,19 +567,19 @@ if(check_code == CS) {
         }
     }
 }
- 
+
 </code></pre><p>For more details and usage examples, Refer to <a href="https://github.com/YDLIDAR/ydlidar_tutorials/blob/master/CommunicationProtocol/README.md">Communication Protocol</a></p>
 
       </div>
-      
-      
-    
-    
-    
-    
-    
-    
-    
-    
-  
+
+
+
+
+
+
+
+
+
+
+
     </body></html>

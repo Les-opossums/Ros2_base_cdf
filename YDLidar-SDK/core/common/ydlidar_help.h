@@ -197,11 +197,11 @@ inline std::string lidarModelToString(int model)
  * @param model lidar model.
  * @return lidar sampling rate.
  */
-inline std::vector<int> getDefaultSampleRate(int model) 
+inline std::vector<int> getDefaultSampleRate(int model)
 {
   std::vector<int> srs;
 
-  switch (model) 
+  switch (model)
   {
     case DriverInterface::YDLIDAR_F4:
     case DriverInterface::YDLIDAR_T1:
@@ -323,7 +323,7 @@ inline bool isTEALidar(int model)
  * @param model   lidar model
  * @return true if THere are multiple sampling rate, otherwise false.
  */
-inline bool hasSampleRate(int model) 
+inline bool hasSampleRate(int model)
 {
   bool ret = false;
 
@@ -380,7 +380,7 @@ inline bool hasZeroAngle(int model) {
  * @param model   lidar model
  * @return true if supported, otherwise false.
  */
-inline bool hasScanFrequencyCtrl(int model) 
+inline bool hasScanFrequencyCtrl(int model)
 {
   bool ret = true;
 
@@ -390,7 +390,7 @@ inline bool hasScanFrequencyCtrl(int model)
       model == DriverInterface::YDLIDAR_X4 ||
       model == DriverInterface::YDLIDAR_GS1 ||
       model == DriverInterface::YDLIDAR_GS2 ||
-      model == DriverInterface::YDLIDAR_GS5) 
+      model == DriverInterface::YDLIDAR_GS5)
   {
     ret = false;
   }
@@ -408,7 +408,7 @@ inline bool isSupportLidar(int model)
   if (model > DriverInterface::YDLIDAR_None &&
       model < DriverInterface::YDLIDAR_Tail)
     return true;
-  
+
   return false;
 }
 
@@ -417,7 +417,7 @@ inline bool isSupportLidar(int model)
  * @param model   lidar model
  * @return true if supported, otherwise false.
  */
-inline bool hasIntensity(int model) 
+inline bool hasIntensity(int model)
 {
   bool ret = false;
 
@@ -588,7 +588,7 @@ inline bool isTriangleLidar(int type) {
  * @param type  LiDAR type
  * @return true if it is a Triangle type, otherwise false.
  */
-inline bool isGSLidar(int type) 
+inline bool isGSLidar(int type)
 {
   return (type == TYPE_GS);
 }
@@ -598,7 +598,7 @@ inline bool isGSLidar(int type)
  * @param type  LiDAR type
  * @return true if it is a Triangle SCL type, otherwise false.
  */
-inline bool isSCLLidar(int type) 
+inline bool isSCLLidar(int type)
 {
   return (type == TYPE_SCL);
 }
@@ -671,7 +671,7 @@ inline bool isSupportHeartBeat(int model) {
  * @param smap  sampling rate map
  * @return true if it is valid, otherwise false.
  */
-inline bool isValidSampleRate(std::map<int, int> smap) 
+inline bool isValidSampleRate(std::map<int, int> smap)
 {
   if (smap.size() < 1) {
     return false;
@@ -700,7 +700,7 @@ inline int ConvertUserToLidarSmaple(int model,
                                     int defaultRate)
 {
   int _samp_rate = 9;
-  switch (sampleRate) 
+  switch (sampleRate)
   {
     case 10:
       _samp_rate = DriverInterface::YDLIDAR_RATE_4K;
@@ -719,10 +719,10 @@ inline int ConvertUserToLidarSmaple(int model,
       break;
   }
 
-  if (!isOctaveLidar(model)) 
+  if (!isOctaveLidar(model))
   {
     _samp_rate = 2;
-    switch (sampleRate) 
+    switch (sampleRate)
     {
       case 4:
         _samp_rate = DriverInterface::YDLIDAR_RATE_4K;
@@ -736,10 +736,10 @@ inline int ConvertUserToLidarSmaple(int model,
       default:
         break;
     }
-    if (model == DriverInterface::YDLIDAR_F4PRO) 
+    if (model == DriverInterface::YDLIDAR_F4PRO)
     {
       _samp_rate = 0;
-      switch (sampleRate) 
+      switch (sampleRate)
       {
         case 4:
           _samp_rate = DriverInterface::YDLIDAR_RATE_4K;
@@ -762,11 +762,11 @@ inline int ConvertUserToLidarSmaple(int model,
  * @param rate      LiDAR sampling rate code
  * @return user sampling code
  */
-inline int ConvertLidarToUserSmaple(int model, int rate) 
+inline int ConvertLidarToUserSmaple(int model, int rate)
 {
   int _samp_rate = 9;
 
-  if (!isOctaveLidar(model) && 
+  if (!isOctaveLidar(model) &&
       !isTOFLidarByModel(model))
   {
     switch (rate)
@@ -874,7 +874,7 @@ inline bool isSerialNumbValid(const LaserDebug &info) {
  * @param node  LiDAR node_info information
  * @param info  LiDAR LaserDebug information
  */
-inline void parsePackageNode(const node_info &node, LaserDebug &info) 
+inline void parsePackageNode(const node_info &node, LaserDebug &info)
 {
   switch (node.index) {
     case 0:
@@ -951,7 +951,7 @@ inline bool parseLaserDebugInfo(const LaserDebug &debug, device_info &di)
   uint8_t Year = uint8_t(debug.year >> 2);
   uint8_t Moth = uint8_t(debug.month >> 3);
   uint8_t Date = uint8_t(debug.day >> 2);
-  uint32_t Number = 
+  uint32_t Number =
     uint32_t(debug.year & 0x03) << 19 |
     uint32_t(debug.month & 0x07) << 16 |
     uint32_t(debug.day & 0x03) << 14 |
@@ -994,7 +994,7 @@ YDLIDAR_API inline bool printfDeviceInfo(const device_info &di,
 
   uint8_t Major = (uint8_t)(di.firmware_version >> 8);
   uint8_t Minjor = (uint8_t)(di.firmware_version & 0xff);
-  
+
   printf("[YDLIDAR] %s device info\n"
          "Firmware version: %u.%u\n"
          "Hardware version: %u\n"

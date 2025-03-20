@@ -1275,4 +1275,3 @@ result_t ETLidarDriver::getScanData() {
   return RESULT_OK;
 
 }
-

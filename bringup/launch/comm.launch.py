@@ -21,7 +21,7 @@ def generate_launch_description():
         namespace=namespace,
         executable="uart_com_node",
         name="uart_com",
-        parameters=[config]
+        parameters=[config],
     )
 
     node_ihm = Node(
@@ -29,7 +29,7 @@ def generate_launch_description():
         namespace=namespace,
         executable="ihm_ros_node",
         name="ihm_ros",
-        parameters=[config]
+        parameters=[config],
     )
 
     node_avoid_obstacle = Node(

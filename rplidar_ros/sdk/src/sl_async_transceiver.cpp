@@ -130,7 +130,7 @@ void ProtocolMessage::fillData(const void * buffer, size_t size)
 
 void ProtocolMessage::cleanData()
 {
-	if (data) 
+	if (data)
 	{
 		if (!_usingOutterData)
 		{
@@ -196,7 +196,7 @@ u_result AsyncTransceiver::openChannelAndBind(IChannel* channel)
 
     unbindAndClose();
 	u_result ans = RESULT_OK;
-	do 
+	do
 	{
 		rp::hal::AutoLocker l(_opLocker);
 
@@ -222,7 +222,7 @@ u_result AsyncTransceiver::openChannelAndBind(IChannel* channel)
 		_decoderThread = CLASS_THREAD(AsyncTransceiver, _proc_decoderThread);
 		_rxThread = CLASS_THREAD(AsyncTransceiver, _proc_rxThread);
 
-        
+
 
 
 	} while (0);
@@ -237,7 +237,7 @@ void AsyncTransceiver::unbindAndClose()
 
     assert(_bindedChannel);
 
-    
+
 	_isWorking = false;
 	_dataEvt.set(); // set signal to wake up threads
 
@@ -278,7 +278,7 @@ u_result AsyncTransceiver::sendMessage(message_autoptr_t& msg)
     _u8* txBuffer = new _u8[requiredBufferSize];
 
     do {
-  
+
         if (!txBuffer) {
             return RESULT_INSUFFICIENT_MEMORY;
         }
@@ -329,18 +329,18 @@ sl_result AsyncTransceiver::_proc_rxThread()
 
 
         Buffer* decodeBuffer = new Buffer();
-        
+
         decodeBuffer->data = new _u8[hintedSize];
 
         decodeBuffer->size = _bindedChannel->read(decodeBuffer->data, hintedSize);
 #ifdef _DEBUG_DUMP_PACKET
         printf("Revc: %d\n", decodeBuffer->size);
 #endif
-         
+
         if  (!decodeBuffer->size) {
             delete decodeBuffer;
 
-            
+
             _workingFlag |= WORKING_FLAG_ERROR;
             _codec.onChannelError(RESULT_OPERATION_ABORTED);
             break;
@@ -375,7 +375,7 @@ sl_result AsyncTransceiver::_proc_decoderThread()
     assert(_bindedChannel);
     rp::hal::Thread::SetSelfPriority(rp::hal::Thread::PRIORITY_HIGH);
     _codec.onDecodeReset();
-    
+
 
     while (_isWorking)
     {

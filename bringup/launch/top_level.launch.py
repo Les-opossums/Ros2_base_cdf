@@ -12,33 +12,48 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     lidar_only = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(
-            get_package_share_directory('bringup'), 'launch'),
-            '/lidar_only.launch.py'])
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(get_package_share_directory("bringup"), "launch"),
+                "/lidar_only.launch.py",
+            ]
+        )
     )
 
     obj_detection = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(
-            get_package_share_directory('bringup'), 'launch'),
-            '/obj_detection.launch.py'])
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(get_package_share_directory("bringup"), "launch"),
+                "/obj_detection.launch.py",
+            ]
+        )
     )
 
     robot_loc = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(
-            get_package_share_directory('bringup'), 'launch'),
-            '/robot_loc.launch.py'])
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(get_package_share_directory("bringup"), "launch"),
+                "/robot_loc.launch.py",
+            ]
+        )
     )
 
     comm = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(
-            get_package_share_directory('bringup'), 'launch'),
-            '/comm.launch.py'])
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(get_package_share_directory("bringup"), "launch"),
+                "/comm.launch.py",
+            ]
+        )
     )
 
     scripting = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(
-            get_package_share_directory('bringup'), 'launch'),
-            '/scripting.launch.py'])
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(get_package_share_directory("bringup"), "launch"),
+                "/scripting.launch.py",
+            ]
+        )
     )
 
     ld.add_action(lidar_only)

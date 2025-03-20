@@ -24,4 +24,3 @@
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <time.h>
-

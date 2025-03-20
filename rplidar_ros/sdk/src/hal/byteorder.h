@@ -1,7 +1,7 @@
 /*
  *  RoboPeak Project
  *  Copyright 2009 - 2013
- *  
+ *
  *  RPOS - Endianness Helper
  *
  */
@@ -24,7 +24,7 @@
 
 
 // we don't want to conflict with the Linux kernel...
-#ifndef __KERNEL__ 
+#ifndef __KERNEL__
 #define constant_cpu_to_le64(x) ((_u64)(x))
 #define constant_le64_to_cpu(x) ((_u64)(x))
 #define constant_cpu_to_le32(x) ((_u32)(x))
@@ -67,7 +67,7 @@
 #else
 
 // we don't want to conflict with the Linux kernel...
-#ifndef __KERNEL__ 
+#ifndef __KERNEL__
 #define constant_cpu_to_le64(x) (__static_byteswap_64((x)))
 #define constant_le64_to_cpu(x) __static_byteswap_64((_u64)(x))
 #define constant_cpu_to_le32(x) (__static_byteswap_32((x)))

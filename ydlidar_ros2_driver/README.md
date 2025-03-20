@@ -21,7 +21,7 @@ ydlidar_ros2_driver depends on YDLidar-SDK library. If you have never installed 
 
 ## Clone ydlidar_ros2_driver
 
-1. Clone ydlidar_ros2_driver package for github : 
+1. Clone ydlidar_ros2_driver package for github :
 
    `git clone https://github.com/YDLIDAR/ydlidar_ros2_driver.git ydlidar_ros2_ws/src/ydlidar_ros2_driver`
 
@@ -57,13 +57,13 @@ ydlidar_ros2_driver depends on YDLidar-SDK library. If you have never installed 
     You should see something similar to:
         `OLDPWD=/home/tony/ydlidar_ros2_ws/install`
 
-5. Create serial port Alias [optional] 
+5. Create serial port Alias [optional]
     ```
 	$chmod 0777 src/ydlidar_ros2_driver/startup/*
 	$sudo sh src/ydlidar_ros2_driver/startup/initenv.sh
     ```
     Note: After completing the previous operation, replug the LiDAR again.
-	
+
 ## Configure LiDAR [paramters](params/ydlidar.yaml)
 ```
 ydlidar_ros2_driver_node:
@@ -95,22 +95,22 @@ ydlidar_ros2_driver_node:
 
 ##### Run ydlidar_ros2_driver using launch file
 
-The command format is : 
+The command format is :
 
  `ros2 launch ydlidar_ros2_driver [launch file].py`
 
 1. Connect LiDAR uint(s).
    ```
-   ros2 launch ydlidar_ros2_driver ydlidar_launch.py 
+   ros2 launch ydlidar_ros2_driver ydlidar_launch.py
    ```
-   or 
+   or
 
    ```
-   launch $(ros2 pkg prefix ydlidar_ros2_driver)/share/ydlidar_ros2_driver/launch/ydlidar.py 
+   launch $(ros2 pkg prefix ydlidar_ros2_driver)/share/ydlidar_ros2_driver/launch/ydlidar.py
    ```
-2. RVIZ 
+2. RVIZ
    ```
-   ros2 launch ydlidar_ros2_driver ydlidar_launch_view.py 
+   ros2 launch ydlidar_ros2_driver ydlidar_launch_view.py
    ```
     ![View](images/view.png  "View")
 
@@ -121,9 +121,9 @@ The command format is :
 
 #####  Launch file introduction
 
-The driver offers users a wealth of options when using different launch file. The launch file directory    
+The driver offers users a wealth of options when using different launch file. The launch file directory
 
-is `"ydlidar_ros2_ws/src/ydlidar_ros2_driver/launch"`. All launch files are listed as below : 
+is `"ydlidar_ros2_ws/src/ydlidar_ros2_driver/launch"`. All launch files are listed as below :
 
 | launch file               | features                                                     |
 | ------------------------- | ------------------------------------------------------------ |
@@ -179,9 +179,3 @@ More paramters details, see [here](details.md)
 ![Development Path](images/EAI.png)
 
 If you have any extra questions, please feel free to [contact us](http://www.ydlidar.cn/cn/contact)
-
-
-
-
-
-

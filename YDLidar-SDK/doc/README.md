@@ -21,5 +21,4 @@
 
 ## FAQs
 
-[README](FAQs/README.md) - Commonly asked questions about YDLidar-SDK's setup 
-
+[README](FAQs/README.md) - Commonly asked questions about YDLidar-SDK's setup

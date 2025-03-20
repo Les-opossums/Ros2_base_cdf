@@ -60,7 +60,7 @@
 #include <windows.h>
 #include <stdlib.h>   //for memcpy etc..
 #include <process.h>
-#include <direct.h> 
+#include <direct.h>
 
 
 #include "timer.h"

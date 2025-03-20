@@ -7,12 +7,12 @@ Previous Tutorial: Writing a Simple Lidar Tutorial ([c](writing_lidar_tutorial_c
 - [Running the Lidar Turorial](#running-the-lidar-turorial)
 
 ### Running the Lidar Turorial
-In the last tutorial we made a tutorial called "lidar_tutorial". Let's run it: 
+In the last tutorial we made a tutorial called "lidar_tutorial". Let's run it:
 ```shell
 ./lidar_tutorial                (C++)(C)
 python lidar_tutorial.py        (Python)
 ```
-You will see something similar to: 
+You will see something similar to:
 
         YDLidar SDK initializing
         YDLidar SDK has been initialized
@@ -43,7 +43,7 @@ You will see something similar to:
         Scan received[1582955715792611000]: 906 ranges is [9.936508]Hz
 
 
-When you are done, press Ctrl-C to terminate both the lidar tutorial. 
+When you are done, press Ctrl-C to terminate both the lidar tutorial.
 
 Note: ERROR
 * ./lidar_tutorial: error while loading shared libraries: libydlidar_sdk.so: cannot open shared object file: No such file or directory
@@ -59,5 +59,5 @@ sudo ldconfig
 OR
 ```shell
 ## ydlidar_sdk library path added to LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH   
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 ```

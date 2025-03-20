@@ -10,5 +10,3 @@ You could first set up the YDLidar-SDK project using the [build and release](how
 In the pop-up window, select the corresponding The options are as shown below:
 
 ![2](images/vscode/tasks.png)
-
-

@@ -80,14 +80,14 @@
 
 // Payloads
 // ------------------------------------------
-#define SL_LIDAR_EXPRESS_SCAN_MODE_NORMAL      0 
+#define SL_LIDAR_EXPRESS_SCAN_MODE_NORMAL      0
 #define SL_LIDAR_EXPRESS_SCAN_MODE_FIXANGLE    0  // won't been supported but keep to prevent build fail
 //for express working flag(extending express scan protocol)
-#define SL_LIDAR_EXPRESS_SCAN_FLAG_BOOST                 0x0001 
+#define SL_LIDAR_EXPRESS_SCAN_FLAG_BOOST                 0x0001
 #define SL_LIDAR_EXPRESS_SCAN_FLAG_SUNLIGHT_REJECTION    0x0002
 
 //for ultra express working flag
-#define SL_LIDAR_ULTRAEXPRESS_SCAN_FLAG_STD                 0x0001 
+#define SL_LIDAR_ULTRAEXPRESS_SCAN_FLAG_STD                 0x0001
 #define SL_LIDAR_ULTRAEXPRESS_SCAN_FLAG_HIGH_SENSITIVITY    0x0002
 
 typedef struct _sl_lidar_payload_express_scan_t

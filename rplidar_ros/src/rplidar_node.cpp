@@ -65,10 +65,10 @@ class RPlidarNode : public rclcpp::Node
     : Node("rplidar_node", options)
     {
 
-      
+
     }
 
-  private:    
+  private:
     void init_param()
     {
         this->declare_parameter<std::string>("channel_type","serial");
@@ -86,13 +86,13 @@ class RPlidarNode : public rclcpp::Node
         this->declare_parameter<std::string>("topic_name",std::string("scan"));
         this->declare_parameter<std::string>("scan_mode",std::string());
         this->declare_parameter<float>("scan_frequency",10);
-        
+
         this->get_parameter_or<std::string>("channel_type", channel_type, "serial");
-        this->get_parameter_or<std::string>("tcp_ip", tcp_ip, "192.168.0.7"); 
+        this->get_parameter_or<std::string>("tcp_ip", tcp_ip, "192.168.0.7");
         this->get_parameter_or<int>("tcp_port", tcp_port, 20108);
-        this->get_parameter_or<std::string>("udp_ip", udp_ip, "192.168.11.2"); 
+        this->get_parameter_or<std::string>("udp_ip", udp_ip, "192.168.11.2");
         this->get_parameter_or<int>("udp_port", udp_port, 8089);
-        this->get_parameter_or<std::string>("serial_port", serial_port, "/dev/ttyUSB0"); 
+        this->get_parameter_or<std::string>("serial_port", serial_port, "/dev/ttyUSB0");
         this->get_parameter_or<int>("serial_baudrate", serial_baudrate, 1000000/*256000*/);//ros run for A1 A2, change to 256000 if A3
         this->get_parameter_or<std::string>("frame_id", frame_id, "laser_frame");
         this->get_parameter_or<bool>("inverted", inverted, false);
@@ -123,7 +123,7 @@ class RPlidarNode : public rclcpp::Node
         }
 
         // print out the device serial number, firmware and hardware version number..
-        char sn_str[37] = {'\0'}; 
+        char sn_str[37] = {'\0'};
         for (int pos = 0; pos < 16 ;++pos) {
             sprintf(sn_str + (pos * 2),"%02X", devinfo.serialnum[pos]);
         }
@@ -138,7 +138,7 @@ class RPlidarNode : public rclcpp::Node
         sl_result     op_result;
         sl_lidar_response_device_health_t healthinfo;
         op_result = drv->getHealth(healthinfo);
-        if (SL_IS_OK(op_result)) { 
+        if (SL_IS_OK(op_result)) {
             RCLCPP_INFO(this->get_logger(),"RPLidar health status : %d", healthinfo.status);
             switch (healthinfo.status) {
                 case SL_LIDAR_STATUS_OK:
@@ -174,7 +174,7 @@ class RPlidarNode : public rclcpp::Node
         }
 
         RCLCPP_DEBUG(this->get_logger(), "Call to '%s'", __FUNCTION__);
-        
+
         //RCLCPP_DEBUG(this->get_logger(),"Stop motor");
         this->stop();
         //drv->setMotorSpeed(0);
@@ -207,7 +207,7 @@ class RPlidarNode : public rclcpp::Node
                 RCLCPP_WARN(this->get_logger(), "Failed to start motor: %08x", ans);
                 return false;
             }
-        
+
             ans=drv->startScan(0,1);
             if (SL_IS_FAIL(ans)) {
                 RCLCPP_WARN(this->get_logger(), "Failed to start scan: %08x", ans);
@@ -365,15 +365,15 @@ class RPlidarNode : public rclcpp::Node
         is_scanning = false;
     }
 
-public:    
+public:
     int work_loop()
-    {        
+    {
         init_param();
         int ver_major = SL_LIDAR_SDK_VERSION_MAJOR;
         int ver_minor = SL_LIDAR_SDK_VERSION_MINOR;
         int ver_patch = SL_LIDAR_SDK_VERSION_PATCH;
         RCLCPP_INFO(this->get_logger(),"RPLidar running on ROS2 package rplidar_ros. RPLIDAR SDK Version:%d.%d.%d",ver_major,ver_minor,ver_patch);
-    
+
         sl_result     op_result;
         // create the driver instance
         drv = *createLidarDriver();
@@ -400,12 +400,12 @@ public:
                 RCLCPP_ERROR(this->get_logger(),"Error, cannot connect to the ip addr  %s with the udp port %s.",udp_ip.c_str(),std::to_string(udp_port).c_str());
             }
             else{
-                RCLCPP_ERROR(this->get_logger(),"Error, cannot bind to the specified serial port %s.",serial_port.c_str());            
+                RCLCPP_ERROR(this->get_logger(),"Error, cannot bind to the specified serial port %s.",serial_port.c_str());
             }
             delete drv; drv = nullptr;
             return -1;
         }
-        
+
         // get rplidar device info
         if (!getRPLIDARDeviceInfo(drv)) {
             delete drv; drv = nullptr;
@@ -439,9 +439,9 @@ public:
 
         scan_pub = this->create_publisher<sensor_msgs::msg::LaserScan>(topic_name, rclcpp::QoS(rclcpp::KeepLast(10)));
 
-        stop_motor_service = this->create_service<std_srvs::srv::Empty>("stop_motor",  
+        stop_motor_service = this->create_service<std_srvs::srv::Empty>("stop_motor",
                                 std::bind(&RPlidarNode::stop_motor,this,std::placeholders::_1,std::placeholders::_2));
-        start_motor_service = this->create_service<std_srvs::srv::Empty>("start_motor", 
+        start_motor_service = this->create_service<std_srvs::srv::Empty>("start_motor",
                                 std::bind(&RPlidarNode::start_motor,this,std::placeholders::_1,std::placeholders::_2));
 
         //drv->setMotorSpeed();
@@ -472,7 +472,7 @@ public:
             if (op_result == SL_RESULT_OK) {
                 if(scan_frequency_tunning_after_scan) { //Set scan frequency(For Slamtec Tof lidar)
                     RCLCPP_ERROR(this->get_logger(), "set lidar scan frequency to %.1f Hz(%.1f Rpm) ",scan_frequency,scan_frequency*60);
-                    drv->setMotorSpeed(scan_frequency*60); //rpm 
+                    drv->setMotorSpeed(scan_frequency*60); //rpm
                     scan_frequency_tunning_after_scan = false;
                     continue;
                 }
@@ -501,7 +501,7 @@ public:
                                 }
                             }
                         }
-    
+
                         publish_scan(scan_pub, angle_compensate_nodes, angle_compensate_nodes_count,
                                 start_scan_time, scan_duration, inverted, flip_x_axis,
                                 angle_min, angle_max, max_distance,
@@ -525,7 +525,7 @@ public:
                         angle_max = DEG2RAD(getAngle(nodes[end_node]));
 
                         publish_scan(scan_pub, &nodes[start_node], end_node-start_node +1,
-                                start_scan_time, scan_duration, inverted, flip_x_axis, 
+                                start_scan_time, scan_duration, inverted, flip_x_axis,
                                 angle_min, angle_max, max_distance,
                                 frame_id);
                     }
@@ -588,11 +588,10 @@ void ExitHandler(int sig)
 
 int main(int argc, char * argv[])
 {
-  rclcpp::init(argc, argv);  
+  rclcpp::init(argc, argv);
   auto rplidar_node = std::make_shared<RPlidarNode>(rclcpp::NodeOptions());
   signal(SIGINT,ExitHandler);
   int ret = rplidar_node->work_loop();
   rclcpp::shutdown();
   return ret;
 }
-

@@ -8,7 +8,8 @@ import time
 from ament_index_python.packages import get_package_share_directory
 from rclpy.logging import get_logger
 
-class ColorChoiceApp():
+
+class ColorChoiceApp:
     def __init__(self):
         self.reload = False
         self.root = tk.Tk()
@@ -16,35 +17,39 @@ class ColorChoiceApp():
 
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        if (screen_width==480 and screen_height==800):
+        if screen_width == 480 and screen_height == 800:
             # Plein écran
             self.root.attributes("-fullscreen", True)
-        else :
+        else:
             self.root.geometry("480x800")
         self.label = tk.Label(self.root, text="Choisissez une couleur :")
         self.label.pack(pady=10)
 
-        self.button_yellow = tk.Button(self.root,
-                                       text="Yellow",
-                                       bg="yellow",
-                                       command=lambda: self.chs_clr("yellow"),
-                                       width=20,
-                                       height=10
-                                    )
+        self.button_yellow = tk.Button(
+            self.root,
+            text="Yellow",
+            bg="yellow",
+            command=lambda: self.chs_clr("yellow"),
+            width=20,
+            height=10,
+        )
         self.button_yellow.pack(padx=20)
 
-        self.button_blue = tk.Button(self.root,
-                                     text="Blue",
-                                     bg="blue",
-                                     command=lambda: self.chs_clr("blue"),
-                                     width=20,
-                                     height=10
-                                    )
+        self.button_blue = tk.Button(
+            self.root,
+            text="Blue",
+            bg="blue",
+            command=lambda: self.chs_clr("blue"),
+            width=20,
+            height=10,
+        )
         self.button_blue.pack(padx=20)
 
         self.selected_color = None
 
-        self.button_reload = tk.Button(self.root, text="Reload", command=self.reload_ihm)
+        self.button_reload = tk.Button(
+            self.root, text="Reload", command=self.reload_ihm
+        )
         self.button_reload.pack(pady=10)
 
         # Bouton pour quitter
@@ -61,7 +66,7 @@ class ColorChoiceApp():
         self.reload = True
 
 
-class ImageApp():
+class ImageApp:
     def __init__(self, selected_color):
         self.reload = False
         self.selected_script = 100
@@ -72,18 +77,18 @@ class ImageApp():
         self.root.configure(bg=selected_color)
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        
-        if (screen_width==480 and screen_height==800):
+
+        if screen_width == 480 and screen_height == 800:
             # Plein écran
             self.root.attributes("-fullscreen", True)
-        else :
+        else:
             self.root.geometry("480x800")
         self.color = selected_color
         plateau_path = os.path.join(
             get_package_share_directory("opossum_ihm"),
-                                    "images",
-                                    "plateau.png",
-            )
+            "images",
+            "plateau.png",
+        )
         self.img = Image.open(plateau_path)
         # Pivoter l'image de 90° dans le sens des aiguilles d'une montre
         self.img = self.img.rotate(90, expand=True)
@@ -113,24 +118,18 @@ class ImageApp():
         # Label pour afficher les coordonnées
         self.label = tk.Label(self.root, text=f"Color: {self.color}")
         self.label.pack(pady=10)
-        
-        self.button_reload = tk.Button(self.root, 
-                                       text="Reload", 
-                                       command=self.reload_ihm,
-                                       height=3,
-                                       width=10
-                                       )
-        self.button_reload.pack(padx=0,pady=10)
+
+        self.button_reload = tk.Button(
+            self.root, text="Reload", command=self.reload_ihm, height=3, width=10
+        )
+        self.button_reload.pack(padx=0, pady=10)
         self.button_reload.place(x=100, y=725)
 
         # Bouton pour quitter
-        self.button_valid = tk.Button(self.root, 
-                                     text="Valid", 
-                                     command=self.root.destroy,
-                                     height=3,
-                                     width=10
-                                     )
-        self.button_valid.pack(padx=20,pady=10)
+        self.button_valid = tk.Button(
+            self.root, text="Valid", command=self.root.destroy, height=3, width=10
+        )
+        self.button_valid.pack(padx=20, pady=10)
         self.button_valid.place(x=300, y=725)
         self.root.mainloop()
 
@@ -142,12 +141,13 @@ class ImageApp():
             self.selected_script = 16
         else:
             self.selected_script = 17
-        
+
     def reload_ihm(self):
         self.root.destroy()
         self.reload = True
 
-class ValidationApp():
+
+class ValidationApp:
     def __init__(self, color, script):
         self.color = color
         self.script = script
@@ -158,10 +158,10 @@ class ValidationApp():
         self.root.title("Validation")
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        if (screen_width==480 and screen_height==800):
+        if screen_width == 480 and screen_height == 800:
             # Plein écran
             self.root.attributes("-fullscreen", True)
-        else :
+        else:
             self.root.geometry("480x800")
         self.root.configure(bg="white")  # Couleur de fond
 
@@ -178,7 +178,7 @@ class ValidationApp():
             text="Détails de la Validation",
             font=("Arial", 16, "bold"),
             bg="white",
-            fg="black"
+            fg="black",
         )
         title_label.pack(pady=10)
 
@@ -191,7 +191,7 @@ class ValidationApp():
             fg="white" if self.color.lower() != "white" else "black",  # Texte visible
             width=30,  # Largeur fixe
             anchor="w",  # Alignement à gauche
-            padx=10
+            padx=10,
         )
         color_label.pack(pady=5)
 
@@ -203,23 +203,15 @@ class ValidationApp():
             bg="white",
             fg="black",
             anchor="w",
-            padx=10
+            padx=10,
         )
         script_label.pack(pady=5)
 
         # Bouton de validation
-        validate_button = tk.Button(
-            self.root,
-            text="Valid",
-            command=self.on_validate
-        )
+        validate_button = tk.Button(self.root, text="Valid", command=self.on_validate)
         validate_button.pack(pady=10)
 
-        reload_button = tk.Button(
-            self.root,
-            text="Reload",
-            command=self.on_reload
-        )
+        reload_button = tk.Button(self.root, text="Reload", command=self.on_reload)
         reload_button.pack(pady=20)
 
     def on_validate(self):
@@ -229,6 +221,7 @@ class ValidationApp():
     def on_reload(self):
         self.reload = True
         self.root.destroy()
+
 
 class ScoreApp:
     def __init__(self, color):
@@ -240,10 +233,10 @@ class ScoreApp:
         self.is_au = False
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        if (screen_width==480 and screen_height==800):
+        if screen_width == 480 and screen_height == 800:
             # Plein écran
             self.root.attributes("-fullscreen", True)
-        else :
+        else:
             self.root.geometry("480x800")
         self.root.configure(bg=self.color)  # Couleur de fond
         # Création de la frame
@@ -261,20 +254,20 @@ class ScoreApp:
             textvariable=self.display_score,
             font=("Arial", 120, "bold"),
             bg="lightgray",
-            fg="black"
+            fg="black",
         )
         self.zero_label.pack(expand=True)
 
     def update_au(self):
-        if self.is_au :
+        if self.is_au:
             self.root.configure(bg="red")
             if self.is_match:
                 root = tk.Toplevel()
                 gif_path = os.path.join(
-                                        get_package_share_directory("opossum_ihm"),
-                                        "images",
-                                        "boulette.gif",
-                                        )
+                    get_package_share_directory("opossum_ihm"),
+                    "images",
+                    "boulette.gif",
+                )
                 lbl = ImageLabel(root)
                 lbl.pack()
                 lbl.load(gif_path)
@@ -294,17 +287,19 @@ class ScoreApp:
 
         # Planifier la prochaine mise à jour dans 500ms
         self.root.after(500, self.update_score)
-        
+
+
 class ImageLabel(tk.Label):
     """
     A Label that displays images, and plays them if they are gifs
     :im: A PIL Image instance or a string filename
     """
+
     def load(self, im):
         if isinstance(im, str):
             im = Image.open(im)
         frames = []
- 
+
         try:
             for i in count(1):
                 frames.append(ImageTk.PhotoImage(im.copy()))
@@ -312,21 +307,21 @@ class ImageLabel(tk.Label):
         except EOFError:
             pass
         self.frames = cycle(frames)
- 
+
         try:
-            self.delay = im.info['duration']
+            self.delay = im.info["duration"]
         except:
             self.delay = 100
- 
+
         if len(frames) == 1:
             self.config(image=next(self.frames))
         else:
             self.next_frame()
- 
+
     def unload(self):
         self.config(image=None)
         self.frames = None
- 
+
     def next_frame(self):
         if self.frames:
             self.config(image=next(self.frames))
@@ -356,7 +351,9 @@ class GUI:
     def run_validation(self):
         assert self.color_app.selected_color is not None
         assert self.img_app.selected_script is not None
-        self.validation_app = ValidationApp(self.color_app.selected_color, self.img_app.selected_script)
+        self.validation_app = ValidationApp(
+            self.color_app.selected_color, self.img_app.selected_script
+        )
         self.reload = self.validation_app.reload
 
     def run_score(self):

@@ -39,14 +39,14 @@
 #include "hal/socket.h"
 #include "hal/event.h"
 #include "rplidar_driver.h"
-#include "sl_crc.h" 
+#include "sl_crc.h"
 #include <algorithm>
 
 namespace rp { namespace standalone{ namespace rplidar {
 
     RPlidarDriver::RPlidarDriver(){}
 
-    RPlidarDriver::RPlidarDriver(sl_u32 channelType) 
+    RPlidarDriver::RPlidarDriver(sl_u32 channelType)
         :_channelType(channelType)
     {
     }
@@ -79,7 +79,7 @@ namespace rp { namespace standalone{ namespace rplidar {
             break;
         }
         if (!(bool)_channel) return SL_RESULT_OPERATION_FAIL;
-        
+
         _lidarDrv = *createLidarDriver();
 
         if (!(bool)_lidarDrv) return SL_RESULT_OPERATION_FAIL;
@@ -93,11 +93,11 @@ namespace rp { namespace standalone{ namespace rplidar {
         (_lidarDrv)->disconnect();
     }
 
-    bool RPlidarDriver::isConnected() 
-    { 
+    bool RPlidarDriver::isConnected()
+    {
         return (_lidarDrv)->isConnected();
     }
-     
+
     u_result RPlidarDriver::reset(_u32 timeout)
     {
         return (_lidarDrv)->reset();
@@ -122,7 +122,7 @@ namespace rp { namespace standalone{ namespace rplidar {
     {
         return (_lidarDrv)->startScanExpress(force, scanMode, options, outUsedScanMode, timeout);
     }
-    
+
     u_result RPlidarDriver::getHealth(rplidar_response_device_health_t & health, _u32 timeout)
     {
         return (_lidarDrv)->getHealth(health, timeout);
@@ -136,8 +136,8 @@ namespace rp { namespace standalone{ namespace rplidar {
     u_result RPlidarDriver::setMotorPWM(_u16 pwm)
     {
         return (_lidarDrv)->setMotorSpeed(pwm);
-    }   
-    
+    }
+
     u_result RPlidarDriver::checkMotorCtrlSupport(bool & support, _u32 timeout)
     {
         MotorCtrlSupport motorSupport;
@@ -162,8 +162,8 @@ namespace rp { namespace standalone{ namespace rplidar {
 		return (_lidarDrv)->getDeviceMacAddr(macAddrArray, timeoutInMs);
 	}
 
-    u_result RPlidarDriver::stop(_u32 timeout) 
-    { 
+    u_result RPlidarDriver::stop(_u32 timeout)
+    {
         return (_lidarDrv)->stop(timeout);
     }
 
@@ -176,7 +176,7 @@ namespace rp { namespace standalone{ namespace rplidar {
     {
         return (_lidarDrv)->ascendScanData(nodebuffer, count);
     }
-    
+
     u_result RPlidarDriver::getScanDataWithInterval(rplidar_response_measurement_node_t * nodebuffer, size_t & count)
     {
         return RESULT_OPERATION_NOT_SUPPORT;

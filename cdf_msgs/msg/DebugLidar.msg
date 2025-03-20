@@ -17,4 +17,3 @@ geometry_msgs/Point[] pot_ba
 geometry_msgs/Point[] pot_bb
 geometry_msgs/Point[] pot_bc
 geometry_msgs/Point[] pot_bd
-

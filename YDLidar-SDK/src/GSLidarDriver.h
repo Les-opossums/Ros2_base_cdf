@@ -416,14 +416,14 @@ namespace ydlidar
 
     //获取设备信息
     virtual result_t getDeviceInfo(
-      device_info &info, 
+      device_info &info,
       uint32_t timeout = DEFAULT_TIMEOUT);
     //获取级联雷达设备信息
     virtual result_t getDeviceInfo(
       std::vector<device_info_ex> &dis,
       uint32_t timeout = DEFAULT_TIMEOUT);
     virtual result_t getDeviceInfo2(
-      device_info &info, 
+      device_info &info,
       uint32_t timeout = DEFAULT_TIMEOUT);
 
     /**

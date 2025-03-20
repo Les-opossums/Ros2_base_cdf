@@ -31,7 +31,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CircleObstacle.msg"
   "msg/Obstacles.msg"
   "msg/SegmentObstacle.msg"
-  DEPENDENCIES geometry_msgs std_msgs builtin_interfaces 
+  DEPENDENCIES geometry_msgs std_msgs builtin_interfaces
 )
 
 set(PROJECT_INCLUDE_DIRS include)
@@ -79,7 +79,7 @@ target_link_libraries(obstacle_publisher_node obstacle_publisher)
 
 #
 # Build nodelets
-# 
+#
 # add_library(${PROJECT_NAME}_nodelets
 #   src/nodelets/scans_merger_nodelet.cpp
 #   src/nodelets/obstacle_extractor_nodelet.cpp

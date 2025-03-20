@@ -44,10 +44,10 @@ ObstacleExtractor::ObstacleExtractor(std::shared_ptr<rclcpp::Node> nh, std::shar
   nh_ = nh;
   nh_local_ = nh_local;
   p_active_ = false;
-//   params_srv_ = nh_->create_service<std_srvs::srv::Empty>("params", 
+//   params_srv_ = nh_->create_service<std_srvs::srv::Empty>("params",
 //                                                           std::bind(
 //                                                                 &ObstacleExtractor::updateParams,
-//                                                                 this, 
+//                                                                 this,
 //                                                                 std::placeholders::_1,
 //                                                                 std::placeholders::_2,
 //                                                                 std::placeholders::_3
@@ -142,7 +142,7 @@ void ObstacleExtractor::updateParamsUtil(){
 }
 
 void ObstacleExtractor::updateParams(const std::shared_ptr<rmw_request_id_t> request_header,
-                                     const std::shared_ptr<std_srvs::srv::Empty::Request> &req, 
+                                     const std::shared_ptr<std_srvs::srv::Empty::Request> &req,
                                      const std::shared_ptr<std_srvs::srv::Empty::Response> &res) {
   updateParamsUtil();
 }
@@ -481,7 +481,7 @@ void ObstacleExtractor::publishVisualizationObstacles(){
     seg_marker.points.push_back(seg_fp);
     seg_marker.points.push_back(seg_lp);
 
-    seg_marker.pose.orientation.w = 1.0;   
+    seg_marker.pose.orientation.w = 1.0;
     obstacles_vis_msg.markers.push_back(seg_marker);
   }
 
@@ -503,7 +503,7 @@ void ObstacleExtractor::publishVisualizationObstacles(){
         circ_marker.color.g = 1.0;
         circ_marker.color.a = 1.0;
         circ_marker.type = visualization_msgs::msg::Marker::CYLINDER;
-        
+
         circ_marker.pose.position.x = c.center.x;
         circ_marker.pose.position.y = c.center.y;
         circ_marker.pose.position.z = c.center.z;
@@ -522,7 +522,7 @@ void ObstacleExtractor::publishVisualizationObstacles(){
     markerD.header.stamp = stamp_;
     markerD.header.frame_id = published_obstacles_frame_id_;
     markerD.ns = "raw_obstacles";
-    markerD.id = id++;  
+    markerD.id = id++;
     markerD.action = visualization_msgs::msg::Marker::DELETE;
     obstacles_vis_msg.markers.push_back(markerD);
   }
@@ -539,7 +539,7 @@ void ObstacleExtractor::transformObstacles() {
 
     try {
         m_transform = tf_buffer_->lookupTransform(p_frame_id_, base_frame_id_, tf2::TimePointZero);
-    } 
+    }
     catch (const tf2::TransformException & ex) {
         RCLCPP_INFO(
         nh_->get_logger(), "Could not transformmm %s to %s: %s",

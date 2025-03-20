@@ -61,7 +61,7 @@ bool raw_serial::open()
 }
 
 bool raw_serial::bind(const char * portname, uint32_t baudrate, uint32_t flags)
-{   
+{
     strncpy(_portName, portname, sizeof(_portName));
     _baudrate = baudrate;
     _flags    = flags;
@@ -71,7 +71,7 @@ bool raw_serial::bind(const char * portname, uint32_t baudrate, uint32_t flags)
 bool raw_serial::open(const char * portname, uint32_t baudrate, uint32_t flags)
 {
     if (isOpened()) close();
-    
+
     serial_fd = ::open(portname, O_RDWR | O_NOCTTY | O_NDELAY);
 
     if (serial_fd == -1) return false;
@@ -98,21 +98,21 @@ bool raw_serial::open(const char * portname, uint32_t baudrate, uint32_t flags)
 
     options.c_iflag &= ~(IXON | IXOFF | IXANY); // no sw flow control
 
-    // raw input mode   
+    // raw input mode
     options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-    // raw output mode   
+    // raw output mode
     options.c_oflag &= ~OPOST;
-    
-    tcflush(serial_fd,TCIFLUSH); 
+
+    tcflush(serial_fd,TCIFLUSH);
 
     if (tcsetattr(serial_fd, TCSANOW, &options))
     {
         close();
         return false;
     }
-	
+
     printf("Setting serial port baudrate...\n");
-    
+
     speed_t speed = (speed_t)baudrate;
     if (ioctl(serial_fd, IOSSIOSPEED, &speed)== -1) {
         printf("Error calling ioctl(..., IOSSIOSPEED, ...) %s - %s(%d).\n",
@@ -125,7 +125,7 @@ bool raw_serial::open(const char * portname, uint32_t baudrate, uint32_t flags)
 
     //Clear the DTR bit to let the motor spin
     clearDTR();
-    
+
     return true;
 }
 
@@ -134,7 +134,7 @@ void raw_serial::close()
     if (serial_fd != -1)
         ::close(serial_fd);
     serial_fd = -1;
-    
+
     _is_serial_opened = false;
 }
 
@@ -144,19 +144,19 @@ int raw_serial::senddata(const unsigned char * data, size_t size)
     if (!isOpened()) return 0;
 
     if (data == NULL || size ==0) return 0;
-    
+
     size_t tx_len = 0;
     required_tx_cnt = 0;
     do {
         int ans = ::write(serial_fd, data + tx_len, size-tx_len);
-        
+
         if (ans == -1) return tx_len;
-        
+
         tx_len += ans;
         required_tx_cnt = tx_len;
     }while (tx_len<size);
-    
-    
+
+
     return tx_len;
 }
 
@@ -164,9 +164,9 @@ int raw_serial::senddata(const unsigned char * data, size_t size)
 int raw_serial::recvdata(unsigned char * data, size_t size)
 {
     if (!isOpened()) return 0;
-    
+
     int ans = ::read(serial_fd, data, size);
-    
+
     if (ans == -1) ans=0;
     required_rx_cnt = ans;
     return ans;
@@ -175,7 +175,7 @@ int raw_serial::recvdata(unsigned char * data, size_t size)
 
 void raw_serial::flush( _u32 flags)
 {
-    tcflush(serial_fd,TCIFLUSH); 
+    tcflush(serial_fd,TCIFLUSH);
 }
 
 int raw_serial::waitforsent(_u32 timeout, size_t * returned_size)
@@ -187,7 +187,7 @@ int raw_serial::waitforsent(_u32 timeout, size_t * returned_size)
 int raw_serial::waitforrecv(_u32 timeout, size_t * returned_size)
 {
     if (!isOpened() ) return -1;
-   
+
     if (returned_size) *returned_size = required_rx_cnt;
     return 0;
 }
@@ -197,7 +197,7 @@ int raw_serial::waitfordata(size_t data_count, _u32 timeout, size_t * returned_s
     size_t length = 0;
     if (returned_size==NULL) returned_size=(size_t *)&length;
     *returned_size = 0;
-    
+
     int max_fd;
     fd_set input_set;
     struct timeval timeout_val;
@@ -254,7 +254,7 @@ int raw_serial::waitfordata(size_t data_count, _u32 timeout, size_t * returned_s
                 return 0;
             }
         }
-        
+
     }
 
     *returned_size=0;
@@ -265,7 +265,7 @@ size_t raw_serial::rxqueue_count()
 {
     if  ( !isOpened() ) return 0;
     size_t remaining;
-    
+
     if (::ioctl(serial_fd, FIONREAD, &remaining) == -1) return 0;
     return remaining;
 }
@@ -325,22 +325,22 @@ _u32 raw_serial::getTermBaudBitmap(_u32 baud)
     }
     return -1;
 }
-    
+
 }}} //end rp::arch::net
 
 
 
 //begin rp::hal
 namespace rp{ namespace hal{
-    
+
     serial_rxtx * serial_rxtx::CreateRxTx()
     {
         return new rp::arch::net::raw_serial();
     }
-    
+
     void serial_rxtx::ReleaseRxTx(serial_rxtx *rxtx)
     {
         delete rxtx;
     }
-    
+
 }} //end rp::hal

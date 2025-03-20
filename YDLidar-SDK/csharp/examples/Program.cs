@@ -3,7 +3,7 @@
 namespace LidarTest
 {
     class Program
-    { 
+    {
         static void Main(string[] args)
         {
             ydlidar.os_init();

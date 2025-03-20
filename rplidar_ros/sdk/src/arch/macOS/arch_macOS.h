@@ -63,4 +63,3 @@ extern "C" {
 }
 
 #include "arch/macOS/timer.h"
-

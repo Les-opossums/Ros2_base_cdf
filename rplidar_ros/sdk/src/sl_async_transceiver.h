@@ -41,7 +41,7 @@ namespace sl { namespace internal {
 class _single_thread ProtocolMessage {
 
 public:
-	size_t len;			
+	size_t len;
 	_u8 cmd;
 protected:
 	_u8* data;
@@ -121,7 +121,7 @@ public:
 	IChannel* getBindedChannel() const {
 		return _bindedChannel;
 	}
-	
+
 	u_result sendMessage(message_autoptr_t& msg);
 
 protected:

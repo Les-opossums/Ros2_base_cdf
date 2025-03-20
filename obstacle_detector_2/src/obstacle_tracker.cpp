@@ -44,10 +44,10 @@ ObstacleTracker::ObstacleTracker(std::shared_ptr<rclcpp::Node> nh, std::shared_p
   nh_ = nh;
   nh_local_ = nh_local;
   p_active_ = false;
-//   params_srv_ = nh_->create_service<std_srvs::srv::Empty>("params", 
+//   params_srv_ = nh_->create_service<std_srvs::srv::Empty>("params",
 //                                                           std::bind(
 //                                                                 &ObstacleTracker::updateParams,
-//                                                                 this, 
+//                                                                 this,
 //                                                                 std::placeholders::_1,
 //                                                                 std::placeholders::_2,
 //                                                                 std::placeholders::_3
@@ -131,7 +131,7 @@ void ObstacleTracker::updateParamsUtil(){
 }
 
 void ObstacleTracker::updateParams(const std::shared_ptr<rmw_request_id_t> request_header,
-                                     const std::shared_ptr<std_srvs::srv::Empty::Request> &req, 
+                                     const std::shared_ptr<std_srvs::srv::Empty::Request> &req,
                                      const std::shared_ptr<std_srvs::srv::Empty::Response> &res) {
   updateParamsUtil();
 }
@@ -774,7 +774,7 @@ visualization_msgs::msg::Marker ObstacleTracker::getMarkerCircle(obstacle_detect
     circ_marker.scale.x = circ_marker.scale.y = scale;
     circ_marker.scale.z = 0.01;
     circ_marker.type = visualization_msgs::msg::Marker::CYLINDER;
-    
+
     circ_marker.pose.position.x = ob.center.x;
     circ_marker.pose.position.y = ob.center.y;
     // tracked obstacles are a bit higher than the raw ones, so that they can be visualized together
@@ -782,7 +782,7 @@ visualization_msgs::msg::Marker ObstacleTracker::getMarkerCircle(obstacle_detect
     return circ_marker;
 }
 
-visualization_msgs::msg::Marker ObstacleTracker::getMarkerVelocityArrow(uid_t uid, 
+visualization_msgs::msg::Marker ObstacleTracker::getMarkerVelocityArrow(uid_t uid,
                                                                         double px,
                                                                         double py,
                                                                         double vx,
@@ -793,7 +793,7 @@ visualization_msgs::msg::Marker ObstacleTracker::getMarkerVelocityArrow(uid_t ui
     arrow_marker.scale.y = 0.07;  // width
     arrow_marker.scale.z = 0.01; // height
     arrow_marker.color.r = arrow_marker.color.g = arrow_marker.color.b = arrow_marker.color.a = 1.0;
-    
+
     arrow_marker.pose.position.x = px;
     arrow_marker.pose.position.y = py;
     double vel_magnitude = std::sqrt(vx*vx + vy*vy);
@@ -802,7 +802,7 @@ visualization_msgs::msg::Marker ObstacleTracker::getMarkerVelocityArrow(uid_t ui
     arrow_marker.scale.x = vel_magnitude;
     arrow_marker.pose.orientation.z = std::sin(alpha/2);
     arrow_marker.pose.orientation.w = std::cos(alpha/2);
-    return arrow_marker; 
+    return arrow_marker;
 }
 
 visualization_msgs::msg::Marker ObstacleTracker::getMarkerSegment(obstacle_detector::msg::SegmentObstacle& ob){

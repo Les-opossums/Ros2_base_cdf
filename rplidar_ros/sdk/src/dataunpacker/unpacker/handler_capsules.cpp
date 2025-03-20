@@ -45,7 +45,7 @@
 #include "handler_capsules.h"
 
 BEGIN_DATAUNPACKER_NS()
-	
+
 namespace unpacker{
 
 
@@ -55,7 +55,7 @@ namespace unpacker{
 static _u64 _getSampleDelayOffsetInExpressMode(const SlamtecLidarTimingDesc& timing, int sampleIdx)
 {
     // FIXME: to eval
-    // 
+    //
     // guess channel baudrate by LIDAR model ....
     const _u64 channelBaudRate = timing.native_baudrate? timing.native_baudrate:115200;
 
@@ -272,7 +272,7 @@ void UnpackerHandler_CapsuleNode::_onScanNodeCapsuleData(rplidar_response_capsul
 static _u64 _getSampleDelayOffsetInUltraBoostMode(const SlamtecLidarTimingDesc& timing, int sampleIdx)
 {
     // FIXME: to eval
-    // 
+    //
     // guess channel baudrate by LIDAR model ....
     const _u64 channelBaudRate = timing.native_baudrate ? timing.native_baudrate : 256000;
 
@@ -586,7 +586,7 @@ void UnpackerHandler_UltraCapsuleNode::_onScanNodeUltraCapsuleData(rplidar_respo
 static _u64 _getSampleDelayOffsetInDenseMode(const SlamtecLidarTimingDesc& timing, int sampleIdx)
 {
     // FIXME: to eval
-    // 
+    //
     // guess channel baudrate by LIDAR model ....
     const _u64 channelBaudRate = timing.native_baudrate ? timing.native_baudrate : 256000;
 
@@ -779,7 +779,7 @@ void UnpackerHandler_DenseCapsuleNode::_onScanNodeDenseCapsuleData(rplidar_respo
             hqNode.angle_z_q14 = (angle_q6 << 8) / 90;
             hqNode.dist_mm_q2 = dist_q2;
             engine->publishHQNode(currentTs - _getSampleDelayOffsetInDenseMode(_cachedTimingDesc, pos), &hqNode);
-            
+
             lastNodeSyncBit = syncBit;
 
         }
@@ -796,7 +796,7 @@ void UnpackerHandler_DenseCapsuleNode::_onScanNodeDenseCapsuleData(rplidar_respo
 static _u64 _getSampleDelayOffsetInUltraDenseMode(const SlamtecLidarTimingDesc& timing, int sampleIdx)
 {
     // FIXME: to eval
-    // 
+    //
     // guess channel baudrate by LIDAR model ....
     const _u64 channelBaudRate = timing.native_baudrate ? timing.native_baudrate : 1000000;
 
@@ -1035,7 +1035,7 @@ void UnpackerHandler_UltraDenseCapsuleNode::_onScanNodeUltraDenseCapsuleData(rpl
             hqNode.angle_z_q14 = (angle_q6 << 8) / 90;
             hqNode.dist_mm_q2 = dist_q2;
             engine->publishHQNode(currentTimestamp - _getSampleDelayOffsetInUltraDenseMode(_cachedTimingDesc, pos), &hqNode);
-            
+
             _last_node_sync_bit = syncBit;
 
         }

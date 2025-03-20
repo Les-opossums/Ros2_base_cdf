@@ -60,7 +60,7 @@ C_INCLUDES += -I$(CURDIR)/src/dataunpacker  -I$(CURDIR)/src/dataunpacker/unpacke
 ifeq ($(BUILD_TARGET_PLATFORM),Linux)
 CXXSRC += src/arch/linux/net_serial.cpp \
           src/arch/linux/net_socket.cpp \
-          src/arch/linux/timer.cpp 
+          src/arch/linux/timer.cpp
 endif
 
 

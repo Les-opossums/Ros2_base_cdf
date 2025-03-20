@@ -117,7 +117,7 @@ struct SdkSdmDeviceInfo {
 
 using namespace std;
 
-namespace ydlidar 
+namespace ydlidar
 {
 
 using namespace core;
@@ -127,7 +127,7 @@ using namespace core::base;
 /*!
 * SDM操控类
 */
-class SDMLidarDriver : public DriverInterface 
+class SDMLidarDriver : public DriverInterface
 {
 public:
   //构造函数
