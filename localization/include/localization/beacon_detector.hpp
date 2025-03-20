@@ -4,7 +4,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
 // #include <visualization_msgs/msg/marker_array.hpp>
-#include <cdf_msgs/msg/obstacles.hpp>
+#include <obstacle_detector/msg/obstacles.hpp>
 #include <cdf_msgs/msg/lidar_loc.hpp>
 #include <cdf_msgs/msg/merged_data.hpp>
 #include <vector>
@@ -31,7 +31,7 @@ private:
     void init_subscribers();
 
     // Callbacks
-    void object_callback(const cdf_msgs::msg::Obstacles::SharedPtr msg);
+    void object_callback(const obstacle_detector::msg::Obstacles::SharedPtr msg);
     void robot_position_callback(const cdf_msgs::msg::MergedData::SharedPtr msg);
 
     // Parameters
@@ -62,7 +62,7 @@ private:
     rclcpp::Publisher<cdf_msgs::msg::LidarLoc>::SharedPtr pub_location_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_debug_;
 
-    rclcpp::Subscription<cdf_msgs::msg::Obstacles>::SharedPtr sub_object_;
+    rclcpp::Subscription<obstacle_detector::msg::Obstacles>::SharedPtr sub_object_;
     rclcpp::Subscription<cdf_msgs::msg::MergedData>::SharedPtr sub_robot_position_;
 
     // Localization Objects

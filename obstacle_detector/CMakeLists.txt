@@ -118,6 +118,7 @@ install(TARGETS obstacle_extractor_node obstacle_tracker_node obstacle_publisher
 install(
   DIRECTORY
   launch
+  config
   DESTINATION share/${PROJECT_NAME}/
 )
 

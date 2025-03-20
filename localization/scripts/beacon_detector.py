@@ -15,7 +15,8 @@ from localization.PositionFinder import PositionFinder
 from localization.publisher import publish_pose_from_lidar
 
 # Msgs import
-from cdf_msgs.msg import Obstacles, LidarLoc, MergedData
+from obstacle_detector.msg import Obstacles
+from cdf_msgs.msg import LidarLoc, MergedData
 from std_msgs.msg import String
 
 

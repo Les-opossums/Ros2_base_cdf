@@ -10,8 +10,10 @@ import numpy as np
 
 # Import des messages
 from rclpy.executors import ExternalShutdownException
-from cdf_msgs.msg import Obstacles, CircleObstacle, PositionMap
+from cdf_msgs.msg import PositionMap
+from obstacle_detector.msg import Obstacles, CircleObstacle
 from std_srvs.srv import Trigger
+from std_msgs.msg import Header
 from localization.math_lidar import lidar_scan
 from sensor_msgs.msg import LaserScan
 
@@ -60,10 +62,10 @@ class LidarSimulation(Node):
         self.lidar_range = (
             self.get_parameter("lidar_range").get_parameter_value().double_value
         )
-        num_points = (
+        self.num_points = (
             self.get_parameter("num_points").get_parameter_value().integer_value
         )
-        self.angle_range = np.linspace(0, 2 * np.pi, num_points)
+        self.angle_range = np.linspace(0, 2 * np.pi, self.num_points)
         beacons = self.get_parameter("beacons").get_parameter_value().double_array_value
         if self.team_color not in ["blue", "yellow"]:
             raise ValueError("Invalid team color")
@@ -149,9 +151,18 @@ class LidarSimulation(Node):
                     {"type": "circle", "center": e[:2, 0], "radius": self.radius}
                 )
             scan_result = lidar_scan(self.angle_range, objects, self.lidar_range)
+            now = self.get_clock().now().to_msg()
+            msg.header = Header(stamp=now, frame_id="laser_frame")
             msg.angle_min = 0.0
+            msg.angle_max = 2 * np.pi 
             msg.angle_increment = self.angle_range[1]
+            msg.time_increment = 0.0
+            msg.scan_time = 0.1
+            msg.range_max = self.lidar_range
+            msg.range_min = 0.12
             msg.ranges = scan_result
+            intensities = np.random.uniform(0, 255, self.num_points)
+            msg.intensities = intensities.tolist()
             self.pub_scan.publish(msg)
         else:
             msg = Obstacles()

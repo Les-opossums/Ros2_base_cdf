@@ -1,0 +1,23 @@
+obstacle_extractor_node:
+  ros__parameters:
+    active: True
+    use_scan: True
+    use_pcl: False
+    use_sim_time: True
+
+    use_split_and_merge: True
+    circles_from_visibles: True
+    discard_converted_segments: True
+    transform_coordinates: True
+
+    min_group_points: 2
+
+    max_group_distance: 0.12
+    distance_proportion: 0.00628
+    max_split_distance: 0.2
+    max_merge_separation: 0.2
+    max_merge_spread: 0.2
+    max_circle_radius: 0.3
+    radius_enlargement: 0.2
+
+    frame_id: /laser_frame

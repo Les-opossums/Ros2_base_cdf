@@ -119,7 +119,7 @@ void BeaconDetectorNode::init_publishers()
 void BeaconDetectorNode::init_subscribers()
 {
     object_topic_ = this->get_parameter("object_topic").as_string();
-    sub_object_ = this->create_subscription<cdf_msgs::msg::Obstacles>(
+    sub_object_ = this->create_subscription<obstacle_detector::msg::Obstacles>(
         object_topic_, 10, std::bind(&BeaconDetectorNode::object_callback, this, std::placeholders::_1));
     if (enable_robot_position_reception_)
     {
@@ -129,7 +129,7 @@ void BeaconDetectorNode::init_subscribers()
     }
 }
 
-void BeaconDetectorNode::object_callback(const cdf_msgs::msg::Obstacles::SharedPtr msg)
+void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles::SharedPtr msg)
 {
     // rclcpp::Time begin = this->now();
     // int64_t ns_begin = begin.nanoseconds();

@@ -14,7 +14,7 @@ main_robot:
   beacon_detector_node:
     ros__parameters:
       enable_robot_position_reception: False
-      object_topic: object
+      object_topic: raw_obstacles
       position_topic: position_out
       debug_topic: debug
       color_topic: init/team_color
@@ -31,7 +31,7 @@ main_robot:
 
   lidar_simulation_node:
     ros__parameters:
-      object_topic: object
+      object_topic: raw_obstacles
       scan_topic: scan
       update_position_topic: update_position
       color_service: init/team_color
@@ -42,7 +42,7 @@ main_robot:
       use_lidar_points: True
       lidar_range: 10.
       radius: 0.1
-      num_points: 2000
+      num_points: 4000
 
   nav_simulation_node:
     ros__parameters:
@@ -55,11 +55,35 @@ main_robot:
       angular_velocity: 0.4
       linear_velocity: 0.15
 
+  obstacle_extractor_node:
+    ros__parameters:
+      active: True
+      use_scan: True
+      use_pcl: False
+      use_sim_time: True
+
+      use_split_and_merge: True
+      circles_from_visibles: True
+      discard_converted_segments: True
+      transform_coordinates: True
+
+      min_group_points: 2
+
+      max_group_distance: 0.12
+      distance_proportion: 0.00628
+      max_split_distance: 0.2
+      max_merge_separation: 0.2
+      max_merge_spread: 0.2
+      max_circle_radius: 0.3
+      radius_enlargement: 0.2
+
+      frame_id: /laser_frame
+
 ennemi_robot:
   beacon_detector_node:
     ros__parameters:
       enable_robot_position_reception: False
-      object_topic: object
+      object_topic: raw_obstacles
       position_topic: position_out
       debug_topic: debug
       color_topic: init/team_color
@@ -76,7 +100,7 @@ ennemi_robot:
 
   lidar_simulation_node:
     ros__parameters:
-      object_topic: object
+      object_topic: raw_obstacles
       scan_topic: scan
       update_position_topic: update_position
       color_service: init/team_color
@@ -98,3 +122,27 @@ ennemi_robot:
       compute_period: 0.01
       angular_velocity: 0.4
       linear_velocity: 0.15
+  
+  obstacle_extractor_node:
+    ros__parameters:
+      active: True
+      use_scan: True
+      use_pcl: False
+      use_sim_time: True
+
+      use_split_and_merge: True
+      circles_from_visibles: True
+      discard_converted_segments: True
+      transform_coordinates: True
+
+      min_group_points: 2
+
+      max_group_distance: 0.12
+      distance_proportion: 0.00628
+      max_split_distance: 0.2
+      max_merge_separation: 0.2
+      max_merge_spread: 0.2
+      max_circle_radius: 0.3
+      radius_enlargement: 0.2
+
+      frame_id: laser_frame
