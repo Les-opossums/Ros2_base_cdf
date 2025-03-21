@@ -145,14 +145,17 @@ class TfBroadcaster(Node):
         t.header.frame_id = "map"
         t.child_frame_id = "laser_frame"
         # Define the translation (x, y, z)
+        self.get_logger().info(f"x: {msg.robot.x}")
+        self.get_logger().info(f"y: {msg.robot.y}")
+        self.get_logger().info(f"th: {msg.robot.z}")
         t.transform.translation.x = msg.robot.x
         t.transform.translation.y = msg.robot.y
         t.transform.translation.z = 0.0
         # Define the rotation (using a quaternion)
         # Here, no rotation is applied (roll=pitch=yaw=0)
-        q = quaternion_from_euler(0.0, 0.0, -msg.robot.z)
-        t.transform.rotation.x = q[0]
-        t.transform.rotation.y = q[1]
+        q = quaternion_from_euler(0.0, 0.0, msg.robot.z)
+        t.transform.rotation.x = 0.0
+        t.transform.rotation.y = 0.0
         t.transform.rotation.z = q[2]
         t.transform.rotation.w = q[3]
         self.br.sendTransform(t)
