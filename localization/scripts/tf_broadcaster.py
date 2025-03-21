@@ -1,34 +1,145 @@
 #!/usr/bin/env python3
+"""Broadcast all TF transforamtions."""
 
+import math
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import TransformStamped
 from tf2_ros import TransformBroadcaster
 import functools
 from cdf_msgs.msg import PositionMap
+from geometry_msgs.msg import Point
+from std_srvs.srv import Empty
+from visualization_msgs.msg import Marker
 from localization.math_lidar import quaternion_from_euler
 
-class MyTfBroadcaster(Node):
+
+class TfBroadcaster(Node):
+    """Broadcast all TF between frames."""
+
     def __init__(self):
-        super().__init__('my_tf_broadcaster')
-        self.br = TransformBroadcaster(self)
-        self.get_logger().info(f"UHDUUADH")
+        super().__init__("my_tf_broadcaster")
         self.declare_parameters(
             namespace="",
             parameters=[
                 ("update_position_topic", rclpy.Parameter.Type.STRING),
+                ("visualization_topic", rclpy.Parameter.Type.STRING),
+                ("init_visu_srv", rclpy.Parameter.Type.STRING),
+                ("boundaries", rclpy.Parameter.Type.DOUBLE_ARRAY),
+                ("beacons", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("robot_names", rclpy.Parameter.Type.STRING_ARRAY),
-            ]
+            ],
+        )
+        self._init_parameters()
+        self._init_subscribers()
+        self._init_publishers()
+        self._init_services()
+        self._init_display()
+        self.get_logger().info("TfBroadcaster node initialized.")
+
+    def _init_parameters(self):
+        """Initialize parameters."""
+        self.br = TransformBroadcaster(self)
+        self.robot_names = (
+            self.get_parameter("robot_names").get_parameter_value().string_array_value
+        )
+        self.boundaries = (
+            self.get_parameter("boundaries").get_parameter_value().double_array_value
+        )
+        self.beacons = (
+            self.get_parameter("beacons").get_parameter_value().double_array_value
         )
 
-        update_position_topic = self.get_parameter("update_position_topic").get_parameter_value().string_value
-        self.robot_names = self.get_parameter("robot_names").get_parameter_value().string_array_value
-        self.get_logger().info(f"POsition_topic: {update_position_topic}")
-        self.get_logger().info(f"Robot_names: {self.robot_names}")
+    def _init_subscribers(self):
+        """Initialize subscribers."""
+        update_position_topic = (
+            self.get_parameter("update_position_topic")
+            .get_parameter_value()
+            .string_value
+        )
         for name in self.robot_names:
-            self.sub_update_position = self.subscriber(PositionMap, update_position_topic, functools.partial(self.broadcast_tf, name=name))
+            self.sub_update_position = self.create_subscription(
+                PositionMap,
+                name + "/" + update_position_topic,
+                functools.partial(self.broadcast_tf, name=name),
+                10,
+            )
+
+    def _init_publishers(self):
+        """Initialize publishers."""
+        visualization_topic = (
+            self.get_parameter("visualization_topic").get_parameter_value().string_value
+        )
+        self.pub_visualization = self.create_publisher(Marker, visualization_topic, 10)
+
+    def _init_services(self):
+        """Initialize services."""
+        init_visu_srv = (
+            self.get_parameter("init_visu_srv").get_parameter_value().string_value
+        )
+        self.visualization_srv = self.create_service(
+            Empty, init_visu_srv, self.update_display
+        )
+
+    def update_display(self, request, response):
+        """Update the display of the board and beacons."""
+        self._init_display()
+        return response
+
+    def _init_display(self):
+        """Initialize the display of the board."""
+        marker_board = Marker()
+        marker_board.header.frame_id = "map"
+        marker_board.header.stamp = self.get_clock().now().to_msg()
+        marker_board.ns = "board"
+        marker_board.id = 0
+        marker_board.type = Marker.LINE_STRIP
+        marker_board.action = Marker.ADD
+        marker_board.scale.x = 0.01  # Line width
+
+        # Color: red
+        marker_board.color.g = 1.0
+        marker_board.color.a = 1.0
+
+        # Define the 8 points of a box (you can replace them)
+        corners = [
+            Point(x=self.boundaries[0], y=self.boundaries[2], z=0.0),
+            Point(x=self.boundaries[1], y=self.boundaries[2], z=0.0),
+            Point(x=self.boundaries[1], y=self.boundaries[3], z=0.0),
+            Point(x=self.boundaries[0], y=self.boundaries[3], z=0.0),
+            Point(x=self.boundaries[0], y=self.boundaries[2], z=0.0),
+        ]
+        marker_board.points = corners
+        self.pub_visualization.publish(marker_board)
+        for i in range(4):
+            marker = Marker()
+            marker.header.frame_id = "map"
+            marker.header.stamp = self.get_clock().now().to_msg()
+            marker.ns = "beacon"
+            marker.id = i + 1
+            marker.type = Marker.LINE_STRIP
+            marker.action = Marker.ADD
+
+            marker.scale.x = 0.01  # Line width
+            marker.color.r = 1.0
+            marker.color.g = 1.0
+            marker.color.a = 1.0
+
+            # Circle center and radius
+            cx, cy, cz = self.beacons[2 * i], self.beacons[2 * i + 1], 0.0
+            radius = 0.05
+            num_points = 100  # More points = smoother circle
+
+            for i in range(num_points + 1):  # Close the loop
+                angle = 2 * math.pi * i / num_points
+                x = cx + radius * math.cos(angle)
+                y = cy + radius * math.sin(angle)
+                marker.points.append(Point(x=x, y=y, z=cz))
+
+            self.pub_visualization.publish(marker)
 
     def broadcast_tf(self, msg, name):
+        """Link a frame to another."""
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = "map"
@@ -39,21 +150,22 @@ class MyTfBroadcaster(Node):
         t.transform.translation.z = 0.0
         # Define the rotation (using a quaternion)
         # Here, no rotation is applied (roll=pitch=yaw=0)
-        q = quaternion_from_euler(0., 0., msg.robot.z)
+        q = quaternion_from_euler(0.0, 0.0, -msg.robot.z)
         t.transform.rotation.x = q[0]
         t.transform.rotation.y = q[1]
         t.transform.rotation.z = q[2]
         t.transform.rotation.w = q[3]
-        
         self.br.sendTransform(t)
-        self.get_logger().info('Broadcasting transform from "world" to "robot"')
+
 
 def main(args=None):
+    """Spin ROS node."""
     rclpy.init(args=args)
-    node = MyTfBroadcaster()
+    node = TfBroadcaster()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
