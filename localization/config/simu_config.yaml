@@ -74,8 +74,11 @@ main_robot:
       max_split_distance: 0.2
       max_merge_separation: 0.2
       max_merge_spread: 0.2
-      max_circle_radius: 0.3
-      radius_enlargement: 0.2
+      max_circle_radius: 0.2
+      radius_enlargement: 0.05
+      max_x_range: 4.0
+      max_y_range: 4.0
+      circles_from_visibles: False
 
       frame_id: /laser_frame
 
