@@ -113,8 +113,8 @@ class NavSimulation(Node):
 
     def _send_position(self, request, response):
         """Send position."""
-        response.pos.x = float(self.position[0])
-        response.pos.y = float(self.position[1])
+        response.pos.x = float(self.position[0].item())
+        response.pos.y = float(self.position[1].item())
         response.pos.z = float(self.angle)
         return response
 
@@ -126,7 +126,6 @@ class NavSimulation(Node):
                 # Abort the existing goal
                 self._goal_handle.abort()
             self._goal_handle = goal_handle
-
         goal_handle.execute()
 
     def _queue_handle_accepted_callback(self, goal_handle):
@@ -172,8 +171,8 @@ class NavSimulation(Node):
                 ]
             )
             moveto_feedback = MoveTo.Feedback()
-            moveto_feedback.current_position.x = float(self.position[0])
-            moveto_feedback.current_position.y = float(self.position[1])
+            moveto_feedback.current_position.x = float(self.position[0].item())
+            moveto_feedback.current_position.y = float(self.position[1].item())
             moveto_feedback.current_position.z = float(self.angle)
             while not reached_position:
                 if goal_handle.is_cancel_requested:
@@ -183,15 +182,14 @@ class NavSimulation(Node):
                     if not goal_handle.is_active:
                         return MoveTo.Result()
                 self._ordered_moves()
-                moveto_feedback.current_position.x = float(self.position[0])
-                moveto_feedback.current_position.y = float(self.position[1])
+                moveto_feedback.current_position.x = float(self.position[0].item())
+                moveto_feedback.current_position.y = float(self.position[1].item())
                 moveto_feedback.current_position.z = float(self.angle)
                 reached_position = (
                     self.position[0] == goal_handle.request.goal.x
                     and self.position[1] == goal_handle.request.goal.y
                     and self.angle == goal_handle.request.goal.z
                 )
-                # goal_handle.publish_feedback(moveto_feedback)
                 self.real_time = time.time()
                 self.pub_real_position.publish(moveto_feedback.current_position)
                 time.sleep(self.compute_period)

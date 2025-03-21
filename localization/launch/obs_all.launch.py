@@ -36,6 +36,14 @@ def generate_launch_description():
     )
     nodes.append(node_orchestrator_gui)
 
+    # node_tf_broadcaster = Node(
+    #     package="localization",
+    #     executable="tf_broadcaster.py",
+    #     name="tf_broadcaster_node",
+    #     parameters=[param_file, {"robot_names": top_keys}],
+    # )
+    # nodes.append(node_tf_broadcaster)
+
     for key in top_keys:
         node_lidar_simulation = Node(
             namespace=key,

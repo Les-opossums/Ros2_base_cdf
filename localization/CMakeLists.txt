@@ -53,6 +53,7 @@ install(PROGRAMS
   scripts/lidar_simulation.py
   scripts/nav_simulation.py
   scripts/position_sender.py
+  scripts/tf_broadcaster.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

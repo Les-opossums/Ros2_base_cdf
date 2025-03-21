@@ -65,8 +65,8 @@ class ActionManager(Node):
         )
 
     def _send_position(self, request, response):
-        response.pos.x = float(self.position[0])
-        response.pos.y = float(self.position[1])
+        response.pos.x = float(self.position[0].item())
+        response.pos.y = float(self.position[1].item())
         response.pos.z = float(self.angle)
         return response
 
