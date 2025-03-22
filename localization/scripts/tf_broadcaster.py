@@ -24,6 +24,8 @@ class TfBroadcaster(Node):
             parameters=[
                 ("update_position_topic", rclpy.Parameter.Type.STRING),
                 ("visualization_topic", rclpy.Parameter.Type.STRING),
+                ("default_color", rclpy.Parameter.Type.STRING),
+                ("available_colors", rclpy.Parameter.Type.STRING_ARRAY),
                 ("init_visu_srv", rclpy.Parameter.Type.STRING),
                 ("boundaries", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("beacons", rclpy.Parameter.Type.DOUBLE_ARRAY),
@@ -46,9 +48,18 @@ class TfBroadcaster(Node):
         self.boundaries = (
             self.get_parameter("boundaries").get_parameter_value().double_array_value
         )
-        self.beacons = (
-            self.get_parameter("beacons").get_parameter_value().double_array_value
+        self.team_color = (
+            self.get_parameter("default_color").get_parameter_value().string_value
         )
+        self.available_colors = (
+            self.get_parameter("available_colors").get_parameter_value().string_array_value
+        )
+        self.beacons = self.get_parameter("beacons").get_parameter_value().double_array_value
+        if self.team_color not in self.available_colors:
+            raise ValueError("Invalid team color")
+        if self.team_color == self.available_colors[1]:
+            for i in range(1, len(self.beacons), 2):
+                self.beacons[i] = self.boundaries[3] - self.beacons[i]
 
     def _init_subscribers(self):
         """Initialize subscribers."""
@@ -145,9 +156,9 @@ class TfBroadcaster(Node):
         t.header.frame_id = "map"
         t.child_frame_id = "laser_frame"
         # Define the translation (x, y, z)
-        self.get_logger().info(f"x: {msg.robot.x}")
-        self.get_logger().info(f"y: {msg.robot.y}")
-        self.get_logger().info(f"th: {msg.robot.z}")
+        # self.get_logger().info(f"x: {msg.robot.x}")
+        # self.get_logger().info(f"y: {msg.robot.y}")
+        # self.get_logger().info(f"th: {msg.robot.z}")
         t.transform.translation.x = msg.robot.x
         t.transform.translation.y = msg.robot.y
         t.transform.translation.z = 0.0
