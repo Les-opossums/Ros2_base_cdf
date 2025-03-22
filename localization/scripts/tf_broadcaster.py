@@ -154,7 +154,7 @@ class TfBroadcaster(Node):
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = "map"
-        t.child_frame_id = "laser_frame"
+        t.child_frame_id = name + "/laser_frame"
         # Define the translation (x, y, z)
         # self.get_logger().info(f"x: {msg.robot.x}")
         # self.get_logger().info(f"y: {msg.robot.y}")

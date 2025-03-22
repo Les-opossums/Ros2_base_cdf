@@ -92,7 +92,7 @@ main_robot:
       max_y_range: 4.0
       circles_from_visibles: False
 
-      frame_id: /laser_frame
+      frame_id: laser_frame
 
 # ennemi_robot:
 #   beacon_detector_node:

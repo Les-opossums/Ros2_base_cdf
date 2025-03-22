@@ -159,7 +159,7 @@ class LidarSimulation(Node):
                 )
             scan_result = lidar_scan(self.angle_range, objects, self.lidar_range)
             now = self.get_clock().now().to_msg()
-            msg.header = Header(stamp=now, frame_id="laser_frame")
+            msg.header = Header(stamp=now, frame_id=self.get_namespace()[1:] + '/laser_frame')
             msg.angle_min = self.angle_info[0] - self.angle_info[1] / 2
             msg.angle_max = self.angle_info[0] + self.angle_info[1] / 2
             msg.angle_increment = self.angle_info[1] / self.num_points

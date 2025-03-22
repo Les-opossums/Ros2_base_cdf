@@ -112,8 +112,13 @@ void ObstacleExtractor::updateParamsUtil(){
   nh_->get_parameter_or("min_y_limit", p_min_y_limit_, -10.0);
   nh_->get_parameter_or("max_y_limit", p_max_y_limit_,  10.0);
   nh_->get_parameter_or("frame_id", p_frame_id_, std::string{"map"});
-
-  if (p_active_ != prev_active) {
+  if (!p_frame_id_.empty() && p_frame_id_[0] != '/')
+  {
+    std::string ns = nh_->get_namespace();
+    if (ns != "/")
+      p_frame_id_ = ns + '/' + p_frame_id_;
+  }
+        if (p_active_ != prev_active) {
     if (p_active_) {
       if (p_use_scan_){
         RCLCPP_INFO_STREAM_ONCE(nh_->get_logger(), "Using LaserScan topic");
