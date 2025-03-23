@@ -1,0 +1,3 @@
+[submodule "cdf_msgs/resources"]
+	path = cdf_msgs/resources
+	url = git@github.com:Les-opossums/com_config_table.git
