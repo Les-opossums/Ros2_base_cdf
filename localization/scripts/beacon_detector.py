@@ -15,7 +15,8 @@ from localization.PositionFinder import PositionFinder
 from localization.publisher import publish_pose_from_lidar
 
 # Msgs import
-from cdf_msgs.msg import Obstacles, LidarLoc, MergedData
+from obstacle_detector.msg import Obstacles
+from cdf_msgs.msg import LidarLoc, MergedData
 from std_msgs.msg import String
 
 
@@ -25,25 +26,6 @@ class BeaconDetectorNode(Node):
     def __init__(self: Node) -> None:
 
         super().__init__("beacon_detector_node")
-        self._init_main_parameters()
-        self.get_logger().info("Beacon detector node initialized.")
-
-    def _init_main_parameters(self: Node) -> None:
-        """
-        Initialise the main parameters of the node given by the launch file and its yaml config file.
-
-        :param enable_wait_color: Enable the wait for the color message
-        :type enable_wait_color: bool
-        :param color_topic: The topic where the color message is published
-        :type color_topic: str
-        :param default_color: The default color of the team
-        :type default_color: str
-        :param team_color: The color of the team, chosen by default or by the message
-        :type team_color: str
-        :param available_colors: The available colors for the team
-        :type available_colors: list
-        """
-
         self.declare_parameters(
             namespace="",
             parameters=[
@@ -63,7 +45,26 @@ class BeaconDetectorNode(Node):
                 ("position_topic", rclpy.Parameter.Type.STRING),
             ],
         )
-        self._available_colors = (
+        self._init_main_parameters()
+        self.get_logger().info("Beacon detector node initialized.")
+
+    def _init_main_parameters(self: Node) -> None:
+        """
+        Initialise the main parameters of the node given by the launch file and its yaml config file.
+
+        :param enable_wait_color: Enable the wait for the color message
+        :type enable_wait_color: bool
+        :param color_topic: The topic where the color message is published
+        :type color_topic: str
+        :param default_color: The default color of the team
+        :type default_color: str
+        :param team_color: The color of the team, chosen by default or by the message
+        :type team_color: str
+        :param available_colors: The available colors for the team
+        :type available_colors: list
+        """
+
+        self.available_colors = (
             self.get_parameter("available_colors")
             .get_parameter_value()
             .string_array_value
@@ -82,7 +83,7 @@ class BeaconDetectorNode(Node):
             self.team_color = (
                 self.get_parameter("default_color").get_parameter_value().string_value
             ).lower()
-            if self.team_color not in self._available_colors:
+            if self.team_color not in self.available_colors:
                 raise ValueError("Invalid team color")
             self._init_parameters()
             self._init_publishers()
@@ -96,7 +97,7 @@ class BeaconDetectorNode(Node):
         :type msg: String
         """
         color = msg.data.lower()
-        if color not in self._available_colors:
+        if color not in self.available_colors:
             raise ValueError("Invalid team color")
         self.team_color = color
         self._init_parameters()
@@ -158,7 +159,9 @@ class BeaconDetectorNode(Node):
             self.get_parameter("boundaries").get_parameter_value().double_array_value
         )
         beacons = self.get_parameter("beacons").get_parameter_value().double_array_value
-        if self.team_color == "blue":
+        if self.team_color not in self.available_colors:
+            raise ValueError("Invalid team color")
+        if self.team_color == self.available_colors[1]:
             for i in range(1, len(beacons), 2):
                 beacons[i] = self.boundaries[3] - beacons[i]
         self.fixed_beacons = [
