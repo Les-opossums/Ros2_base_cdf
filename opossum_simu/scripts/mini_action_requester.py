@@ -11,15 +11,15 @@ from rclpy.executors import ExternalShutdownException
 from ament_index_python.packages import get_package_share_directory
 import os
 import yaml
+import time
 
 # Msgs import
 from std_msgs.msg import String
 
-class ZynqCommSimulation(Node):
+class Communication(Node):
     """Simulate the communication between the zynq and the raspi."""
 
     def __init__(self: Node) -> None:
-
         super().__init__("beacon_detector_node")
         self.declare_parameters(
             namespace="",
@@ -32,6 +32,11 @@ class ZynqCommSimulation(Node):
         self._init_subscribers()
         self._init_publishers()
         self.get_logger().info("Beacon detector node initialized.")
+        time.sleep(1)
+        self.send_cmd()
+        while True:
+            time.sleep(1)
+            self.sender()
 
     def _init_parameters(self: Node) -> None:
         """Initialise parameters of the node."""
@@ -50,10 +55,10 @@ class ZynqCommSimulation(Node):
         self.rcv_comm_topic = (
             self.get_parameter("rcv_comm_topic").get_parameter_value().string_value
         )
-
+        self.get_logger().info(f"IM INITITIITI ")
         self.sub_comm_topic = self.create_subscription(
             String,
-            self.comm_topic,
+            self.rcv_comm_topic,
             self.result_callback,
             10,
         )
@@ -75,14 +80,46 @@ class ZynqCommSimulation(Node):
         msg_type = self.comm_yaml[name]["receive"]
         if msg_type not in self.msgs_yaml:
             self.get_logger().info(f"The message type {msg_type} does not exists in the yaml file format_msgs.")
-        result = {key: args[i] for i, key in enumerate(self.msgs_yaml)}
+        result = {key: args[i] for i, key in enumerate(list(self.msgs_yaml[msg_type]["struct"].keys()))}
+        self.get_logger().info(f"Received:")
         for key in result.keys():
             self.get_logger().info(f"{key}: {result[key]}.")
+
+    def sender(self):
+        "Send to the card the command."
+        msg = String()
+        name = "GETODOM"
+        args = {
+            "enable": 1,
+            "freq": 40.0,
+            }
+        command = name
+        msg_type = self.comm_yaml[name]["send"]
+        for key in self.msgs_yaml[msg_type]["struct"].keys():
+            command += " " + str(args[key])
+        msg.data = command
+        self.pub_comm_topic.publish(msg)
+
+    def send_cmd(self):
+        "Send to the card the command."
+        msg = String()
+        name = "SETODOM"
+        args = {
+            "x": 1.,
+            "y": 1.2,
+            "t": 1.6,
+        }
+        command = name
+        msg_type = self.comm_yaml[name]["send"]
+        for key in self.msgs_yaml[msg_type]["struct"].keys():
+            command += " " + str(args[key])
+        msg.data = command
+        self.pub_comm_topic.publish(msg)
 
 def main(args=None):
     """Spin main loop."""
     rclpy.init(args=args)
-    zynq_comm_simu_node = ZynqCommSimulation()
+    zynq_comm_simu_node = Communication()
     executor = MultiThreadedExecutor()
     try:
         rclpy.spin(zynq_comm_simu_node, executor=executor)

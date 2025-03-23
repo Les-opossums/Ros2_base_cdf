@@ -15,12 +15,18 @@ find_package(cdf_msgs REQUIRED)
 
 include_directories(include)
 
+install(DIRECTORY
+  launch
+  config
+  DESTINATION share/${PROJECT_NAME}/
+)
+
 ament_python_install_package(${PROJECT_NAME})
 
 
 # Install Python executables
 install(PROGRAMS
-  scripts/comm_simu.py
+  scripts/zynq_simu.py
   scripts/mini_action_requester.py
   DESTINATION lib/${PROJECT_NAME}
 )

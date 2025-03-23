@@ -76,7 +76,7 @@ class NavSimulation(Node):
         """Init publishers of the node."""
         self.real_position_topic = (
             self.get_parameter("real_position_topic").get_parameter_value().string_value
-        )
+        ) 
         self.pub_real_position = self.create_publisher(
             Point, self.real_position_topic, 10
         )
