@@ -10,8 +10,10 @@ import numpy as np
 
 # Import des messages
 from rclpy.executors import ExternalShutdownException
-from cdf_msgs.msg import Obstacles, CircleObstacle, PositionMap
+from cdf_msgs.msg import PositionMap
+from obstacle_detector.msg import Obstacles, CircleObstacle
 from std_srvs.srv import Trigger
+from std_msgs.msg import Header
 from localization.math_lidar import lidar_scan
 from sensor_msgs.msg import LaserScan
 
@@ -41,11 +43,16 @@ class LidarSimulation(Node):
                 ("update_position_topic", rclpy.Parameter.Type.STRING),
                 ("color_service", rclpy.Parameter.Type.STRING),
                 ("default_color", rclpy.Parameter.Type.STRING),
+                ("available_colors", rclpy.Parameter.Type.STRING_ARRAY),
                 ("use_lidar_points", rclpy.Parameter.Type.BOOL),
                 ("radius", rclpy.Parameter.Type.DOUBLE),
                 ("num_points", rclpy.Parameter.Type.INTEGER),
                 ("lidar_range", rclpy.Parameter.Type.DOUBLE),
+                ("angle_info", rclpy.Parameter.Type.DOUBLE_ARRAY),
             ],
+        )
+        self.available_colors = (
+            self.get_parameter("available_colors").get_parameter_value().string_array_value
         )
         self.team_color = (
             self.get_parameter("default_color").get_parameter_value().string_value
@@ -60,14 +67,16 @@ class LidarSimulation(Node):
         self.lidar_range = (
             self.get_parameter("lidar_range").get_parameter_value().double_value
         )
-        num_points = (
+        self.num_points = (
             self.get_parameter("num_points").get_parameter_value().integer_value
         )
-        self.angle_range = np.linspace(0, 2 * np.pi, num_points)
+        self.angle_info = self.get_parameter("angle_info").get_parameter_value().double_array_value
+        self.angle_info = [np.pi * a / 180 for a in self.angle_info]
+        self.angle_range = np.linspace(self.angle_info[0], self.angle_info[0] + self.angle_info[1], self.num_points)
         beacons = self.get_parameter("beacons").get_parameter_value().double_array_value
-        if self.team_color not in ["blue", "yellow"]:
+        if self.team_color not in self.available_colors:
             raise ValueError("Invalid team color")
-        if self.team_color == "blue":
+        if self.team_color == self.available_colors[1]:
             for i in range(1, len(beacons), 2):
                 beacons[i] = self.boundaries[3] - beacons[i]
         self.fixed_beacons = [
@@ -149,9 +158,18 @@ class LidarSimulation(Node):
                     {"type": "circle", "center": e[:2, 0], "radius": self.radius}
                 )
             scan_result = lidar_scan(self.angle_range, objects, self.lidar_range)
-            msg.angle_min = 0.0
-            msg.angle_increment = self.angle_range[1]
+            now = self.get_clock().now().to_msg()
+            msg.header = Header(stamp=now, frame_id=self.get_namespace()[1:] + '/laser_frame')
+            msg.angle_min = self.angle_info[0] - self.angle_info[1] / 2
+            msg.angle_max = self.angle_info[0] + self.angle_info[1] / 2
+            msg.angle_increment = self.angle_info[1] / self.num_points
+            msg.time_increment = 0.0
+            msg.scan_time = 0.1
+            msg.range_max = self.lidar_range
+            msg.range_min = 0.12
             msg.ranges = scan_result
+            intensities = np.random.uniform(0, 255, self.num_points)
+            msg.intensities = intensities.tolist()
             self.pub_scan.publish(msg)
         else:
             msg = Obstacles()

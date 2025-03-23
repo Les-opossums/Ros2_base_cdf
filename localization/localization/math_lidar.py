@@ -269,4 +269,28 @@ def lidar_scan(angles, objects, max_range=10.0):
                     min_distance = t
             # elif: similar block for rectangle intersections
         scan_results.append(min_distance)
+        scan_results = [p if p < max_range else 0.0 for p in scan_results]
     return scan_results
+
+def quaternion_from_euler(ai, aj, ak):
+    ai /= 2.0
+    aj /= 2.0
+    ak /= 2.0
+    ci = np.cos(ai)
+    si = np.sin(ai)
+    cj = np.cos(aj)
+    sj = np.sin(aj)
+    ck = np.cos(ak)
+    sk = np.sin(ak)
+    cc = ci*ck
+    cs = ci*sk
+    sc = si*ck
+    ss = si*sk
+
+    q = np.empty((4, ))
+    q[0] = cj*sc - sj*cs
+    q[1] = cj*ss + sj*cc
+    q[2] = cj*cs - sj*sc
+    q[3] = cj*cc + sj*ss
+
+    return q

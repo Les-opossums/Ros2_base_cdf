@@ -2,7 +2,7 @@
 
 from geometry_msgs.msg import Point
 from cdf_msgs.msg import LidarLoc
-
+import math
 
 def publish_pose_from_lidar(robot_datas) -> None:
     """Publish datas get from lidar."""
@@ -14,7 +14,7 @@ def publish_pose_from_lidar(robot_datas) -> None:
     rdatas.robot_position.y = (
         int(value_approx * robot_datas["position"][1]) / value_approx
     )
-    rdatas.robot_position.z = robot_datas["position"][2]
+    rdatas.robot_position.z = robot_datas["position"][2] % (2 * math.pi) 
     rdatas.other_robot_position = []
     rdatas.balises = [
         Point(x=robot_datas["beacons"][0][0], y=robot_datas["beacons"][0][1]),
