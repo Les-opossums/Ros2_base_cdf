@@ -13,5 +13,15 @@ zynq_simu_node:
 
 mini_action_requester_node:
   ros__parameters:
+    simulation: False
     rcv_comm_topic: zync_raspi
     send_comm_topic: raspi_zync
+
+    cards_name: ["zynq"]
+    command_topic: command
+    feedback_command_topic: feedback_command
+    frequency: 10.
+    cards:
+      zynq:
+        port: '/dev/ttyUSB0'
+        baudrate: 115200
