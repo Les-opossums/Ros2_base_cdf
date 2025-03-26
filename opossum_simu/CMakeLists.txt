@@ -27,6 +27,7 @@ ament_python_install_package(${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
   scripts/zynq_simu.py
+  scripts/motor_simu.py
   scripts/mini_action_requester.py
   DESTINATION lib/${PROJECT_NAME}
 )

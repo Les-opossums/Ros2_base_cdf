@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-
 """Simulate the communication with the Zynq."""
 
-# Libraries import
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
@@ -11,58 +9,41 @@ from rclpy.executors import ExternalShutdownException
 from ament_index_python.packages import get_package_share_directory
 import os
 import yaml
-from opossum_simu.RobotState import RobotState
-import numpy as np
-import time
-
-# Msgs import
+from geometry_msgs.msg import Point
+from rclpy.action import ActionClient
+from cdf_msgs.srv import PosTrigger
+from cdf_msgs.action import MoveTo
 from std_msgs.msg import String
 
 
 class ZynqSimulation(Node):
     """Simulate the communication between the zynq and the raspi."""
 
-    def __init__(self: Node) -> None:
-
+    def __init__(self) -> None:
+        super().__init__("zynq_simu_node")
+        # Declare parameters provided by the launch YAML (auto-declared)
         super().__init__("zynq_simu_node")
         self.declare_parameters(
             namespace="",
             parameters=[
-                # The 3 follwing are used to make sure the world positions well the robot
-                ("real_position_topic", rclpy.Parameter.Type.STRING),
-                ("trigger_position_srv", rclpy.Parameter.Type.STRING),
-                ("compute_period", rclpy.Parameter.Type.DOUBLE),
-                # Others represents the robot conditions
                 ("rcv_comm_topic", rclpy.Parameter.Type.STRING),
                 ("send_comm_topic", rclpy.Parameter.Type.STRING),
-                ("boundaries", rclpy.Parameter.Type.DOUBLE_ARRAY),
-                ("random_moves", rclpy.Parameter.Type.BOOL),
-                ("angular_velocity", rclpy.Parameter.Type.DOUBLE),
-                ("linear_velocity", rclpy.Parameter.Type.DOUBLE),
+                ("robot_components", rclpy.Parameter.Type.STRING_ARRAY),
             ],
         )
         self._init_parameters()
         self._init_subscribers()
         self._init_publishers()
+        self._init_action_clients()
+        self._init_service_clients()
         self.get_logger().info("ZYNQ simulation node initialized.")
 
     def _init_parameters(self: Node) -> None:
         """Initialise parameters of the node."""
-        is_random = self.get_parameter("random_moves").get_parameter_value().bool_value
-        angular_velocity = (
-            self.get_parameter("angular_velocity").get_parameter_value().double_value
-        )
-        linear_velocity = (
-            self.get_parameter("linear_velocity").get_parameter_value().double_value
-        )
-        boundaries = (
-            self.get_parameter("boundaries").get_parameter_value().double_array_value
-        )
-        self.compute_period = (
-            self.get_parameter("compute_period").get_parameter_value().double_value
-        )
-        self.robot_state = RobotState(
-            is_random, linear_velocity, angular_velocity, boundaries
+        self.robot_components = (
+            self.get_parameter("robot_components")
+            .get_parameter_value()
+            .string_array_value
         )
         msgs_path = os.path.join(get_package_share_directory("cdf_msgs"), "resources")
         self.timers_clb = {}
@@ -73,12 +54,9 @@ class ZynqSimulation(Node):
         with open(msgs_yaml_file, "r") as file:
             self.msgs_yaml = yaml.safe_load(file)
 
-    def _init_subscribers(self: Node) -> None:
-        """Initialise the subscribers of the node."""
-        self.rcv_comm_topic = (
-            self.get_parameter("rcv_comm_topic").get_parameter_value().string_value
-        )
-
+    def _init_subscribers(self) -> None:
+        """Initialize the subscribers of the node."""
+        self.rcv_comm_topic = self.get_parameter("rcv_comm_topic").value
         callback_group = ReentrantCallbackGroup()
         self.sub_comm_topic = self.create_subscription(
             String,
@@ -88,83 +66,147 @@ class ZynqSimulation(Node):
             callback_group=callback_group,
         )
 
-    def _init_publishers(self: Node) -> None:
+    def _init_publishers(self) -> None:
         """Initialize publishers of the node."""
-        self.send_comm_topic = (
-            self.get_parameter("send_comm_topic").get_parameter_value().string_value
-        )
+        self.send_comm_topic = self.get_parameter("send_comm_topic").value
         self.pub_comm_topic = self.create_publisher(String, self.send_comm_topic, 10)
 
-    def do_action_callback(self, msg):
-        """Do action needed corresponding to messages."""
-        self.get_logger().info(f"REQ: {msg.data}.")
+    def _init_action_clients(self):
+        """Initialize action clients of the node."""
+        callback_group = ReentrantCallbackGroup()
+        self.robot_client = {
+            component: ActionClient(
+                self, MoveTo, f"{component}/action_simu", callback_group=callback_group
+            )
+            for component in self.robot_components
+        }
+
+    def _init_service_clients(self):
+        """Initialize service clients of the node."""
+        callback_group = ReentrantCallbackGroup()
+        self.get_pos_simu_srv = self.create_client(
+            PosTrigger, "get_pos_simu", callback_group=callback_group
+        )
+        # Wait for the service asynchronously (or log warnings until it's available)
+        while not self.get_pos_simu_srv.wait_for_service(timeout_sec=1.0):
+            self.get_logger().warn("No position service available, retrying...")
+
+    def do_action_callback(self, msg: String):
+        """Handle an incoming command message and initiate the appropriate action/service call."""
+        self.get_logger().info(f"Received request: {msg.data}")
         parser = msg.data.split()
         name = parser[0]
-        args = parser[1:]
+        args_list = parser[1:]
         if name not in self.comm_yaml:
             self.get_logger().info(
-                f"The name {name} does not exists in the yaml file com_msgs."
+                f"The name {name} does not exist in the YAML file com_msgs."
             )
+            return
+
         order = self.comm_yaml[name]
         msg_type = order["send"]
         if msg_type not in self.msgs_yaml:
             self.get_logger().info(
-                f"The message type {msg_type} does not exists in the yaml file format_msgs."
+                f"The message type {msg_type} does not exist in the YAML file format_msgs."
             )
+            return
+
+        # Build args dictionary based on the expected structure.
+        # This assumes that the ordering in the YAML is correct.
         args = {
-            key: args[i]
+            key: args_list[i]
             for i, key in enumerate(self.msgs_yaml[msg_type]["struct"].keys())
         }
-        result = self.process_action(name, args)
-        if order["receive"] == "null":
-            return
-        command = name
-        msg_type_rcv = order["receive"]
-        for key in self.msgs_yaml[msg_type_rcv]["struct"].keys():
-            command += " " + str(result[key])
-        msg.data = command
-        self.pub_comm_topic.publish(msg)
+        self.get_logger().info("Processing action request")
+        self.process_action(name, args)
+        # Do not wait for a synchronous response here. The asynchronous callbacks below will handle the result.
 
     def process_action(self, name, args):
-        """Execute the action requested."""
+        """Execute the requested action asynchronously."""
         if name == "GETODOM":
-            if int(args["enable"]) == 1 and float(args["freq"]) != 0:
-                # self.timers["GETODOM"] = self.create_timer(args["freq"], self.get_odom())
-                pass
-            else:
-                pass
-            result = {
-                "x": float(self.robot_state.position[0].item()),
-                "y": float(self.robot_state.position[1].item()),
-                "t": self.robot_state.angle,
-            }
+            self.get_pos_robot()
         elif name == "MOVE":
-            obj = np.array([[float(args["x"])], [float(args["y"])], [float(args["t"])]])
-            real_time = time.time()
-            self.get_logger().info(f"{self.robot_state.angle}")
-            self.get_logger().info(f"{float(obj[2].item())}")
-            while (
-                np.linalg.norm(self.robot_state.position[:2] - obj[:2]) > 0.005
-                or abs(self.robot_state.angle - float(obj[2].item())) > 0.01
-            ):
-                self.robot_state.move(obj, real_time)
-                real_time = time.time()
-                time.sleep(self.compute_period)
-            result = {"is_done": True}
-        return result
+            self.send_motor_goal(float(args["x"]), float(args["y"]), float(args["t"]))
+        else:
+            self.get_logger().warn(f"Action {name} is not implemented.")
+
+    def send_motor_goal(self, x, y, t):
+        """Send goal for motors asynchronously."""
+        goal_msg = MoveTo.Goal()
+        goal_msg.goal = Point(x=x, y=y, z=t)
+        client = self.robot_client.get("motors")
+        if client is None:
+            self.get_logger().error("No action client found for motors!")
+            return
+        if not client.wait_for_server(timeout_sec=5.0):
+            self.get_logger().error("Motor action server not available!")
+            return
+
+        self.get_logger().info(f"Sending motor goal: x={x}, y={y}, t={t}")
+        future = client.send_goal_async(goal_msg)
+        # Add a done callback so the node doesn't block here
+        future.add_done_callback(self.handle_motor_result)
+
+    def handle_motor_result(self, future):
+        """Handle the result from the motor action asynchronously."""
+        try:
+            result_response = future.result()
+            # Check if goal was accepted
+            if not result_response.accepted:
+                self.get_logger().error("Motor action goal was rejected!")
+                return
+
+            # Now wait for the result asynchronously:
+            result_future = result_response.get_result_async()
+            result_future.add_done_callback(self.handle_motor_action_result)
+        except Exception as e:
+            self.get_logger().error(f"Motor action send failed: {e}")
+
+    def handle_motor_action_result(self, future):
+        """Process the final result of the motor action."""
+        try:
+            result = future.result().result
+            self.get_logger().info(f"Motor action result: {result}")
+            # Optionally publish the result message on a topic
+            result_msg = String()
+            result_msg.data = f"MOVE 1"
+            self.pub_comm_topic.publish(result_msg)
+        except Exception as e:
+            self.get_logger().error(f"Failed to get motor action result: {e}")
+
+    def get_pos_robot(self):
+        """Call a service to get the robot's position asynchronously."""
+        self.get_logger().info("Requesting robot position (GETODOM)")
+        req = PosTrigger.Request()
+        future = self.get_pos_simu_srv.call_async(req)
+        future.add_done_callback(self.handle_get_pos_result)
+
+    def handle_get_pos_result(self, future):
+        """Handle the result from the GETODOM service asynchronously."""
+        try:
+            res = future.result().pos
+            result = {"x": res.x, "y": res.y, "t": res.z}
+            self.get_logger().info(f"GETODOM result: {result}")
+            # Optionally publish a message with the result
+            result_msg = String()
+            result_msg.data = f"GETODOM {res.x} {res.y} {res.z}"
+            self.pub_comm_topic.publish(result_msg)
+        except Exception as e:
+            self.get_logger().error(f"GETODOM service call failed: {e}")
 
 
 def main(args=None):
-    """Spin main loop."""
     rclpy.init(args=args)
-    zynq_comm_simu_node = ZynqSimulation()
+    node = ZynqSimulation()
     executor = MultiThreadedExecutor()
     try:
-        rclpy.spin(zynq_comm_simu_node, executor=executor)
-    except (KeyboardInterrupt, ExternalShutdownException):
-        pass
+        rclpy.spin(node, executor=executor)
+    except (KeyboardInterrupt) as e:
+        node.get_logger().info("KeyboardInterrupt, shutting down node.")
+    except Exception as e:
+        node.get_logger().error(f"Exception in spin: {e}")
     finally:
-        zynq_comm_simu_node.destroy_node()
+        node.destroy_node()
         rclpy.shutdown()
 
 

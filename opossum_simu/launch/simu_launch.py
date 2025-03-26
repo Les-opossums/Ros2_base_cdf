@@ -27,8 +27,16 @@ def generate_launch_description():
         parameters=[config],
     )
 
+    node_motor_simu = Node(
+        package="opossum_simu",
+        executable="motor_simu.py",
+        name="motor_simu_node",
+        parameters=[config],
+    )
+
     ld.add_action(node_mini_action_requester)
     ld.add_action(node_zynq_simu)
+    ld.add_action(node_motor_simu)
 
     print(LaunchIntrospector().format_launch_description(ld))
     return ld
