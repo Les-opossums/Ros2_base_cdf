@@ -4,8 +4,6 @@
 import sys
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Point
-from orchestrator_gui.qt_interface import MyWidget
 from PyQt5 import QtWidgets, QtGui, QtCore
 from ament_index_python.packages import get_package_share_directory
 import os
@@ -17,7 +15,7 @@ from std_msgs.msg import String
 import functools
 
 
-class MyROSNode(Node):
+class NodeGUI(Node):
     """Make the link between interface and ROS messages."""
 
     def __init__(self, parent=None):
@@ -60,7 +58,6 @@ class MyROSNode(Node):
             self.get_parameter("position_topic").get_parameter_value().string_value
         )
         for name in self.robot_names:
-            self.get_logger().info(f"NAMES: {name + '/' + self.position_topic}")
             self.create_subscription(
                 LidarLoc,
                 name + "/" + self.position_topic,
@@ -78,39 +75,22 @@ class MyROSNode(Node):
             for name in self.robot_names
         }
 
-    def publish_command(self, x, y, name):
+    def publish_command(self, x, y, theta, name):
         """Publish the command for the robot."""
         command_msg = String()
-        command = "MOVE " + str(x) + " " + str(y) + " " + "0.0"
+        command = "MOVE " + str(x) + " " + str(y) + " " + str(theta)
         command_msg.data = command
         self.pub_command[name].publish(command_msg)
 
-    def send_goal(self, x, y, name):
-        """Send goal to the action server."""
-        goal_msg = MoveTo.Goal()
-        goal_msg.goal = Point()
-        goal_msg.goal.x = x
-        goal_msg.goal.y = y
-        goal_msg.goal.z = 0.0
-        self.moveto_client[name].wait_for_server()
-
-        return self.moveto_client[name].send_goal_async(goal_msg)
-
-    def send_future_position(self, x, y, name):
-        """Send future position."""
-        future = self.send_goal(x, y, name)
-        rclpy.spin_until_future_complete(self, future)
-
     def position_callback(self, msg, name):
         """Receive the last known information and display it."""
-        self.get_logger().info(f"THE CURENT valeu for {name} is {msg}")
         self.parent.update_robot_position(msg, name)
 
 
-class MapViewRosConnected(QtWidgets.QGraphicsView):
+class MapScene(QtWidgets.QGraphicsView):
     """Connect to ROS and display information of a robot."""
 
-    def __init__(self, name, parent=None):
+    def __init__(self, name, parent=None, use_map=True):
         super().__init__()
         self.parent = parent
         self.name = name
@@ -127,9 +107,10 @@ class MapViewRosConnected(QtWidgets.QGraphicsView):
         # Chargement de l'image de la carte
         self.map_pixmap = QtGui.QPixmap(map).scaled(800, 800, QtCore.Qt.KeepAspectRatio)
         self.map_item = QtWidgets.QGraphicsPixmapItem(self.map_pixmap)
-        self.map_item.mousePressEvent = lambda event: self.send_pos_goal(
-            event, self.name
-        )
+        if use_map:
+            self.map_item.mousePressEvent = lambda event: self.send_pos_goal(
+                event, self.name
+            )
         self.scene.addItem(self.map_item)
 
         # Chargement de l'icône et ajout d'un item déplaçable
@@ -155,7 +136,7 @@ class MapViewRosConnected(QtWidgets.QGraphicsView):
     def send_pos_goal(self, event, name):
         """Send the goal position on the button click."""
         x, y = self.get_real_pos(event.pos().x(), event.pos().y())
-        self.parent.send_future_position(x, y, name)
+        self.parent.send_future_position(x, y, 0.0, name)
 
     def get_real_pos(self, x, y):
         """Convert the position on the map to real world."""
@@ -165,7 +146,7 @@ class MapViewRosConnected(QtWidgets.QGraphicsView):
         return 3 * x / width, 2 * (1 - y / height)
 
     @QtCore.pyqtSlot(LidarLoc)
-    def update_robot_position(self, msg):
+    def update_map_position(self, msg):
         """Update the robot position."""
         map_rect = self.map_item.boundingRect()
         width = map_rect.width()
@@ -212,55 +193,195 @@ class DraggablePixmapItem(QtWidgets.QGraphicsPixmapItem):
         self.setTransformOriginPoint(pixmap.width() / 2, pixmap.height() / 2)
 
 
+class GlobalViewPage(QtWidgets.QWidget):
+    """Display Global State."""
+
+    def __init__(self, name, parent=None):
+        super().__init__()
+        self.parent = parent
+        self.name = name
+        main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.map_scene = MapScene(name, self.parent)
+        form_layout = QtWidgets.QFormLayout()
+
+        # Create QLabel objects for the static labels (the keys)
+        # and QLabel objects for the dynamic values.
+        self.x_value_label = QtWidgets.QLabel("0.0")
+        self.y_value_label = QtWidgets.QLabel("0.0")
+        self.t_value_label = QtWidgets.QLabel("0.0")
+
+        # Add rows to the layout: each row has a static label and a value label.
+        form_layout.addRow("x:", self.x_value_label)
+        form_layout.addRow("y:", self.y_value_label)
+        form_layout.addRow("theta:", self.t_value_label)
+        main_layout.addWidget(self.map_scene)
+        main_layout.addLayout(form_layout)
+        # self.setLayout(main_layout)
+
+    def update_text_position(self, msg):
+        """Update the text of the dynamic labels."""
+        self.x_value_label.setText(f"{msg.robot_position.x:.2f}")
+        self.y_value_label.setText(f"{msg.robot_position.y:.2f}")
+        self.t_value_label.setText(f"{msg.robot_position.z:.2f}")
+
+    def update_map_position(self, msg):
+        """Update the map of the robots."""
+        self.map_scene.update_map_position(msg)
+
+
+class MotorsPage(QtWidgets.QWidget):
+    """Page dedicated for Motors."""
+
+    def __init__(self, name, parent=None):
+        super().__init__()
+        self.parent = parent
+        self.name = name
+        main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.map_scene = MapScene(name, self.parent)
+        form_layout = QtWidgets.QFormLayout()
+        grid_layout = QtWidgets.QGridLayout()
+        self.button = QtWidgets.QPushButton("Send Command")
+
+        # Create QLabel objects for the static labels (the keys)
+        # and QLabel objects for the dynamic values.
+        self.x_value_label = QtWidgets.QLabel("0.0")
+        self.y_value_label = QtWidgets.QLabel("0.0")
+        self.t_value_label = QtWidgets.QLabel("0.0")
+
+        # Create labels for each parameter
+        x_label = QtWidgets.QLabel("X (m):")
+        y_label = QtWidgets.QLabel("Y (m):")
+        theta_label = QtWidgets.QLabel("Theta (deg):")
+
+        # Create line edits for each parameter
+        self.x_edit = QtWidgets.QLineEdit(self)
+        self.x_edit.setPlaceholderText("Enter x value")
+        self.y_edit = QtWidgets.QLineEdit(self)
+        self.y_edit.setPlaceholderText("Enter y value")
+        self.theta_edit = QtWidgets.QLineEdit(self)
+        self.theta_edit.setPlaceholderText("Enter theta value")
+
+        # Place widgets in the grid
+        grid_layout.addWidget(x_label, 0, 0)
+        grid_layout.addWidget(self.x_edit, 0, 1)
+        grid_layout.addWidget(y_label, 1, 0)
+        grid_layout.addWidget(self.y_edit, 1, 1)
+        grid_layout.addWidget(theta_label, 2, 0)
+        grid_layout.addWidget(self.theta_edit, 2, 1)
+
+        self.button.clicked.connect(self.send_command)
+        self.x_edit.returnPressed.connect(self.y_edit.setFocus)
+        self.y_edit.returnPressed.connect(self.theta_edit.setFocus)
+        # For the last QLineEdit, trigger the button click when Enter is pressed.
+        self.theta_edit.returnPressed.connect(self.button.setFocus)
+
+        # Add rows to the layout: each row has a static label and a value label.
+        form_layout.addRow("X (m):", self.x_value_label)
+        form_layout.addRow("Y (m):", self.y_value_label)
+        form_layout.addRow("Theta (deg):", self.t_value_label)
+        main_layout.addWidget(self.map_scene)
+        main_layout.addLayout(form_layout)
+        main_layout.addLayout(grid_layout)
+        main_layout.addWidget(self.button)
+
+    def send_command(self):
+        """Send command to ROS."""
+        x = float(self.x_edit.text())
+        y = float(self.y_edit.text())
+        theta = float(self.theta_edit.text()) * np.pi / 180
+        self.parent.send_future_position(x, y, theta, self.name)
+
+    def update_text_position(self, msg):
+        """Update the text of the dynamic labels."""
+        self.x_value_label.setText(f"{msg.robot_position.x:.2f}")
+        self.y_value_label.setText(f"{msg.robot_position.y:.2f}")
+        self.t_value_label.setText(f"{msg.robot_position.z * 180 / np.pi:.2f}")
+
+    def update_map_position(self, msg):
+        """Update the map of the robots."""
+        self.map_scene.update_map_position(msg)
+
+
+class MainRobotPage(QtWidgets.QWidget):
+    """Page for ecah robot."""
+
+    def __init__(self, name, parent=None):
+        super().__init__()
+        self.parent = parent
+        self.name = name
+        self.components_names = QtWidgets.QComboBox()
+        self.components_names.addItems(
+            ["Global View", "Motors", "Servo", "Create Script"]
+        )
+        self.component_pages = {
+            "GlobalView": GlobalViewPage(name, self.parent),
+            "Motors": MotorsPage(name, self.parent),
+            "Servo": MapScene(name, self.parent),
+            "Create Script": MapScene(name, self.parent),
+        }
+        self.stackedWidgets = QtWidgets.QStackedWidget()
+        for val in self.component_pages.values():
+            self.stackedWidgets.addWidget(val)
+
+        self.components_names.currentIndexChanged.connect(self.change_page)
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.layout.addWidget(self.components_names)
+        self.layout.addWidget(self.stackedWidgets)
+
+    def change_page(self, index):
+        """Change the page."""
+        self.stackedWidgets.setCurrentIndex(index)
+
+    def update_robot_position(self, msg):
+        """Update robot position in every layout."""
+        self.component_pages["GlobalView"].update_map_position(msg)
+        self.component_pages["GlobalView"].update_text_position(msg)
+        self.component_pages["Motors"].update_map_position(msg)
+        self.component_pages["Motors"].update_text_position(msg)
+
+
 # Fenêtre Qt avec un label à mettre à jour
-class MyWindow(QtWidgets.QMainWindow):
+class OrchestratorGUI(QtWidgets.QMainWindow):
     """Display all the information and master interface."""
 
     def __init__(self):
         super().__init__()
-        self.p2 = {}
-        self.ros_node = MyROSNode(self)
-        self.p2 = {
-            name: MapViewRosConnected(name, self) for name in self.ros_node.robot_names
-        }
+        # Set main characteristics
+        self.setWindowTitle("Orchestrator GUI")
+        self.setGeometry(0, 0, 1000, 800)
 
-        self.setWindowTitle("Subscriber ROS2 - Mise à jour d'un texte")
-        self.setGeometry(0, 0, 800, 500)
-        # self.setGeometry(0, 0, 1900, 1040)
+        # ROS connection
+        self.gui_node = NodeGUI(self)
+
+        # GUI for each robot
+        self.page_name_box = QtWidgets.QComboBox()
+        self.page_name_box.addItems([name for name in self.gui_node.robot_names])
+        self.robot_pages = {
+            name: MainRobotPage(name, self) for name in self.gui_node.robot_names
+        }
+        self.stackedWidgets = QtWidgets.QStackedWidget()
+        for val in self.robot_pages.values():
+            self.stackedWidgets.addWidget(val)
+
+        self.page_name_box.currentIndexChanged.connect(self.change_page)
 
         central_widget = QtWidgets.QWidget()
         self.setCentralWidget(central_widget)
         self.layout = QtWidgets.QVBoxLayout(central_widget)
-        self.stackedWidgets = QtWidgets.QStackedWidget()
-
-        # Add Pages for need
-        self.comboBox = QtWidgets.QComboBox()
-        self.pageComboBox = QtWidgets.QComboBox()
-        self.comboBox.addItems(["Page 1"] + [key for key in self.p2.keys()])
-        self.comboBox.currentIndexChanged.connect(self.change_page)
-
-        p1 = MyWidget("Heyooo")
-        self.pages = [p1] + [val for val in self.p2.values()]
-
-        self.label = QtWidgets.QLabel("En attente de message...", self)
-
-        self.layout.addWidget(self.label)
-        self.layout.addWidget(self.comboBox)
+        self.layout.addWidget(self.page_name_box)
         self.layout.addWidget(self.stackedWidgets)
 
-        self.stackedWidgets.addWidget(p1)
-        for val in self.p2.values():
-            self.stackedWidgets.addWidget(val)
         self._connect_to_ros()
 
     def update_robot_position(self, msg, name):
         """Update the position of the robot."""
-        self.p2[name].update_robot_position(msg)
+        self.robot_pages[name].update_robot_position(msg)
 
-    def send_future_position(self, x, y, name):
+    def send_future_position(self, x, y, theta, name):
         """Send the position request to node ROS."""
-        self.ros_node.publish_command(x, y, name)
-        # self.ros_node.send_future_position(x, y, name)
+        self.gui_node.publish_command(x, y, theta, name)
 
     def _connect_to_ros(self):
         """Connect ROS to interface."""
@@ -274,14 +395,14 @@ class MyWindow(QtWidgets.QMainWindow):
 
     def spin_ros(self):
         """Spin the ROS node."""
-        rclpy.spin_once(self.ros_node, timeout_sec=0.001)
+        rclpy.spin_once(self.gui_node, timeout_sec=0.001)
 
 
 def main():
     """Run main loop."""
     rclpy.init(args=None)
     app = QtWidgets.QApplication(sys.argv)
-    window = MyWindow()
+    window = OrchestratorGUI()
     window.show()
     app.exec_()
     rclpy.shutdown()

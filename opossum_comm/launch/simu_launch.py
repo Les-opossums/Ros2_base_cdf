@@ -12,7 +12,7 @@ def generate_launch_description():
     param_file = os.path.join(
         get_package_share_directory("opossum_comm"),
         "config",
-        "simu_comm.yaml",
+        "comm_params.yaml",
     )
 
     nodes = []

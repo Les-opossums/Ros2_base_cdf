@@ -38,7 +38,7 @@ class ZynqSimulation(Node):
         self._init_service_clients()
         self.get_logger().info("ZYNQ simulation node initialized.")
 
-    def _init_parameters(self: Node) -> None:
+    def _init_parameters(self):
         """Initialise parameters of the node."""
         self.robot_components = (
             self.get_parameter("robot_components")
