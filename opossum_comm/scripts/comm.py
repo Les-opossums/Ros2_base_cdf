@@ -37,7 +37,7 @@ class Communication(Node):
         self._init_parameters()
         self._init_publishers()
         self._init_subscribers()
-        self.get_logger().info("Beacon detector node initialized.")
+        self.get_logger().info("Communication node initialized.")
 
     def _init_parameters(self: Node) -> None:
         """Initialise parameters of the node."""
