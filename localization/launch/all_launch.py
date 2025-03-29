@@ -46,14 +46,6 @@ def generate_launch_description():
             parameters=[param_file],
         )
 
-        node_nav_simulation = Node(
-            namespace=key,
-            package="localization",
-            executable="nav_simulation.py",
-            name="nav_simulation_node",
-            parameters=[param_file],
-        )
-
         node_beacon_detector = Node(
             namespace=key,
             package="localization",
@@ -62,6 +54,5 @@ def generate_launch_description():
             parameters=[param_file],
         )
         nodes.append(node_lidar_simulation)
-        nodes.append(node_nav_simulation)
         nodes.append(node_beacon_detector)
     return LaunchDescription(nodes)

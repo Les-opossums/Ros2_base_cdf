@@ -1,30 +1,32 @@
-zynq_simu_node:
-  ros__parameters:
-    rcv_comm_topic: raspi_zync
-    send_comm_topic: zync_raspi
-    robot_components: ["motors"]
+main_robot:
+  zynq_simu_node:
+    ros__parameters:
+      rcv_comm_topic: raspi_zync
+      trigger_position_srv: trigger_position
+      send_comm_topic: zync_raspi
+      robot_components: ["motors"]
 
-motor_simu_node:
-  ros__parameters:
-    real_position_topic: real_position
-    trigger_position_srv: trigger_position
-    random_moves: False
-    boundaries:  [0.0, 3.0, 0.0, 2.0]
-    compute_period: 0.01
-    angular_velocity: 0.4
-    linear_velocity: 0.15
+  motor_simu_node:
+    ros__parameters:
+      real_position_topic: real_position
+      trigger_position_srv: trigger_position
+      random_moves: False
+      boundaries:  [0.0, 3.0, 0.0, 2.0]
+      compute_period: 0.01
+      angular_velocity: 0.4
+      linear_velocity: 0.15
 
-mini_action_requester_node:
-  ros__parameters:
-    simulation: True
-    rcv_comm_topic: zync_raspi
-    send_comm_topic: raspi_zync
+  communication_node:
+    ros__parameters:
+      simulation: True
+      rcv_comm_topic: zync_raspi
+      send_comm_topic: raspi_zync
 
-    cards_name: ["zynq"]
-    command_topic: command
-    feedback_command_topic: feedback_command
-    frequency: 10.
-    cards:
-      zynq:
-        port: '/dev/ttyUSB0'
-        baudrate: 115200
+      cards_name: ["zynq"]
+      command_topic: command
+      feedback_command_topic: feedback_command
+      frequency: 10.
+      cards:
+        zynq:
+          port: '/dev/ttyUSB0'
+          baudrate: 115200

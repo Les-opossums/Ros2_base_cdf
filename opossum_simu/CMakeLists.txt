@@ -10,6 +10,9 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
+find_package(opossum_comm REQUIRED)
+find_package(localization REQUIRED)
+find_package(orchestrator_gui REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(cdf_msgs REQUIRED)
 
@@ -28,7 +31,6 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   scripts/zynq_simu.py
   scripts/motor_simu.py
-  scripts/mini_action_requester.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

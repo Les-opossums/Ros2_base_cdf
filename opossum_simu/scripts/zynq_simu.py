@@ -5,7 +5,6 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
-from rclpy.executors import ExternalShutdownException
 from ament_index_python.packages import get_package_share_directory
 import os
 import yaml
@@ -28,6 +27,7 @@ class ZynqSimulation(Node):
             parameters=[
                 ("rcv_comm_topic", rclpy.Parameter.Type.STRING),
                 ("send_comm_topic", rclpy.Parameter.Type.STRING),
+                ("trigger_position_srv", rclpy.Parameter.Type.STRING),
                 ("robot_components", rclpy.Parameter.Type.STRING_ARRAY),
             ],
         )
@@ -84,8 +84,13 @@ class ZynqSimulation(Node):
     def _init_service_clients(self):
         """Initialize service clients of the node."""
         callback_group = ReentrantCallbackGroup()
+        trigger_position_srv = (
+            self.get_parameter("trigger_position_srv")
+            .get_parameter_value()
+            .string_value
+        )
         self.get_pos_simu_srv = self.create_client(
-            PosTrigger, "get_pos_simu", callback_group=callback_group
+            PosTrigger, trigger_position_srv, callback_group=callback_group
         )
         # Wait for the service asynchronously (or log warnings until it's available)
         while not self.get_pos_simu_srv.wait_for_service(timeout_sec=1.0):
@@ -169,7 +174,7 @@ class ZynqSimulation(Node):
             self.get_logger().info(f"Motor action result: {result}")
             # Optionally publish the result message on a topic
             result_msg = String()
-            result_msg.data = f"MOVE 1"
+            result_msg.data = "MOVE 1"
             self.pub_comm_topic.publish(result_msg)
         except Exception as e:
             self.get_logger().error(f"Failed to get motor action result: {e}")
@@ -196,13 +201,14 @@ class ZynqSimulation(Node):
 
 
 def main(args=None):
+    """Run the main loop."""
     rclpy.init(args=args)
     node = ZynqSimulation()
     executor = MultiThreadedExecutor()
     try:
         rclpy.spin(node, executor=executor)
     except (KeyboardInterrupt) as e:
-        node.get_logger().info("KeyboardInterrupt, shutting down node.")
+        node.get_logger().info(f"KeyboardInterrupt, shutting down node: {e}.")
     except Exception as e:
         node.get_logger().error(f"Exception in spin: {e}")
     finally:

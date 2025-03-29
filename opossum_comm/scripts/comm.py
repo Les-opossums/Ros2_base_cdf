@@ -6,7 +6,6 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import ExternalShutdownException
 from ament_index_python.packages import get_package_share_directory
 import os
@@ -49,7 +48,7 @@ class Communication(Node):
             self.comm_yaml = yaml.safe_load(file)
         with open(msgs_yaml_file, "r") as file:
             self.msgs_yaml = yaml.safe_load(file)
-        self.default_exec = MutuallyExclusiveCallbackGroup()
+        self.default_exec = MultiThreadedExecutor()
         self.simulation = (
             self.get_parameter("simulation").get_parameter_value().bool_value
         )
@@ -98,14 +97,14 @@ class Communication(Node):
             self.sub_comm_topic = self.create_subscription(
                 String,
                 self.rcv_comm_topic,
-                self.result_card_simu,
+                self.read_card_simu,
                 10,
             )
             self.sub_command = self.create_subscription(
                 String, command_topic, self.send_card_simu, 10
             )
         else:
-            self.read_timer = self.create_timer(1 / self.freq, self.read_cards)
+            self.read_timer = self.create_timer(1 / self.frequency, self.read_card)
             # Currently, only one card, so we have name = first card name
             name = list(self.cards.keys())[0]
             self.sub_command = self.create_subscription(
@@ -136,19 +135,22 @@ class Communication(Node):
             self.get_logger().info("trying to connect to %s" % name)
             try:
                 tested_serial = serial.Serial(
-                    "/dev/" + self.cards[name]["port"],
+                    self.cards[name]["port"],
                     self.cards[name]["baudrate"],
                     timeout=0,
                     write_timeout=0,
                 )
                 tested_serial.write("VERSION\n".encode("utf-8"))
-
                 rclpy.spin_once(self, timeout_sec=0.2, executor=self.default_exec)
-
                 all_data = tested_serial.read(tested_serial.in_waiting).decode("utf-8")
+                self.get_logger().info(f"All data: {all_data}")
+                self.get_logger().info(f"Name: {name}")
                 for line in all_data.split("\n"):
                     splited = line.split(",")
-                    if splited[0] == "version" and splited[1] == name:
+                    if (
+                        splited[0].lower() == "version"
+                        and splited[1][1:].lower() == name
+                    ):
                         return tested_serial
                     else:
                         raise ValueError("unknown card type")
@@ -167,7 +169,7 @@ class Communication(Node):
         """Send the received message frome ActionSequencer to real card."""
         self.cards[name]["serial"].write((msg.data + "\n").encode("utf-8"))
 
-    def read_cards(self):
+    def read_card(self):
         """Read the messages that could have been sent by the Zynq."""
         try:
             for name in self.cards.keys():
@@ -175,6 +177,7 @@ class Communication(Node):
                 char_available = serial_card.in_waiting
                 if char_available != 0:
                     received_data = str(serial_card.read(char_available).decode("UTF8"))
+                    self.get_logger().info(f"Received_data: {received_data}")
                     try:
                         data_sequences = received_data.split("\n")
                     except Exception:
@@ -186,7 +189,7 @@ class Communication(Node):
         except Exception as e:
             self.get_logger().error("Unhandled Exception : %s" % e)
 
-    def result_card_simu(self, msg):
+    def read_card_simu(self, msg):
         """Look at the result of the command send in simulation."""
         parser = msg.data.split()
         name = parser[0]

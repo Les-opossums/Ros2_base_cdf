@@ -13,6 +13,7 @@ import numpy as np
 from rclpy.action import ActionClient
 from cdf_msgs.action import MoveTo
 from cdf_msgs.msg import LidarLoc
+from std_msgs.msg import String
 import functools
 
 
@@ -23,6 +24,7 @@ class MyROSNode(Node):
         super().__init__("gui_node")
         self.parent = parent
         self._init_parameters()
+        self._init_publishers()
         self._init_subscriber()
         self._init_client_action()
         self.get_logger().info("Orchestrator GUI node initialized.")
@@ -34,6 +36,7 @@ class MyROSNode(Node):
             parameters=[
                 ("position_topic", rclpy.Parameter.Type.STRING),
                 ("moveto_action", rclpy.Parameter.Type.STRING),
+                ("command_topic", rclpy.Parameter.Type.STRING),
                 ("robot_names", rclpy.Parameter.Type.STRING_ARRAY),
             ],
         )
@@ -41,12 +44,23 @@ class MyROSNode(Node):
             self.get_parameter("robot_names").get_parameter_value().string_array_value
         )
 
+    def _init_publishers(self):
+        """Initialize subscribers of the node."""
+        self.command_topic = (
+            self.get_parameter("command_topic").get_parameter_value().string_value
+        )
+        self.pub_command = {
+            name: self.create_publisher(String, name + "/" + self.command_topic, 10)
+            for name in self.robot_names
+        }
+
     def _init_subscriber(self):
         """Initialize subscribers of the node."""
         self.position_topic = (
             self.get_parameter("position_topic").get_parameter_value().string_value
         )
         for name in self.robot_names:
+            self.get_logger().info(f"NAMES: {name + '/' + self.position_topic}")
             self.create_subscription(
                 LidarLoc,
                 name + "/" + self.position_topic,
@@ -63,6 +77,13 @@ class MyROSNode(Node):
             name: ActionClient(self, MoveTo, name + "/" + self.moveto_action)
             for name in self.robot_names
         }
+
+    def publish_command(self, x, y, name):
+        """Publish the command for the robot."""
+        command_msg = String()
+        command = "MOVE " + str(x) + " " + str(y) + " " + "0.0"
+        command_msg.data = command
+        self.pub_command[name].publish(command_msg)
 
     def send_goal(self, x, y, name):
         """Send goal to the action server."""
@@ -82,6 +103,7 @@ class MyROSNode(Node):
 
     def position_callback(self, msg, name):
         """Receive the last known information and display it."""
+        self.get_logger().info(f"THE CURENT valeu for {name} is {msg}")
         self.parent.update_robot_position(msg, name)
 
 
@@ -237,7 +259,8 @@ class MyWindow(QtWidgets.QMainWindow):
 
     def send_future_position(self, x, y, name):
         """Send the position request to node ROS."""
-        self.ros_node.send_future_position(x, y, name)
+        self.ros_node.publish_command(x, y, name)
+        # self.ros_node.send_future_position(x, y, name)
 
     def _connect_to_ros(self):
         """Connect ROS to interface."""

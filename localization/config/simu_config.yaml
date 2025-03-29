@@ -9,6 +9,7 @@ orchestrator_gui_node:
   ros__parameters:
     position_topic: position_out
     moveto_action: moveto
+    command_topic: command
 
 tf_broadcaster_node:
   ros__parameters:
@@ -53,7 +54,7 @@ main_robot:
       use_lidar_points: true
       lidar_range: 10.
       radius: 0.05
-      num_points: 720
+      num_points: 360
       angle_info: [0., 360.]
 
   nav_simulation_node:
@@ -90,7 +91,6 @@ main_robot:
       radius_enlargement: 0.05
       max_x_range: 4.0
       max_y_range: 4.0
-      circles_from_visibles: False
 
       frame_id: laser_frame
 
@@ -137,7 +137,7 @@ main_robot:
 #       compute_period: 0.01
 #       angular_velocity: 0.4
 #       linear_velocity: 0.15
-  
+
 #   obstacle_extractor_node:
 #     ros__parameters:
 #       active: True

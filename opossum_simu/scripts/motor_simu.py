@@ -19,7 +19,7 @@ import threading
 import collections
 
 
-class NavSimulation(Node):
+class MotorSimu(Node):
     """Simulate the state of the robot and receives the actions for navigation only."""
 
     def __init__(self):
@@ -86,8 +86,7 @@ class NavSimulation(Node):
             self.moveto_server = ActionServer(
                 self,
                 MoveTo,
-                # self.get_namespace() + "/motors/action_simu",
-                "/motors/action_simu",
+                "motors/action_simu",
                 self.execute_callback,
                 handle_accepted_callback=self.handle_accepted_callback,
                 goal_callback=self.goal_callback,
@@ -99,8 +98,13 @@ class NavSimulation(Node):
 
     def _init_services(self):
         """Init services of the node."""
+        trigger_position_srv = (
+            self.get_parameter("trigger_position_srv")
+            .get_parameter_value()
+            .string_value
+        )
         self.srv_trigger_position = self.create_service(
-            PosTrigger, "get_pos_simu", self._send_position
+            PosTrigger, trigger_position_srv, self._send_position
         )
 
     def _send_position(self, request, response):
@@ -247,7 +251,7 @@ class NavSimulation(Node):
 def main(args=None):
     """Spin main loop."""
     rclpy.init(args=args)
-    nav_simu_node = NavSimulation()
+    nav_simu_node = MotorSimu()
     executor = MultiThreadedExecutor()
     try:
         rclpy.spin(nav_simu_node, executor=executor)
