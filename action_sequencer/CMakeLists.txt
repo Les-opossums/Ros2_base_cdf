@@ -27,7 +27,6 @@ ament_python_install_package(${PROJECT_NAME})
 
 install(PROGRAMS
   scripts/action_sequencer_node.py
-  scripts/action_manager.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
