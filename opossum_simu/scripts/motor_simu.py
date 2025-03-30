@@ -12,7 +12,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 # Import des messages
-from cdf_msgs.action import MoveTo
+from cdf_msgs.action import StringAction
 from cdf_msgs.srv import StringReq
 from geometry_msgs.msg import Point
 import threading
@@ -85,7 +85,7 @@ class MotorSimu(Node):
         if not self.random_moves:
             self.moveto_server = ActionServer(
                 self,
-                MoveTo,
+                StringAction,
                 "motors/action_simu",
                 self.execute_callback,
                 handle_accepted_callback=self.handle_accepted_callback,
@@ -155,69 +155,89 @@ class MotorSimu(Node):
 
     def execute_callback(self, goal_handle):
         """Execute the actions."""
-        try:
-            self.real_time = time.time()
-            self.preempt_request = False
-            self.current_goal_handle = goal_handle
-            reached_position = (
-                self.position[0] == goal_handle.request.goal.x
-                and self.position[1] == goal_handle.request.goal.y
-                and self.angle == goal_handle.request.goal.z
-            )
+        req = goal_handle.request.data.split(",")
+        name = req[0]
+        args = req[1:]
+        if name.upper() == "MOVE":
             self.obj = np.array(
                 [
-                    goal_handle.request.goal.x,
-                    goal_handle.request.goal.y,
-                    goal_handle.request.goal.z,
+                    float(args[0]),
+                    float(args[1]),
+                    float(args[2]),
                 ]
             )
-            moveto_feedback = MoveTo.Feedback()
-            moveto_feedback.current_position.x = float(self.position[0].item())
-            moveto_feedback.current_position.y = float(self.position[1].item())
-            moveto_feedback.current_position.z = float(self.angle)
-            while not reached_position:
-                if goal_handle.is_cancel_requested:
-                    goal_handle.canceled()
-                    return MoveTo.Result()
-                if not self.blocking:
-                    if not goal_handle.is_active:
-                        return MoveTo.Result()
-                self._ordered_moves()
-                moveto_feedback.current_position.x = float(self.position[0].item())
-                moveto_feedback.current_position.y = float(self.position[1].item())
-                moveto_feedback.current_position.z = float(self.angle)
-                reached_position = (
-                    self.position[0] == goal_handle.request.goal.x
-                    and self.position[1] == goal_handle.request.goal.y
-                    and self.angle == goal_handle.request.goal.z
-                )
+            try:
                 self.real_time = time.time()
-                self.pub_real_position.publish(moveto_feedback.current_position)
-                time.sleep(self.compute_period)
-            if not self.blocking:
-                with self._goal_lock:
-                    if not goal_handle.is_active:
-                        return MoveTo.Result()
-                    goal_handle.succeed()
-            else:
-                goal_handle.succeed()
-            result = MoveTo.Result()
-            result.result.x = moveto_feedback.current_position.x
-            result.result.y = moveto_feedback.current_position.y
-            result.result.z = moveto_feedback.current_position.z
-            return result
-        finally:
-            if self.blocking:
-                with self._goal_queue_lock:
-                    try:
-                        # Start execution of the next goal in the queue.
-                        self._current_goal = self._goal_queue.popleft()
-                        self._current_goal.execute()
-                    except IndexError:
-                        # No goal in the queue.
-                        self._current_goal = None
+                self.preempt_request = False
+                self.current_goal_handle = goal_handle
 
-    def _randomize_position(self) -> Point:
+                reached_position = (
+                    self.position[0] == self.obj[0]
+                    and self.position[1] == self.obj[1]
+                    and self.angle == self.obj[2]
+                )
+
+                moveto_feedback = StringAction.Feedback()
+                moveto_feedback.current_state = (
+                    "MOVE,"
+                    + str(self.position[0].item())
+                    + ","
+                    + str(self.position[1].item())
+                    + ","
+                    + str(self.angle)
+                )
+                while not reached_position:
+                    if goal_handle.is_cancel_requested:
+                        goal_handle.canceled()
+                        return StringAction.Result()
+                    if not self.blocking:
+                        if not goal_handle.is_active:
+                            return StringAction.Result()
+                    self._ordered_moves()
+                    moveto_feedback.current_state = (
+                        "MOVE,"
+                        + str(self.position[0].item())
+                        + ","
+                        + str(self.position[1].item())
+                        + ","
+                        + str(self.angle)
+                    )
+                    reached_position = (
+                        self.position[0] == self.obj[0]
+                        and self.position[1] == self.obj[1]
+                        and self.angle == self.obj[2]
+                    )
+                    self.real_time = time.time()
+                    self.pub_real_position.publish(
+                        Point(
+                            x=float(self.position[0].item()),
+                            y=float(self.position[1].item()),
+                            z=float(self.angle),
+                        )
+                    )
+                    time.sleep(self.compute_period)
+                if not self.blocking:
+                    with self._goal_lock:
+                        if not goal_handle.is_active:
+                            return StringAction.Result()
+                        goal_handle.succeed()
+                else:
+                    goal_handle.succeed()
+                result = StringAction.Result()
+                result.response = moveto_feedback.current_state
+                return result
+            finally:
+                if self.blocking:
+                    with self._goal_queue_lock:
+                        try:
+                            # Start execution of the next goal in the queue.
+                            self._current_goal = self._goal_queue.popleft()
+                            self._current_goal.execute()
+                        except IndexError:
+                            # No goal in the queue.
+                            self._current_goal = None
+
+    def _randomize_position(self):
         """Create random positions for init."""
         self.angle = np.random.uniform(0, 2 * np.pi)
         self.position = np.random.uniform(0, 2, (2, 1))

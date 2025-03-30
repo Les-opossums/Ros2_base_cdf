@@ -8,10 +8,9 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from ament_index_python.packages import get_package_share_directory
 import os
 import yaml
-from geometry_msgs.msg import Point
 from rclpy.action import ActionClient
 from cdf_msgs.srv import StringReq
-from cdf_msgs.action import MoveTo
+from cdf_msgs.action import StringAction
 from std_msgs.msg import String
 
 
@@ -49,6 +48,7 @@ class ZynqSimulation(Node):
         self.timers_clb = {}
         comm_yaml_file = os.path.join(msgs_path, "com_msgs.yaml")
         msgs_yaml_file = os.path.join(msgs_path, "format_msgs.yaml")
+        self.type_names = ["struct"]
         with open(comm_yaml_file, "r") as file:
             self.comm_yaml = yaml.safe_load(file)
         with open(msgs_yaml_file, "r") as file:
@@ -74,9 +74,12 @@ class ZynqSimulation(Node):
     def _init_action_clients(self):
         """Initialize action clients of the node."""
         callback_group = ReentrantCallbackGroup()
-        self.robot_client = {
+        self.robot_action_clients = {
             component: ActionClient(
-                self, MoveTo, f"{component}/action_simu", callback_group=callback_group
+                self,
+                StringAction,
+                f"{component}/action_simu",
+                callback_group=callback_group,
             )
             for component in self.robot_components
         }
@@ -115,9 +118,12 @@ class ZynqSimulation(Node):
 
         # Build args dictionary based on the expected structure.
         # This assumes that the ordering in the YAML is correct.
+        name_type = [
+            nt for nt in self.type_names if nt in self.msgs_yaml[msg_type].keys()
+        ][0]
         args = {
             key: args_list[i]
-            for i, key in enumerate(self.msgs_yaml[msg_type]["struct"].keys())
+            for i, key in enumerate(self.msgs_yaml[msg_type][name_type].keys())
         }
         self.process_action(name, args)
         # Do not wait for a synchronous response here. The asynchronous callbacks below will handle the result.
@@ -127,32 +133,28 @@ class ZynqSimulation(Node):
         if name == "GETODOM" or name == "SPEED":
             self.send_short_cmd_motor(name, args)
         elif name == "MOVE":
-            self.send_motor_goal(float(args["x"]), float(args["y"]), float(args["t"]))
+            self.send_long_cmd_motor(name, args)
         else:
             self.get_logger().warn(f"Action {name} is not implemented.")
 
-    def send_motor_goal(self, x, y, t):
+    # Actions handler
+    def send_long_cmd_motor(self, name, args):
         """Send goal for motors asynchronously."""
-        goal_msg = MoveTo.Goal()
-        goal_msg.goal = Point(x=x, y=y, z=t)
-        client = self.robot_client.get("motors")
+        goal = StringAction.Goal()
+        goal.data = name
+        for arg in args.values():
+            goal.data += "," + arg
+        client = self.robot_action_clients.get("motors")
         if client is None:
             self.get_logger().error("No action client found for motors!")
             return
         if not client.wait_for_server(timeout_sec=5.0):
             self.get_logger().error("Motor action server not available!")
             return
-        future = client.send_goal_async(goal_msg)
-        # Add a done callback so the node doesn't block here
-        future.add_done_callback(self.handle_motor_result)
+        future = client.send_goal_async(goal)
+        future.add_done_callback(self.handle_long_cmd_motor_result)
 
-    def send_speed_goal(self, x, y, t):
-        """Call a service to set robot asynchronously."""
-        req = StringReq.Request()
-        future = self.send_speed_simu_srv.call_async(req)
-        future.add_done_callback(self.handle_send_speed_result)
-
-    def handle_motor_result(self, future):
+    def handle_long_cmd_motor_result(self, future):
         """Handle the result from the motor action asynchronously."""
         try:
             result_response = future.result()
@@ -160,23 +162,25 @@ class ZynqSimulation(Node):
             if not result_response.accepted:
                 self.get_logger().error("Motor action goal was rejected!")
                 return
-
-            # Now wait for the result asynchronously:
             result_future = result_response.get_result_async()
-            result_future.add_done_callback(self.handle_motor_action_result)
+            result_future.add_done_callback(self.handle_long_motor_action_result)
         except Exception as e:
             self.get_logger().error(f"Motor action send failed: {e}")
 
-    def handle_motor_action_result(self, future):
+    def handle_long_motor_action_result(self, future):
         """Process the final result of the motor action."""
         try:
-            # Optionally publish the result message on a topic
+            res = future.result().result.response
+            if res == "":
+                return
+            res = " ".join(res.split(","))
             result_msg = String()
-            result_msg.data = "MOVE 1"
+            result_msg.data = res
             self.pub_comm_topic.publish(result_msg)
         except Exception as e:
             self.get_logger().error(f"Failed to get motor action result: {e}")
 
+    # Services handler
     def send_short_cmd_motor(self, name, args):
         """Call a service to get the robot's position asynchronously."""
         req = StringReq.Request()

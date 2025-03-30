@@ -7,7 +7,7 @@ from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
 
 # Import des messages
-from cdf_msgs.srv import PosTrigger
+from cdf_msgs.srv import StringReq
 from geometry_msgs.msg import Point
 from cdf_msgs.msg import PositionMap
 import functools
@@ -31,7 +31,7 @@ class PositionSender(Node):
             parameters=[
                 ("robot_names", rclpy.Parameter.Type.STRING_ARRAY),
                 ("real_position_topic", rclpy.Parameter.Type.STRING),
-                ("trigger_position_srv", rclpy.Parameter.Type.STRING),
+                ("short_motor_srv", rclpy.Parameter.Type.STRING),
                 ("update_period", rclpy.Parameter.Type.DOUBLE),
                 ("update_position_topic", rclpy.Parameter.Type.STRING),
             ],
@@ -77,22 +77,24 @@ class PositionSender(Node):
 
     def _init_clients(self):
         """Initialize clients of the node."""
-        self.trigger_position_srv = (
-            self.get_parameter("trigger_position_srv")
-            .get_parameter_value()
-            .string_value
+        self.short_motor_srv = (
+            self.get_parameter("short_motor_srv").get_parameter_value().string_value
         )
         for name in self.robot_names:
-            cli_trigger_position = self.create_client(
-                PosTrigger, name + "/" + self.trigger_position_srv
+            cli_motor_srv = self.create_client(
+                StringReq, name + "/" + self.short_motor_srv
             )
-            while not cli_trigger_position.wait_for_service(timeout_sec=1.0):
+            while not cli_motor_srv.wait_for_service(timeout_sec=1.0):
                 self.get_logger().warn(f"No position to update currently for {name}...")
-            req = PosTrigger.Request()
+            req = StringReq.Request()
+            req.data = "GETODOM,1,30.0"
             self.get_logger().info("Is it where it bugs?")
-            future = cli_trigger_position.call_async(req)
+            future = cli_motor_srv.call_async(req)
             rclpy.spin_until_future_complete(self, future)
-            self.current_pos[name] = future.result().pos
+            res = future.result().response.split(",")
+            self.current_pos[name] = Point(
+                x=float(res[1]), y=float(res[2]), z=float(res[3])
+            )
 
     def _update_pos(self, msg, name):
         """Update the position of the robot corresponding to the name."""

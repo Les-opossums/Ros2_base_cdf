@@ -3,7 +3,7 @@
 
 // #include "geometry_msgs/msg/point.hpp"
 #include "cdf_msgs/msg/position_map.hpp"
-#include "cdf_msgs/srv/pos_trigger.hpp"
+#include "cdf_msgs/srv/string_req.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 #include <string>
@@ -20,7 +20,7 @@ private:
   // Parameters
   std::vector<std::string> robot_names_;
   std::string real_position_topic_;
-  std::string trigger_position_srv_;
+  std::string short_motor_srv_;
   std::string update_position_topic_;
   double update_period_;
 

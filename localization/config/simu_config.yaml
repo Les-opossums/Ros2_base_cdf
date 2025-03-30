@@ -1,7 +1,7 @@
 position_sender_node:
   ros__parameters:
     real_position_topic: real_position
-    trigger_position_srv: trigger_position
+    short_motor_srv: short_motor
     update_position_topic: update_position
     update_period: 0.1
 
