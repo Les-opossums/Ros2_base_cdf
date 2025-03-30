@@ -13,7 +13,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 
 # Import des messages
 from cdf_msgs.action import MoveTo
-from cdf_msgs.srv import PosTrigger
+from cdf_msgs.srv import StringReq
 from geometry_msgs.msg import Point
 import threading
 import collections
@@ -38,7 +38,7 @@ class MotorSimu(Node):
             parameters=[
                 ("boundaries", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("real_position_topic", rclpy.Parameter.Type.STRING),
-                ("trigger_position_srv", rclpy.Parameter.Type.STRING),
+                ("short_motor_srv", rclpy.Parameter.Type.STRING),
                 ("random_moves", rclpy.Parameter.Type.BOOL),
                 ("compute_period", rclpy.Parameter.Type.DOUBLE),
                 ("angular_velocity", rclpy.Parameter.Type.DOUBLE),
@@ -98,20 +98,25 @@ class MotorSimu(Node):
 
     def _init_services(self):
         """Init services of the node."""
-        trigger_position_srv = (
-            self.get_parameter("trigger_position_srv")
-            .get_parameter_value()
-            .string_value
+        short_motor_srv = (
+            self.get_parameter("short_motor_srv").get_parameter_value().string_value
         )
-        self.srv_trigger_position = self.create_service(
-            PosTrigger, trigger_position_srv, self._send_position
+        self.srv_short_motor = self.create_service(
+            StringReq, short_motor_srv, self.response_callback
         )
 
-    def _send_position(self, request, response):
-        """Send position."""
-        response.pos.x = float(self.position[0].item())
-        response.pos.y = float(self.position[1].item())
-        response.pos.z = float(self.angle)
+    def response_callback(self, request, response):
+        """Answer to the request."""
+        request_split = request.data.split(",")
+        if request_split[0] == "GETODOM":
+            x = str(self.position[0].item())
+            y = str(self.position[1].item())
+            angle = str(self.angle)
+            response.response = request_split[0] + "," + x + "," + y + "," + angle
+        elif request_split[0] == "SPEED":
+            self.linear_velocity = float(request_split[1])
+            self.angle_velocity = float(request_split[3])
+            response.response = request_split[0] + "," + "1"
         return response
 
     def _single_handle_accepted_callback(self, goal_handle):

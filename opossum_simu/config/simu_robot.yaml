@@ -2,14 +2,14 @@ main_robot:
   zynq_simu_node:
     ros__parameters:
       rcv_comm_topic: raspi_zync
-      trigger_position_srv: trigger_position
+      short_motor_srv: short_motor
       send_comm_topic: zync_raspi
       robot_components: ["motors"]
 
   motor_simu_node:
     ros__parameters:
       real_position_topic: real_position
-      trigger_position_srv: trigger_position
+      short_motor_srv: short_motor
       random_moves: False
       boundaries:  [0.0, 3.0, 0.0, 2.0]
       compute_period: 0.01
@@ -35,14 +35,14 @@ ennemi_robot:
   zynq_simu_node:
     ros__parameters:
       rcv_comm_topic: raspi_zync
-      trigger_position_srv: trigger_position
+      short_motor_srv: short_motor
       send_comm_topic: zync_raspi
       robot_components: ["motors"]
 
   motor_simu_node:
     ros__parameters:
       real_position_topic: real_position
-      trigger_position_srv: trigger_position
+      short_motor_srv: short_motor
       random_moves: False
       boundaries:  [0.0, 3.0, 0.0, 2.0]
       compute_period: 0.01

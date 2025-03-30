@@ -8,8 +8,6 @@ from PyQt5 import QtWidgets, QtGui, QtCore
 from ament_index_python.packages import get_package_share_directory
 import os
 import numpy as np
-from rclpy.action import ActionClient
-from cdf_msgs.action import MoveTo
 from cdf_msgs.msg import LidarLoc
 from std_msgs.msg import String
 import functools
@@ -24,7 +22,6 @@ class NodeGUI(Node):
         self._init_parameters()
         self._init_publishers()
         self._init_subscriber()
-        self._init_client_action()
         self.get_logger().info("Orchestrator GUI node initialized.")
 
     def _init_parameters(self) -> None:
@@ -33,7 +30,6 @@ class NodeGUI(Node):
             namespace="",
             parameters=[
                 ("position_topic", rclpy.Parameter.Type.STRING),
-                ("moveto_action", rclpy.Parameter.Type.STRING),
                 ("command_topic", rclpy.Parameter.Type.STRING),
                 ("robot_names", rclpy.Parameter.Type.STRING_ARRAY),
             ],
@@ -65,20 +61,12 @@ class NodeGUI(Node):
                 10,
             )
 
-    def _init_client_action(self):
-        """Initialize client of the node."""
-        self.moveto_action = (
-            self.get_parameter("moveto_action").get_parameter_value().string_value
-        )
-        self.moveto_client = {
-            name: ActionClient(self, MoveTo, name + "/" + self.moveto_action)
-            for name in self.robot_names
-        }
-
-    def publish_command(self, x, y, theta, name):
+    def publish_command(self, name, command_name, args):
         """Publish the command for the robot."""
         command_msg = String()
-        command = "MOVE " + str(x) + " " + str(y) + " " + str(theta)
+        command = command_name.upper()
+        for arg in args:
+            command += " " + str(arg)
         command_msg.data = command
         self.pub_command[name].publish(command_msg)
 
@@ -108,9 +96,7 @@ class MapScene(QtWidgets.QGraphicsView):
         self.map_pixmap = QtGui.QPixmap(map).scaled(800, 800, QtCore.Qt.KeepAspectRatio)
         self.map_item = QtWidgets.QGraphicsPixmapItem(self.map_pixmap)
         if use_map:
-            self.map_item.mousePressEvent = lambda event: self.send_pos_goal(
-                event, self.name
-            )
+            self.map_item.mousePressEvent = lambda event: self.send_pos_goal(event)
         self.scene.addItem(self.map_item)
 
         # Chargement de l'icône et ajout d'un item déplaçable
@@ -133,10 +119,12 @@ class MapScene(QtWidgets.QGraphicsView):
         self.scene.addItem(self.icon_item)
         self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
 
-    def send_pos_goal(self, event, name):
+    def send_pos_goal(self, event):
         """Send the goal position on the button click."""
         x, y = self.get_real_pos(event.pos().x(), event.pos().y())
-        self.parent.send_future_position(x, y, 0.0, name)
+        command_name = "MOVE"
+        args = [x, y, 0.0]
+        self.parent.send_future_position(self.name, command_name, args)
 
     def get_real_pos(self, x, y):
         """Convert the position on the map to real world."""
@@ -202,7 +190,7 @@ class GlobalViewPage(QtWidgets.QWidget):
         self.name = name
         main_layout = QtWidgets.QVBoxLayout(self)
 
-        self.map_scene = MapScene(name, self.parent)
+        self.map_scene = MapScene(name, self.parent, use_map=False)
         form_layout = QtWidgets.QFormLayout()
 
         # Create QLabel objects for the static labels (the keys)
@@ -240,20 +228,28 @@ class MotorsPage(QtWidgets.QWidget):
         main_layout = QtWidgets.QVBoxLayout(self)
 
         self.map_scene = MapScene(name, self.parent)
-        form_layout = QtWidgets.QFormLayout()
         grid_layout = QtWidgets.QGridLayout()
         self.button = QtWidgets.QPushButton("Send Command")
 
         # Create QLabel objects for the static labels (the keys)
         # and QLabel objects for the dynamic values.
-        self.x_value_label = QtWidgets.QLabel("0.0")
-        self.y_value_label = QtWidgets.QLabel("0.0")
-        self.t_value_label = QtWidgets.QLabel("0.0")
+        self.x_value_label = QtWidgets.QLabel("--.--")
+        self.y_value_label = QtWidgets.QLabel("--.--")
+        self.t_value_label = QtWidgets.QLabel("--.--")
+        self.lin_vel_value_label = QtWidgets.QLabel("--.--")
+        self.ang_vel_value_label = QtWidgets.QLabel("--.--")
 
         # Create labels for each parameter
+        current_value_label_x = QtWidgets.QLabel("Current Value X:")
+        current_value_label_y = QtWidgets.QLabel("Current Value Y:")
+        current_value_label_t = QtWidgets.QLabel("Current Value Theta:")
+        current_value_label_lin_vel = QtWidgets.QLabel("Current Value Linear Vel:")
+        current_value_label_ang_vel = QtWidgets.QLabel("Current Value Angle Vel:")
         x_label = QtWidgets.QLabel("X (m):")
         y_label = QtWidgets.QLabel("Y (m):")
         theta_label = QtWidgets.QLabel("Theta (deg):")
+        lin_vel_label = QtWidgets.QLabel("Linear Vel (m/s):")
+        ang_vel_label = QtWidgets.QLabel("Angular Vel (deg/s):")
 
         # Create line edits for each parameter
         self.x_edit = QtWidgets.QLineEdit(self)
@@ -262,36 +258,64 @@ class MotorsPage(QtWidgets.QWidget):
         self.y_edit.setPlaceholderText("Enter y value")
         self.theta_edit = QtWidgets.QLineEdit(self)
         self.theta_edit.setPlaceholderText("Enter theta value")
+        self.lin_vel_edit = QtWidgets.QLineEdit(self)
+        self.lin_vel_edit.setPlaceholderText("Enter linear velocity value")
+        self.ang_vel_edit = QtWidgets.QLineEdit(self)
+        self.ang_vel_edit.setPlaceholderText("Enter angle velocity value")
 
         # Place widgets in the grid
         grid_layout.addWidget(x_label, 0, 0)
         grid_layout.addWidget(self.x_edit, 0, 1)
+        grid_layout.addWidget(current_value_label_x, 0, 2)
+        grid_layout.addWidget(self.x_value_label, 0, 3)
         grid_layout.addWidget(y_label, 1, 0)
         grid_layout.addWidget(self.y_edit, 1, 1)
+        grid_layout.addWidget(current_value_label_y, 1, 2)
+        grid_layout.addWidget(self.y_value_label, 1, 3)
         grid_layout.addWidget(theta_label, 2, 0)
         grid_layout.addWidget(self.theta_edit, 2, 1)
+        grid_layout.addWidget(current_value_label_t, 2, 2)
+        grid_layout.addWidget(self.t_value_label, 2, 3)
+        grid_layout.addWidget(lin_vel_label, 3, 0)
+        grid_layout.addWidget(self.lin_vel_edit, 3, 1)
+        grid_layout.addWidget(current_value_label_lin_vel, 3, 2)
+        grid_layout.addWidget(self.lin_vel_value_label, 3, 3)
+        grid_layout.addWidget(ang_vel_label, 4, 0)
+        grid_layout.addWidget(self.ang_vel_edit, 4, 1)
+        grid_layout.addWidget(current_value_label_ang_vel, 4, 2)
+        grid_layout.addWidget(self.ang_vel_value_label, 4, 3)
 
-        self.button.clicked.connect(self.send_command)
+        self.button.clicked.connect(self.send_motor_command)
         self.x_edit.returnPressed.connect(self.y_edit.setFocus)
         self.y_edit.returnPressed.connect(self.theta_edit.setFocus)
-        # For the last QLineEdit, trigger the button click when Enter is pressed.
         self.theta_edit.returnPressed.connect(self.button.setFocus)
 
-        # Add rows to the layout: each row has a static label and a value label.
-        form_layout.addRow("X (m):", self.x_value_label)
-        form_layout.addRow("Y (m):", self.y_value_label)
-        form_layout.addRow("Theta (deg):", self.t_value_label)
         main_layout.addWidget(self.map_scene)
-        main_layout.addLayout(form_layout)
         main_layout.addLayout(grid_layout)
         main_layout.addWidget(self.button)
 
-    def send_command(self):
+    def send_motor_command(self):
         """Send command to ROS."""
-        x = float(self.x_edit.text())
-        y = float(self.y_edit.text())
-        theta = float(self.theta_edit.text()) * np.pi / 180
-        self.parent.send_future_position(x, y, theta, self.name)
+        x = self.x_edit.text()
+        y = self.y_edit.text()
+        theta = self.theta_edit.text()
+        x = float(x) if x != "" else -1
+        y = float(y) if y != "" else -1
+        theta = float(theta) * np.pi / 180 if theta != "" else -1
+        if x != -1 or y != -1 or theta != -1:
+            command_name = "MOVE"
+            args = [x, y, theta]
+            self.parent.send_future_position(self.name, command_name, args)
+        lin_vel = self.lin_vel_edit.text()
+        ang_vel = self.ang_vel_edit.text()
+        lin_vel = float(lin_vel) if lin_vel != "" else -1
+        ang_vel = float(ang_vel) if ang_vel != "" else -1
+        if lin_vel != -1 or ang_vel != -1:
+            command_name = "SPEED"
+            args = [lin_vel, lin_vel, ang_vel]
+            self.parent.send_future_position(self.name, command_name, args)
+            self.lin_vel_value_label.setText(f"{lin_vel:.2f}")
+            self.ang_vel_value_label.setText(f"{ang_vel:.2f}")
 
     def update_text_position(self, msg):
         """Update the text of the dynamic labels."""
@@ -379,9 +403,9 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         """Update the position of the robot."""
         self.robot_pages[name].update_robot_position(msg)
 
-    def send_future_position(self, x, y, theta, name):
-        """Send the position request to node ROS."""
-        self.gui_node.publish_command(x, y, theta, name)
+    def send_future_position(self, name, command_name, args):
+        """Send the command request to node ROS."""
+        self.gui_node.publish_command(name, command_name, args)
 
     def _connect_to_ros(self):
         """Connect ROS to interface."""

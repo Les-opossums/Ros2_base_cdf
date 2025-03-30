@@ -8,7 +8,6 @@ position_sender_node:
 orchestrator_gui_node:
   ros__parameters:
     position_topic: position_out
-    moveto_action: moveto
     command_topic: command
 
 tf_broadcaster_node:

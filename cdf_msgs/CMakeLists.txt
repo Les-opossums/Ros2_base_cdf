@@ -32,6 +32,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/MoveTo.action"
   "srv/Init.srv"
   "srv/PosTrigger.srv"
+  "srv/StringReq.srv"
   DEPENDENCIES std_msgs geometry_msgs vision_msgs action_msgs
 )
 

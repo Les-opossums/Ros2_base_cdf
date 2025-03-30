@@ -191,6 +191,7 @@ class Communication(Node):
 
     def read_card_simu(self, msg):
         """Look at the result of the command send in simulation."""
+        self.get_logger().info(f"{msg}")
         parser = msg.data.split()
         name = parser[0]
         args = parser[1:]
