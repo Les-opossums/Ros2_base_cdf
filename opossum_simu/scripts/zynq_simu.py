@@ -48,7 +48,7 @@ class ZynqSimulation(Node):
         self.timers_clb = {}
         comm_yaml_file = os.path.join(msgs_path, "com_msgs.yaml")
         msgs_yaml_file = os.path.join(msgs_path, "format_msgs.yaml")
-        self.type_names = ["struct"]
+        self.type_names = ["struct", "variable", "array"]
         with open(comm_yaml_file, "r") as file:
             self.comm_yaml = yaml.safe_load(file)
         with open(msgs_yaml_file, "r") as file:
@@ -107,30 +107,29 @@ class ZynqSimulation(Node):
                 f"The name {name} does not exist in the YAML file com_msgs."
             )
             return
-
         order = self.comm_yaml[name]
         msg_type = order["send"]
-        if msg_type not in self.msgs_yaml:
+        if msg_type is None:
+            self.process_action(name, {})
+
+        elif msg_type not in self.msgs_yaml:
             self.get_logger().info(
                 f"The message type {msg_type} does not exist in the YAML file format_msgs."
             )
-            return
 
-        # Build args dictionary based on the expected structure.
-        # This assumes that the ordering in the YAML is correct.
-        name_type = [
-            nt for nt in self.type_names if nt in self.msgs_yaml[msg_type].keys()
-        ][0]
-        args = {
-            key: args_list[i]
-            for i, key in enumerate(self.msgs_yaml[msg_type][name_type].keys())
-        }
-        self.process_action(name, args)
-        # Do not wait for a synchronous response here. The asynchronous callbacks below will handle the result.
+        else:
+            name_type = [
+                nt for nt in self.type_names if nt in self.msgs_yaml[msg_type].keys()
+            ][0]
+            args = {
+                key: args_list[i]
+                for i, key in enumerate(self.msgs_yaml[msg_type][name_type].keys())
+            }
+            self.process_action(name, args)
 
     def process_action(self, name, args):
         """Execute the requested action asynchronously."""
-        if name == "GETODOM" or name == "SPEED":
+        if name == "GETODOM" or name == "SPEED" or name == "MAPASSERV":
             self.send_short_cmd_motor(name, args)
         elif name == "MOVE":
             self.send_long_cmd_motor(name, args)

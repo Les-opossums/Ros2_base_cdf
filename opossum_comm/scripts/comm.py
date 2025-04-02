@@ -15,6 +15,7 @@ import functools
 
 # Msgs import
 from std_msgs.msg import String
+from geometry_msgs.msg import Point
 
 
 class Communication(Node):
@@ -26,6 +27,8 @@ class Communication(Node):
             namespace="",
             parameters=[
                 ("simulation", rclpy.Parameter.Type.BOOL),
+                ("set_asserv", rclpy.Parameter.Type.BOOL),
+                ("asserv_topic", rclpy.Parameter.Type.STRING),
                 ("send_comm_topic", rclpy.Parameter.Type.STRING),
                 ("rcv_comm_topic", rclpy.Parameter.Type.STRING),
                 ("cards_name", rclpy.Parameter.Type.STRING_ARRAY),
@@ -37,6 +40,7 @@ class Communication(Node):
         self._init_parameters()
         self._init_publishers()
         self._init_subscribers()
+        self.get_logger().info(f"Simu: {self.simulation}")
         self.get_logger().info("Communication node initialized.")
 
     def _init_parameters(self: Node) -> None:
@@ -52,7 +56,10 @@ class Communication(Node):
         self.simulation = (
             self.get_parameter("simulation").get_parameter_value().bool_value
         )
-        self.get_logger().info(f"Simu: {self.simulation}")
+        self.type_names = ["struct", "variable", "array"]
+        self.set_asserv = (
+            self.get_parameter("set_asserv").get_parameter_value().bool_value
+        )
         if not self.simulation:
             cards_name = (
                 self.get_parameter("cards_name")
@@ -64,7 +71,6 @@ class Communication(Node):
             )
             self.cards = {}
             for name in cards_name:
-                self.get_logger().info(f"cards.{name}.port")
                 self.declare_parameter(
                     f"cards.{name}.port", rclpy.Parameter.Type.STRING
                 )
@@ -114,11 +120,20 @@ class Communication(Node):
     def _init_publishers(self: Node) -> None:
         """Initialize publishers of the node."""
         if self.simulation:
-            self.send_comm_topic = (
+            send_comm_topic = (
                 self.get_parameter("send_comm_topic").get_parameter_value().string_value
             )
-            self.pub_comm_topic = self.create_publisher(
-                String, self.send_comm_topic, 10
+            self.pub_comm = self.create_publisher(String, send_comm_topic, 10)
+
+        if self.set_asserv:
+            asserv_topic = (
+                self.get_parameter("asserv_topic").get_parameter_value().string_value
+            )
+            self.pub_asserv_pos = self.create_publisher(
+                Point, asserv_topic + "/pos", 10
+            )
+            self.pub_asserv_vel = self.create_publisher(
+                Point, asserv_topic + "/vel", 10
             )
 
         feedback_command_topic = (
@@ -143,8 +158,6 @@ class Communication(Node):
                 tested_serial.write("VERSION\n".encode("utf-8"))
                 rclpy.spin_once(self, timeout_sec=0.2, executor=self.default_exec)
                 all_data = tested_serial.read(tested_serial.in_waiting).decode("utf-8")
-                self.get_logger().info(f"All data: {all_data}")
-                self.get_logger().info(f"Name: {name}")
                 for line in all_data.split("\n"):
                     splited = line.split(",")
                     if (
@@ -177,7 +190,6 @@ class Communication(Node):
                 char_available = serial_card.in_waiting
                 if char_available != 0:
                     received_data = str(serial_card.read(char_available).decode("UTF8"))
-                    self.get_logger().info(f"Received_data: {received_data}")
                     try:
                         data_sequences = received_data.split("\n")
                     except Exception:
@@ -186,35 +198,63 @@ class Communication(Node):
                     self.get_logger().info(f"data_sequences: {data_sequences}")
                     for data in data_sequences:
                         self.pub_feedback_command.publish(String(data=data))
+                        if self.set_asserv:
+                            self.check_and_publish_asserv(data)
+
         except Exception as e:
             self.get_logger().error("Unhandled Exception : %s" % e)
 
     def read_card_simu(self, msg):
         """Look at the result of the command send in simulation."""
-        self.get_logger().info(f"{msg}")
-        parser = msg.data.split()
-        name = parser[0]
-        args = parser[1:]
-        if name not in self.comm_yaml:
-            self.get_logger().info(
-                f"The name {name} does not exists in the yaml file com_msgs."
-            )
-        msg_type = self.comm_yaml[name]["receive"]
-        if msg_type not in self.msgs_yaml:
-            self.get_logger().info(
-                f"The message type {msg_type} does not exists in the yaml file format_msgs."
-            )
-        result = {
-            key: args[i]
-            for i, key in enumerate(list(self.msgs_yaml[msg_type]["struct"].keys()))
-        }
-        self.get_logger().info("Received:")
-        for key in result.keys():
-            self.get_logger().info(f"{key}: {result[key]}.")
+        data_seq = msg.data.split("\n")
+        for data in data_seq:
+            # parser = data.split()
+            # name = parser[0]
+            # args = parser[1:]
+            # if name not in self.comm_yaml:
+            #     self.get_logger().info(
+            #         f"The name {name} does not exists in the yaml file com_msgs."
+            #     )
+            # msg_type = self.comm_yaml[name]["receive"]
+            # if msg_type is None:
+            #     return
+            # if msg_type not in self.msgs_yaml:
+            #     self.get_logger().info(
+            #         f"The message type {msg_type} does not exists in the yaml file format_msgs."
+            #     )
+            # name_type = [nt for nt in self.type_names if nt in self.msgs_yaml[msg_type].keys()][0]
+            # result = {
+            #     key: args[i]
+            #     for i, key in enumerate(list(self.msgs_yaml[msg_type][name_type].keys()))
+            # }
+            # self.get_logger().info("Received:")
+            # for key in result.keys():
+            #     self.get_logger().info(f"{key}: {result[key]}.")
+            self.pub_feedback_command.publish(String(data=data))
+            if self.set_asserv:
+                self.check_and_publish_asserv(data)
 
     def send_card_simu(self, msg):
         """Send to the card the command in simulation."""
-        self.pub_comm_topic.publish(msg)
+        self.pub_comm.publish(msg)
+
+    def check_and_publish_asserv(self, data):
+        """Publish the asserv data if necessary."""
+        if len(data) == 0:
+            self.get_logger().warn("Data len is 0.")
+            return
+        splitted_data = data.split()
+        if splitted_data[0] == "MAPASSERV":
+            pos = Point()
+            pos.x = float(splitted_data[1])
+            pos.y = float(splitted_data[2])
+            pos.z = float(splitted_data[3])
+            self.pub_asserv_pos.publish(pos)
+            vel = Point()
+            vel.x = float(splitted_data[4])
+            vel.y = float(splitted_data[5])
+            vel.z = float(splitted_data[6])
+            self.pub_asserv_vel.publish(vel)
 
 
 def main(args=None):

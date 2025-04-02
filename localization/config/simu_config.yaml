@@ -7,8 +7,10 @@ position_sender_node:
 
 orchestrator_gui_node:
   ros__parameters:
+    set_asserv: false
     position_topic: position_out
     command_topic: command
+    feedback_command_topic: feedback_command
 
 tf_broadcaster_node:
   ros__parameters:

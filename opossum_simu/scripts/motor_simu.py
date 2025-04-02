@@ -102,7 +102,10 @@ class MotorSimu(Node):
             self.get_parameter("short_motor_srv").get_parameter_value().string_value
         )
         self.srv_short_motor = self.create_service(
-            StringReq, short_motor_srv, self.response_callback
+            StringReq,
+            short_motor_srv,
+            self.response_callback,
+            callback_group=ReentrantCallbackGroup(),
         )
 
     def response_callback(self, request, response):
@@ -111,12 +114,26 @@ class MotorSimu(Node):
         if request_split[0] == "GETODOM":
             x = str(self.position[0].item())
             y = str(self.position[1].item())
-            angle = str(self.angle)
+            angle = str(self.position[2].item())
             response.response = request_split[0] + "," + x + "," + y + "," + angle
+
         elif request_split[0] == "SPEED":
             self.linear_velocity = float(request_split[1])
-            self.angle_velocity = float(request_split[3])
+            self.angular_velocity = float(request_split[3])
             response.response = request_split[0] + "," + "1"
+
+        elif request_split[0] == "MAPASSERV":
+            begin = time.time()
+            response.response = ""
+            while time.time() - begin < 5:
+                response.response += request_split[0]
+                for i in range(3):
+                    response.response += "," + str(self.position[i].item())
+                for i in range(3):
+                    response.response += "," + str(self.velocity[i].item())
+                response.response += "\n"
+                time.sleep(self.compute_period)
+
         return response
 
     def _single_handle_accepted_callback(self, goal_handle):
@@ -148,11 +165,6 @@ class MotorSimu(Node):
         """Accept or reject a client request to cancel an action."""
         return CancelResponse.ACCEPT
 
-    def destroy(self):
-        """Destroy the node."""
-        self.moveto_server.destroy()
-        super().destroy_node()
-
     def execute_callback(self, goal_handle):
         """Execute the actions."""
         req = goal_handle.request.data.split(",")
@@ -171,11 +183,7 @@ class MotorSimu(Node):
                 self.preempt_request = False
                 self.current_goal_handle = goal_handle
 
-                reached_position = (
-                    self.position[0] == self.obj[0]
-                    and self.position[1] == self.obj[1]
-                    and self.angle == self.obj[2]
-                )
+                reached_position = np.allclose(self.position[:, 0], self.obj)
 
                 moveto_feedback = StringAction.Feedback()
                 moveto_feedback.current_state = (
@@ -184,7 +192,7 @@ class MotorSimu(Node):
                     + ","
                     + str(self.position[1].item())
                     + ","
-                    + str(self.angle)
+                    + str(self.position[2].item())
                 )
                 while not reached_position:
                     if goal_handle.is_cancel_requested:
@@ -200,19 +208,15 @@ class MotorSimu(Node):
                         + ","
                         + str(self.position[1].item())
                         + ","
-                        + str(self.angle)
+                        + str(self.position[2].item())
                     )
-                    reached_position = (
-                        self.position[0] == self.obj[0]
-                        and self.position[1] == self.obj[1]
-                        and self.angle == self.obj[2]
-                    )
+                    reached_position = np.allclose(self.position[:, 0], self.obj)
                     self.real_time = time.time()
                     self.pub_real_position.publish(
                         Point(
                             x=float(self.position[0].item()),
                             y=float(self.position[1].item()),
-                            z=float(self.angle),
+                            z=float(self.position[2].item()),
                         )
                     )
                     time.sleep(self.compute_period)
@@ -239,13 +243,16 @@ class MotorSimu(Node):
 
     def _randomize_position(self):
         """Create random positions for init."""
-        self.angle = np.random.uniform(0, 2 * np.pi)
-        self.position = np.random.uniform(0, 2, (2, 1))
+        angle = np.random.uniform(0, 2 * np.pi)
+        init_pos = np.random.uniform(0, 2, (2, 1))
+        self.position = np.concatenate((init_pos, np.array([[angle]])), axis=0)
+        self.velocity = np.array([[0.0], [0.0], [0.0]])
+        self.acceleration = np.array([[0.0], [0.0], [0.0]])
 
     def _random_moves(self):
         """Do some random moves."""
-        self.angle += np.random.uniform(-0.3, 0.3)
-        pot_pos = self.position + np.random.uniform(-0.05, 0.05, (2, 1))
+        self.position[2] += np.random.uniform(-0.3, 0.3)
+        pot_pos = self.position[:2, :] + np.random.uniform(-0.05, 0.05, (2, 1))
         while (
             pot_pos[0] > self.boundaries[1]
             or pot_pos[0] < self.boundaries[0]
@@ -260,17 +267,28 @@ class MotorSimu(Node):
         real_delta = time.time() - self.real_time
         deltas = self.obj[:2] - self.position[:2, 0]
         dst = np.linalg.norm(deltas)
-        dangle = self.obj[2] % (2 * np.pi) - self.angle % (2 * np.pi)
+        dangle = self.obj[2] % (2 * np.pi) - self.position[2] % (2 * np.pi)
         va = self.angular_velocity if dangle >= 0 else -self.angular_velocity
         if dst < self.linear_velocity * real_delta:
+            self.velocity[:2, 0] = np.array([0, 0])
             self.position[:2, 0] = self.obj[:2]
         else:
-            self.position[:2, 0] += real_delta * self.linear_velocity * deltas / dst
-        self.angle = (
-            self.angle + real_delta * va
-            if abs(real_delta * va) < abs(dangle)
-            else self.obj[2]
-        )
+            self.velocity[:2, 0] = self.linear_velocity * deltas / dst
+            self.position[:2, 0] = (
+                self.position[:2, 0] + real_delta * self.velocity[:2, 0]
+            )
+
+        if abs(real_delta * va) < abs(dangle):
+            self.velocity[2, 0] = va
+            self.position[2, 0] += real_delta * self.velocity[2, 0]
+        else:
+            self.velocity[2, 0] = 0
+            self.position[2, 0] = self.obj[2]
+
+    def destroy(self):
+        """Destroy the node."""
+        self.moveto_server.destroy()
+        super().destroy_node()
 
 
 def main(args=None):

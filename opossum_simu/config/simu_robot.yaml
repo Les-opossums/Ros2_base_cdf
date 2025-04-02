@@ -12,13 +12,16 @@ main_robot:
       short_motor_srv: short_motor
       random_moves: False
       boundaries:  [0.0, 3.0, 0.0, 2.0]
-      compute_period: 0.01
+      compute_period: 0.05
       angular_velocity: 0.4
       linear_velocity: 0.15
 
   communication_node:
     ros__parameters:
-      simulation: True
+      set_asserv: true
+      asserv_topic: asserv
+
+      simulation: true
       rcv_comm_topic: zync_raspi
       send_comm_topic: raspi_zync
 
@@ -47,10 +50,13 @@ ennemi_robot:
       boundaries:  [0.0, 3.0, 0.0, 2.0]
       compute_period: 0.01
       angular_velocity: 0.4
-      linear_velocity: 0.15
+      linear_velocity: 0.02
 
   communication_node:
     ros__parameters:
+      set_asserv: false
+      asserv_topic: asserv
+
       simulation: True
       rcv_comm_topic: zync_raspi
       send_comm_topic: raspi_zync

@@ -2,8 +2,10 @@
 """Display all the information gathered by captors."""
 
 import sys
+import random
 import rclpy
 from rclpy.node import Node
+from PyQt5.QtChart import QChart, QChartView, QLineSeries
 from PyQt5 import QtWidgets, QtGui, QtCore
 from ament_index_python.packages import get_package_share_directory
 import os
@@ -11,6 +13,8 @@ import numpy as np
 from cdf_msgs.msg import LidarLoc
 from std_msgs.msg import String
 import functools
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 
 class NodeGUI(Node):
@@ -29,13 +33,18 @@ class NodeGUI(Node):
         self.declare_parameters(
             namespace="",
             parameters=[
+                ("set_asserv", rclpy.Parameter.Type.BOOL),
                 ("position_topic", rclpy.Parameter.Type.STRING),
                 ("command_topic", rclpy.Parameter.Type.STRING),
+                ("feedback_command_topic", rclpy.Parameter.Type.STRING),
                 ("robot_names", rclpy.Parameter.Type.STRING_ARRAY),
             ],
         )
         self.robot_names = (
             self.get_parameter("robot_names").get_parameter_value().string_array_value
+        )
+        self.set_asserv = (
+            self.get_parameter("set_asserv").get_parameter_value().bool_value
         )
 
     def _init_publishers(self):
@@ -50,16 +59,29 @@ class NodeGUI(Node):
 
     def _init_subscriber(self):
         """Initialize subscribers of the node."""
-        self.position_topic = (
+        position_topic = (
             self.get_parameter("position_topic").get_parameter_value().string_value
         )
         for name in self.robot_names:
             self.create_subscription(
                 LidarLoc,
-                name + "/" + self.position_topic,
+                name + "/" + position_topic,
                 functools.partial(self.position_callback, name=name),
                 10,
             )
+        if self.set_asserv:
+            feedback_command_topic = (
+                self.get_parameter("feedback_command_topic")
+                .get_parameter_value()
+                .string_value
+            )
+            for name in self.robot_names:
+                self.create_subscription(
+                    String,
+                    name + "/" + feedback_command_topic,
+                    functools.partial(self.check_asserv_callback, name=name),
+                    10,
+                )
 
     def publish_command(self, name, command_name, args):
         """Publish the command for the robot."""
@@ -72,6 +94,10 @@ class NodeGUI(Node):
 
     def position_callback(self, msg, name):
         """Receive the last known information and display it."""
+        self.parent.update_robot_position(msg, name)
+
+    def check_asserv_callback(self, msg, name):
+        """Check if an interesting data is received."""
         self.parent.update_robot_position(msg, name)
 
 
@@ -288,7 +314,9 @@ class MotorsPage(QtWidgets.QWidget):
         self.button.clicked.connect(self.send_motor_command)
         self.x_edit.returnPressed.connect(self.y_edit.setFocus)
         self.y_edit.returnPressed.connect(self.theta_edit.setFocus)
-        self.theta_edit.returnPressed.connect(self.button.setFocus)
+        self.theta_edit.returnPressed.connect(self.lin_vel_edit.setFocus)
+        self.lin_vel_edit.returnPressed.connect(self.ang_vel_edit.setFocus)
+        self.ang_vel_edit.returnPressed.connect(self.button.setFocus)
 
         main_layout.addWidget(self.map_scene)
         main_layout.addLayout(grid_layout)
@@ -328,6 +356,82 @@ class MotorsPage(QtWidgets.QWidget):
         self.map_scene.update_map_position(msg)
 
 
+class AsservPage(QtWidgets.QWidget):
+    """Page dedicated for Motors."""
+
+    def __init__(self, name, parent=None):
+        super().__init__()
+        self.parent = parent
+        self.name = name
+        main_layout = QtWidgets.QVBoxLayout(self)
+        # Create the main layout
+
+        # Create the plot canvas and add it to the layout
+        self.canvas = PlotCanvas(self, width=5, height=4, dpi=100)
+        main_layout.addWidget(self.canvas)
+
+        # Create a button to update the graph
+        self.button = QtWidgets.QPushButton("Update Graph", self)
+        self.button.clicked.connect(self.canvas.update_plot)
+        main_layout.addWidget(self.button)
+
+
+class PlotCanvas(FigureCanvas):
+    """Plot in a graph the result of asserv (Not implemented yet well)."""
+
+    def __init__(self, parent=None, width=5, height=4, dpi=100):
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        self.ax = self.fig.add_subplot(111)
+        super().__init__(self.fig)
+        self.setParent(parent)
+        self.plot_initial()
+
+    def plot_initial(self):
+        """Plot randomly to init."""
+        self.ax.clear()
+        self.ax.plot([i for i in range(10)], "r-")
+        self.ax.set_title("Initial Plot")
+        self.draw()
+
+    def update_plot(self):
+        """Update the plot."""
+        self.ax.clear()
+        data = [random.randint(0, 10) for _ in range(10)]
+        self.ax.plot(data, "b-")
+        self.ax.set_title("Updated Plot")
+        self.draw()
+
+
+class ChartWidget(QtWidgets.QWidget):
+    """Plot also but a Chart, moving and Dynamic (not well implemented)."""
+
+    def __init__(self, name, parent):
+        super().__init__()
+        self.parent = parent
+        self.name = name
+        self.series = QLineSeries()
+        self.chart = QChart()
+        self.chart.addSeries(self.series)
+        self.chart.createDefaultAxes()
+        self.chart_view = QChartView(self.chart)
+
+        # Create a button to add a new point.
+        self.button = QtWidgets.QPushButton("Add Point")
+        self.button.clicked.connect(self.add_point)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self.chart_view)
+        layout.addWidget(self.button)
+        self.counter = 0
+
+    def add_point(self):
+        """Add a point to the last serie."""
+        self.counter += 1
+        new_y = random.uniform(0, 10)
+        self.series.append(QtCore.QPointF(self.counter, new_y))
+        self.chart.axisX().setRange(0, self.counter + 1)
+
+
 class MainRobotPage(QtWidgets.QWidget):
     """Page for ecah robot."""
 
@@ -337,13 +441,22 @@ class MainRobotPage(QtWidgets.QWidget):
         self.name = name
         self.components_names = QtWidgets.QComboBox()
         self.components_names.addItems(
-            ["Global View", "Motors", "Servo", "Create Script"]
+            [
+                "Global View",
+                "Motors",
+                "Servo",
+                "Create Script",
+                "Asserv",
+                "Asserv Dynamic",
+            ]
         )
         self.component_pages = {
             "GlobalView": GlobalViewPage(name, self.parent),
             "Motors": MotorsPage(name, self.parent),
             "Servo": MapScene(name, self.parent),
             "Create Script": MapScene(name, self.parent),
+            "Asserv": AsservPage(name, self.parent),
+            "AsservDynamic": ChartWidget(name, self.parent),
         }
         self.stackedWidgets = QtWidgets.QStackedWidget()
         for val in self.component_pages.values():
