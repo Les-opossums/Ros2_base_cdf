@@ -12,14 +12,14 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 # Import des messages
-from cdf_msgs.action import MoveTo
-from cdf_msgs.srv import PosTrigger
+from cdf_msgs.action import StringAction
+from cdf_msgs.srv import StringReq
 from geometry_msgs.msg import Point
 import threading
 import collections
 
 
-class NavSimulation(Node):
+class MotorSimu(Node):
     """Simulate the state of the robot and receives the actions for navigation only."""
 
     def __init__(self):
@@ -27,7 +27,7 @@ class NavSimulation(Node):
         self._init_parameters()
         self._randomize_position()
         self._init_publishers()
-        self._init_server_actions()
+        self._init_action_server()
         self._init_services()
         self.get_logger().info("Nav simulation node initialized.")
 
@@ -38,9 +38,8 @@ class NavSimulation(Node):
             parameters=[
                 ("boundaries", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("real_position_topic", rclpy.Parameter.Type.STRING),
-                ("trigger_position_srv", rclpy.Parameter.Type.STRING),
+                ("short_motor_srv", rclpy.Parameter.Type.STRING),
                 ("random_moves", rclpy.Parameter.Type.BOOL),
-                ("moveto_action", rclpy.Parameter.Type.STRING),
                 ("compute_period", rclpy.Parameter.Type.DOUBLE),
                 ("angular_velocity", rclpy.Parameter.Type.DOUBLE),
                 ("linear_velocity", rclpy.Parameter.Type.DOUBLE),
@@ -76,21 +75,18 @@ class NavSimulation(Node):
         """Init publishers of the node."""
         self.real_position_topic = (
             self.get_parameter("real_position_topic").get_parameter_value().string_value
-        ) 
+        )
         self.pub_real_position = self.create_publisher(
             Point, self.real_position_topic, 10
         )
 
-    def _init_server_actions(self):
+    def _init_action_server(self):
         """Init server actions of the node."""
         if not self.random_moves:
-            self.moveto_action = (
-                self.get_parameter("moveto_action").get_parameter_value().string_value
-            )
             self.moveto_server = ActionServer(
                 self,
-                MoveTo,
-                self.get_namespace() + "/" + self.moveto_action,
+                StringAction,
+                "motors/action_simu",
                 self.execute_callback,
                 handle_accepted_callback=self.handle_accepted_callback,
                 goal_callback=self.goal_callback,
@@ -102,20 +98,42 @@ class NavSimulation(Node):
 
     def _init_services(self):
         """Init services of the node."""
-        self.trigger_position_srv = (
-            self.get_parameter("trigger_position_srv")
-            .get_parameter_value()
-            .string_value
+        short_motor_srv = (
+            self.get_parameter("short_motor_srv").get_parameter_value().string_value
         )
-        self.srv_trigger_position = self.create_service(
-            PosTrigger, self.trigger_position_srv, self._send_position
+        self.srv_short_motor = self.create_service(
+            StringReq,
+            short_motor_srv,
+            self.response_callback,
+            callback_group=ReentrantCallbackGroup(),
         )
 
-    def _send_position(self, request, response):
-        """Send position."""
-        response.pos.x = float(self.position[0].item())
-        response.pos.y = float(self.position[1].item())
-        response.pos.z = float(self.angle)
+    def response_callback(self, request, response):
+        """Answer to the request."""
+        request_split = request.data.split(",")
+        if request_split[0] == "GETODOM":
+            x = str(self.position[0].item())
+            y = str(self.position[1].item())
+            angle = str(self.position[2].item())
+            response.response = request_split[0] + "," + x + "," + y + "," + angle
+
+        elif request_split[0] == "SPEED":
+            self.linear_velocity = float(request_split[1])
+            self.angular_velocity = float(request_split[3])
+            response.response = request_split[0] + "," + "1"
+
+        elif request_split[0] == "MAPASSERV":
+            begin = time.time()
+            response.response = ""
+            while time.time() - begin < 5:
+                response.response += request_split[0]
+                for i in range(3):
+                    response.response += "," + str(self.position[i].item())
+                for i in range(3):
+                    response.response += "," + str(self.velocity[i].item())
+                response.response += "\n"
+                time.sleep(self.compute_period)
+
         return response
 
     def _single_handle_accepted_callback(self, goal_handle):
@@ -147,84 +165,94 @@ class NavSimulation(Node):
         """Accept or reject a client request to cancel an action."""
         return CancelResponse.ACCEPT
 
-    def destroy(self):
-        """Destroy the node."""
-        self.moveto_server.destroy()
-        super().destroy_node()
-
     def execute_callback(self, goal_handle):
         """Execute the actions."""
-        try:
-            self.real_time = time.time()
-            self.preempt_request = False
-            self.current_goal_handle = goal_handle
-            reached_position = (
-                self.position[0] == goal_handle.request.goal.x
-                and self.position[1] == goal_handle.request.goal.y
-                and self.angle == goal_handle.request.goal.z
-            )
+        req = goal_handle.request.data.split(",")
+        name = req[0]
+        args = req[1:]
+        if name.upper() == "MOVE":
             self.obj = np.array(
                 [
-                    goal_handle.request.goal.x,
-                    goal_handle.request.goal.y,
-                    goal_handle.request.goal.z,
+                    float(args[0]),
+                    float(args[1]),
+                    float(args[2]),
                 ]
             )
-            moveto_feedback = MoveTo.Feedback()
-            moveto_feedback.current_position.x = float(self.position[0].item())
-            moveto_feedback.current_position.y = float(self.position[1].item())
-            moveto_feedback.current_position.z = float(self.angle)
-            while not reached_position:
-                if goal_handle.is_cancel_requested:
-                    goal_handle.canceled()
-                    return MoveTo.Result()
-                if not self.blocking:
-                    if not goal_handle.is_active:
-                        return MoveTo.Result()
-                self._ordered_moves()
-                moveto_feedback.current_position.x = float(self.position[0].item())
-                moveto_feedback.current_position.y = float(self.position[1].item())
-                moveto_feedback.current_position.z = float(self.angle)
-                reached_position = (
-                    self.position[0] == goal_handle.request.goal.x
-                    and self.position[1] == goal_handle.request.goal.y
-                    and self.angle == goal_handle.request.goal.z
-                )
+            try:
                 self.real_time = time.time()
-                self.pub_real_position.publish(moveto_feedback.current_position)
-                time.sleep(self.compute_period)
-            if not self.blocking:
-                with self._goal_lock:
-                    if not goal_handle.is_active:
-                        return MoveTo.Result()
-                    goal_handle.succeed()
-            else:
-                goal_handle.succeed()
-            result = MoveTo.Result()
-            result.result.x = moveto_feedback.current_position.x
-            result.result.y = moveto_feedback.current_position.y
-            result.result.z = moveto_feedback.current_position.z
-            return result
-        finally:
-            if self.blocking:
-                with self._goal_queue_lock:
-                    try:
-                        # Start execution of the next goal in the queue.
-                        self._current_goal = self._goal_queue.popleft()
-                        self._current_goal.execute()
-                    except IndexError:
-                        # No goal in the queue.
-                        self._current_goal = None
+                self.preempt_request = False
+                self.current_goal_handle = goal_handle
 
-    def _randomize_position(self) -> Point:
+                reached_position = np.allclose(self.position[:, 0], self.obj)
+
+                moveto_feedback = StringAction.Feedback()
+                moveto_feedback.current_state = (
+                    "MOVE,"
+                    + str(self.position[0].item())
+                    + ","
+                    + str(self.position[1].item())
+                    + ","
+                    + str(self.position[2].item())
+                )
+                while not reached_position:
+                    if goal_handle.is_cancel_requested:
+                        goal_handle.canceled()
+                        return StringAction.Result()
+                    if not self.blocking:
+                        if not goal_handle.is_active:
+                            return StringAction.Result()
+                    self._ordered_moves()
+                    moveto_feedback.current_state = (
+                        "MOVE,"
+                        + str(self.position[0].item())
+                        + ","
+                        + str(self.position[1].item())
+                        + ","
+                        + str(self.position[2].item())
+                    )
+                    reached_position = np.allclose(self.position[:, 0], self.obj)
+                    self.real_time = time.time()
+                    self.pub_real_position.publish(
+                        Point(
+                            x=float(self.position[0].item()),
+                            y=float(self.position[1].item()),
+                            z=float(self.position[2].item()),
+                        )
+                    )
+                    time.sleep(self.compute_period)
+                if not self.blocking:
+                    with self._goal_lock:
+                        if not goal_handle.is_active:
+                            return StringAction.Result()
+                        goal_handle.succeed()
+                else:
+                    goal_handle.succeed()
+                result = StringAction.Result()
+                result.response = moveto_feedback.current_state
+                return result
+            finally:
+                if self.blocking:
+                    with self._goal_queue_lock:
+                        try:
+                            # Start execution of the next goal in the queue.
+                            self._current_goal = self._goal_queue.popleft()
+                            self._current_goal.execute()
+                        except IndexError:
+                            # No goal in the queue.
+                            self._current_goal = None
+
+    def _randomize_position(self):
         """Create random positions for init."""
-        self.angle = np.random.uniform(0, 2 * np.pi)
-        self.position = np.random.uniform(0, 2, (2, 1))
+        angle = np.random.uniform(0, 2 * np.pi)
+        init_pos = np.random.uniform(0, 2, (2, 1))
+        self.position = np.concatenate((init_pos, np.array([[angle]])), axis=0)
+        self.velocity = np.array([[0.0], [0.0], [0.0]])
+        self.acceleration = np.array([[0.0], [0.0], [0.0]])
 
     def _random_moves(self):
         """Do some random moves."""
-        self.angle += np.random.uniform(-0.3, 0.3)
-        pot_pos = self.position + np.random.uniform(-0.05, 0.05, (2, 1))
+        self.position[2] += np.random.uniform(-0.3, 0.3)
+        pot_pos = self.position[:2, :] + np.random.uniform(-0.05, 0.05, (2, 1))
         while (
             pot_pos[0] > self.boundaries[1]
             or pot_pos[0] < self.boundaries[0]
@@ -239,23 +267,34 @@ class NavSimulation(Node):
         real_delta = time.time() - self.real_time
         deltas = self.obj[:2] - self.position[:2, 0]
         dst = np.linalg.norm(deltas)
-        dangle = self.obj[2] % (2 * np.pi) - self.angle % (2 * np.pi)
+        dangle = self.obj[2] % (2 * np.pi) - self.position[2] % (2 * np.pi)
         va = self.angular_velocity if dangle >= 0 else -self.angular_velocity
         if dst < self.linear_velocity * real_delta:
+            self.velocity[:2, 0] = np.array([0, 0])
             self.position[:2, 0] = self.obj[:2]
         else:
-            self.position[:2, 0] += real_delta * self.linear_velocity * deltas / dst
-        self.angle = (
-            self.angle + real_delta * va
-            if abs(real_delta * va) < abs(dangle)
-            else self.obj[2]
-        )
+            self.velocity[:2, 0] = self.linear_velocity * deltas / dst
+            self.position[:2, 0] = (
+                self.position[:2, 0] + real_delta * self.velocity[:2, 0]
+            )
+
+        if abs(real_delta * va) < abs(dangle):
+            self.velocity[2, 0] = va
+            self.position[2, 0] += real_delta * self.velocity[2, 0]
+        else:
+            self.velocity[2, 0] = 0
+            self.position[2, 0] = self.obj[2]
+
+    def destroy(self):
+        """Destroy the node."""
+        self.moveto_server.destroy()
+        super().destroy_node()
 
 
 def main(args=None):
     """Spin main loop."""
     rclpy.init(args=args)
-    nav_simu_node = NavSimulation()
+    nav_simu_node = MotorSimu()
     executor = MultiThreadedExecutor()
     try:
         rclpy.spin(nav_simu_node, executor=executor)

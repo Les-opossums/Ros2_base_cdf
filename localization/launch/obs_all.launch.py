@@ -20,7 +20,6 @@ def generate_launch_description():
         params = yaml.safe_load(file)
 
     top_keys = [key for key in params.keys() if not key.endswith("node")]
-    print(top_keys)
     node_position_sender = Node(
         package="localization",
         executable="position_sender",
@@ -37,12 +36,28 @@ def generate_launch_description():
     )
     nodes.append(node_orchestrator_gui)
 
+    node_tf_broadcaster = Node(
+        package="localization",
+        executable="tf_broadcaster.py",
+        name="tf_broadcaster_node",
+        parameters=[param_file, {"robot_names": top_keys}],
+    )
+    nodes.append(node_tf_broadcaster)
+
     for key in top_keys:
         node_lidar_simulation = Node(
             namespace=key,
             package="localization",
             executable="lidar_simulation.py",
             name="lidar_simulation_node",
+            parameters=[param_file],
+        )
+
+        node_nav_simulation = Node(
+            namespace=key,
+            package="localization",
+            executable="nav_simulation.py",
+            name="nav_simulation_node",
             parameters=[param_file],
         )
 
@@ -53,6 +68,19 @@ def generate_launch_description():
             name="beacon_detector_node",
             parameters=[param_file],
         )
+
+        print(params[key]["lidar_simulation_node"]["ros__parameters"]["use_lidar_points"])
+        if bool(params[key]["lidar_simulation_node"]["ros__parameters"]["use_lidar_points"]):
+            node_obstacle_extractor = Node(
+                namespace=key,
+                package="obstacle_detector",
+                executable="obstacle_extractor_node",
+                name="obstacle_extractor_node",
+                parameters=[param_file],
+            )
+            nodes.append(node_obstacle_extractor)
         nodes.append(node_lidar_simulation)
+        nodes.append(node_nav_simulation)
         nodes.append(node_beacon_detector)
+        
     return LaunchDescription(nodes)

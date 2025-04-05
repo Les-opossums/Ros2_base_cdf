@@ -1,0 +1,18 @@
+main_robot:
+  communication_node:
+    ros__parameters:
+      set_asserv: true
+      asserv_topic: asserv
+
+      simulation: false
+      rcv_comm_topic: zync_raspi
+      send_comm_topic: raspi_zync
+
+      cards_name: ["zynq"]
+      command_topic: command
+      feedback_command_topic: feedback_command
+      frequency: 100.
+      cards:
+        zynq:
+          port: '/dev/ttyUSB0'
+          baudrate: 115200
