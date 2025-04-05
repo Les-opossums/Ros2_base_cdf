@@ -1,10 +1,7 @@
 import tkinter as tk
-from tkinter import messagebox
-from PIL import Image, ImageTk, ImageSequence
+from PIL import Image, ImageTk
 import os
-from pathlib import Path
 from itertools import count, cycle
-import time
 from ament_index_python.packages import get_package_share_directory
 from rclpy.logging import get_logger
 
@@ -53,7 +50,9 @@ class ColorChoiceApp:
         self.button_reload.pack(pady=10)
 
         # Bouton pour quitter
-        self.button_quit = tk.Button(self.root, text="Quit", command=self.root.destroy)
+        self.button_quit = tk.Button(self.root,
+                                     text="Quit",
+                                     command=self.root.destroy)
         self.button_quit.pack(pady=20)
         self.root.mainloop()
 
@@ -69,7 +68,7 @@ class ColorChoiceApp:
 class ImageApp:
     def __init__(self, selected_color):
         self.reload = False
-        self.selected_script = 100
+        self.selected_script = 0
         self.selected_color = selected_color
 
         self.root = tk.Tk()
@@ -97,7 +96,7 @@ class ImageApp:
         window_height = 800
         # Dimensions de l'image après la rotation
         img_width, img_height = self.img.size
-        # Calculer les facteurs de redimensionnement pour la largeur et la hauteur
+        # Calculer les facteurs de redimensionnement
         width_factor = window_width / img_width
         height_factor = window_height / img_height
         # Choisir le plus petit facteur pour conserver le ratio
@@ -120,14 +119,22 @@ class ImageApp:
         self.label.pack(pady=10)
 
         self.button_reload = tk.Button(
-            self.root, text="Reload", command=self.reload_ihm, height=3, width=10
+            self.root,
+            text="Reload",
+            command=self.reload_ihm,
+            height=3,
+            width=10
         )
         self.button_reload.pack(padx=0, pady=10)
         self.button_reload.place(x=100, y=725)
 
         # Bouton pour quitter
         self.button_valid = tk.Button(
-            self.root, text="Valid", command=self.root.destroy, height=3, width=10
+            self.root,
+            text="Valid",
+            command=self.root.destroy,
+            height=3,
+            width=10
         )
         self.button_valid.pack(padx=20, pady=10)
         self.button_valid.place(x=300, y=725)
@@ -188,7 +195,7 @@ class ValidationApp:
             text=f"Couleur : {self.color}",
             font=("Arial", 14),
             bg=self.color,  # Utilisation de la couleur fournie
-            fg="white" if self.color.lower() != "white" else "black",  # Texte visible
+            fg="white" if self.color.lower() != "white" else "black",
             width=30,  # Largeur fixe
             anchor="w",  # Alignement à gauche
             padx=10,
@@ -208,10 +215,14 @@ class ValidationApp:
         script_label.pack(pady=5)
 
         # Bouton de validation
-        validate_button = tk.Button(self.root, text="Valid", command=self.on_validate)
+        validate_button = tk.Button(self.root,
+                                    text="Valid",
+                                    command=self.on_validate)
         validate_button.pack(pady=10)
 
-        reload_button = tk.Button(self.root, text="Reload", command=self.on_reload)
+        reload_button = tk.Button(self.root,
+                                  text="Reload",
+                                  command=self.on_reload)
         reload_button.pack(pady=20)
 
     def on_validate(self):
@@ -279,7 +290,7 @@ class ScoreApp:
 
     def update_score(self):
         """Met à jour le score toutes les 500ms"""
-        # self.score = score  # Incrémentation du score (remplace par ta logique)
+        # self.score = score  # Incrémentation du score
         logger = get_logger("opossum_ihm")
         logger.info(f"Score: {self.score}")
         self.display_score.set(str(self.score))  # Mise à jour du texte

@@ -13,13 +13,13 @@ class ParametersServer(Node):
 
         # Initialisation des paramètres
         self.team_color = "blue"
-        self.script_number = 1
+        self.script_number = 0
         self.debug_mode = False
         self.current_score = 0
 
         # Déclarer les paramètres avec des valeurs par défaut
         self.declare_parameter("team_color", "blue")
-        self.declare_parameter("script_number", 1)
+        self.declare_parameter("script_number", 0)
         self.declare_parameter("debug_mode", False)
         self.declare_parameter("current_score", 0)
 
