@@ -20,6 +20,7 @@ include_directories(include)
 
 install(DIRECTORY
   config
+  match
   DESTINATION share/${PROJECT_NAME}/
 )
 

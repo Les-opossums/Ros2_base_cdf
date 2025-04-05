@@ -4,6 +4,7 @@
 
 import rclpy
 from rclpy.node import Node
+from rcl_interfaces.msg import ParameterEvent
 
 from std_msgs.msg import String
 from action_sequencer.action_manager import Version, Position, Speed
@@ -13,10 +14,11 @@ from action_sequencer.action_manager import ODOM_struct, SERVO_struct
 
 class ActionManager(Node):
     def __init__(self):
-        super().__init__("action_manager_node")
+        super().__init__("action_sequencer_node")
+        self.get_logger().info("Action Manager Node started")
         self._init_parameters()
         self._init_publishers()
-        self.move_to(Position(1, 2, 3))
+        self._init_subscribers()
 
     def _init_parameters(self) -> None:
         self.declare_parameters(
@@ -38,8 +40,28 @@ class ActionManager(Node):
                                                      10
                                                      )
 
+    def _init_subscribers(self):
+        self.subscription = self.create_subscription(
+            ParameterEvent,
+            '/parameter_events',
+            self.parameter_event_callback,
+            10)
+
+    def parameter_event_callback(self, event):
+        # Parcours des paramètres modifiés
+        self.get_logger().info(f"Parameter event received: {event}")
+        for changed in event.changed_parameters:
+            if changed.name == 'script_number':
+                # Affiche la nouvelle valeur du paramètre script_number
+                self.get_logger().info(
+                    f"Choix du script : {changed.value}"
+                )
+
     def feedback_callback(self, msg):
         self.get_logger().info(f"Feedback received: {msg.data}")
+
+        if msg.data.startswith("LEASH"):
+            pass
 
     def move_to(self, pos: Position):
         self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
