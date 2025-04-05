@@ -5,7 +5,8 @@ import sys
 import random
 import rclpy
 from rclpy.node import Node
-from PyQt5.QtChart import QChart, QChartView, QLineSeries
+
+# from PyQt5.QtChart import QChart, QChartView, QLineSeries
 from PyQt5 import QtWidgets, QtGui, QtCore
 from ament_index_python.packages import get_package_share_directory
 import os
@@ -70,15 +71,19 @@ class NodeGUI(Node):
                 10,
             )
         if self.set_asserv:
-            feedback_command_topic = (
-                self.get_parameter("feedback_command_topic")
-                .get_parameter_value()
-                .string_value
+            asserv_topic = (
+                self.get_parameter("asserv_topic").get_parameter_value().string_value
             )
             for name in self.robot_names:
                 self.create_subscription(
                     String,
-                    name + "/" + feedback_command_topic,
+                    name + "/" + asserv_topic + "/pos",
+                    functools.partial(self.check_asserv_callback, name=name),
+                    10,
+                )
+                self.create_subscription(
+                    String,
+                    name + "/" + asserv_topic + "/vel",
                     functools.partial(self.check_asserv_callback, name=name),
                     10,
                 )
@@ -150,7 +155,7 @@ class MapScene(QtWidgets.QGraphicsView):
         x, y = self.get_real_pos(event.pos().x(), event.pos().y())
         command_name = "MOVE"
         args = [x, y, 0.0]
-        self.parent.send_future_position(self.name, command_name, args)
+        self.parent.send_cmd(self.name, command_name, args)
 
     def get_real_pos(self, x, y):
         """Convert the position on the map to real world."""
@@ -333,7 +338,7 @@ class MotorsPage(QtWidgets.QWidget):
         if x != -1 or y != -1 or theta != -1:
             command_name = "MOVE"
             args = [x, y, theta]
-            self.parent.send_future_position(self.name, command_name, args)
+            self.parent.send_cmd(self.name, command_name, args)
         lin_vel = self.lin_vel_edit.text()
         ang_vel = self.ang_vel_edit.text()
         lin_vel = float(lin_vel) if lin_vel != "" else -1
@@ -341,7 +346,7 @@ class MotorsPage(QtWidgets.QWidget):
         if lin_vel != -1 or ang_vel != -1:
             command_name = "SPEED"
             args = [lin_vel, lin_vel, ang_vel]
-            self.parent.send_future_position(self.name, command_name, args)
+            self.parent.send_cmd(self.name, command_name, args)
             self.lin_vel_value_label.setText(f"{lin_vel:.2f}")
             self.ang_vel_value_label.setText(f"{ang_vel:.2f}")
 
@@ -364,16 +369,45 @@ class AsservPage(QtWidgets.QWidget):
         self.parent = parent
         self.name = name
         main_layout = QtWidgets.QVBoxLayout(self)
+
+        grid_layout = QtWidgets.QGridLayout()
+        self.button = QtWidgets.QPushButton("Send Command")
+        cmd_label = QtWidgets.QLabel("Command: ")
+        args_label = QtWidgets.QLabel("Args:")
+
+        # Create line edits for each parameter
+        self.cmd_edit = QtWidgets.QLineEdit(self)
+        self.cmd_edit.setPlaceholderText("Enter command")
+        self.args_edit = QtWidgets.QLineEdit(self)
+        self.args_edit.setPlaceholderText("Enter Arguments")
+
+        # Place widgets in the grid
+        grid_layout.addWidget(cmd_label, 0, 0)
+        grid_layout.addWidget(self.cmd_edit, 0, 1)
+        grid_layout.addWidget(args_label, 1, 0)
+        grid_layout.addWidget(self.args_edit, 1, 1)
+
+        self.button.clicked.connect(self.send_command)
+        self.cmd_edit.returnPressed.connect(self.args_edit.setFocus)
+        self.args_edit.returnPressed.connect(self.button.setFocus)
+
+        main_layout.addLayout(grid_layout)
+        main_layout.addWidget(self.button)
         # Create the main layout
 
         # Create the plot canvas and add it to the layout
         self.canvas = PlotCanvas(self, width=5, height=4, dpi=100)
         main_layout.addWidget(self.canvas)
 
-        # Create a button to update the graph
-        self.button = QtWidgets.QPushButton("Update Graph", self)
-        self.button.clicked.connect(self.canvas.update_plot)
-        main_layout.addWidget(self.button)
+        self.button2 = QtWidgets.QPushButton("Update Graph", self)
+        self.button2.clicked.connect(self.canvas.update_plot)
+        main_layout.addWidget(self.button2)
+
+    def send_command(self):
+        """Send command to ROS node."""
+        command_name = self.cmd_edit.text()
+        args = self.args_edit.text().split()
+        self.parent.send_cmd(self.name, command_name, args)
 
 
 class PlotCanvas(FigureCanvas):
@@ -402,34 +436,34 @@ class PlotCanvas(FigureCanvas):
         self.draw()
 
 
-class ChartWidget(QtWidgets.QWidget):
-    """Plot also but a Chart, moving and Dynamic (not well implemented)."""
+# class ChartWidget(QtWidgets.QWidget):
+#     """Plot also but a Chart, moving and Dynamic (not well implemented)."""
 
-    def __init__(self, name, parent):
-        super().__init__()
-        self.parent = parent
-        self.name = name
-        self.series = QLineSeries()
-        self.chart = QChart()
-        self.chart.addSeries(self.series)
-        self.chart.createDefaultAxes()
-        self.chart_view = QChartView(self.chart)
+#     def __init__(self, name, parent):
+#         super().__init__()
+#         self.parent = parent
+#         self.name = name
+#         self.series = QLineSeries()
+#         self.chart = QChart()
+#         self.chart.addSeries(self.series)
+#         self.chart.createDefaultAxes()
+#         self.chart_view = QChartView(self.chart)
 
-        # Create a button to add a new point.
-        self.button = QtWidgets.QPushButton("Add Point")
-        self.button.clicked.connect(self.add_point)
+#         # Create a button to add a new point.
+#         self.button = QtWidgets.QPushButton("Add Point")
+#         self.button.clicked.connect(self.add_point)
 
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.addWidget(self.chart_view)
-        layout.addWidget(self.button)
-        self.counter = 0
+#         layout = QtWidgets.QVBoxLayout(self)
+#         layout.addWidget(self.chart_view)
+#         layout.addWidget(self.button)
+#         self.counter = 0
 
-    def add_point(self):
-        """Add a point to the last serie."""
-        self.counter += 1
-        new_y = random.uniform(0, 10)
-        self.series.append(QtCore.QPointF(self.counter, new_y))
-        self.chart.axisX().setRange(0, self.counter + 1)
+#     def add_point(self):
+#         """Add a point to the last serie."""
+#         self.counter += 1
+#         new_y = random.uniform(0, 10)
+#         self.series.append(QtCore.QPointF(self.counter, new_y))
+#         self.chart.axisX().setRange(0, self.counter + 1)
 
 
 class MainRobotPage(QtWidgets.QWidget):
@@ -456,7 +490,7 @@ class MainRobotPage(QtWidgets.QWidget):
             "Servo": MapScene(name, self.parent),
             "Create Script": MapScene(name, self.parent),
             "Asserv": AsservPage(name, self.parent),
-            "AsservDynamic": ChartWidget(name, self.parent),
+            # "AsservDynamic": ChartWidget(name, self.parent),
         }
         self.stackedWidgets = QtWidgets.QStackedWidget()
         for val in self.component_pages.values():
@@ -516,7 +550,7 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         """Update the position of the robot."""
         self.robot_pages[name].update_robot_position(msg)
 
-    def send_future_position(self, name, command_name, args):
+    def send_cmd(self, name, command_name, args):
         """Send the command request to node ROS."""
         self.gui_node.publish_command(name, command_name, args)
 

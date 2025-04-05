@@ -11,7 +11,7 @@ main_robot:
       cards_name: ["zynq"]
       command_topic: command
       feedback_command_topic: feedback_command
-      frequency: 10.
+      frequency: 100.
       cards:
         zynq:
           port: '/dev/ttyUSB0'

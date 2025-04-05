@@ -159,11 +159,15 @@ class Communication(Node):
                 rclpy.spin_once(self, timeout_sec=0.2, executor=self.default_exec)
                 all_data = tested_serial.read(tested_serial.in_waiting).decode("utf-8")
                 for line in all_data.split("\n"):
-                    splited = line.split(",")
-                    if (
-                        splited[0].lower() == "version"
-                        and splited[1][1:].lower() == name
-                    ):
+                    self.get_logger().info(f"line: {line}")
+                    # splited = line.split(",")
+                    if True:
+                        self.get_logger().info("GOT IT")
+
+                        # if (
+                        #     splited[0].lower() == "version"
+                        #     and splited[1][1:].lower() == name
+                        # ):
                         return tested_serial
                     else:
                         raise ValueError("unknown card type")
@@ -190,12 +194,12 @@ class Communication(Node):
                 char_available = serial_card.in_waiting
                 if char_available != 0:
                     received_data = str(serial_card.read(char_available).decode("UTF8"))
+                    self.get_logger().info(f"received: {received_data}")
                     try:
                         data_sequences = received_data.split("\n")
                     except Exception:
                         self.get_logger().info("Error While Decoding Data")
                         data_sequences = []
-                    self.get_logger().info(f"data_sequences: {data_sequences}")
                     for data in data_sequences:
                         self.pub_feedback_command.publish(String(data=data))
                         if self.set_asserv:
@@ -208,28 +212,6 @@ class Communication(Node):
         """Look at the result of the command send in simulation."""
         data_seq = msg.data.split("\n")
         for data in data_seq:
-            # parser = data.split()
-            # name = parser[0]
-            # args = parser[1:]
-            # if name not in self.comm_yaml:
-            #     self.get_logger().info(
-            #         f"The name {name} does not exists in the yaml file com_msgs."
-            #     )
-            # msg_type = self.comm_yaml[name]["receive"]
-            # if msg_type is None:
-            #     return
-            # if msg_type not in self.msgs_yaml:
-            #     self.get_logger().info(
-            #         f"The message type {msg_type} does not exists in the yaml file format_msgs."
-            #     )
-            # name_type = [nt for nt in self.type_names if nt in self.msgs_yaml[msg_type].keys()][0]
-            # result = {
-            #     key: args[i]
-            #     for i, key in enumerate(list(self.msgs_yaml[msg_type][name_type].keys()))
-            # }
-            # self.get_logger().info("Received:")
-            # for key in result.keys():
-            #     self.get_logger().info(f"{key}: {result[key]}.")
             self.pub_feedback_command.publish(String(data=data))
             if self.set_asserv:
                 self.check_and_publish_asserv(data)
@@ -241,9 +223,11 @@ class Communication(Node):
     def check_and_publish_asserv(self, data):
         """Publish the asserv data if necessary."""
         if len(data) == 0:
-            self.get_logger().warn("Data len is 0.")
             return
         splitted_data = data.split()
+        if len(splitted_data) < 1:
+            return
+        self.get_logger().info(f"splitted_data: {splitted_data}")
         if splitted_data[0] == "MAPASSERV":
             pos = Point()
             pos.x = float(splitted_data[1])
