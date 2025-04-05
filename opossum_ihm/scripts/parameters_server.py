@@ -4,7 +4,6 @@
 import rclpy
 from rclpy.node import Node
 from cdf_msgs.srv import Init
-import tkinter as tk
 
 
 class ParametersServer(Node):
@@ -38,13 +37,14 @@ class ParametersServer(Node):
     def set_parameters_callback(self, request, response):
         self.get_logger().info(
             f"Received request: team_color={request.team_color}, "
-            f"script_number={request.script_number}, debug_mode={request.debug_mode}"
+            f"script_number={request.script_number}, "
+            f"debug_mode={request.debug_mode}"
         )
 
         # Validation des valeurs
         if request.team_color not in ["blue", "yellow"]:
             response.success = False
-            self.get_logger().error("Invalid team_color. Must be 'blue' or 'yellow'.")
+            self.get_logger().error("Invalid team_color.")
             return response
 
         # Mise à jour des paramètres
