@@ -22,7 +22,8 @@ class IhmNode(Node):
         self.gui = GUI()
 
         # Démarrage de la logique principale
-        self.logic_thread = threading.Thread(target=self.main_logic, daemon=True)
+        self.logic_thread = threading.Thread(target=self.main_logic,
+                                             daemon=True)
         self.logic_thread.start()
 
     def main_logic(self):
@@ -87,7 +88,10 @@ class IhmNode(Node):
         self.sub_score_topic = self.create_subscription(
             Int32, "score", self.score_callback, 10
         )
-        self.sub_au_topic = self.create_subscription(Bool, "au", self.au_callback, 10)
+        self.sub_au_topic = self.create_subscription(Bool,
+                                                     "au",
+                                                     self.au_callback,
+                                                     10)
         self.sub_enable_timer_topic = self.create_subscription(
             Bool, "enable_timer", self.enable_timer_callback, 10
         )

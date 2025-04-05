@@ -363,7 +363,8 @@ class GUI:
         assert self.color_app.selected_color is not None
         assert self.img_app.selected_script is not None
         self.validation_app = ValidationApp(
-            self.color_app.selected_color, self.img_app.selected_script
+            self.color_app.selected_color,
+            self.img_app.selected_script
         )
         self.reload = self.validation_app.reload
 
