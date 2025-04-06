@@ -1,4 +1,4 @@
-# Opossum bringup
+# OPOSSUM BRINGUP
 
 In this packages are located all the main launchers to run the robot.
 
