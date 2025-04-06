@@ -23,6 +23,8 @@ ros2 launch opossum_comm comm.launch.py simulation:=true
 
 As for simulation, you can add as many robots as you want (only `main_robot` by default), by adding `robot_names:=main_robot,ennemi_robot,third_robot` for example. However, you have to check that configuration file is set for these robots.
 
+You can then open a new terminal and run:
+
 ```
 ros2 topic pub /main_robot/command std_msgs/String "data: 'YOUR_COMMAND arg0 arg1 arg2'" -1 # Here we want to talk with the main_robot
 ```
