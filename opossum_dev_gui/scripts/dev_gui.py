@@ -114,7 +114,7 @@ class MapScene(QtWidgets.QGraphicsView):
         self.parent = parent
         self.name = name
         image_path = os.path.join(
-            get_package_share_directory("orchestrator_gui"), "images"
+            get_package_share_directory("opossum_dev_gui"), "images"
         )
         map = os.path.join(image_path, "plateau.png")
         icon = os.path.join(image_path, "robot.png")
