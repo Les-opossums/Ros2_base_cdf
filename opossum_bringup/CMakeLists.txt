@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(opossum_simu)
+project(opossum_bringup)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -12,9 +12,6 @@ find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(cdf_msgs REQUIRED)
-find_package(vision_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(Eigen3 REQUIRED)
 
 include_directories(include)
 
@@ -24,23 +21,11 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}/
 )
 
-add_executable(position_sender src/position_sender.cpp)
-ament_target_dependencies(position_sender rclcpp cdf_msgs geometry_msgs)
-
-# Install cpp executables
-install(TARGETS
-  position_sender
-  DESTINATION lib/${PROJECT_NAME}
-)
-
 ament_python_install_package(${PROJECT_NAME})
+
 
 # Install Python executables
 install(PROGRAMS
-  scripts/zynq_simu.py
-  scripts/motor_simu.py
-  scripts/lidar_simu.py
-  scripts/position_sender.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

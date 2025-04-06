@@ -1,12 +1,11 @@
 main_robot:
-  communication_node:
+  comm_node:
     ros__parameters:
-      set_asserv: true
-      asserv_topic: asserv
-
-      simulation: false
       rcv_comm_topic: zync_raspi
       send_comm_topic: raspi_zync
+
+      set_asserv: true
+      asserv_topic: asserv
 
       cards_name: ["zynq"]
       command_topic: command
