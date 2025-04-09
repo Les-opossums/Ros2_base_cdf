@@ -3,7 +3,6 @@
 import rclpy
 from rclpy.node import Node
 from cdf_msgs.srv import Init
-import tkinter as tk
 from opossum_ihm.interface import GUI
 from std_msgs.msg import Int32, Bool
 import threading
@@ -17,6 +16,8 @@ class IhmNode(Node):
         # Initialisation des abonnements
         self._init_subscribers()
         self.current_score = 0
+        self.clr = 'blue'
+        self.scr = 0
 
         # Initialisation de l'interface graphique
         self.gui = GUI()
@@ -30,6 +31,7 @@ class IhmNode(Node):
         """Logique principale pour interagir avec l'utilisateur."""
         while True:
             self.gui.reload = False
+            self.update_parameters()
             self.gui.run_color()
             if self.gui.reload:
                 continue
@@ -77,7 +79,8 @@ class IhmNode(Node):
         """Gère la réponse du service asynchrone."""
         try:
             response = future.result()
-            self.get_logger().info(f"Parameters updated successfully: {response}")
+            self.get_logger().info(f"Parameters updated successfully: "
+                                   f"{response}")
         except Exception as e:
             self.get_logger().error(f"Service call failed: {e}")
 
@@ -102,7 +105,8 @@ class IhmNode(Node):
         if self.gui.initialized:
             self.gui.score_app.score += msg.data
             self.get_logger().info(
-                f"Score received: {msg.data}, current_score={self.gui.score_app.score}"
+                f"Score received: {msg.data}, "
+                f"current_score={self.gui.score_app.score}"
             )
 
     def au_callback(self, msg):
