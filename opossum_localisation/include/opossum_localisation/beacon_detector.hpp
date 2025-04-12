@@ -11,6 +11,8 @@
 #include <string>
 #include <array>
 #include <Eigen/Dense>
+#include <memory>
+#include <sstream>
 
 #include "opossum_localisation/math_lidar.hpp"
 #include "opossum_localisation/BeaconSorter.hpp"
@@ -60,6 +62,7 @@ private:
 
     // ROS 2 communication
     rclcpp::Publisher<cdf_msgs::msg::LidarLoc>::SharedPtr pub_location_;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_location_cmd_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_debug_;
 
     rclcpp::Subscription<obstacle_detector::msg::Obstacles>::SharedPtr sub_object_;

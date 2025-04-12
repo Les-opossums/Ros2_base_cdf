@@ -16,6 +16,7 @@ from std_msgs.msg import String
 import functools
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from rclpy.logging import get_logger
 
 
 class NodeGUI(Node):
@@ -132,7 +133,7 @@ class MapScene(QtWidgets.QGraphicsView):
 
         # Chargement de l'icône et ajout d'un item déplaçable
         self.icon_pixmap = QtGui.QPixmap(icon).scaled(
-            100, 100, QtCore.Qt.KeepAspectRatio
+            50, 50, QtCore.Qt.KeepAspectRatio
         )
         self.icon_item = DraggablePixmapItem(self.icon_pixmap)
         icon_rect = self.icon_item.boundingRect()
@@ -140,7 +141,7 @@ class MapScene(QtWidgets.QGraphicsView):
         self.icon_height = icon_rect.height()
         self.icon_item.setPos(5, 5)  # Position initiale
         m_pixmap = QtGui.QPixmap(self.mad_icon).scaled(
-            100, 100, QtCore.Qt.KeepAspectRatio
+            50, 50, QtCore.Qt.KeepAspectRatio
         )
         dragmap = DraggablePixmapItem(m_pixmap)
         m_icon_rect = dragmap.boundingRect()
@@ -174,7 +175,7 @@ class MapScene(QtWidgets.QGraphicsView):
         posy = height * (1 - msg.robot_position.y / 2) - self.icon_height / 2
         new_pos = QtCore.QPointF(posx, posy)
         self.icon_item.setPos(new_pos)
-        new_rotation = msg.robot_position.z * 180 / np.pi
+        new_rotation = -msg.robot_position.z * 180 / np.pi
         self.icon_item.setRotation(new_rotation)
         index = 0
         for rob in msg.other_robot_position:
@@ -193,8 +194,10 @@ class MapScene(QtWidgets.QGraphicsView):
                 e_y = height * (1 - rob.y / 2) - self.m_icon_height / 2
                 e_pos = QtCore.QPointF(e_x, e_y)
                 self.ennemis_items[index].setPos(e_pos)
-                self.scene.addItem(self.ennemis_items[index])
+                # self.scene.addItem(self.ennemis_items[index])
             index += 1
+        # logger = get_logger("HEY")
+        # logger.info(f"NUM robo: {len(self.ennemis_items)}")
         if index < len(self.ennemis_items) - 1:
             self.ennemis_items = self.ennemis_items[:index]
 
@@ -521,7 +524,7 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         super().__init__()
         # Set main characteristics
         self.setWindowTitle("Orchestrator GUI")
-        self.setGeometry(0, 0, 1000, 800)
+        self.setGeometry(0, 0, 600, 800)
 
         # ROS connection
         self.gui_node = NodeGUI(self)
