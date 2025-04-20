@@ -11,7 +11,7 @@ tf_broadcaster_node:
 main_robot:
   rplidar_node:
     ros__parameters:
-      serial_port: /dev/ttyUSB1
+      serial_port: /dev/ttyLidar
       serial_baudrate: 256000
       channel_type: serial
       frame_id: laser_frame
