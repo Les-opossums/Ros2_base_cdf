@@ -12,6 +12,8 @@ import os
 import serial
 import yaml
 import functools
+import csv
+import time
 
 # Msgs import
 from std_msgs.msg import String
@@ -56,6 +58,13 @@ class Communication(Node):
         self.simulation = (
             self.get_parameter("simulation").get_parameter_value().bool_value
         )
+        self.buffer = []
+        self.csv_file = "/tmp/debug_" + str(time.time()) + ".csv"
+        with open(self.csv_file, "w", newline="") as csvfile:
+            self.get_logger().info("Creating the file")
+            writer = csv.writer(csvfile)
+            writer.writerow(["x", "y", "theta", "vx", "vy", "vtheta"])
+
         self.type_names = ["struct", "variable", "array"]
         self.set_asserv = (
             self.get_parameter("set_asserv").get_parameter_value().bool_value
@@ -239,6 +248,21 @@ class Communication(Node):
             vel.y = float(splitted_data[5])
             vel.z = float(splitted_data[6])
             self.pub_asserv_vel.publish(vel)
+            self.buffer.append((pos.x, pos.y, pos.z, vel.x, vel.y, vel.z))
+            if len(self.buffer) >= 1000:
+                write_to_csv(self.csv_file, self.buffer)
+                self.get_logger().info(
+                    f"Dumped {len(self.buffer)} records to {self.csv_file}."
+                )
+                # Clear the buffer after dumping to file
+                self.buffer.clear()
+
+
+def write_to_csv(filename, data):
+    """Append a list of sensor data entries to a CSV file."""
+    with open(filename, "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerows(data)
 
 
 def main(args=None):
@@ -251,6 +275,13 @@ def main(args=None):
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
+
+        if zynq_comm_simu_node.buffer or True:
+            write_to_csv(zynq_comm_simu_node.csv_file, zynq_comm_simu_node.buffer)
+            zynq_comm_simu_node.get_logger().info(
+                f"Dumped remaining {len(zynq_comm_simu_node.buffer)} records to {zynq_comm_simu_node.csv_file} before exit."
+            )
+        zynq_comm_simu_node.get_logger().info("Data collection terminated.")
         zynq_comm_simu_node.destroy_node()
         rclpy.shutdown()
 
