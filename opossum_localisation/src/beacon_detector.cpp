@@ -172,10 +172,10 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
             pub_location_->publish(msg);
             std_msgs::msg::String msg_cmd;
             std::ostringstream ss;
-            ss << "SETLIDAR " 
-            << position_found->x() << " " 
-            << position_found->y() << " " 
-            << position_found->z();
+            ss << "SETLIDAR "
+            << position_found->x() << " "
+            << position_found->y() << " "
+            << position_found->z() - 3.6651914;
             msg_cmd.data = ss.str();
             // Log the message to console
             RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", msg_cmd.data.c_str());
