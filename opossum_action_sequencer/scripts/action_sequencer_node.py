@@ -7,9 +7,8 @@ from rclpy.node import Node
 from rcl_interfaces.msg import ParameterEvent
 
 from std_msgs.msg import String
-from action_sequencer.action_manager import Version, Position, Speed
-from action_sequencer.action_manager import PUMP_struct, LED_struct
-from action_sequencer.action_manager import ODOM_struct, SERVO_struct
+
+from opossum_action_sequencer.utils import *
 
 
 class ActionManager(Node):
@@ -56,6 +55,8 @@ class ActionManager(Node):
                 self.get_logger().info(
                     f"Choix du script : {changed.value}"
                 )
+                run()
+
 
     def feedback_callback(self, msg):
         self.get_logger().info(f"Feedback received: {msg.data}")
