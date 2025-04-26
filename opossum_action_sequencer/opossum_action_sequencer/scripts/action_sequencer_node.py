@@ -55,7 +55,7 @@ class ActionManager(Node):
                 self.get_logger().info(
                     f"Choix du script : {changed.value}"
                 )
-                run()
+                Script.run()
 
 
     def feedback_callback(self, msg):

@@ -5,4 +5,4 @@ from opossum_action_sequencer.action_manager import PUMP_struct, LED_struct
 from opossum_action_sequencer.action_manager import Version, Position, Speed
 from opossum_action_sequencer.action_manager import ODOM_struct, SERVO_struct
 
-from .match.script1 import run
+from opossum_action_sequencer.match.script1 import Script

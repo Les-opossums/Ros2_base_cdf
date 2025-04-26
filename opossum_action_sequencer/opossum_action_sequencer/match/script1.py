@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from action_sequencer.action_sequencer_node import ActionManager
-from action_sequencer.action_manager import Version, Position, Speed
-from action_sequencer.action_manager import PUMP_struct, LED_struct
-from action_sequencer.action_manager import ODOM_struct, SERVO_struct
+from opossum_action_sequencer.scripts.action_sequencer_node import ActionManager
+from opossum_action_sequencer.action_manager import Version, Position, Speed
+from opossum_action_sequencer.action_manager import PUMP_struct, LED_struct
+from opossum_action_sequencer.action_manager import ODOM_struct, SERVO_struct
 
 
 class Script(ActionManager):

@@ -20,14 +20,13 @@ include_directories(include)
 
 install(DIRECTORY
   config
-  match
   DESTINATION share/${PROJECT_NAME}/
 )
 
 ament_python_install_package(${PROJECT_NAME})
 
 install(PROGRAMS
-  scripts/action_sequencer_node.py
+  opossum_action_sequencer/scripts/action_sequencer_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
