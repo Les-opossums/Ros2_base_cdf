@@ -1,6 +1,6 @@
 dev_gui_node:
   ros__parameters:
-    rosbridge_ip: "100.118.237.88"
+    rosbridge_ip: "100.73.192.52"
     set_asserv: false
     position_topic: position_out
     command_topic: command
