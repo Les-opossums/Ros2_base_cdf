@@ -55,8 +55,12 @@ class ActionManager(Node):
                 self.get_logger().info(
                     f"Choix du script : {changed.value}"
                 )
+                # Import script
+                if changed.value == 1:
+                    from opossum_action_sequencer.match.script1 import Script
+                elif changed.value == 2:
+                    from opossum_action_sequencer.match.script2 import Script
                 Script.run()
-
 
     def feedback_callback(self, msg):
         self.get_logger().info(f"Feedback received: {msg.data}")
