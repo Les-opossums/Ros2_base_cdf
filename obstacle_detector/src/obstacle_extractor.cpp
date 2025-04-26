@@ -546,9 +546,9 @@ void ObstacleExtractor::transformObstacles() {
         m_transform = tf_buffer_->lookupTransform(p_frame_id_, base_frame_id_, tf2::TimePointZero);
     }
     catch (const tf2::TransformException & ex) {
-        RCLCPP_INFO(
-        nh_->get_logger(), "Could not transformmm %s to %s: %s",
-        p_frame_id_.c_str(), base_frame_id_.c_str(), ex.what());
+        // RCLCPP_INFO(
+        // nh_->get_logger(), "Could not transformmm %s to %s: %s",
+        // p_frame_id_.c_str(), base_frame_id_.c_str(), ex.what());
         return;
     }
 

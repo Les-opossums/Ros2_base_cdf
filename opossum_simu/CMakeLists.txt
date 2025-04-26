@@ -41,6 +41,7 @@ install(PROGRAMS
   scripts/motor_simu.py
   scripts/lidar_simu.py
   scripts/position_sender.py
+  scripts/robot_controller.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

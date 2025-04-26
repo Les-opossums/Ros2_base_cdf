@@ -12,6 +12,8 @@ import os
 import serial
 import yaml
 import functools
+import csv
+from datetime import datetime
 
 # Msgs import
 from std_msgs.msg import String
@@ -56,6 +58,20 @@ class Communication(Node):
         self.simulation = (
             self.get_parameter("simulation").get_parameter_value().bool_value
         )
+        self.buffer = []
+        # Get the current datetime
+        now = datetime.now()
+
+        # Format the date and time
+        formatted_datetime = now.strftime("%d-%m-%Y-%H_%M_%S")
+        self.csv_file = "/tmp/debug_" + formatted_datetime + ".csv"
+        with open(self.csv_file, "w", newline="") as csvfile:
+            self.get_logger().info("Creating the file")
+            writer = csv.writer(csvfile)
+            writer.writerow(
+                ["x", "y", "theta", "vx", "vy", "vtheta", "opt0", "opt1", "opt2"]
+            )
+
         self.type_names = ["struct", "variable", "array"]
         self.set_asserv = (
             self.get_parameter("set_asserv").get_parameter_value().bool_value
@@ -163,11 +179,6 @@ class Communication(Node):
                     # splited = line.split(",")
                     if True:
                         self.get_logger().info("GOT IT")
-
-                        # if (
-                        #     splited[0].lower() == "version"
-                        #     and splited[1][1:].lower() == name
-                        # ):
                         return tested_serial
                     else:
                         raise ValueError("unknown card type")
@@ -194,7 +205,7 @@ class Communication(Node):
                 char_available = serial_card.in_waiting
                 if char_available != 0:
                     received_data = str(serial_card.read(char_available).decode("UTF8"))
-                    self.get_logger().info(f"received: {received_data}")
+                    # self.get_logger().info(f"received: {received_data}")
                     try:
                         data_sequences = received_data.split("\n")
                     except Exception:
@@ -227,8 +238,7 @@ class Communication(Node):
         splitted_data = data.split()
         if len(splitted_data) < 1:
             return
-        self.get_logger().info(f"splitted_data: {splitted_data}")
-        if splitted_data[0] == "MAPASSERV":
+        if splitted_data[0] == "DEBUG" and len(splitted_data) == 10:
             pos = Point()
             pos.x = float(splitted_data[1])
             pos.y = float(splitted_data[2])
@@ -238,7 +248,27 @@ class Communication(Node):
             vel.x = float(splitted_data[4])
             vel.y = float(splitted_data[5])
             vel.z = float(splitted_data[6])
+            opt0 = float(splitted_data[7])
+            opt1 = float(splitted_data[8])
+            opt2 = float(splitted_data[9])
             self.pub_asserv_vel.publish(vel)
+            self.buffer.append(
+                (pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, opt0, opt1, opt2)
+            )
+            if len(self.buffer) >= 1000:
+                write_to_csv(self.csv_file, self.buffer)
+                self.get_logger().info(
+                    f"Dumped {len(self.buffer)} records to {self.csv_file}."
+                )
+                # Clear the buffer after dumping to file
+                self.buffer.clear()
+
+
+def write_to_csv(filename, data):
+    """Append a list of sensor data entries to a CSV file."""
+    with open(filename, "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerows(data)
 
 
 def main(args=None):
@@ -251,8 +281,16 @@ def main(args=None):
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
+        zynq_comm_simu_node.get_logger().info(
+            f"Data collection terminated, buffer_len: {zynq_comm_simu_node.buffer} ."
+        )
+        if zynq_comm_simu_node.buffer or True:
+            write_to_csv(zynq_comm_simu_node.csv_file, zynq_comm_simu_node.buffer)
+            zynq_comm_simu_node.get_logger().info(
+                f"Dumped remaining {len(zynq_comm_simu_node.buffer)} records to {zynq_comm_simu_node.csv_file} before exit."
+            )
         zynq_comm_simu_node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == "__main__":

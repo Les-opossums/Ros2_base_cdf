@@ -13,5 +13,5 @@ main_robot:
       frequency: 100.
       cards:
         zynq:
-          port: '/dev/ttyUSB0'
+          port: '/dev/ttyZynq'
           baudrate: 115200
