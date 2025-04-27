@@ -40,5 +40,5 @@ def lidar_scan(angles, objects, max_range=10.0):
                     min_distance = t
             # elif: similar block for rectangle intersections
         scan_results.append(min_distance)
-        scan_results = [p if p < max_range else 0.0 for p in scan_results]
+        scan_results = [p if p < max_range else max_range for p in scan_results]
     return scan_results

@@ -4,8 +4,28 @@ main_robot:
       rcv_comm_topic: zync_raspi
       send_comm_topic: raspi_zync
 
-      set_asserv: true
       asserv_topic: asserv
+      robot_data_topic: robot_data
+      goal_position_topic: goal_position
+
+      cards_name: ["zynq"]
+      command_topic: command
+      feedback_command_topic: feedback_command
+      frequency: 100.
+      cards:
+        zynq:
+          port: '/dev/ttyZynq'
+          baudrate: 115200
+
+second_robot:
+  comm_node:
+    ros__parameters:
+      rcv_comm_topic: zync_raspi
+      send_comm_topic: raspi_zync
+
+      asserv_topic: asserv
+      robot_data_topic: robot_data
+      goal_position_topic: goal_position
 
       cards_name: ["zynq"]
       command_topic: command

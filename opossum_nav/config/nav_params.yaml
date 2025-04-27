@@ -1,0 +1,23 @@
+
+main_robot:
+  avoid_obstacle_node:
+    ros__parameters:
+      robot_data_topic: robot_data
+      position_topic: position_out
+      goal_position_topic: goal_position
+      scan_topic: scan
+      command_topic: command
+      obstacle_detected_topic: obstacle_detected
+      obstacle_detection_distance: 0.4
+      detection_mode: full
+      # angle_correction: -1.5707963267948966  # pi / 2
+      angle_correction: -3.6651914
+      angle_increment: 0.0032287694048136473
+      len_scan: 1947
+      cone_range: 80.0
+      thickness: 0.2
+      boundaries: [0.0, 2.0, 0.0, 3.0]
+      boundary_limit_detection: 0.05
+      enable_detection: true
+      enable_boundary_check: true
+      enable_new_path: false

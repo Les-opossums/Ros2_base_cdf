@@ -14,7 +14,9 @@ def generate_launch_description():
     )
     simulation = LaunchConfiguration("simulation")
     robot_names_arg = DeclareLaunchArgument(
-        "robot_names", default_value="main_robot", description="Set list of robots"
+        "robot_names",
+        default_value="main_robot, second_robot",
+        description="Set list of robots",
     )
     robot_names = LaunchConfiguration("robot_names")
 

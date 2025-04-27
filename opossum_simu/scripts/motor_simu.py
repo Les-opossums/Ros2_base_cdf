@@ -14,6 +14,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 # Import des messages
 from cdf_msgs.action import StringAction
 from cdf_msgs.srv import StringReq
+from std_msgs.msg import String
 from geometry_msgs.msg import Point
 import threading
 import collections
@@ -61,6 +62,7 @@ class MotorSimu(Node):
             self.get_parameter("boundaries").get_parameter_value().double_array_value
         )
         self.blocking = False
+        self.ask_for_block = False
         if self.blocking:
             self._goal_queue = collections.deque()
             self._goal_queue_lock = threading.Lock()
@@ -79,6 +81,8 @@ class MotorSimu(Node):
         self.pub_real_position = self.create_publisher(
             Point, self.real_position_topic, 10
         )
+
+        self.pub_feedback_command = self.create_publisher(String, "zync_raspi", 10)
 
     def _init_action_server(self):
         """Init server actions of the node."""
@@ -134,6 +138,9 @@ class MotorSimu(Node):
                 response.response += "\n"
                 time.sleep(self.compute_period)
 
+        elif request_split[0] == "BLOCK":
+            self.ask_for_block = True
+
         return response
 
     def _single_handle_accepted_callback(self, goal_handle):
@@ -167,6 +174,7 @@ class MotorSimu(Node):
 
     def execute_callback(self, goal_handle):
         """Execute the actions."""
+        self.ask_for_block = False
         req = goal_handle.request.data.split(",")
         name = req[0]
         args = req[1:]
@@ -194,7 +202,7 @@ class MotorSimu(Node):
                     + ","
                     + str(self.position[2].item())
                 )
-                while not reached_position:
+                while not reached_position and not self.ask_for_block:
                     if goal_handle.is_cancel_requested:
                         goal_handle.canceled()
                         return StringAction.Result()
@@ -219,7 +227,15 @@ class MotorSimu(Node):
                             z=float(self.position[2].item()),
                         )
                     )
+                    self.pub_feedback_command.publish(
+                        String(
+                            data=f"PDE {self.position[0].item()} {self.position[1].item()} {self.position[2].item()} {self.linear_velocity} {np.arctan2(self.velocity[1], self.velocity[0]).item()}"
+                        )
+                    )
                     time.sleep(self.compute_period)
+                if self.ask_for_block:
+                    self.ask_for_block = False
+                    self.velocity = np.array([[0.0], [0.0], [0.0]])
                 if not self.blocking:
                     with self._goal_lock:
                         if not goal_handle.is_active:

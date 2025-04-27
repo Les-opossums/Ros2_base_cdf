@@ -16,7 +16,6 @@ from std_msgs.msg import String
 import functools
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from rclpy.logging import get_logger
 
 
 class NodeGUI(Node):
@@ -132,9 +131,7 @@ class MapScene(QtWidgets.QGraphicsView):
         self.scene.addItem(self.map_item)
 
         # Chargement de l'icône et ajout d'un item déplaçable
-        self.icon_pixmap = QtGui.QPixmap(icon).scaled(
-            50, 50, QtCore.Qt.KeepAspectRatio
-        )
+        self.icon_pixmap = QtGui.QPixmap(icon).scaled(50, 50, QtCore.Qt.KeepAspectRatio)
         self.icon_item = DraggablePixmapItem(self.icon_pixmap)
         icon_rect = self.icon_item.boundingRect()
         self.icon_width = icon_rect.width()
@@ -186,7 +183,7 @@ class MapScene(QtWidgets.QGraphicsView):
                 self.ennemis_items[index].setPos(e_pos)
             else:
                 e_pix = QtGui.QPixmap(self.mad_icon).scaled(
-                    100, 100, QtCore.Qt.KeepAspectRatio
+                    50, 50, QtCore.Qt.KeepAspectRatio
                 )
                 e_item = DraggablePixmapItem(e_pix)
                 self.ennemis_items.append(e_item)
@@ -194,7 +191,7 @@ class MapScene(QtWidgets.QGraphicsView):
                 e_y = height * (1 - rob.y / 2) - self.m_icon_height / 2
                 e_pos = QtCore.QPointF(e_x, e_y)
                 self.ennemis_items[index].setPos(e_pos)
-                # self.scene.addItem(self.ennemis_items[index])
+                self.scene.addItem(self.ennemis_items[index])
             index += 1
         # logger = get_logger("HEY")
         # logger.info(f"NUM robo: {len(self.ennemis_items)}")
