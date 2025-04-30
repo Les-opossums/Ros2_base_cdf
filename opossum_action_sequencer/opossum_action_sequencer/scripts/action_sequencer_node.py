@@ -58,9 +58,14 @@ class ActionManager(Node):
                 # Import script
                 if changed.value == 1:
                     from opossum_action_sequencer.match.script1 import Script
+                    self.get_logger().info(f'Script 1')
                 elif changed.value == 2:
                     from opossum_action_sequencer.match.script2 import Script
-                Script.run()
+                    self.get_logger().info(f'Script 2')
+                else:
+                    from opossum_action_sequencer.match.script1 import Script
+                    self.get_logger().info(f'Default script')
+                Script.run(self)
 
     def feedback_callback(self, msg):
         self.get_logger().info(f"Feedback received: {msg.data}")
@@ -88,6 +93,9 @@ class ActionManager(Node):
         self.pub_command.publish(String(
             data=f"LED {led.red} {led.green} {led.blue}"
         ))
+
+    def write_log(self, message):
+        self.get_logger().info(f"{message}")
 
 
 def main(args=None):
