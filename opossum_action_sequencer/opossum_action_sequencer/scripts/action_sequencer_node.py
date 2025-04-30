@@ -74,6 +74,21 @@ class ActionManager(Node):
             data=f"MOVE {pos.x} {pos.y} {pos.t}"
         ))
 
+    def servo(self, servo: SERVO_struct):
+        self.pub_command.publish(String(
+            data=f"SERVO {servo.servo_id} {servo.angle}"
+        ))
+
+    def pump(self, pump: PUMP_struct):
+        self.pub_command.publish(String(
+            data=f"PUMP {pump.pump_id} {pump.enable}"
+        ))
+
+    def led(self, led: LED_struct):
+        self.pub_command.publish(String(
+            data=f"LED {led.red} {led.green} {led.blue}"
+        ))
+
 
 def main(args=None):
     rclpy.init(args=args)
