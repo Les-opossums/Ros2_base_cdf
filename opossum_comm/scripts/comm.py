@@ -210,7 +210,7 @@ class Communication(Node):
             goal_pos.goal_position.y = float(splitted_data[2])
             goal_pos.goal_position.z = float(splitted_data[3])
             goal_pos.detection_mode = -1  # int(splitted_data[4])
-            goal_pos.obstacle_detection_distance = float(splitted_data[5])
+            goal_pos.obstacle_detection_distance = 0.4 # float(splitted_data[5])
             self.pub_goal_position.publish(goal_pos)
             msg.data = " ".join(splitted_data[:4])
             self.get_logger().info("I DID PUBLIUSH")
