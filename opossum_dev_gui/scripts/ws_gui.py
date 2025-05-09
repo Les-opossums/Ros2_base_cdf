@@ -3,8 +3,6 @@
 
 import sys
 import random
-import rclpy
-from rclpy.node import Node
 
 # from PyQt5.QtChart import QChart, QChartView, QLineSeries
 from PyQt5 import QtWidgets, QtGui, QtCore
@@ -12,99 +10,109 @@ from ament_index_python.packages import get_package_share_directory
 import os
 import numpy as np
 from cdf_msgs.msg import LidarLoc
-from std_msgs.msg import String
-import functools
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from rclpy.logging import get_logger
+import websocket
+import threading
+import json
+import yaml
 
 
-class NodeGUI(Node):
-    """Make the link between interface and ROS messages."""
+def load_config(file_path):
+    """Load the YAML config."""
+    with open(file_path, "r") as f:
+        config = yaml.safe_load(f)
+    return config
 
-    def __init__(self, parent=None):
-        super().__init__("gui_node")
+
+class RosbridgeClient:
+    """Connect GUI to ROS through rosbridge."""
+
+    def __init__(self, parent):
+        config_params_path = os.path.join(
+            get_package_share_directory("opossum_dev_gui"),
+            "config",
+            "dev_gui_params.yaml",
+        )
+        config_params = load_config(config_params_path)
+        config = config_params["dev_gui_node"]["ros__parameters"]
+
+        # Access settings
+        self.position_topic = config["position_topic"]
+        self.command_topic = config["command_topic"]
+        self.rosbridge_ip = config["rosbridge_ip"]
+
         self.parent = parent
-        self._init_parameters()
-        self._init_publishers()
-        self._init_subscriber()
-        self.get_logger().info("Orchestrator GUI node initialized.")
+        self.robot_names = ["main_robot"]  # We will fill it when needed
 
-    def _init_parameters(self) -> None:
-        """Initialize parameters of the node."""
-        self.declare_parameters(
-            namespace="",
-            parameters=[
-                ("set_asserv", rclpy.Parameter.Type.BOOL),
-                ("position_topic", rclpy.Parameter.Type.STRING),
-                ("command_topic", rclpy.Parameter.Type.STRING),
-                ("feedback_command_topic", rclpy.Parameter.Type.STRING),
-                ("robot_names", rclpy.Parameter.Type.STRING_ARRAY),
-            ],
-        )
-        self.robot_names = (
-            self.get_parameter("robot_names").get_parameter_value().string_array_value
-        )
-        self.set_asserv = (
-            self.get_parameter("set_asserv").get_parameter_value().bool_value
+        self.ws = websocket.WebSocketApp(
+            f"ws://{self.rosbridge_ip}:9090",
+            on_message=self.on_message,
+            on_open=self.on_open,
+            on_error=self.on_error,
+            on_close=self.on_close,
         )
 
-    def _init_publishers(self):
-        """Initialize subscribers of the node."""
-        self.command_topic = (
-            self.get_parameter("command_topic").get_parameter_value().string_value
-        )
-        self.pub_command = {
-            name: self.create_publisher(String, name + "/" + self.command_topic, 10)
-            for name in self.robot_names
-        }
+        self.thread = threading.Thread(target=self.ws.run_forever)
+        self.thread.daemon = True
+        self.thread.start()
 
-    def _init_subscriber(self):
-        """Initialize subscribers of the node."""
-        position_topic = (
-            self.get_parameter("position_topic").get_parameter_value().string_value
-        )
+        self.connected = False
+
+    def on_open(self, ws):
+        """Open the rosbridge connection."""
+        print("[RosbridgeClient] Connected to rosbridge!")
+        self.connected = True
+        # Subscribe to topics once connection is open
+        self._subscribe_to_all()
+
+    def on_error(self, ws, error):
+        """Ouput the error fo Rosbridge."""
+        print(f"[RosbridgeClient] Error: {error}")
+
+    def on_close(self, ws, close_status_code, close_msg):
+        """Advert the closing connection."""
+        print("[RosbridgeClient] Disconnected from rosbridge.")
+
+    def _subscribe_to_all(self):
+        """Subscribe to all robot position topics."""
         for name in self.robot_names:
-            self.create_subscription(
-                LidarLoc,
-                name + "/" + position_topic,
-                functools.partial(self.position_callback, name=name),
-                10,
-            )
-        if self.set_asserv:
-            asserv_topic = (
-                self.get_parameter("asserv_topic").get_parameter_value().string_value
-            )
-            for name in self.robot_names:
-                self.create_subscription(
-                    String,
-                    name + "/" + asserv_topic + "/pos",
-                    functools.partial(self.check_asserv_callback, name=name),
-                    10,
-                )
-                self.create_subscription(
-                    String,
-                    name + "/" + asserv_topic + "/vel",
-                    functools.partial(self.check_asserv_callback, name=name),
-                    10,
-                )
+            topic = f"/{name}/{self.position_topic}"
+            msg = {"op": "subscribe", "topic": topic, "type": "cdf_msgs/msg/LidarLoc"}
+            self.ws.send(json.dumps(msg))
+            print(f"[RosbridgeClient] Subscribed to {topic}")
+
+    def configure_robots(self):
+        """Set robot names and subscribe when ready."""
+        if self.connected:
+            self._subscribe_to_all()
 
     def publish_command(self, name, command_name, args):
-        """Publish the command for the robot."""
-        command_msg = String()
-        command = command_name.upper()
-        for arg in args:
-            command += " " + str(arg)
-        command_msg.data = command
-        self.pub_command[name].publish(command_msg)
+        """Publish a command message over rosbridge."""
+        topic = f"/{name}/{self.command_topic}"
+        command = command_name.upper() + " " + " ".join(map(str, args))
+        msg = {"op": "publish", "topic": topic, "msg": {"data": command}}
+        self.ws.send(json.dumps(msg))
+        print(f"[RosbridgeClient] Published to {topic}: {command}")
 
-    def position_callback(self, msg, name):
-        """Receive the last known information and display it."""
-        self.parent.update_robot_position(msg, name)
-
-    def check_asserv_callback(self, msg, name):
-        """Check if an interesting data is received."""
-        self.parent.update_robot_position(msg, name)
+    def on_message(self, ws, message):
+        """Handle incoming messages."""
+        data = json.loads(message)
+        if data.get("op") == "publish":
+            topic = data["topic"]
+            msg = data["msg"]
+            # Extract robot name from topic
+            parts = topic.split("/")
+            if len(parts) >= 2:
+                robot_name = parts[1]
+                # Update the GUI
+                QtCore.QMetaObject.invokeMethod(
+                    self.parent,
+                    "update_robot_position_from_json",
+                    QtCore.Qt.QueuedConnection,
+                    QtCore.Q_ARG(dict, msg),
+                    QtCore.Q_ARG(str, robot_name),
+                )
 
 
 class MapScene(QtWidgets.QGraphicsView):
@@ -132,9 +140,7 @@ class MapScene(QtWidgets.QGraphicsView):
         self.scene.addItem(self.map_item)
 
         # Chargement de l'icône et ajout d'un item déplaçable
-        self.icon_pixmap = QtGui.QPixmap(icon).scaled(
-            50, 50, QtCore.Qt.KeepAspectRatio
-        )
+        self.icon_pixmap = QtGui.QPixmap(icon).scaled(50, 50, QtCore.Qt.KeepAspectRatio)
         self.icon_item = DraggablePixmapItem(self.icon_pixmap)
         icon_rect = self.icon_item.boundingRect()
         self.icon_width = icon_rect.width()
@@ -439,36 +445,6 @@ class PlotCanvas(FigureCanvas):
         self.draw()
 
 
-# class ChartWidget(QtWidgets.QWidget):
-#     """Plot also but a Chart, moving and Dynamic (not well implemented)."""
-
-#     def __init__(self, name, parent):
-#         super().__init__()
-#         self.parent = parent
-#         self.name = name
-#         self.series = QLineSeries()
-#         self.chart = QChart()
-#         self.chart.addSeries(self.series)
-#         self.chart.createDefaultAxes()
-#         self.chart_view = QChartView(self.chart)
-
-#         # Create a button to add a new point.
-#         self.button = QtWidgets.QPushButton("Add Point")
-#         self.button.clicked.connect(self.add_point)
-
-#         layout = QtWidgets.QVBoxLayout(self)
-#         layout.addWidget(self.chart_view)
-#         layout.addWidget(self.button)
-#         self.counter = 0
-
-#     def add_point(self):
-#         """Add a point to the last serie."""
-#         self.counter += 1
-#         new_y = random.uniform(0, 10)
-#         self.series.append(QtCore.QPointF(self.counter, new_y))
-#         self.chart.axisX().setRange(0, self.counter + 1)
-
-
 class MainRobotPage(QtWidgets.QWidget):
     """Page for ecah robot."""
 
@@ -527,11 +503,13 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         self.setGeometry(0, 0, 600, 800)
 
         # ROS connection
-        self.gui_node = NodeGUI(self)
+        self.gui_node = RosbridgeClient(self)
+        self.gui_node.configure_robots()
 
         # GUI for each robot
         self.page_name_box = QtWidgets.QComboBox()
         self.page_name_box.addItems([name for name in self.gui_node.robot_names])
+
         self.robot_pages = {
             name: MainRobotPage(name, self) for name in self.gui_node.robot_names
         }
@@ -547,7 +525,25 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         self.layout.addWidget(self.page_name_box)
         self.layout.addWidget(self.stackedWidgets)
 
-        self._connect_to_ros()
+    @QtCore.pyqtSlot(dict, str)
+    def update_robot_position_from_json(self, msg, name):
+        """Update the robot position from JSON message."""
+
+        class RobotPos:
+            def __init__(self, pos):
+                self.x = pos.get("x", 0.0)
+                self.y = pos.get("y", 0.0)
+                self.z = pos.get("z", 0.0)
+
+        class LidarLocMsg:
+            def __init__(self, data):
+                self.robot_position = RobotPos(data.get("robot_position", {}))
+                self.other_robot_position = [
+                    RobotPos(p) for p in data.get("other_robot_position", [])
+                ]
+
+        lidar_loc_msg = LidarLocMsg(msg)
+        self.update_robot_position(lidar_loc_msg, name)
 
     def update_robot_position(self, msg, name):
         """Update the position of the robot."""
@@ -557,29 +553,17 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         """Send the command request to node ROS."""
         self.gui_node.publish_command(name, command_name, args)
 
-    def _connect_to_ros(self):
-        """Connect ROS to interface."""
-        self.timer = QtCore.QTimer(self)
-        self.timer.timeout.connect(self.spin_ros)
-        self.timer.start(10)
-
     def change_page(self, index):
         """Change the page."""
         self.stackedWidgets.setCurrentIndex(index)
 
-    def spin_ros(self):
-        """Spin the ROS node."""
-        rclpy.spin_once(self.gui_node, timeout_sec=0.001)
-
 
 def main():
     """Run main loop."""
-    rclpy.init(args=None)
     app = QtWidgets.QApplication(sys.argv)
     window = OrchestratorGUI()
     window.show()
     app.exec_()
-    rclpy.shutdown()
 
 
 if __name__ == "__main__":

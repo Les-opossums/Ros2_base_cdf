@@ -114,6 +114,7 @@ void BeaconDetectorNode::init_publishers()
 {
     position_topic_ = this->get_parameter("position_topic").as_string();
     pub_location_ = this->create_publisher<cdf_msgs::msg::LidarLoc>(position_topic_, 10);
+    pub_location_cmd_ = this->create_publisher<std_msgs::msg::String>("command", 10);
 }
 
 void BeaconDetectorNode::init_subscribers()
@@ -159,21 +160,29 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
     }
     std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> beacons_result;
     beacons_result = beacon_sorter_->find_possible_beacons(previous_beacons, new_objects_detected);
+    RCLCPP_INFO(this->get_logger(), "NUMBER BEACONS %d", beacons_result.first);
     if (beacons_result.first > 1)
     {
         std::optional<Eigen::Vector3d> position_found = position_finder_->search_pos(beacons_result.first, beacons_result.second, new_objects_detected);
         if (position_found.has_value())
         {
-            // RCLCPP_INFO(this->get_logger(), "Result: %f %f %f", position_found->x(), position_found->y(), position_found->z());
             std::vector<Eigen::Vector2d> others;
             others = position_finder_->find_robots_on_plateau(new_objects_detected);
             cdf_msgs::msg::LidarLoc msg = publish_pose_from_lidar(position_found.value(), others);
             pub_location_->publish(msg);
+            std_msgs::msg::String msg_cmd;
+            std::ostringstream ss;
+            ss << "SETLIDAR "
+            << position_found->x() << " "
+            << position_found->y() << " "
+            << position_found->z() - 3.6651914;
+            msg_cmd.data = ss.str();
+            // Log the message to console
+            RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", msg_cmd.data.c_str());
+
+            // Publish the message.
+            pub_location_cmd_->publish(msg_cmd);
         }
-        // else
-        // {
-        //     RCLCPP_INFO(this->get_logger(), "UNLUCKY BUT COMPILE!");
-        // }
     }
     // rclcpp::Time now = this->now();
     // int64_t ns_now = now.nanoseconds();
