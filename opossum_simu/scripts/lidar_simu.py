@@ -160,9 +160,7 @@ class LidarSimulation(Node):
                     {"type": "circle", "center": beacon[:2, 0], "radius": self.radius}
                 )
             for e in self.new_ennemis:
-                objects.append(
-                    {"type": "circle", "center": e[:2, 0], "radius": self.radius}
-                )
+                objects.append({"type": "circle", "center": e[:2, 0], "radius": 0.01})
             scan_result = lidar_scan(self.angle_range, objects, self.lidar_range)
             now = self.get_clock().now().to_msg()
             msg.header = Header(

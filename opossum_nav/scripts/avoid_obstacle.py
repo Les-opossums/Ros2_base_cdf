@@ -49,7 +49,7 @@ class ObstacleAvoider(Node):
         self.enable_detection_default = (
             self.get_parameter("enable_detection").get_parameter_value().bool_value
         )
-        self.enable_detection = False
+        self.enable_detection = self.enable_detection_default
         self.enable_boundary_check = (
             self.get_parameter("enable_boundary_check").get_parameter_value().bool_value
         )
@@ -72,6 +72,8 @@ class ObstacleAvoider(Node):
         self.angle_increment = (
             self.get_parameter("angle_increment").get_parameter_value().double_value
         )
+        self.index_correction = int(self.angle_correction / self.angle_increment)
+        self.get_logger().info(f"INDEX CORRECTION: {self.index_correction}")
         self.len_scan = (
             self.get_parameter("len_scan").get_parameter_value().integer_value
         )
@@ -186,9 +188,18 @@ class ObstacleAvoider(Node):
             if self.in_avoid:
                 self.in_avoid = self._find_new_path()
             else:
-                index_correction = int(self.angle_correction / self.angle_increment)
+                # lidar_range = msg.ranges
                 lidar_range = (
-                    msg.ranges[index_correction:] + msg.ranges[:index_correction]
+                    msg.ranges[self.index_correction:]
+                    + msg.ranges[: self.index_correction]
+                )
+                for i in range(len(lidar_range)):
+                    if msg.ranges[i] < 0.5 or lidar_range[i] < 0.5:
+                        self.get_logger().info(
+                            f"{i}, {i * self.angle_increment}, {msg.ranges[i]}, {lidar_range[i]}"
+                        )
+                self.get_logger().info(
+                    f"Self.index_correction: {self.index_correction}"
                 )
                 self.obstacle_detected = self.detect_obstacle(lidar_range)
                 if self.obstacle_detected:
@@ -222,19 +233,12 @@ class ObstacleAvoider(Node):
 
     def _check_in_boundaries(self, i: float, dist: float) -> bool:
         """Check if the obstacle is on the board."""
-        x = dist * np.cos(i * self.angle_increment)
-        y = dist * np.sin(i * self.angle_increment)
-        real_position_x = (
-            self.robot_data.x
-            + x * np.cos(self.robot_data.theta)
-            - y * np.sin(self.robot_data.theta)
+        real_position_x = self.robot_data.x + dist * np.cos(
+            i * self.angle_increment + self.robot_data.theta
         )
-        real_position_y = (
-            self.robot_data.y
-            + x * np.sin(self.robot_data.theta)
-            + y * np.cos(self.robot_data.theta)
+        real_position_y = self.robot_data.y + dist * np.sin(
+            i * self.angle_increment + self.robot_data.theta
         )
-        self.get_logger().info(f"rpos: {real_position_x}, {real_position_y}")
         return (
             real_position_x > self.boundaries[0] + self.boundary_limit_detection
             and real_position_x < self.boundaries[1] - self.boundary_limit_detection
@@ -253,14 +257,17 @@ class ObstacleAvoider(Node):
                     return True
             return False
         for i in range(len(lidar_range)):
+            # self.get_logger().info(f"ranges: {lidar_range[i]}, {self.obstacle_detection_distance}")
             if (
                 lidar_range[i] < self.obstacle_detection_distance
                 or str(lidar_range[i]) == "inf"
             ):
-                self.get_logger().info(f"angle: {i}")
+                self.get_logger().info(
+                    f"angle: {i}, range: {lidar_range[i]}, res: {i * self.angle_increment + self.angle_correction}"
+                )
                 if self._check_in_boundaries(i, lidar_range[i]):
                     self.get_logger().info("Inside")
-                    return True
+                    # return True
         return False
 
     def _detect_obstacle_cone(self, lidar_range: list) -> bool:
