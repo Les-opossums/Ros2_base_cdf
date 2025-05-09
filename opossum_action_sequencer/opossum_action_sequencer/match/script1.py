@@ -10,7 +10,7 @@ import time
 class Script(ActionManager):
     def __init__(self):
         super().__init__('script1')
-        self.pos_departure = Position(0, 0, 0)
+        self.pos_departure = Position(0.6, 0.6, 0)
 
     def run(self):
         # self.move_to(self.pos_departure)
