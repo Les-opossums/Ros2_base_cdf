@@ -283,6 +283,11 @@ class Communication(Node):
             rdata.vlin = float(splitted_data[4])
             rdata.vdir = float(splitted_data[5])
             self.pub_robot_data.publish(rdata)
+            pos = Point()
+            pos.x = float(splitted_data[1])
+            pos.y = float(splitted_data[2])
+            pos.z = float(splitted_data[3])
+            self.pub_asserv_pos.publish(pos)
         elif splitted_data[0] == "DEBUG" and len(splitted_data) == 10:
             pos = Point()
             pos.x = float(splitted_data[1])
