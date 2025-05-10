@@ -265,7 +265,6 @@ class RPlidarNode : public rclcpp::Node
 
         size_t scan_midpoint = node_count / 2;
         int index_correction = angle_correction / scan_msg->angle_increment;
-        RCLCPP_INFO(this->get_logger(), "index_correction %d", index_correction);
         for (size_t i = 0; i < node_count; i++) {
             float read_value = (float)nodes[i].dist_mm_q2 / 4.0f / 1000;
             size_t apply_index = i;

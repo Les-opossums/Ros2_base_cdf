@@ -18,6 +18,7 @@ main_robot:
       inverted: false
       angle_compensate: true
       scan_mode: Sensitivity
+      angle_correction: -3.6651914
 
   obstacle_extractor_node:
     ros__parameters:
