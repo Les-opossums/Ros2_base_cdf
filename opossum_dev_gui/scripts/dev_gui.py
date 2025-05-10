@@ -337,7 +337,7 @@ class MotorsPage(QtWidgets.QWidget):
         "Send the command to update odom with lidar."
         self.x_value_label.text()
         if self.x_value_label.text() != "--.--":
-            self.parent.send_cmd(self.name, "SYNCHROLIDAR", f"{''.join(self.x_value_label.text().split())} {''.join(self.y_value_label.text().split())} {''.join(self.t_value_label.text().split())}")
+            self.parent.send_cmd(self.name, "SYNCHROLIDAR", [float(self.x_value_label.text()), float(self.y_value_label.text()), float(self.t_value_label.text())])
 
     def send_motor_command(self):
         """Send command to ROS."""
