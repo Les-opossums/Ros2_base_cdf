@@ -170,18 +170,18 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
             others = position_finder_->find_robots_on_plateau(new_objects_detected);
             cdf_msgs::msg::LidarLoc msg = publish_pose_from_lidar(position_found.value(), others);
             pub_location_->publish(msg);
-            // std_msgs::msg::String msg_cmd;
-            // std::ostringstream ss;
-            // ss << "SETLIDAR "
-            // << position_found->x() << " "
-            // << position_found->y() << " "
-            // << position_found->z() - 3.6651914;
-            // msg_cmd.data = ss.str();
-            // // Log the message to console
-            // // RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", msg_cmd.data.c_str());
+            std_msgs::msg::String msg_cmd;
+            std::ostringstream ss;
+            ss << "SETLIDAR "
+            << position_found->x() << " "
+            << position_found->y() << " "
+            << position_found->z();
+            msg_cmd.data = ss.str();
+            // Log the message to console
+            // RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", msg_cmd.data.c_str());
 
-            // // Publish the message.
-            // pub_location_cmd_->publish(msg_cmd);
+            // Publish the message.
+            pub_location_cmd_->publish(msg_cmd);
         }
     }
     // rclcpp::Time now = this->now();

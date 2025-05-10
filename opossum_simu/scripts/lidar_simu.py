@@ -132,7 +132,7 @@ class LidarSimulation(Node):
     def _update(self, msg) -> None:
         """Update the position and beacons in robot frame."""
         self.position = np.array([[msg.robot.x], [msg.robot.y], [1]])
-        self.angle = msg.robot.z + 3.6651914
+        self.angle = msg.robot.z
         self.OtoR = np.array(
             [
                 [np.cos(self.angle), -np.sin(self.angle), self.position[0, 0]],

@@ -4,7 +4,7 @@ cdf_msgs::msg::LidarLoc publish_pose_from_lidar(const Eigen::Vector3d& robot_pos
     cdf_msgs::msg::LidarLoc pos;
     pos.robot_position.x = robot_position.x();
     pos.robot_position.y = robot_position.y();
-    pos.robot_position.z = robot_position.z() - 3.6651914;
+    pos.robot_position.z = robot_position.z();
 
 
     for (std::size_t i=0; i < others.size(); i++) {
