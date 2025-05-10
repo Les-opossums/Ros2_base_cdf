@@ -248,14 +248,7 @@ class ObstacleAvoider(Node):
                     return True
             return False
         for i in range(len(lidar_range)):
-            # self.get_logger().info(f"ranges: {lidar_range[i]}, {self.obstacle_detection_distance}")
-            if (
-                lidar_range[i] < self.obstacle_detection_distance
-                or str(lidar_range[i]) == "inf"
-            ):
-                self.get_logger().info(
-                    f"angle: {i}, range: {lidar_range[i]}, res: {i * self.angle_increment + self.angle_correction}"
-                )
+            if lidar_range[i] < self.obstacle_detection_distance:
                 if self._check_in_boundaries(i, lidar_range[i]):
                     self.get_logger().info("Inside")
                     return True
