@@ -35,8 +35,8 @@ class ObstacleAvoider(Node):
                 ("obstacle_detection_distance", 0.4),
                 ("detection_mode", "full"),
                 ("angle_correction", -1.5707963267948966),  # pi / 2
-                ("angle_increment", 0.0032287694048136473),
-                ("len_scan", 1947),
+                ("angle_increment", 0.0034828970674425364),
+                ("len_scan", 1800),
                 ("cone_range", 80.0),
                 ("thickness", 0.2),
                 ("boundaries", [0.0, 2.0, 0.0, 3.0]),
@@ -216,6 +216,7 @@ class ObstacleAvoider(Node):
         elif self.detection_mode == "full":
             return self._detect_obstacle_full(lidar_range)
         elif self.detection_mode == "cone":
+            self.get_logger().info(f"IM ION thE BOULCE")
             return self._detect_obstacle_cone(lidar_range)
         elif self.detection_mode == "rectangle":
             return self._detect_obstacle_rectangle(lidar_range)
@@ -242,15 +243,11 @@ class ObstacleAvoider(Node):
         if self.robot_data is None or not self.enable_boundary_check:
             for dist in lidar_range:
                 if dist < self.obstacle_detection_distance:
-                    self.get_logger().info(
-                        f"Dist: {dist}, obstacle_detect: {self.obstacle_detection_distance}"
-                    )
                     return True
             return False
         for i in range(len(lidar_range)):
             if lidar_range[i] < self.obstacle_detection_distance:
                 if self._check_in_boundaries(i, lidar_range[i]):
-                    self.get_logger().info("Inside")
                     return True
         return False
 
@@ -258,73 +255,70 @@ class ObstacleAvoider(Node):
         """Detect obstacles in a cone."""
         if (
             self.ptheta is not None
-            and self.robot_data.vx.data**2 + self.robot_data.vy.data**2 < 0.001**2
+            and self.robot_data.vlin < 0.001
         ):
             theta = self.ptheta
         else:
-            theta = np.arctan2(self.robot_data.vy.data, self.robot_data.vx.data)
+            theta = self.robot_data.vdir
         self.ptheta = theta
         middle_angle = np.mod(theta, 2 * np.pi)
         index_middle_angle = int(middle_angle / self.angle_increment)
-        ls_real = len(lidar_range)
-        if index_middle_angle - self.len_scan // 4 < 0:
+        if index_middle_angle - self.cone_range // 2 < 0:
             angle_range = list(
-                range(int(0.75 * ls_real) + index_middle_angle, ls_real)
-            ) + list(range(0, index_middle_angle + int(ls_real / 4)))
-        elif index_middle_angle + ls_real // 4 > ls_real:
+                range(index_middle_angle - self.cone_range // 2 + self.len_scan, self.len_scan)
+            ) + list(range(0, index_middle_angle + self.cone_range // 2 + self.len_scan))
+        elif index_middle_angle + self.cone_range // 2 > self.len_scan:
             angle_range = list(
-                range(index_middle_angle - ls_real // 4, ls_real)
-            ) + list(range(0, index_middle_angle - int(0.75 * ls_real)))
+                range(index_middle_angle - self.cone_range // 2, self.len_scan)
+            ) + list(range(0, index_middle_angle + self.cone_range // 2 - self.len_scan))
         else:
             angle_range = list(
                 range(
-                    index_middle_angle - ls_real // 4,
-                    index_middle_angle + ls_real // 4,
+                    index_middle_angle - self.cone_range // 2,
+                    index_middle_angle + self.cone_range // 2,
                 )
             )
-        angle_range = angle_range[: len(self.security_dst)]
         if self.robot_position is None or not self.enable_boundary_check:
-            for i in range(len(angle_range)):
-                if lidar_range[angle_range[i]] < self.obstacle_detection_distance:
+            for i in angle_range:
+                if lidar_range[i] < self.obstacle_detection_distance:
                     return True
             return False
-        for i in range(len(angle_range)):
-            if (
-                lidar_range[angle_range[i]] < self.obstacle_detection_distance
-                or str(lidar_range[angle_range[i]]) == "inf"
-            ):
-                if self._check_in_boundaries(
-                    angle_range[i], lidar_range[angle_range[i]]
-                ):
-                    return True
+        try:
+            for i in angle_range:
+                if lidar_range[i] < self.obstacle_detection_distance:
+                    if self._check_in_boundaries(
+                        i, lidar_range[i]
+                    ):
+                        return True
+        except Exception as e:
+            pass
         return False
 
     def _detect_obstacle_rectangle(self, lidar_range: list) -> bool:
         """Detect obstacles in the rectangle in front."""
         if (
             self.ptheta is not None
-            and self.robot_data.vx.data**2 + self.robot_data.vy.data**2 < 0.001**2
+            and self.robot_data.vlin < 0.001
         ):
             theta = self.ptheta
         else:
-            theta = np.arctan2(self.robot_data.vy.data, self.robot_data.vx.data)
+            theta = self.robot_data.vdir
         self.ptheta = theta
         middle_angle = np.mod(theta, 2 * np.pi)
         index_middle_angle = int(middle_angle / self.angle_increment)
-        ls_real = len(lidar_range)
         if index_middle_angle - self.len_scan // 4 < 0:
             angle_range = list(
-                range(int(0.75 * ls_real) + index_middle_angle, ls_real)
-            ) + list(range(0, index_middle_angle + int(ls_real / 4)))
-        elif index_middle_angle + ls_real // 4 > ls_real:
+                range(3 * self.len_scan // 4 + index_middle_angle, self.len_scan)
+            ) + list(range(0, index_middle_angle + self.len_scan // 4))
+        elif index_middle_angle + self.len_scan // 4 > self.len_scan:
             angle_range = list(
-                range(index_middle_angle - ls_real // 4, ls_real)
-            ) + list(range(0, index_middle_angle - int(0.75 * ls_real)))
+                range(index_middle_angle - self.len_scan // 4, self.len_scan)
+            ) + list(range(0, index_middle_angle - int(0.75 * self.len_scan)))
         else:
             angle_range = list(
                 range(
-                    index_middle_angle - ls_real // 4,
-                    index_middle_angle + ls_real // 4,
+                    index_middle_angle - self.len_scan // 4,
+                    index_middle_angle + self.len_scan // 4,
                 )
             )
         angle_range = angle_range[: len(self.security_dst)]
@@ -336,7 +330,6 @@ class ObstacleAvoider(Node):
         for i in range(len(angle_range)):
             if (
                 lidar_range[angle_range[i]] < self.security_dst[i]
-                or str(lidar_range[angle_range[i]]) == "inf"
             ):
                 if self._check_in_boundaries(
                     angle_range[i], lidar_range[angle_range[i]]

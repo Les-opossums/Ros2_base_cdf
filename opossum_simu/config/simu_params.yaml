@@ -37,7 +37,7 @@ main_robot:
       use_lidar_points: true
       lidar_range: 10.
       radius: 0.05
-      num_points: 1947
+      num_points: 1800
       angle_info: [0., 360.]
 
 

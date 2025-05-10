@@ -9,13 +9,13 @@ main_robot:
       command_topic: command
       obstacle_detected_topic: obstacle_detected
       obstacle_detection_distance: 0.5
-      detection_mode: full
+      detection_mode: rectangle
       # angle_correction: -1.5707963267948966  # pi / 2
       angle_correction: 3.1415926
-      angle_increment: 0.0032287694048136473
-      len_scan: 1947
-      cone_range: 80.0
-      thickness: 0.2
+      angle_increment: 0.0034828970674425364
+      len_scan: 1800
+      cone_range: 60.0
+      thickness: 0.4
       boundaries: [0.0, 2.0, 0.0, 3.0]
       boundary_limit_detection: 0.05
       enable_detection: true
