@@ -337,7 +337,7 @@ class MotorsPage(QtWidgets.QWidget):
         "Send the command to update odom with lidar."
         self.x_value_label.text()
         if self.x_value_label.text() != "--.--":
-            self.parent.send_cmd(self.name, "SYNCHROLIDAR", [float(self.x_value_label.text()), float(self.y_value_label.text()), float(self.t_value_label.text())])
+            self.parent.send_cmd(self.name, "SYNCHROLIDAR", [float(self.x_value_label.text()), float(self.y_value_label.text()), float(self.t_value_label.text()) * np.pi / 180])
 
     def send_motor_command(self):
         """Send command to ROS."""
@@ -346,7 +346,7 @@ class MotorsPage(QtWidgets.QWidget):
         theta = self.theta_edit.text()
         x = float(x) if x != "" else -1
         y = float(y) if y != "" else -1
-        theta = float(theta) * np.pi / 180 if theta != "" else -1
+        theta = float(theta) * np.pi / 180 if theta != "" else -1 
         if x != -1 or y != -1 or theta != -1:
             command_name = "MOVE"
             args = [x, y, theta]
