@@ -274,8 +274,8 @@ class Communication(Node):
         if len(splitted_data) < 1:
             return
         if (
-            splitted_data[0] == "PDE" and len(splitted_data) == 6
-        ):  # PDE x, y, t, vlin, vdir
+            splitted_data[0] == "ROBOTDATA" and len(splitted_data) == 6
+        ):  # ROBOTDATA x, y, t, vlin, vdir
             rdata = RobotData()
             rdata.x = float(splitted_data[1])
             rdata.y = float(splitted_data[2])

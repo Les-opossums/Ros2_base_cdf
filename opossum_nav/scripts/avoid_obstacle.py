@@ -188,18 +188,9 @@ class ObstacleAvoider(Node):
             if self.in_avoid:
                 self.in_avoid = self._find_new_path()
             else:
-                # lidar_range = msg.ranges
                 lidar_range = (
                     msg.ranges[self.index_correction:]
                     + msg.ranges[: self.index_correction]
-                )
-                for i in range(len(lidar_range)):
-                    if msg.ranges[i] < 0.5 or lidar_range[i] < 0.5:
-                        self.get_logger().info(
-                            f"{i}, {i * self.angle_increment}, {msg.ranges[i]}, {lidar_range[i]}"
-                        )
-                self.get_logger().info(
-                    f"Self.index_correction: {self.index_correction}"
                 )
                 self.obstacle_detected = self.detect_obstacle(lidar_range)
                 if self.obstacle_detected:
@@ -267,7 +258,7 @@ class ObstacleAvoider(Node):
                 )
                 if self._check_in_boundaries(i, lidar_range[i]):
                     self.get_logger().info("Inside")
-                    # return True
+                    return True
         return False
 
     def _detect_obstacle_cone(self, lidar_range: list) -> bool:
