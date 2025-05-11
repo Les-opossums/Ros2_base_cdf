@@ -27,8 +27,8 @@ class ColorChoiceApp:
             text="Yellow",
             bg="yellow",
             command=lambda: self.chs_clr("yellow"),
-            width=20,
-            height=10,
+            width=40,
+            height=15,
         )
         self.button_yellow.pack(padx=20)
 
@@ -37,8 +37,8 @@ class ColorChoiceApp:
             text="Blue",
             bg="blue",
             command=lambda: self.chs_clr("blue"),
-            width=20,
-            height=10,
+            width=40,
+            height=15,
         )
         self.button_blue.pack(padx=20)
 
@@ -144,10 +144,21 @@ class ImageApp:
         x, y = event.x, event.y
         self.label.config(text=f"Couleur: {self.color} | x={x}, y={y})")
         print(f"Couleur choisie: {self.color}, Coordonnées: ({x}, {y})")
-        if y < 100:
-            self.selected_script = 16
+        if x < 105 and y > 515 and y < 620:
+            self.selected_script = 1
+        elif x > 190 and x < 300 and y > 545:
+            self.selected_script = 2
+        elif x > 350 and y > 330 and y < 450:
+            self.selected_script = 3
+        elif x > 350 and y > 185 and y < 390:
+            self.selected_script = 4
+        elif x > 190 and x < 300 and y < 80:
+            self.selected_script = 5
+        elif x < 105 and y < 140 and y > 30:
+            self.selected_script = 6
         else:
-            self.selected_script = 17
+            self.selected_script = 0
+        self.label.config(text=f"Script: {self.selected_script}")
 
     def reload_ihm(self):
         self.root.destroy()
