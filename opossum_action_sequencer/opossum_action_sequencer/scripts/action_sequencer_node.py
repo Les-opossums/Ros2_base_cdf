@@ -53,19 +53,23 @@ class ActionManager(Node):
             if changed.name == 'script_number':
                 # Affiche la nouvelle valeur du paramètre script_number
                 self.get_logger().info(
-                    f"Choix du script : {changed.value}"
+                    f"Choix du script : {changed.value.integer_value}"
                 )
                 # Import script
-                if changed.value == 1:
+                if changed.value.integer_value == 0:
+                    pass
+                elif changed.value.integer_value == 1:
                     from opossum_action_sequencer.match.script1 import Script
                     self.get_logger().info(f'Script 1')
-                elif changed.value == 2:
+                elif changed.value.integer_value == 2:
                     from opossum_action_sequencer.match.script2 import Script
                     self.get_logger().info(f'Script 2')
                 else:
                     from opossum_action_sequencer.match.script1 import Script
                     self.get_logger().info(f'Default script')
-                Script.run(self)
+
+                if changed.value.integer_value != 0:
+                    Script.run(self)
 
     def feedback_callback(self, msg):
         self.get_logger().info(f"Feedback received: {msg.data}")
