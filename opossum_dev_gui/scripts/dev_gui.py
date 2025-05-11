@@ -263,7 +263,8 @@ class MotorsPage(QtWidgets.QWidget):
 
         self.map_scene = MapScene(name, self.parent)
         grid_layout = QtWidgets.QGridLayout()
-        self.button = QtWidgets.QPushButton("Send Command")
+        self.button_cmd = QtWidgets.QPushButton("Send Command")
+        self.button_update_lidar = QtWidgets.QPushButton("Update Value with lidar")
 
         # Create QLabel objects for the static labels (the keys)
         # and QLabel objects for the dynamic values.
@@ -319,16 +320,24 @@ class MotorsPage(QtWidgets.QWidget):
         grid_layout.addWidget(current_value_label_ang_vel, 4, 2)
         grid_layout.addWidget(self.ang_vel_value_label, 4, 3)
 
-        self.button.clicked.connect(self.send_motor_command)
+        self.button_cmd.clicked.connect(self.send_motor_command)
+        self.button_update_lidar.clicked.connect(self.send_update_lidar)
         self.x_edit.returnPressed.connect(self.y_edit.setFocus)
         self.y_edit.returnPressed.connect(self.theta_edit.setFocus)
         self.theta_edit.returnPressed.connect(self.lin_vel_edit.setFocus)
         self.lin_vel_edit.returnPressed.connect(self.ang_vel_edit.setFocus)
-        self.ang_vel_edit.returnPressed.connect(self.button.setFocus)
+        self.ang_vel_edit.returnPressed.connect(self.button_cmd.setFocus)
 
         main_layout.addWidget(self.map_scene)
         main_layout.addLayout(grid_layout)
-        main_layout.addWidget(self.button)
+        main_layout.addWidget(self.button_cmd)
+        main_layout.addWidget(self.button_update_lidar)
+
+    def send_update_lidar(self):
+        "Send the command to update odom with lidar."
+        self.x_value_label.text()
+        if self.x_value_label.text() != "--.--":
+            self.parent.send_cmd(self.name, "SYNCHROLIDAR", [float(self.x_value_label.text()), float(self.y_value_label.text()), float(self.t_value_label.text()) * np.pi / 180])
 
     def send_motor_command(self):
         """Send command to ROS."""
@@ -337,7 +346,7 @@ class MotorsPage(QtWidgets.QWidget):
         theta = self.theta_edit.text()
         x = float(x) if x != "" else -1
         y = float(y) if y != "" else -1
-        theta = float(theta) * np.pi / 180 if theta != "" else -1
+        theta = float(theta) * np.pi / 180 if theta != "" else -1 
         if x != -1 or y != -1 or theta != -1:
             command_name = "MOVE"
             args = [x, y, theta]
