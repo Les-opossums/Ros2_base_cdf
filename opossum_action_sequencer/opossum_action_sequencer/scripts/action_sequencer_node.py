@@ -18,6 +18,7 @@ class ActionManager(Node):
         self._init_parameters()
         self._init_publishers()
         self._init_subscribers()
+        self.state_leash = False
 
     def _init_parameters(self) -> None:
         self.declare_parameters(
@@ -69,13 +70,17 @@ class ActionManager(Node):
                     self.get_logger().info(f'Default script')
 
                 if changed.value.integer_value != 0:
-                    Script.run(self)
+                    self.ready = True
+                    # Script.run(self)
 
     def feedback_callback(self, msg):
         self.get_logger().info(f"Feedback received: {msg.data}")
 
         if msg.data.startswith("LEASH"):
-            pass
+            if self.ready:
+                self.get_logger().info("Leash activated")
+                Script.run(self)
+            self.state_leash = True
 
     def move_to(self, pos: Position):
         self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
