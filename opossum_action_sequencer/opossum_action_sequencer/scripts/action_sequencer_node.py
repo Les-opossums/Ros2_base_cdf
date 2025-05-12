@@ -25,7 +25,7 @@ class ActionManager(Node):
             namespace="",
             parameters=[
                 ("pub_command", "command"),
-                ("feedback_topic", "feedback_command"),
+                ("feedback_topic", "pub_feedback_command"),
             ],
         )
 
@@ -43,7 +43,7 @@ class ActionManager(Node):
             10)
 
         self.pub_feedback = self.create_subscription(String,
-                                                     "feedback_command",
+                                                     "pub_feedback_command",
                                                      self.feedback_callback,
                                                      10
                                                      )
