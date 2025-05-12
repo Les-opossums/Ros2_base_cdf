@@ -32,7 +32,7 @@ class ActionManager(Node):
 
     def _init_publishers(self):
         self.pub_command = self.create_publisher(String,
-                                                 "command",
+                                                 "/main_robot/command",
                                                  10
                                                  )
 
@@ -77,7 +77,7 @@ class ActionManager(Node):
                 self.script_class = Script
 
     def feedback_callback(self, msg):
-        self.get_logger().info(f"Feedback received: {msg.data}")
+        # self.get_logger().info(f"Feedback received: {msg.data}")
 
         if msg.data.startswith("LEASH"):
             if self.ready:
