@@ -34,11 +34,6 @@ class ActionManager(Node):
                                                  "command",
                                                  10
                                                  )
-        self.pub_feedback = self.create_subscription(String,
-                                                     "feedback_command",
-                                                     self.feedback_callback,
-                                                     10
-                                                     )
 
     def _init_subscribers(self):
         self.subscription = self.create_subscription(
@@ -46,6 +41,12 @@ class ActionManager(Node):
             '/parameter_events',
             self.parameter_event_callback,
             10)
+
+        self.pub_feedback = self.create_subscription(String,
+                                                     "feedback_command",
+                                                     self.feedback_callback,
+                                                     10
+                                                     )
 
     def parameter_event_callback(self, event):
         # Parcours des paramètres modifiés
