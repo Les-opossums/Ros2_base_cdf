@@ -19,6 +19,7 @@ class ActionManager(Node):
         self._init_publishers()
         self._init_subscribers()
         self.state_leash = False
+        self.script_class = None
 
     def _init_parameters(self) -> None:
         self.declare_parameters(
@@ -43,7 +44,7 @@ class ActionManager(Node):
             10)
 
         self.pub_feedback = self.create_subscription(String,
-                                                     "pub_feedback_command",
+                                                     "/main_robot/feedback_command",
                                                      self.feedback_callback,
                                                      10
                                                      )
@@ -72,7 +73,8 @@ class ActionManager(Node):
 
                 if changed.value.integer_value != 0:
                     self.ready = True
-                    # Script.run(self)
+               #  Script.run(self)
+                self.script_class = Script
 
     def feedback_callback(self, msg):
         self.get_logger().info(f"Feedback received: {msg.data}")
@@ -80,7 +82,8 @@ class ActionManager(Node):
         if msg.data.startswith("LEASH"):
             if self.ready:
                 self.get_logger().info("Leash activated")
-                Script.run(self)
+                # Script.run(self)
+                self.script_class.run(self)
             self.state_leash = True
 
     def move_to(self, pos: Position):
@@ -106,6 +109,11 @@ class ActionManager(Node):
 
     def write_log(self, message):
         self.get_logger().info(f"{message}")
+
+    def send_raw(self, raw_command):
+        self.pub_command.publish(String(
+            data=raw_command
+        ))
 
 
 def main(args=None):
