@@ -37,12 +37,12 @@ class ActionManager(Node):
                                                  )
 
         self.pub_score = self.create_publisher(Int32,
-                                               "score",
+                                               "/main_robot/score",
                                                10
                                                )
 
         self.pub_au = self.create_publisher(Bool,
-                                            "au",
+                                            "/main_robot/au",
                                             10
                                             )
 
