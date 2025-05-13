@@ -22,10 +22,10 @@ class Script(ActionManager):
             self.add_score(1)
             self.move_to(Position(0.6, 0.6, -1.2))
             self.pump(PUMP_struct(1, 1))
-            time.sleep(3)
+            time.sleep(4)
             self.move_to(Position(0.6, 1.45, -1.2))
             self.pump(PUMP_struct(1, 0))
-            time.sleep(3)
+            time.sleep(4)
 
 
 if __name__ == "__main__":
