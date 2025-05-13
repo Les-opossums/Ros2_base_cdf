@@ -162,7 +162,7 @@ class ImageApp:
             self.root,
             text="Valid",
             bg="green",
-            command=self.root.destroy,
+            command=self.verify_selection,
             height=5,
             width=10
         )
@@ -192,6 +192,31 @@ class ImageApp:
     def reload_ihm(self):
         self.root.destroy()
         self.reload = True
+
+    def verify_selection(self):
+        if self.selected_script == 0:
+            self.show_temp_popup("Please select a script!")
+        elif self.selected_script % 2 == 0 and self.color == "yellow":
+            self.show_temp_popup("Invalid color for this script!")
+        elif self.selected_script % 2 != 0 and self.color == "blue":
+            self.show_temp_popup("Invalid color for this script!")
+        else:
+            self.root.destroy()
+
+    def show_temp_popup(self, message):
+        popup = tk.Toplevel(self.root)
+        popup.title("Warning")
+        popup.geometry("250x100")
+        popup.configure(bg="white")
+        popup.transient(self.root)  # lie le popup à la fenêtre principale
+        popup.grab_set()  # empêche l'interaction avec la fenêtre principale
+
+        label = tk.Label(popup, text=message, bg="white",
+                         fg="red", font=("Helvetica", 12, "bold"))
+        label.pack(expand=True, padx=10, pady=10)
+
+        # Ferme automatiquement la fenêtre après 1000 ms
+        self.root.after(1000, popup.destroy)
 
 
 class ValidationApp:
