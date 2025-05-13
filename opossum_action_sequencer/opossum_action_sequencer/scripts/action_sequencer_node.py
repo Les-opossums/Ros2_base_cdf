@@ -131,8 +131,15 @@ class ActionManager(Node):
         self.get_logger().info(f"{message}")
 
     def send_raw(self, raw_command):
+        self.get_logger().info(f"Sending raw command: {raw_command}")
         self.pub_command.publish(String(
             data=raw_command
+        ))
+
+    def synchro_lidar(self, pos_lidar: Position, pos_robot: Position):
+        self.get_logger().info(f"Synchronizing Lidar with robot")
+        self.pub_command.publish(String(
+            data=f"SYNCHROLIDAR"
         ))
 
     def add_score(self, score):

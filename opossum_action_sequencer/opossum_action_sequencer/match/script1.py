@@ -17,6 +17,7 @@ class Script(ActionManager):
     def run(self):
         self.write_log('Script 1 is running...')
         self.send_raw('SYNCHROLIDAR')
+        time.sleep(2)
         # self.move_to(self.pos_departure)
         for _ in range(10):
             self.add_score(1)
