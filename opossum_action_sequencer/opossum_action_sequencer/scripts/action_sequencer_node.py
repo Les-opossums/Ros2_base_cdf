@@ -73,7 +73,6 @@ class ActionManager(Node):
 
                 if changed.value.integer_value != 0:
                     self.ready = True
-               #  Script.run(self)
                 self.script_class = Script
 
     def feedback_callback(self, msg):
