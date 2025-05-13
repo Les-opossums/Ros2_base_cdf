@@ -45,15 +45,23 @@ class ColorChoiceApp:
         self.selected_color = None
 
         self.button_reload = tk.Button(
-            self.root, text="Reload", command=self.reload_ihm
+            self.root,
+            text="Reload",
+            bg="red",
+            command=self.reload_ihm,
+            width=10,
+            height=5,
         )
-        self.button_reload.pack(pady=10)
+        self.button_reload.pack(pady=25)
 
         # Bouton pour quitter
-        self.button_quit = tk.Button(self.root,
-                                     text="Quit",
-                                     command=self.root.destroy)
-        self.button_quit.pack(pady=20)
+        # self.button_quit = tk.Button(self.root,
+        #                              text="Quit",
+        #                              command=self.root.destroy,
+        #                              width=10,
+        #                              height=5,
+        #                              )
+        # self.button_quit.pack(pady=20)
         self.root.mainloop()
 
     def chs_clr(self, color):
@@ -112,6 +120,26 @@ class ImageApp:
         self.canvas = tk.Canvas(self.root, width=new_width, height=new_height)
         self.canvas.pack()
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.tk_img)
+        self.script_zones = {
+            1: (0, 515, 105, 620),
+            2: (190, 545, 300, 650),
+            3: (330, 330, 480, 450),
+            4: (330, 210, 480, 320),
+            5: (190, 0, 300, 110),
+            6: (0, 30, 105, 140)
+        }
+        self.zone_rects = {}
+
+        for script_num, (x1, y1, x2, y2) in self.script_zones.items():
+            rect = self.canvas.create_rectangle(x1, y1, x2, y2, fill="grey",
+                                                outline="black"
+                                                )
+            text = self.canvas.create_text((x1 + x2) // 2, (y1 + y2) // 2,
+                                           text=str(script_num),
+                                           fill="white",
+                                           font=("Helvetica", 20, "bold")
+                                           )
+            self.zone_rects[script_num] = (rect, text)
         # Bind pour obtenir les coordonnées du clic
         self.canvas.bind("<Button-1>", self.get_coordinates)
         # Label pour afficher les coordonnées
@@ -121,44 +149,45 @@ class ImageApp:
         self.button_reload = tk.Button(
             self.root,
             text="Reload",
+            bg="red",
             command=self.reload_ihm,
-            height=3,
+            height=5,
             width=10
         )
         self.button_reload.pack(padx=0, pady=10)
-        self.button_reload.place(x=100, y=725)
+        self.button_reload.place(x=100, y=700)
 
         # Bouton pour quitter
         self.button_valid = tk.Button(
             self.root,
             text="Valid",
+            bg="green",
             command=self.root.destroy,
-            height=3,
+            height=5,
             width=10
         )
         self.button_valid.pack(padx=20, pady=10)
-        self.button_valid.place(x=300, y=725)
+        self.button_valid.place(x=300, y=700)
         self.root.mainloop()
 
     def get_coordinates(self, event):
         x, y = event.x, event.y
-        self.label.config(text=f"Couleur: {self.color} | x={x}, y={y})")
         print(f"Couleur choisie: {self.color}, Coordonnées: ({x}, {y})")
-        if x < 105 and y > 515 and y < 620:
-            self.selected_script = 1
-        elif x > 190 and x < 300 and y > 545:
-            self.selected_script = 2
-        elif x > 350 and y > 330 and y < 450:
-            self.selected_script = 3
-        elif x > 350 and y > 185 and y < 390:
-            self.selected_script = 4
-        elif x > 190 and x < 300 and y < 80:
-            self.selected_script = 5
-        elif x < 105 and y < 140 and y > 30:
-            self.selected_script = 6
-        else:
-            self.selected_script = 0
-        self.label.config(text=f"Script: {self.selected_script}")
+
+        selected = 0
+        for script_num, (x1, y1, x2, y2) in self.script_zones.items():
+            if x1 <= x <= x2 and y1 <= y <= y2:
+                selected = script_num
+                break
+
+        self.selected_script = selected
+
+        # Update colors of all zones
+        for script_num, (rect_id, _) in self.zone_rects.items():
+            color = "green" if script_num == self.selected_script else "grey"
+            self.canvas.itemconfig(rect_id, fill=color)
+
+        self.label.config(text=f"Script:{self.selected_script} | x={x}, y={y}")
 
     def reload_ihm(self):
         self.root.destroy()
@@ -228,12 +257,20 @@ class ValidationApp:
         # Bouton de validation
         validate_button = tk.Button(self.root,
                                     text="Valid",
-                                    command=self.on_validate)
+                                    command=self.on_validate,
+                                    bg="green",
+                                    height=5,
+                                    width=10
+                                    )
         validate_button.pack(pady=10)
 
         reload_button = tk.Button(self.root,
                                   text="Reload",
-                                  command=self.on_reload)
+                                  command=self.on_reload,
+                                  bg="red",
+                                  height=5,
+                                  width=10
+                                  )
         reload_button.pack(pady=20)
 
     def on_validate(self):
