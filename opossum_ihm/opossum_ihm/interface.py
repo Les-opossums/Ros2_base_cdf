@@ -345,7 +345,8 @@ class ScoreApp:
     def update_au(self):
         if self.is_au:
             self.root.configure(bg="red")
-            if self.is_match:
+            # if self.is_match:
+            if True:
                 root = tk.Toplevel()
                 gif_path = os.path.join(
                     get_package_share_directory("opossum_ihm"),
