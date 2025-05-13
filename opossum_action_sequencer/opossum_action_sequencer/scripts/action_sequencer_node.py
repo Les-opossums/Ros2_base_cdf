@@ -97,6 +97,14 @@ class ActionManager(Node):
                 self.script_class.run(self)
             self.state_leash = True
 
+        elif msg.data.startswith("AU"):
+            if msg.data[-1] == 0:
+                self.get_logger().info("AU activated")
+                self.pub_au.publish(Bool(data=True))
+            else:
+                self.get_logger().info("AU deactivated")
+                self.pub_au.publish(Bool(data=False))
+
     def move_to(self, pos: Position):
         self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
         self.pub_command.publish(String(
