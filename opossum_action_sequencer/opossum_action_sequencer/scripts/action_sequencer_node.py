@@ -6,7 +6,7 @@ import rclpy
 from rclpy.node import Node
 from rcl_interfaces.msg import ParameterEvent
 
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool, Int32
 
 from opossum_action_sequencer.utils import *
 
@@ -35,6 +35,16 @@ class ActionManager(Node):
                                                  "/main_robot/command",
                                                  10
                                                  )
+
+        self.pub_score = self.create_publisher(Int32,
+                                               "score",
+                                               10
+                                               )
+
+        self.pub_au = self.create_publisher(Bool,
+                                            "au",
+                                            10
+                                            )
 
     def _init_subscribers(self):
         self.subscription = self.create_subscription(
@@ -73,7 +83,9 @@ class ActionManager(Node):
 
                 if changed.value.integer_value != 0:
                     self.ready = True
-                self.script_class = Script
+                    self.script_class = Script
+                else:
+                    pass
 
     def feedback_callback(self, msg):
         # self.get_logger().info(f"Feedback received: {msg.data}")
@@ -112,6 +124,11 @@ class ActionManager(Node):
     def send_raw(self, raw_command):
         self.pub_command.publish(String(
             data=raw_command
+        ))
+
+    def add_score(self, score):
+        self.pub_score.publish(Int32(
+            data=score
         ))
 
 

@@ -18,6 +18,7 @@ class Script(ActionManager):
         self.send_raw('SYNCHROLIDAR')
         # self.move_to(self.pos_departure)
         for _ in range(10):
+            self.add_score(1)
             self.move_to(Position(0.6, 0.6, 0))
             time.sleep(10)
             self.move_to(Position(0.6, 1.45, 0))
