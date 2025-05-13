@@ -23,9 +23,11 @@ class Script(ActionManager):
         # self.move_to(self.pos_departure)
         for _ in range(10):
             self.add_score(1)
-            self.move_to(Position(0.6, 0.6, 0))
+            self.move_to(Position(0.6, 0.6, -1.2))
+            self.pump(PUMP_struct(1, 1))
             time.sleep(3)
-            self.move_to(Position(0.6, 1.45, 0))
+            self.move_to(Position(0.6, 1.45, -1.2))
+            self.pump(PUMP_struct(1, 0))
             time.sleep(3)
 
 
