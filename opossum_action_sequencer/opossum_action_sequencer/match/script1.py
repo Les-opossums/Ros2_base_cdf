@@ -15,15 +15,18 @@ class Script(ActionManager):
         self.pos_departure = Position(0.6, 0.6, 0)
 
     def run(self):
-        self.send_raw('SYNCHROLIDAR')
+        self.write_log('Script 1 is running...')
+        # self.send_raw('SYNCHROLIDAR')
+        self.send_raw('SETX 0.6')
+        self.send_raw('SETY 0.6')
+        self.send_raw('SETT 0')
         # self.move_to(self.pos_departure)
         for _ in range(10):
             self.add_score(1)
             self.move_to(Position(0.6, 0.6, 0))
-            time.sleep(10)
+            time.sleep(3)
             self.move_to(Position(0.6, 1.45, 0))
-            time.sleep(10)
-        self.write_log('Script 1 is running...')
+            time.sleep(3)
 
 
 if __name__ == "__main__":
