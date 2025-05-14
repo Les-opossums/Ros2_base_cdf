@@ -99,7 +99,7 @@ class ActionManager(Node):
 
         elif msg.data.startswith("AU"):
             self.get_logger().info(f"AU_test : {msg.data[-1]}")
-            if msg.data[-1] == '0':
+            if msg.data[-1] == '1':
                 self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
             else:
