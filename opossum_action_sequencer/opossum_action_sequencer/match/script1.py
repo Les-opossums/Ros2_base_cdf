@@ -16,10 +16,11 @@ class Script(ActionManager):
 
     def run(self):
         self.write_log('Script 1 is running...')
-        self.send_raw('SYNCHROLIDAR')
-        self.send_raw('SETX 0.6')
-        self.send_raw('SETY 0.6')
-        self.send_raw('SETT -1.2')
+        # self.send_raw('SYNCHROLIDAR')
+        # self.send_raw('SETX 0.6')
+        # self.send_raw('SETY 0.6')
+        # self.send_raw('SETT -1.2')
+        self.syncro_lidar()
         time.sleep(2)
         # self.move_to(self.pos_departure)
         for _ in range(10):
