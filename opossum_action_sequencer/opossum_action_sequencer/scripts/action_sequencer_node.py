@@ -7,6 +7,7 @@ from rclpy.node import Node
 from rcl_interfaces.msg import ParameterEvent
 
 from std_msgs.msg import String, Bool, Int32
+from cdf_msgs.msg import LidarLoc
 
 from opossum_action_sequencer.utils import *
 
@@ -51,13 +52,22 @@ class ActionManager(Node):
             ParameterEvent,
             '/parameter_events',
             self.parameter_event_callback,
-            10)
+            10
+        )
 
-        self.pub_feedback = self.create_subscription(String,
-                                                     "/main_robot/feedback_command",
-                                                     self.feedback_callback,
-                                                     10
-                                                     )
+        self.pub_feedback = self.create_subscription(
+            String,
+            "/main_robot/feedback_command",
+            self.feedback_callback,
+            10
+        )
+
+        self.create_subscription(
+            LidarLoc,
+            "/main_robot/lidar_loc",
+            self.position_callback,
+            10
+        )
 
     def parameter_event_callback(self, event):
         # Parcours des paramètres modifiés
@@ -106,6 +116,14 @@ class ActionManager(Node):
                 self.get_logger().info("AU deactivated")
                 self.pub_au.publish(Bool(data=False))
 
+    def position_callback(self, msg: LidarLoc):
+        # self.get_logger().info(f"Position received: {msg}")
+        self.pos_lidar = Position(
+            x=msg.robot_position.x,
+            y=msg.robot_position.y,
+            t=msg.robot_position.z,
+        )
+
     def move_to(self, pos: Position):
         self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
         self.pub_command.publish(String(
@@ -136,10 +154,10 @@ class ActionManager(Node):
             data=raw_command
         ))
 
-    def synchro_lidar(self, pos_lidar: Position, pos_robot: Position):
+    def synchro_lidar(self):
         self.get_logger().info(f"Synchronizing Lidar with robot")
         self.pub_command.publish(String(
-            data=f"SYNCHROLIDAR"
+            data=f"SYNCHROLIDAR {self.pos_lidar.x} {self.pos_lidar.y} {self.pos_lidar.t}"
         ))
 
     def add_score(self, score):
