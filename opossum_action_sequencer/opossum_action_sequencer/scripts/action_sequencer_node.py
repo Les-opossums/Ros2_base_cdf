@@ -64,7 +64,7 @@ class ActionManager(Node):
 
         self.create_subscription(
             LidarLoc,
-            "/main_robot/lidar_loc",
+            "/main_robot/position_out",
             self.position_callback,
             10
         )
