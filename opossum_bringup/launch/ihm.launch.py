@@ -23,7 +23,9 @@ def generate_launch_description():
         namespace=namespace,
         executable="parameters_server.py",
         name="param_server",
-        parameters=[{"team_color": "blue", "script_number": 1, "debug_mode": False}],
+        parameters=[{"team_color": "blue",
+                     "script_number": 1,
+                     "debug_mode": False}],
     )
 
     ld.add_action(node_ihm)
