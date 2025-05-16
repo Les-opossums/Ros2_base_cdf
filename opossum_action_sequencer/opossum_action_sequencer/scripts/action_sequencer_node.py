@@ -12,6 +12,8 @@ from cdf_msgs.msg import LidarLoc
 
 from opossum_action_sequencer.utils import *
 
+import threading
+
 
 class ActionManager(Node):
     def __init__(self):
@@ -114,11 +116,19 @@ class ActionManager(Node):
         # self.get_logger().info(f"Feedback received: {msg.data}")
 
         if msg.data.startswith("LEASH"):
-            if self.ready:
-                self.get_logger().info("Leash activated")
-                # Script.run(self)
-                self.script_class.run(self)
+            # if self.ready:
+            #     self.get_logger().info("Leash activated")
+            #     # Script.run(self)
+            #     self.script_class.run(self)
             self.state_leash = True
+            if msg.data.startswith("LEASH"):
+                if self.ready:
+                    self.get_logger().info("Leash activated")
+                    thread = threading.Thread(target=self.script_class.run, 
+                                              args=(self,)
+                                              )
+                    thread.start()
+                self.state_leash = True
 
         elif msg.data.startswith("AU"):
             self.get_logger().info(f"AU_test : {msg.data[-1]}")
