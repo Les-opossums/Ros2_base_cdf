@@ -163,6 +163,12 @@ class ActionManager(Node):
         self.is_robot_moving = True
         self.get_logger().info(f"Robot moving...")
 
+    def wait_for_motion(self):
+        while self.is_robot_moving:
+            # self.get_logger().info("Waiting for robot to stop...")
+            rclpy.spin_once(self, timeout_sec=0.1)
+        self.get_logger().info("Motion done")
+
     def servo(self, servo: SERVO_struct):
         self.pub_command.publish(String(
             data=f"SERVO {servo.servo_id} {servo.angle}"

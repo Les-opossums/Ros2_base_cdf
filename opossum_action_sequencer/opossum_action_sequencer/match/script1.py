@@ -28,12 +28,14 @@ class Script(ActionManager):
             self.move_to(Position(0.6, 0.6, -1.2))
             self.pump(PUMP_struct(1, 1))
             self.pump(PUMP_struct(2, 1))
-            time.sleep(4)
+            # time.sleep(4)
+            self.wait_for_motion()
             self.move_to(Position(0.6, 1.45, 0))
             self.pump(PUMP_struct(1, 0))
             self.pump(PUMP_struct(2, 1))
-            time.sleep(8)
+            # time.sleep(8)
             # self.synchro_lidar()
+            self.wait_for_motion()
 
 
 if __name__ == "__main__":
