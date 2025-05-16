@@ -17,10 +17,10 @@ class Script(ActionManager):
     def run(self):
         self.write_log('Script 1 is running...')
         # self.send_raw('SYNCHROLIDAR')
-        # self.send_raw('SETX 0.6')
-        # self.send_raw('SETY 0.6')
-        # self.send_raw('SETT -1.2')
-        self.synchro_lidar()
+        self.send_raw('SETX 0.6')
+        self.send_raw('SETY 0.6')
+        self.send_raw('SETT -1.2')
+        # self.synchro_lidar()
         time.sleep(2)
         # self.move_to(self.pos_departure)
         for _ in range(5):
@@ -33,7 +33,7 @@ class Script(ActionManager):
             self.pump(PUMP_struct(1, 0))
             self.pump(PUMP_struct(2, 1))
             time.sleep(8)
-            self.synchro_lidar()
+            # self.synchro_lidar()
 
 
 if __name__ == "__main__":

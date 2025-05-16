@@ -138,6 +138,7 @@ class ActionManager(Node):
         )
 
     def velocity_callback(self, msg: String):
+        self.get_logger().info(f"Velocity received: {msg}")
         if self.is_robot_moving:
             if msg.x < 0.001 and msg.y < 0.001 and msg.z < 0.001:
                 self.get_logger().info("Robot stopped")
