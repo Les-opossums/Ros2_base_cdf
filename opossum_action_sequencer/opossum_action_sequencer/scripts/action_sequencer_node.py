@@ -22,6 +22,11 @@ class ActionManager(Node):
         self.state_leash = False
         self.script_class = None
 
+        # Action Done
+        self.is_robot_moving = False
+        self.is_pump_top_on = False
+        self.is_pump_bottom_on = False
+
     def _init_parameters(self) -> None:
         self.declare_parameters(
             namespace="",
@@ -62,11 +67,18 @@ class ActionManager(Node):
             10
         )
 
-        self.create_subscription(
+        self.pos_sub = self.create_subscription(
             LidarLoc,
             "/main_robot/position_out",
             self.position_callback,
             10
+        )
+
+        self.velocity_sub = self.create_subscription(
+            Point,
+            "/main_robot/asserv/vel",
+            self.velocity_callback,
+            1
         )
 
     def parameter_event_callback(self, event):
@@ -124,11 +136,20 @@ class ActionManager(Node):
             t=msg.robot_position.z,
         )
 
+    def velocity_callback(self, msg: String):
+        if self.is_robot_moving:
+            if msg.x < 0.001 and msg.y < 0.001 and msg.z < 0.001:
+                self.get_logger().info("Robot stopped")
+                self.is_robot_moving = False
+
     def move_to(self, pos: Position):
         self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
         self.pub_command.publish(String(
             data=f"MOVE {pos.x} {pos.y} {pos.t}"
         ))
+        self.pos_obj = pos
+        self.is_robot_moving = True
+        self.get_logger().info(f"Robot moving...")
 
     def servo(self, servo: SERVO_struct):
         self.pub_command.publish(String(
