@@ -157,7 +157,7 @@ class ActionManager(Node):
     def velocity_callback(self, msg: Point):
         # self.get_logger().info(f"Velocity received: x={msg.x}, y={msg.y}, z={msg.z}")
         if self.is_robot_moving:
-            if abs(msg.x) < 0.005 and abs(msg.y) < 0.005 and abs(msg.z) < 0.005:
+            if abs(msg.x) < 0.0001 and abs(msg.y) < 0.0001 and abs(msg.z) < 0.0001:
                 self.get_logger().info("Robot stopped")
                 self.is_robot_moving = False
                 self.motion_done_event.set()
