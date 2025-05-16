@@ -23,7 +23,7 @@ class Script(ActionManager):
         self.synchro_lidar()
         time.sleep(2)
         # self.move_to(self.pos_departure)
-        for _ in range(10):
+        for _ in range(5):
             self.add_score(1)
             self.move_to(Position(0.6, 0.6, -1.2))
             self.pump(PUMP_struct(1, 1))
@@ -32,7 +32,8 @@ class Script(ActionManager):
             self.move_to(Position(0.6, 1.45, 0))
             self.pump(PUMP_struct(1, 0))
             self.pump(PUMP_struct(2, 1))
-            time.sleep(4)
+            time.sleep(8)
+            self.synchro_lidar()
 
 
 if __name__ == "__main__":
