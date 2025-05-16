@@ -157,7 +157,8 @@ class ActionManager(Node):
     def velocity_callback(self, msg: Point):
         # self.get_logger().info(f"Velocity received: x={msg.x}, y={msg.y}, z={msg.z}")
         if self.is_robot_moving:
-            if abs(msg.x) < 0.0001 and abs(msg.y) < 0.0001 and abs(msg.z) < 0.0001:
+            self.wait_for_arrival()
+            if abs(msg.x) < 0.0001 and abs(msg.y) < 0.0001 and abs(msg.z) < 0.0001 and self.is_robot_arrived:
                 self.get_logger().info("Robot stopped")
                 self.is_robot_moving = False
                 self.motion_done_event.set()
@@ -165,12 +166,22 @@ class ActionManager(Node):
     def move_to(self, pos: Position):
         self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
         self.is_robot_moving = True
+        self.is_robot_arrived = False
         self.pub_command.publish(String(
             data=f"MOVE {pos.x} {pos.y} {pos.t}"
         ))
         self.pos_obj = pos
         self.motion_done_event.clear()  # Block the wait
         self.get_logger().info(f"Robot moving...")
+
+    def wait_for_arrival(self):
+        delta_x = abs(self.pos_obj.x - self.pos_lidar.x)
+        delta_y = abs(self.pos_obj.y - self.pos_lidar.y)
+        delta_t = abs(self.pos_obj.t - self.pos_lidar.t)
+
+        if delta_x < 0.05 and delta_y < 0.05 and delta_t < 0.1:
+            self.get_logger().info("Robot arrived")
+            self.is_robot_arrived = True
 
     def wait_for_motion(self):
         self.get_logger().info("Waiting for robot to stop...")
