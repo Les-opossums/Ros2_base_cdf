@@ -6,7 +6,8 @@ import rclpy
 from rclpy.node import Node
 from rcl_interfaces.msg import ParameterEvent
 
-from std_msgs.msg import String, Bool, Int32, Point
+from std_msgs.msg import String, Bool, Int32
+from geometry_msgs.msg import Point
 from cdf_msgs.msg import LidarLoc
 
 from opossum_action_sequencer.utils import *
