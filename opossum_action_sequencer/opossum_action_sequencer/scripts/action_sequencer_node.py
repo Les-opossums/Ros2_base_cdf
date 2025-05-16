@@ -13,6 +13,7 @@ from cdf_msgs.msg import LidarLoc
 from opossum_action_sequencer.utils import *
 
 import threading
+from threading import Event
 
 
 class ActionManager(Node):
@@ -29,6 +30,9 @@ class ActionManager(Node):
         self.is_robot_moving = False
         self.is_pump_top_on = False
         self.is_pump_bottom_on = False
+
+        self.motion_done_event = Event()
+        self.motion_done_event.set()
 
     def _init_parameters(self) -> None:
         self.declare_parameters(
@@ -148,25 +152,45 @@ class ActionManager(Node):
         )
 
     def velocity_callback(self, msg: String):
-        self.get_logger().info(f"Velocity received: {msg}")
+        # self.get_logger().info(f"Velocity received: {msg}")
+        # if self.is_robot_moving:
+        #     if msg.x < 0.001 and msg.y < 0.001 and msg.z < 0.001:
+        #         self.get_logger().info("Robot stopped")
+        #         self.is_robot_moving = False
+
+        self.get_logger().info(f"Velocity received: x={msg.x}, y={msg.y}, z={msg.z}")
         if self.is_robot_moving:
-            if msg.x < 0.001 and msg.y < 0.001 and msg.z < 0.001:
+            if abs(msg.x) < 0.001 and abs(msg.y) < 0.001 and abs(msg.z) < 0.001:
                 self.get_logger().info("Robot stopped")
                 self.is_robot_moving = False
+                self.motion_done_event.set()
 
     def move_to(self, pos: Position):
+        # self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
+        # self.pub_command.publish(String(
+        #     data=f"MOVE {pos.x} {pos.y} {pos.t}"
+        # ))
+        # self.pos_obj = pos
+        # self.is_robot_moving = True
+        # self.get_logger().info(f"Robot moving...")
+
         self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
         self.pub_command.publish(String(
             data=f"MOVE {pos.x} {pos.y} {pos.t}"
         ))
         self.pos_obj = pos
         self.is_robot_moving = True
+        self.motion_done_event.clear()  # Block the wait
         self.get_logger().info(f"Robot moving...")
 
     def wait_for_motion(self):
-        while self.is_robot_moving:
-            # self.get_logger().info("Waiting for robot to stop...")
-            rclpy.spin_once(self, timeout_sec=0.1)
+        #while self.is_robot_moving:
+        #    # self.get_logger().info("Waiting for robot to stop...")
+        #    rclpy.spin_once(self, timeout_sec=0.1)
+        #self.get_logger().info("Motion done")
+
+        self.get_logger().info("Waiting for robot to stop...")
+        self.motion_done_event.wait()  # Blocks efficiently until velocity_callback sets the event
         self.get_logger().info("Motion done")
 
     def servo(self, servo: SERVO_struct):
