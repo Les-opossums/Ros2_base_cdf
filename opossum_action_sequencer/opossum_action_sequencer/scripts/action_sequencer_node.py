@@ -128,9 +128,12 @@ class ActionManager(Node):
             if msg.data.startswith("LEASH"):
                 if self.ready:
                     self.get_logger().info("Leash activated")
-                    thread = threading.Thread(target=self.script_class.run, 
-                                              args=(self,)
-                                              )
+                    # thread = threading.Thread(target=self.script_class.run, 
+                    #                           args=(self,)
+                    #                           )
+                    self.script_instance = self.script_class()
+                    thread = threading.Thread(target=self.script_instance.run, 
+                                              args=(self,))
                     thread.start()
                 self.state_leash = True
 

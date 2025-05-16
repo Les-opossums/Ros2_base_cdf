@@ -9,35 +9,26 @@ from opossum_action_sequencer.action_manager import ODOM_struct, SERVO_struct
 import time
 
 
-class Script(ActionManager):
-    def __init__(self):
-        super().__init__('script1')
-        self.pos_departure = Position(0.6, 0.6, 0)
-
-    def run(self):
-        self.write_log('Script 1 is running...')
+class Script():
+    def run(self, node):
+        node.write_log('Script 1 is running...')
         # self.send_raw('SYNCHROLIDAR')
         # self.send_raw('SETX 0.6')
         # self.send_raw('SETY 0.6')
         # self.send_raw('SETT -1.2')
-        self.synchro_lidar()
+        node.synchro_lidar()
         time.sleep(2)
         # self.move_to(self.pos_departure)
         for _ in range(5):
-            self.add_score(1)
-            self.move_to(Position(0.6, 0.6, -1.2))
-            self.pump(PUMP_struct(1, 1))
-            self.pump(PUMP_struct(2, 1))
+            node.add_score(1)
+            node.move_to(Position(0.6, 0.6, -1.2))
+            node.pump(PUMP_struct(1, 1))
+            node.pump(PUMP_struct(2, 1))
             # time.sleep(4)
-            self.wait_for_motion()
-            self.move_to(Position(0.6, 1.45, 0))
-            self.pump(PUMP_struct(1, 0))
-            self.pump(PUMP_struct(2, 1))
+            node.wait_for_motion()
+            node.move_to(Position(0.6, 1.45, 0))
+            node.pump(PUMP_struct(1, 0))
+            node.pump(PUMP_struct(2, 1))
             # time.sleep(8)
-            self.synchro_lidar()
-            self.wait_for_motion()
-
-
-if __name__ == "__main__":
-    script = Script()
-    script.run()
+            node.wait_for_motion()
+            node.synchro_lidar()
