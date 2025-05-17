@@ -46,7 +46,6 @@ class LidarSimulation(Node):
                 ("available_colors", rclpy.Parameter.Type.STRING_ARRAY),
                 ("use_lidar_points", rclpy.Parameter.Type.BOOL),
                 ("radius", rclpy.Parameter.Type.DOUBLE),
-                ("num_points", rclpy.Parameter.Type.INTEGER),
                 ("lidar_range", rclpy.Parameter.Type.DOUBLE),
                 ("angle_info", rclpy.Parameter.Type.DOUBLE_ARRAY),
             ],
@@ -69,15 +68,8 @@ class LidarSimulation(Node):
         self.lidar_range = (
             self.get_parameter("lidar_range").get_parameter_value().double_value
         )
-        self.num_points = (
-            self.get_parameter("num_points").get_parameter_value().integer_value
-        )
         self.angle_info = (
             self.get_parameter("angle_info").get_parameter_value().double_array_value
-        )
-        self.angle_info = [np.pi * a / 180 for a in self.angle_info]
-        self.angle_range = np.linspace(
-            self.angle_info[0], self.angle_info[0] + self.angle_info[1], self.num_points
         )
         beacons = self.get_parameter("beacons").get_parameter_value().double_array_value
         if self.team_color not in self.available_colors:
@@ -143,7 +135,6 @@ class LidarSimulation(Node):
         self.new_beacons = [
             np.linalg.inv(self.OtoR) @ beacon for beacon in self.fixed_beacons
         ]
-
         self.new_ennemis = []
         for e in msg.ennemis:
             e_w = np.array([[e.x], [e.y], [1]])
@@ -160,23 +151,27 @@ class LidarSimulation(Node):
                     {"type": "circle", "center": beacon[:2, 0], "radius": self.radius}
                 )
             for e in self.new_ennemis:
-                objects.append(
-                    {"type": "circle", "center": e[:2, 0], "radius": self.radius}
-                )
-            scan_result = lidar_scan(self.angle_range, objects, self.lidar_range)
+                objects.append({"type": "circle", "center": e[:2, 0], "radius": 0.1})
+            scan_result = lidar_scan(
+                self.angle_info[0],
+                self.angle_info[1],
+                self.angle_info[2],
+                objects,
+                self.lidar_range,
+            )
             now = self.get_clock().now().to_msg()
             msg.header = Header(
                 stamp=now, frame_id=self.get_namespace()[1:] + "/laser_frame"
             )
-            msg.angle_min = self.angle_info[0] - self.angle_info[1] / 2
-            msg.angle_max = self.angle_info[0] + self.angle_info[1] / 2
-            msg.angle_increment = self.angle_info[1] / self.num_points
+            msg.angle_min = self.angle_info[0]
+            msg.angle_max = self.angle_info[1]
+            msg.angle_increment = self.angle_info[2]
             msg.time_increment = 0.0
             msg.scan_time = 0.1
             msg.range_max = self.lidar_range
             msg.range_min = 0.12
             msg.ranges = scan_result
-            intensities = np.random.uniform(0, 255, self.num_points)
+            intensities = np.random.uniform(0, 255, len(scan_result))
             msg.intensities = intensities.tolist()
             self.pub_scan.publish(msg)
         else:

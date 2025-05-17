@@ -37,7 +37,7 @@
 #include <std_srvs/srv/empty.hpp>
 #include "sl_lidar.h"
 #include "math.h"
-
+#include <algorithm>  // for std::rotate
 #include <signal.h>
 
 #ifndef _countof
@@ -86,6 +86,7 @@ class RPlidarNode : public rclcpp::Node
         this->declare_parameter<std::string>("topic_name",std::string("scan"));
         this->declare_parameter<std::string>("scan_mode",std::string());
         this->declare_parameter<float>("scan_frequency",10);
+        this->declare_parameter<float>("angle_correction", -3.6651914);
 
         this->get_parameter_or<std::string>("channel_type", channel_type, "serial");
         this->get_parameter_or<std::string>("tcp_ip", tcp_ip, "192.168.0.7");
@@ -101,6 +102,7 @@ class RPlidarNode : public rclcpp::Node
         this->get_parameter_or<bool>("auto_standby", auto_standby, false);
         this->get_parameter_or<std::string>("topic_name", topic_name, "scan");
         this->get_parameter_or<std::string>("scan_mode", scan_mode, std::string());
+        this->get_parameter_or<float>("angle_correction", angle_correction, -3.6651914);
         if(channel_type == "udp")
             this->get_parameter_or<float>("scan_frequency", scan_frequency, 20.0);
         else
@@ -262,6 +264,7 @@ class RPlidarNode : public rclcpp::Node
         bool reverse_data = (!inverted && reversed) || (inverted && !reversed);
 
         size_t scan_midpoint = node_count / 2;
+        int index_correction = angle_correction / scan_msg->angle_increment;
         for (size_t i = 0; i < node_count; i++) {
             float read_value = (float)nodes[i].dist_mm_q2 / 4.0f / 1000;
             size_t apply_index = i;
@@ -281,7 +284,22 @@ class RPlidarNode : public rclcpp::Node
                 scan_msg->ranges[apply_index] = read_value;
             scan_msg->intensities[apply_index] = (float)(nodes[apply_index].quality >> 2);
         }
+        int offset = index_correction % scan_msg->ranges.size();
+        if (offset < 0) {
+            offset += scan_msg->ranges.size();  // Convert negative to equivalent positive offset
+        }
 
+        std::rotate(
+            scan_msg->ranges.begin(),
+            scan_msg->ranges.begin() + offset,
+            scan_msg->ranges.end()
+        );
+
+        std::rotate(
+            scan_msg->intensities.begin(),
+            scan_msg->intensities.begin() + offset,
+            scan_msg->intensities.end()
+        );
         pub->publish(*scan_msg);
     }
 
@@ -573,6 +591,7 @@ public:
     size_t angle_compensate_multiple = 1;//it stand of angle compensate at per 1 degree
     std::string scan_mode;
     float scan_frequency;
+    float angle_correction;
     /* State */
     bool is_scanning = false;
 

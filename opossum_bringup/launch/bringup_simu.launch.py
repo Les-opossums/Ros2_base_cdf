@@ -14,7 +14,10 @@ def generate_launch_description():
     )
     simulation = LaunchConfiguration("simulation")
     robot_names_arg = DeclareLaunchArgument(
-        "robot_names", default_value="main_robot", description="Set list of robots"
+        "robot_names",
+        # default_value="main_robot, second_robot",
+        default_value="main_robot",
+        description="Set list of robots",
     )
     robot_names = LaunchConfiguration("robot_names")
 
@@ -32,6 +35,22 @@ def generate_launch_description():
         ),
         launch_arguments={"robot_names": robot_names}.items(),
     )
+
+    nav_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                PathJoinSubstitution(
+                    [
+                        FindPackageShare("opossum_nav"),
+                        "launch",
+                        "nav.launch.py",
+                    ]
+                )
+            ]
+        ),
+        launch_arguments={"robot_names": robot_names}.items(),
+    )
+
     localisation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -76,6 +95,7 @@ def generate_launch_description():
             simulation_arg,
             robot_names_arg,
             comm_launch,
+            nav_launch,
             localisation_launch,
             simu_launch,
             dev_gui_launch,

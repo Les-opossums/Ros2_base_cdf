@@ -129,10 +129,17 @@ class ZynqSimulation(Node):
 
     def process_action(self, name, args):
         """Execute the requested action asynchronously."""
-        if name == "GETODOM" or name == "SPEED" or name == "MAPASSERV":
+        if (
+            name == "GETODOM"
+            or name == "SPEED"
+            or name == "MAPASSERV"
+            or name == "BLOCK"
+        ):
             self.send_short_cmd_motor(name, args)
         elif name == "MOVE":
             self.send_long_cmd_motor(name, args)
+        elif name == "SETLIDAR":
+            pass
         else:
             self.get_logger().warn(f"Action {name} is not implemented.")
 

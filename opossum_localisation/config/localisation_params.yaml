@@ -6,7 +6,7 @@ tf_broadcaster_node:
     default_color: yellow
     available_colors: ["yellow", "blue"]
     boundaries: [0.0, 3.0, 0.0, 2.0]
-    beacons: [-0.094, 0.072, -0.094, 1.928, 3.094, 1., 1.275, 2.12]
+    beacons: [-0.094, 0.05, -0.094, 1.95, 3.094, 1., 1.275, 2.13]
 
 main_robot:
   rplidar_node:
@@ -18,6 +18,64 @@ main_robot:
       inverted: false
       angle_compensate: true
       scan_mode: Sensitivity
+      angle_correction: -3.6651914
+
+  obstacle_extractor_node:
+    ros__parameters:
+      active: True
+      use_scan: True
+      use_pcl: False
+      use_sim_time: True
+
+      use_split_and_merge: True
+      circles_from_visibles: True
+      discard_converted_segments: True
+      transform_coordinates: True
+
+      min_group_points: 2
+
+      max_group_distance: 0.12
+      distance_proportion: 0.00628
+      max_split_distance: 0.2
+      max_merge_separation: 0.2
+      max_merge_spread: 0.2
+      max_circle_radius: 0.2
+      radius_enlargement: 0.05
+      max_x_range: 4.0
+      max_y_range: 4.0
+
+      frame_id: laser_frame
+
+  beacon_detector_node:
+    ros__parameters:
+      enable_robot_position_reception: False
+      object_topic: raw_obstacles
+      position_topic: position_out
+      debug_topic: debug
+      color_topic: init/team_color
+      default_color: yellow
+      available_colors: ["yellow", "blue"]
+      beacons: [-0.094, 0.072, -0.094, 1.928, 3.094, 1., 1.275, 2.12]
+      boundaries:  [0.0, 3.0, 0.0, 2.0]
+      init_position: [1.77, 0.23, 0.0]
+      distance_tolerance: 0.3
+      angle_tolerance: 0.7853981633974483
+      robot_position_topic: robot_position_input
+      enable_wait_color: False
+      enable_initial_position: False
+
+
+second_robot:
+  rplidar_node:
+    ros__parameters:
+      serial_port: /dev/ttyLidar
+      serial_baudrate: 256000
+      channel_type: serial
+      frame_id: second_robot/laser_frame
+      inverted: false
+      angle_compensate: true
+      scan_mode: Sensitivity
+      angle_correction: -3.6651914
 
   obstacle_extractor_node:
     ros__parameters:

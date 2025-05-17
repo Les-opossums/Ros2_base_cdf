@@ -1,3 +1,3 @@
-int32 detection_mode
+int8 detection_mode
 geometry_msgs/Point goal_position
 float64 obstacle_detection_distance

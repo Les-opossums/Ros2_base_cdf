@@ -1,0 +1,38 @@
+
+main_robot:
+  avoid_obstacle_node:
+    ros__parameters:
+      robot_data_topic: robot_data
+      position_topic: position_out
+      goal_position_topic: goal_position
+      scan_topic: scan
+      command_topic: command
+      obstacle_detected_topic: obstacle_detected
+      obstacle_detection_distance: 0.5
+      detection_mode: full
+      cone_range: 60.0 # deg
+      thickness: 0.2
+      boundaries: [0.0, 3.0, 0.0, 2.0]
+      boundary_limit_detection: 0.05
+      enable_detection: true
+      enable_boundary_check: true
+      enable_new_path: false
+
+second_robot:
+  avoid_obstacle_node:
+    ros__parameters:
+      robot_data_topic: robot_data
+      position_topic: position_out
+      goal_position_topic: goal_position
+      scan_topic: scan
+      command_topic: command
+      obstacle_detected_topic: obstacle_detected
+      obstacle_detection_distance: 0.5
+      detection_mode: rectangle
+      cone_range: 60.0
+      thickness: 0.4
+      boundaries: [0.0, 2.0, 0.0, 3.0]
+      boundary_limit_detection: 0.05
+      enable_detection: true
+      enable_boundary_check: true
+      enable_new_path: false

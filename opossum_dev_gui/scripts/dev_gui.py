@@ -10,13 +10,11 @@ from rclpy.node import Node
 from PyQt5 import QtWidgets, QtGui, QtCore
 from ament_index_python.packages import get_package_share_directory
 import os
-import numpy as np
 from cdf_msgs.msg import LidarLoc
 from std_msgs.msg import String
 import functools
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from rclpy.logging import get_logger
 
 
 class NodeGUI(Node):
@@ -132,9 +130,7 @@ class MapScene(QtWidgets.QGraphicsView):
         self.scene.addItem(self.map_item)
 
         # Chargement de l'icône et ajout d'un item déplaçable
-        self.icon_pixmap = QtGui.QPixmap(icon).scaled(
-            50, 50, QtCore.Qt.KeepAspectRatio
-        )
+        self.icon_pixmap = QtGui.QPixmap(icon).scaled(50, 50, QtCore.Qt.KeepAspectRatio)
         self.icon_item = DraggablePixmapItem(self.icon_pixmap)
         icon_rect = self.icon_item.boundingRect()
         self.icon_width = icon_rect.width()
@@ -175,7 +171,7 @@ class MapScene(QtWidgets.QGraphicsView):
         posy = height * (1 - msg.robot_position.y / 2) - self.icon_height / 2
         new_pos = QtCore.QPointF(posx, posy)
         self.icon_item.setPos(new_pos)
-        new_rotation = -msg.robot_position.z * 180 / np.pi
+        new_rotation = -msg.robot_position.z
         self.icon_item.setRotation(new_rotation)
         index = 0
         for rob in msg.other_robot_position:
@@ -186,7 +182,7 @@ class MapScene(QtWidgets.QGraphicsView):
                 self.ennemis_items[index].setPos(e_pos)
             else:
                 e_pix = QtGui.QPixmap(self.mad_icon).scaled(
-                    100, 100, QtCore.Qt.KeepAspectRatio
+                    50, 50, QtCore.Qt.KeepAspectRatio
                 )
                 e_item = DraggablePixmapItem(e_pix)
                 self.ennemis_items.append(e_item)
@@ -282,9 +278,9 @@ class MotorsPage(QtWidgets.QWidget):
         current_value_label_ang_vel = QtWidgets.QLabel("Current Value Angle Vel:")
         x_label = QtWidgets.QLabel("X (m):")
         y_label = QtWidgets.QLabel("Y (m):")
-        theta_label = QtWidgets.QLabel("Theta (deg):")
+        theta_label = QtWidgets.QLabel("Theta (rad):")
         lin_vel_label = QtWidgets.QLabel("Linear Vel (m/s):")
-        ang_vel_label = QtWidgets.QLabel("Angular Vel (deg/s):")
+        ang_vel_label = QtWidgets.QLabel("Angular Vel (rad/s):")
 
         # Create line edits for each parameter
         self.x_edit = QtWidgets.QLineEdit(self)
@@ -334,10 +330,18 @@ class MotorsPage(QtWidgets.QWidget):
         main_layout.addWidget(self.button_update_lidar)
 
     def send_update_lidar(self):
-        "Send the command to update odom with lidar."
+        """Send the command to update odom with lidar."""
         self.x_value_label.text()
         if self.x_value_label.text() != "--.--":
-            self.parent.send_cmd(self.name, "SYNCHROLIDAR", [float(self.x_value_label.text()), float(self.y_value_label.text()), float(self.t_value_label.text()) * np.pi / 180])
+            self.parent.send_cmd(
+                self.name,
+                "SYNCHROLIDAR",
+                [
+                    float(self.x_value_label.text()),
+                    float(self.y_value_label.text()),
+                    float(self.t_value_label.text()),
+                ],
+            )
 
     def send_motor_command(self):
         """Send command to ROS."""
@@ -346,7 +350,7 @@ class MotorsPage(QtWidgets.QWidget):
         theta = self.theta_edit.text()
         x = float(x) if x != "" else -1
         y = float(y) if y != "" else -1
-        theta = float(theta) * np.pi / 180 if theta != "" else -1 
+        theta = float(theta) if theta != "" else -1
         if x != -1 or y != -1 or theta != -1:
             command_name = "MOVE"
             args = [x, y, theta]
@@ -366,7 +370,7 @@ class MotorsPage(QtWidgets.QWidget):
         """Update the text of the dynamic labels."""
         self.x_value_label.setText(f"{msg.robot_position.x:.2f}")
         self.y_value_label.setText(f"{msg.robot_position.y:.2f}")
-        self.t_value_label.setText(f"{msg.robot_position.z * 180 / np.pi:.2f}")
+        self.t_value_label.setText(f"{msg.robot_position.z:.2f}")
 
     def update_map_position(self, msg):
         """Update the map of the robots."""

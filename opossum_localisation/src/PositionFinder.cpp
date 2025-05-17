@@ -169,13 +169,16 @@ void PositionFinder::init_finding(
     }
 }
 
-std::optional<Eigen::Vector3d> PositionFinder::search_pos(
+std::pair<std::array<std::optional<Eigen::Vector2d>, 4>, std::optional<Eigen::Vector3d>> PositionFinder::search_pos(
     int nb_potential_beacons,
     const std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>& potential_beacons,
     const std::vector<Eigen::Vector2d>& new_objects_detected)
 {
     update_data();
+    std::pair<std::array<std::optional<Eigen::Vector2d>, 4>, std::optional<Eigen::Vector3d>> output;
     std::vector<std::pair<Eigen::Vector3d, double>> potential_positions = find_position(potential_beacons, fixed_beacons_, nb_potential_beacons, boundaries_);
+    std::array<std::optional<Eigen::Vector2d>, 4> beacons_random;
+    output.first = beacons_random;
     if (!potential_positions.empty())
     {
         if (!initialisation_)
@@ -190,13 +193,16 @@ std::optional<Eigen::Vector3d> PositionFinder::search_pos(
         if (initialisation_ && true_valor_)
         {
             find_robots_on_plateau(new_objects_detected);
-            return current_robot;
+            output.second = current_robot;
+            return output;
         }
         else
         {
-            return std::nullopt;
+            output.second = std::nullopt;
+            return output;
         }
     }
     true_valor_ = false;
-    return std::nullopt;
+    output.second = std::nullopt;
+    return output;
 }

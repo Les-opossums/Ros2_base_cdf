@@ -16,7 +16,7 @@ public:
         double precision = 0.1,
         std::optional<std::array<double, 3>> init_position = std::nullopt);
 
-    std::optional<Eigen::Vector3d> search_pos(
+    std::pair<std::array<std::optional<Eigen::Vector2d>, 4>, std::optional<Eigen::Vector3d>> search_pos(
         int nb_potential_beacons,
         const std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>& potential_beacons,
         const std::vector<Eigen::Vector2d>& new_objects_detected);

@@ -134,6 +134,8 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
 {
     // rclcpp::Time begin = this->now();
     // int64_t ns_begin = begin.nanoseconds();
+    // rclcpp::Time last_time = msg->header.stamp;
+    // int64_t ns_last_time = last_time.nanoseconds();
 
     if ((!enable_robot_position_reception_ || !position_finder_->previous_robot.has_value()) && position_finder_->current_robot.has_value())
     {
@@ -160,10 +162,12 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
     }
     std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> beacons_result;
     beacons_result = beacon_sorter_->find_possible_beacons(previous_beacons, new_objects_detected);
-    RCLCPP_INFO(this->get_logger(), "NUMBER BEACONS %d", beacons_result.first);
+    // RCLCPP_INFO(this->get_logger(), "NUMBER BEACONS %d", beacons_result.first);
     if (beacons_result.first > 1)
     {
-        std::optional<Eigen::Vector3d> position_found = position_finder_->search_pos(beacons_result.first, beacons_result.second, new_objects_detected);
+        std::pair<std::array<std::optional<Eigen::Vector2d>, 4>, std::optional<Eigen::Vector3d>> output = position_finder_->search_pos(beacons_result.first, beacons_result.second, new_objects_detected);
+        std::array<std::optional<Eigen::Vector2d>, 4> beacons = output.first;
+        std::optional<Eigen::Vector3d> position_found = output.second;
         if (position_found.has_value())
         {
             std::vector<Eigen::Vector2d> others;
@@ -175,10 +179,10 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
             ss << "SETLIDAR "
             << position_found->x() << " "
             << position_found->y() << " "
-            << position_found->z() - 3.6651914;
+            << position_found->z();
             msg_cmd.data = ss.str();
             // Log the message to console
-            RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", msg_cmd.data.c_str());
+            // RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", msg_cmd.data.c_str());
 
             // Publish the message.
             pub_location_cmd_->publish(msg_cmd);
@@ -187,6 +191,7 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
     // rclcpp::Time now = this->now();
     // int64_t ns_now = now.nanoseconds();
     // RCLCPP_INFO(this->get_logger(), "Current time: %d seconds", ns_now - ns_begin);
+    // RCLCPP_INFO(this->get_logger(), "Last Time: %d seconds", ns_now - ns_last_time);
 }
 
 void BeaconDetectorNode::robot_position_callback(const cdf_msgs::msg::MergedData::SharedPtr msg)
