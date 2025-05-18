@@ -2,14 +2,16 @@
 main_robot:
   avoid_obstacle_node:
     ros__parameters:
+      display_all: true
       robot_data_topic: robot_data
       position_topic: position_out
       goal_position_topic: goal_position
       scan_topic: scan
       command_topic: command
       obstacle_detected_topic: obstacle_detected
+      visualization_topic: visualization_limit
       obstacle_detection_distance: 0.5
-      detection_mode: full
+      detection_mode: cone
       cone_range: 60.0 # deg
       thickness: 0.2
       boundaries: [0.0, 3.0, 0.0, 2.0]
@@ -21,12 +23,14 @@ main_robot:
 second_robot:
   avoid_obstacle_node:
     ros__parameters:
+      display_all: true
       robot_data_topic: robot_data
       position_topic: position_out
       goal_position_topic: goal_position
       scan_topic: scan
       command_topic: command
       obstacle_detected_topic: obstacle_detected
+      visualization_topic: visualization_limit
       obstacle_detection_distance: 0.5
       detection_mode: rectangle
       cone_range: 60.0

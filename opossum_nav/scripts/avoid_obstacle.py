@@ -9,6 +9,8 @@ from rclpy.executors import MultiThreadedExecutor
 from sensor_msgs.msg import LaserScan
 from opossum_msgs.msg import RobotData, LidarLoc, GoalDetection
 from std_msgs.msg import Bool, String
+from geometry_msgs.msg import Point
+from visualization_msgs.msg import Marker
 
 
 class ObstacleAvoider(Node):
@@ -31,6 +33,7 @@ class ObstacleAvoider(Node):
                 ("goal_position_topic", "goal_position"),
                 ("scan_topic", "scan"),
                 ("command_topic", "command"),
+                ("visualization_topic", "visualization_limit"),
                 ("obstacle_detected_topic", "obstacle_detected"),
                 ("obstacle_detection_distance", 0.4),
                 ("detection_mode", "full"),
@@ -41,7 +44,11 @@ class ObstacleAvoider(Node):
                 ("enable_detection", True),
                 ("enable_boundary_check", False),
                 ("enable_new_path", False),
+                ("display_all", True),
             ],
+        )
+        self.display_all = (
+            self.get_parameter("display_all").get_parameter_value().bool_value
         )
         self.enable_detection_default = (
             self.get_parameter("enable_detection").get_parameter_value().bool_value
@@ -97,10 +104,17 @@ class ObstacleAvoider(Node):
         self.command_topic = (
             self.get_parameter("command_topic").get_parameter_value().string_value
         )
+
+        self.visualization_topic = (
+            self.get_parameter("visualization_topic").get_parameter_value().string_value
+        )
+
         self.pub_obstacle_detected = self.create_publisher(
             Bool, self.obstacle_detected_topic, 10
         )
         self.pub_command = self.create_publisher(String, self.command_topic, 10)
+
+        self.pub_visualization = self.create_publisher(Marker, self.visualization_topic, 10)
 
     def _init_subscribers(self) -> None:
         """Initialize subscribers."""
@@ -178,7 +192,6 @@ class ObstacleAvoider(Node):
                 np.pi * self.cone_range / (180 * self.angle_increment)
             )
             self.len_scan = int((msg.angle_max - msg.angle_min) / msg.angle_increment)
-            self.get_logger().info(f"Len scan: {self.len_scan}")
             self._compute_security_rectangle_distances()
 
         if self.enable_detection:
@@ -239,16 +252,17 @@ class ObstacleAvoider(Node):
 
     def _detect_obstacle_full(self, lidar_range: list) -> bool:
         """Detect obstacles around robot."""
+        if self.display_all:
+            self.publish_visualization("full")
         if self.robot_data is None or not self.enable_boundary_check:
             for dist in lidar_range:
                 if dist < self.obstacle_detection_distance:
                     return True
             return False
+        
         for i in range(len(lidar_range)):
             if lidar_range[i] < self.obstacle_detection_distance:
-                self.get_logger().info(f"Distance: {lidar_range[i]}")
                 if self._check_in_boundaries(i, lidar_range[i]):
-                    self.get_logger().info(f"INSIDE")
                     return True
         return False
 
@@ -259,7 +273,7 @@ class ObstacleAvoider(Node):
         else:
             theta = self.robot_data.vdir
         self.ptheta = theta
-        middle_angle = np.mod(theta, 2 * np.pi)
+        middle_angle = np.mod(theta, 2 * np.pi) - self.robot_data.theta
         index_middle_angle = int(middle_angle / self.angle_increment)
         if index_middle_angle - self.cone_range_index // 2 < 0:
             angle_range = list(
@@ -287,7 +301,9 @@ class ObstacleAvoider(Node):
                     index_middle_angle + self.cone_range_index // 2,
                 )
             )
-        if self.robot_position is None or not self.enable_boundary_check:
+        if self.display_all:
+            self.publish_visualization("cone", angle_range)
+        if not self.enable_boundary_check:
             for i in angle_range:
                 if lidar_range[i] < self.obstacle_detection_distance:
                     return True
@@ -308,7 +324,7 @@ class ObstacleAvoider(Node):
         else:
             theta = self.robot_data.vdir
         self.ptheta = theta
-        middle_angle = np.mod(theta, 2 * np.pi)
+        middle_angle = np.mod(theta, 2 * np.pi) - self.robot_data.theta
         index_middle_angle = int(middle_angle / self.angle_increment)
         if index_middle_angle - self.len_scan // 4 < 0:
             angle_range = list(
@@ -326,7 +342,9 @@ class ObstacleAvoider(Node):
                 )
             )
         angle_range = angle_range[: len(self.security_dst)]
-        if self.robot_position is None or not self.enable_boundary_check:
+        if self.display_all:
+            self.publish_visualization("rectangle", angle_range)
+        if not self.enable_boundary_check:
             for i in range(len(angle_range)):
                 if lidar_range[angle_range[i]] < self.security_dst[i]:
                     return True
@@ -484,6 +502,57 @@ class ObstacleAvoider(Node):
         if len(limit_bound) > 0:
             return limit_bound[0]
         return None
+    
+    def publish_visualization(self, mode, angle_range=None):
+        marker_robot = Marker()
+        marker_robot.header.frame_id = self.get_namespace() + "/laser_frame"
+        marker_robot.header.stamp = self.get_clock().now().to_msg()
+        marker_robot.ns = str(self.get_namespace()[1:])
+        marker_robot.id = 253
+        marker_robot.type = Marker.LINE_STRIP
+        marker_robot.action = Marker.ADD
+        marker_robot.scale.x = 0.01  # Line width
+        marker_robot.color.r = 1.0
+        marker_robot.color.g = 0.0
+        marker_robot.color.a = 1.0
+        radius = 0.1
+        num_points = 100 # self.len_scan  # More points = smoother circle
+        for i in range(num_points + 1):  # Close the loop
+            angle = 2 * np.pi * i / num_points
+            x = radius * np.cos(angle)
+            y = radius * np.sin(angle)
+            marker_robot.points.append(Point(x=x, y=y, z=0.0))
+        self.pub_visualization.publish(marker_robot)
+        
+        marker = Marker()
+        marker.header.frame_id = self.get_namespace() + "/laser_frame"
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = "limit_detection"
+        marker.id = 254
+        marker.type = Marker.LINE_STRIP
+        marker.action = Marker.ADD
+
+        marker.scale.x = 0.01  # Line width
+        marker.color.r = 1.0
+        marker.color.g = 1.0
+        marker.color.a = 1.0
+        if mode == "full":
+            num_points = 100 # self.len_scan  # More points = smoother circle
+            for i in range(num_points + 1):  # Close the loop
+                angle = 2 * np.pi * i / num_points
+                x = self.obstacle_detection_distance * np.cos(angle)
+                y = self.obstacle_detection_distance * np.sin(angle)
+                marker.points.append(Point(x=x, y=y, z=0.0))
+        elif mode == "cone":
+            marker.points.append(Point(x=0.0, y=0.0, z=0.0))
+            # for i in range(- len(angle_range) // 2,  len(angle_range) // 2):
+            for i in range(angle_range[0], angle_range[-1]):
+                angle = 2 * np.pi * i / self.len_scan
+                x = self.obstacle_detection_distance * np.cos(angle)
+                y = self.obstacle_detection_distance * np.sin(angle)
+                marker.points.append(Point(x=x, y=y, z=0.0))
+            marker.points.append(Point(x=0.0, y=0.0, z=0.0))
+        self.pub_visualization.publish(marker)
 
 
 def main(args=None):
