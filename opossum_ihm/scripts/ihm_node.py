@@ -92,7 +92,7 @@ class IhmNode(Node):
 
         self.sub_score_topic = self.create_subscription(
             Int32,
-            "score",
+            "/main_robot/score",
             self.score_callback,
             10
         )

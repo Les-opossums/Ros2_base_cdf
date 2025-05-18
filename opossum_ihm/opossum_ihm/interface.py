@@ -386,8 +386,8 @@ class ScoreApp:
     def update_score(self):
         """Met à jour le score toutes les 500ms"""
         # self.score = score  # Incrémentation du score
-        logger = get_logger("opossum_ihm")
-        logger.info(f"Score: {self.score}")
+        # logger = get_logger("opossum_ihm")
+        # logger.info(f"Score: {self.score}")
         self.display_score.set(str(self.score))  # Mise à jour du texte
         self.zero_label.update_idletasks()
 
