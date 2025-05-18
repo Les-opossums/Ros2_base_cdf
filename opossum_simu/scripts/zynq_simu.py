@@ -19,8 +19,6 @@ class ZynqSimulation(Node):
 
     def __init__(self) -> None:
         super().__init__("zynq_simu_node")
-        # Declare parameters provided by the launch YAML (auto-declared)
-        super().__init__("zynq_simu_node")
         self.declare_parameters(
             namespace="",
             parameters=[

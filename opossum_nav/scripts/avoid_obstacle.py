@@ -39,7 +39,7 @@ class ObstacleAvoider(Node):
                 ("detection_mode", "full"),
                 ("cone_range", 80.0),
                 ("thickness", 0.2),
-                ("boundaries", [0.0, 2.0, 0.0, 3.0]),
+                ("boundaries", [0.0, 3.0, 0.0, 2.0]),
                 ("boundary_limit_detection", 0.05),
                 ("enable_detection", True),
                 ("enable_boundary_check", False),
@@ -187,7 +187,7 @@ class ObstacleAvoider(Node):
         if not self.init_scan:
             self.init_scan = True
             self.angle_increment = msg.angle_increment
-            self.index_correction = int(msg.angle_increment / self.angle_increment)
+            self.index_correction = int(msg.angle_min / self.angle_increment)
             self.cone_range_index = int(
                 np.pi * self.cone_range / (180 * self.angle_increment)
             )
@@ -199,8 +199,8 @@ class ObstacleAvoider(Node):
                 self.in_avoid = self._find_new_path()
             else:
                 lidar_range = (
-                    msg.ranges[self.index_correction :]
-                    + msg.ranges[: self.index_correction]
+                    msg.ranges[-self.index_correction :]
+                    + msg.ranges[: -self.index_correction]
                 )
                 last_obs_detected = self.obstacle_detected
                 self.obstacle_detected = self.detect_obstacle(lidar_range)
@@ -324,7 +324,6 @@ class ObstacleAvoider(Node):
             theta = self.ptheta
         else:
             theta = self.robot_data.vdir
-        self.get_logger().info(f"Vdir: {self.robot_data.vdir}")
         self.ptheta = theta
         middle_angle = np.mod(theta, 2 * np.pi)
         index_middle_angle = int(middle_angle / self.angle_increment)
