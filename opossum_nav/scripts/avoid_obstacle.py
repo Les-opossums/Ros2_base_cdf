@@ -324,6 +324,7 @@ class ObstacleAvoider(Node):
             theta = self.ptheta
         else:
             theta = self.robot_data.vdir
+        self.get_logger().info(f"Vdir: {self.robot_data.vdir}")
         self.ptheta = theta
         middle_angle = np.mod(theta, 2 * np.pi) - self.robot_data.theta
         index_middle_angle = int(middle_angle / self.angle_increment)

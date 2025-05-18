@@ -1,6 +1,6 @@
 tf_broadcaster_node:
   ros__parameters:
-    display_all: true
+    display_all: false
     update_position_topic: update_position
     robot_data_topic: robot_data
     visualization_topic: visualization
