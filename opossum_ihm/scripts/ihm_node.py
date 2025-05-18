@@ -20,6 +20,9 @@ class IhmNode(Node):
         self.clr = 'blue'
         self.scr = 0
         self.ready_plot_pos = False
+        self.score = 0
+        self.au = False
+        self.x, self.y, self.t = None, None, None
 
         # Initialisation de l'interface graphique
         self.gui = GUI()
@@ -56,12 +59,28 @@ class IhmNode(Node):
             else:
                 self.update_parameters()
             break
-
+        
         self.gui.run_score()
-        self.gui.score_app.update_score()
-        self.gui.score_app.update_au()
-        # self.gui.score_app.update_position()
+        self.timer = self.create_timer(0.5, self.update_values)
         self.gui.score_app.root.mainloop()
+
+    def update_values(self):
+        # TODO: @greg Pour update fais comme ca, tu crée un timer comme au dessus, puis ensuite tu update le GUI avec les valeurs. 
+        # Evite de mélanger GUI et ROS Node. Idéalement self.gui.attribut doit pas se trouver dans ce fichier.
+        #PAs de self.gui.appscore.score, ou des choses comme ca. Autant l'appeler self.score ici, puis update le texte dans GUI 
+        # L'interface a pas de cerveau elle recupere juste les données et les affiche. Mais tu update avec des methodes
+        # Ici par exemple, c'est sur un timer, amsi tu peux aussi update dans les callbacks meme en soit
+        self.get_logger().info(f"Updating values:")
+        self.get_logger().info(f"Score: {self.score}")
+        self.get_logger().info(f"AU: {self.au}")
+        self.get_logger().info(f"Posiiton: {self.x} {self.y} {self.t}")
+        self.gui.score_app.update_score(self.score)
+        self.gui.score_app.update_au(self.au)
+        self.gui.score_app.update_position(self.x, self.y, self.t)
+
+    def exemple_de_callback_pos(self, msg):
+        # Un exemple de update dans un callback
+        self.gui_update_pos(msg.data)
 
     def update_parameters(self):
         """Met à jour les paramètres via un service ROS 2."""
@@ -124,18 +143,16 @@ class IhmNode(Node):
     def score_callback(self, msg):
         """Callback pour le topic 'score'."""
         self.get_logger().info(f"Score received: {msg.data}")
-        if self.gui.initialized:
-            self.gui.score_app.score += msg.data
-            self.get_logger().info(
-                f"Score received: {msg.data}, "
-                f"current_score={self.gui.score_app.score}"
-            )
+        self.score += msg.data
+        self.get_logger().info(
+            f"Score received: {msg.data}, "
+            f"current_score={self.score}"
+        )
 
     def au_callback(self, msg):
         """Callback pour le topic 'au'."""
-        if self.gui.initialized:
-            self.gui.score_app.is_au = msg.data
-            self.get_logger().info(f"AU received: {msg.data}")
+        self.au = msg.data
+        self.get_logger().info(f"AU received: {msg.data}")
 
     def enable_timer_callback(self, msg):
         """Callback pour le topic 'enable_timer'."""
@@ -151,11 +168,9 @@ class IhmNode(Node):
 
     def lidar_loc_callback(self, msg: LidarLoc):
         """Receive Lidar location."""
-        if self.gui.initialized:
-            self.gui.score_app.lidar_pos_x = msg.robot_position.x
-            self.gui.score_app.lidar_pos_y = msg.robot_position.y
-            self.gui.score_app.lidar_pos_t = msg.robot_position.z
-
+        self.x = msg.robot_position.x
+        self.y = msg.robot_position.y
+        self.t = msg.robot_position.z
 
 def main(args=None):
     rclpy.init(args=args)

@@ -361,8 +361,8 @@ class ScoreApp:
         )
         self.position_label.pack(side="bottom", pady=10)
 
-    def update_au(self):
-        if self.is_au:
+    def update_au(self, au):
+        if au:
             self.root.configure(bg="red")
             # if self.is_match:
             if True:
@@ -381,29 +381,29 @@ class ScoreApp:
             self.root.configure(bg="orange")
         else:
             self.root.configure(bg=self.color)
-        self.root.after(500, self.update_au)
 
-    def update_score(self):
+    def update_score(self, score):
         """Met à jour le score toutes les 500ms"""
         # self.score = score  # Incrémentation du score
         # logger = get_logger("opossum_ihm")
         # logger.info(f"Score: {self.score}")
-        self.display_score.set(str(self.score))  # Mise à jour du texte
+        self.display_score.set(str(score))  # Mise à jour du texte
         self.zero_label.update_idletasks()
 
-        # Planifier la prochaine mise à jour dans 500ms
-        self.root.after(500, self.update_score)
-
-    def update_position(self):
+    def update_position(self, x, y, t):
         """Met à jour la position toutes les 500ms"""
-        self.position_text.set(f" X: {self.lidar_pos_x:.2f}"
-                               f" Y: {self.lidar_pos_y:.2f}"
-                               f" T: {self.lidar_pos_z:.2f}"
-                               )
+        if x is None:
+            self.position_text.set(f" X: --:--"
+                                f" Y: --:--"
+                                f" T: --:--"
+                                )
+        else:
+            self.position_text.set(f" X: {x:.2f}"
+                                f" Y: {y:.2f}"
+                                f" T: {t:.2f}"
+                                )
         self.position_label.update_idletasks()
 
-        # Planifier la prochaine mise à jour dans 500ms
-        self.root.after(500, self.update_position)
 
 
 class ImageLabel(tk.Label):
