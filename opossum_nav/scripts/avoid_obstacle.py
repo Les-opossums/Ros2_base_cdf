@@ -225,6 +225,7 @@ class ObstacleAvoider(Node):
         if self.robot_data is None:
             return self._detect_obstacle_full(lidar_range)
         elif self.robot_data.vlin < 0.001 and not self.obstacle_detected:
+            self.publish_visualization("full")
             return False
         elif self.detection_mode == "full":
             return self._detect_obstacle_full(lidar_range)
