@@ -60,6 +60,7 @@ class IhmNode(Node):
         self.gui.run_score()
         self.gui.score_app.update_score()
         self.gui.score_app.update_au()
+        self.gui.score_app.update_position()
         self.gui.score_app.root.mainloop()
 
     def update_parameters(self):
