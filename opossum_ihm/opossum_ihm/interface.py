@@ -449,6 +449,7 @@ class GUI:
     def __init__(self):
         self.reload = False
         self.initialized = False
+        self.score_app_init = False
 
     def run_color(self):
         self.color_app = ColorChoiceApp()
@@ -475,4 +476,5 @@ class GUI:
         self.reload = self.validation_app.reload
 
     def run_score(self):
+        self.score_app_init = True
         self.score_app = ScoreApp(self.color_app.selected_color)
