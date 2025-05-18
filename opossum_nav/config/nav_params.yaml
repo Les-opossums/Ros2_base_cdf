@@ -11,7 +11,7 @@ main_robot:
       obstacle_detected_topic: obstacle_detected
       visualization_topic: visualization_limit
       obstacle_detection_distance: 0.5
-      detection_mode: cone
+      detection_mode: rectangle
       cone_range: 60.0 # deg
       thickness: 0.2
       boundaries: [0.0, 3.0, 0.0, 2.0]

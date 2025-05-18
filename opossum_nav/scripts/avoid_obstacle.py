@@ -545,13 +545,20 @@ class ObstacleAvoider(Node):
                 marker.points.append(Point(x=x, y=y, z=0.0))
         elif mode == "cone":
             marker.points.append(Point(x=0.0, y=0.0, z=0.0))
-            # for i in range(- len(angle_range) // 2,  len(angle_range) // 2):
-            for i in range(angle_range[0], angle_range[-1]):
+            angle_final = angle_range[-1] + 1 + self.len_scan if angle_range[-1] + 1 < angle_range[0] else angle_range[-1] + 1
+            for i in range(angle_range[0], angle_final):
                 angle = 2 * np.pi * i / self.len_scan
                 x = self.obstacle_detection_distance * np.cos(angle)
                 y = self.obstacle_detection_distance * np.sin(angle)
                 marker.points.append(Point(x=x, y=y, z=0.0))
             marker.points.append(Point(x=0.0, y=0.0, z=0.0))
+        elif mode == "rectangle":
+            angle_final = angle_range[-1] + 1 + self.len_scan if angle_range[-1] + 1 < angle_range[0] else angle_range[-1] + 1
+            for ind, i in enumerate(range(angle_range[0], angle_final)):
+                angle = 2 * np.pi * i / self.len_scan
+                x = self.security_dst[ind] * np.cos(angle)
+                y = self.security_dst[ind] * np.sin(angle)
+                marker.points.append(Point(x=x, y=y, z=0.0))
         self.pub_visualization.publish(marker)
 
 
