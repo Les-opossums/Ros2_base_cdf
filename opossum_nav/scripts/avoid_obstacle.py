@@ -274,7 +274,7 @@ class ObstacleAvoider(Node):
         else:
             theta = self.robot_data.vdir
         self.ptheta = theta
-        middle_angle = np.mod(theta, 2 * np.pi) - self.robot_data.theta
+        middle_angle = np.mod(theta, 2 * np.pi)
         index_middle_angle = int(middle_angle / self.angle_increment)
         if index_middle_angle - self.cone_range_index // 2 < 0:
             angle_range = list(
@@ -326,7 +326,7 @@ class ObstacleAvoider(Node):
             theta = self.robot_data.vdir
         self.get_logger().info(f"Vdir: {self.robot_data.vdir}")
         self.ptheta = theta
-        middle_angle = np.mod(theta, 2 * np.pi) - self.robot_data.theta
+        middle_angle = np.mod(theta, 2 * np.pi)
         index_middle_angle = int(middle_angle / self.angle_increment)
         if index_middle_angle - self.len_scan // 4 < 0:
             angle_range = list(

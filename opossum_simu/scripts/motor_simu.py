@@ -88,7 +88,7 @@ class MotorSimu(Node):
     def send_robot_data(self):
         self.pub_zync_raspi.publish(
             String(
-                data=f"ROBOTDATA {self.position[0].item()} {self.position[1].item()} {self.position[2].item()} {np.linalg.norm(self.velocity[:2]).item()} {np.arctan2(self.velocity[1], self.velocity[0]).item()} {self.velocity[2].item()}\n"
+                data=f"ROBOTDATA {self.position[0].item()} {self.position[1].item()} {self.position[2].item()} {np.linalg.norm(self.velocity[:2]).item()} {np.arctan2(self.velocity[1], self.velocity[0]).item() - self.position[2].item()} {self.velocity[2].item()}\n"
             )
         )
 
