@@ -98,6 +98,9 @@ class IhmNode(Node):
         self.sub_enable_timer_topic = self.create_subscription(
             Bool, "enable_timer", self.enable_timer_callback, 10
         )
+        self.sub_comm_state_topic = self.create_subscription(
+            Bool, "/main_robot/comm_state", self.comm_state_callback, 10
+        )
 
     def score_callback(self, msg):
         """Callback pour le topic 'score'."""
@@ -120,6 +123,12 @@ class IhmNode(Node):
         if self.gui.initialized:
             self.gui.score_app.is_match = msg.data
             self.get_logger().info(f"Enable Timer received: {msg.data}")
+
+    def comm_state_callback(self, msg):
+        """Callback pour le topic 'comm_state'."""
+        if self.gui.initialized:
+            self.gui.score_app.comm_state = msg.data
+            self.get_logger().info(f"Comm State received: {msg.data}")
 
 
 def main(args=None):

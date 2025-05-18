@@ -14,7 +14,7 @@ import yaml
 import functools
 
 # Msgs import
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
 from opossum_msgs.msg import RobotData, GoalDetection
 
 
@@ -29,6 +29,7 @@ class Communication(Node):
                 ("simulation", rclpy.Parameter.Type.BOOL),
                 ("send_comm_topic", rclpy.Parameter.Type.STRING),
                 ("rcv_comm_topic", rclpy.Parameter.Type.STRING),
+                ("comm_state_topic", rclpy.Parameter.Type.STRING),
                 ("cards_name", rclpy.Parameter.Type.STRING_ARRAY),
                 ("command_topic", rclpy.Parameter.Type.STRING),
                 ("feedback_command_topic", rclpy.Parameter.Type.STRING),
@@ -146,6 +147,9 @@ class Communication(Node):
         self.pub_goal_position = self.create_publisher(
             GoalDetection, goal_position_topic, 10
         )
+        self.pub_comm_state = self.create_publisher(
+            Bool, self.get_parameter("comm_state_topic").get_parameter_value().string_value, 10
+        )
 
     def _init_card(self, name):
         while True:
@@ -243,6 +247,7 @@ class Communication(Node):
             return
         if splitted_data[0] == "GREENSWITCH":
             self.enable_send = not self.enable_send
+            self.pub_comm_state.publish(Bool(data=self.enable_send))
             self.get_logger().info(f"Enable send: {self.enable_send}")
         elif (
             splitted_data[0] == "ROBOTDATA" and len(splitted_data) == 7

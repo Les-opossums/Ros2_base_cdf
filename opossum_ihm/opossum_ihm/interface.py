@@ -315,6 +315,7 @@ class ScoreApp:
         self.score = 0
         self.is_match = False
         self.is_au = False
+        self.comm_state = True
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         if screen_width == 480 and screen_height == 800:
@@ -358,6 +359,8 @@ class ScoreApp:
                 lbl.load(gif_path)
                 root.after(3000, root.destroy)
                 root.mainloop()
+        elif not self.comm_state:
+            self.root.configure(bg="orange")
         else:
             self.root.configure(bg=self.color)
         self.root.after(500, self.update_au)
