@@ -15,6 +15,7 @@ from std_msgs.msg import String
 import functools
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from math import pi
 
 
 class NodeGUI(Node):
@@ -171,7 +172,7 @@ class MapScene(QtWidgets.QGraphicsView):
         posy = height * (1 - msg.robot_position.y / 2) - self.icon_height / 2
         new_pos = QtCore.QPointF(posx, posy)
         self.icon_item.setPos(new_pos)
-        new_rotation = -msg.robot_position.z
+        new_rotation = -msg.robot_position.z * 180 / pi
         self.icon_item.setRotation(new_rotation)
         index = 0
         for rob in msg.other_robot_position:
