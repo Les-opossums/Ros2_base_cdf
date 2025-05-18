@@ -61,7 +61,10 @@ class IhmNode(Node):
             break
         
         self.gui.run_score()
+        #On crée un timer a partir d'ici pour update
         self.timer = self.create_timer(0.5, self.update_values)
+        # Mais tu pourrais aussi créer un sub:
+        #self.create_sub... Et donc il écouterait que mtnt
         self.gui.score_app.root.mainloop()
 
     def update_values(self):
@@ -80,6 +83,7 @@ class IhmNode(Node):
 
     def exemple_de_callback_pos(self, msg):
         # Un exemple de update dans un callback
+
         self.gui_update_pos(msg.data)
 
     def update_parameters(self):
