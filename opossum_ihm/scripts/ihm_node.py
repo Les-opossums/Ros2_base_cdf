@@ -151,7 +151,7 @@ class IhmNode(Node):
 
     def lidar_loc_callback(self, msg: LidarLoc):
         """Receive Lidar location."""
-        if self.gui.score_app_init:
+        if self.gui.initialized:
             self.gui.score_app.lidar_pos_x = msg.robot_position.x
             self.gui.score_app.lidar_pos_y = msg.robot_position.y
             self.gui.score_app.lidar_pos_t = msg.robot_position.z

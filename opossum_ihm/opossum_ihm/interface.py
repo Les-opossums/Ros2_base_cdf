@@ -337,9 +337,9 @@ class ScoreApp:
         self.display_score = tk.StringVar()
         self.display_score.set("0")
         self.position_text = tk.StringVar()
-        self.position_text.set(f" X: {self.lidar_pos_x} "
-                               f" Y: {self.lidar_pos_y} "
-                               f" T: {self.lidar_pos_z} "
+        self.position_text.set(f" X: {self.lidar_pos_x:.2f} "
+                               f" Y: {self.lidar_pos_y:.2f} "
+                               f" T: {self.lidar_pos_z:.2f} "
                                )
 
         self.zero_label = tk.Label(
@@ -449,7 +449,6 @@ class GUI:
     def __init__(self):
         self.reload = False
         self.initialized = False
-        self.score_app_init = False
 
     def run_color(self):
         self.color_app = ColorChoiceApp()
@@ -476,5 +475,4 @@ class GUI:
         self.reload = self.validation_app.reload
 
     def run_score(self):
-        self.score_app_init = True
         self.score_app = ScoreApp(self.color_app.selected_color)
