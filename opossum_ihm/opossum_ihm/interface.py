@@ -396,9 +396,9 @@ class ScoreApp:
 
     def update_position(self):
         """Met à jour la position toutes les 500ms"""
-        self.position_text.set(f"X: {self.lidar_pos_x}"
-                               f"Y: {self.lidar_pos_y}"
-                               f"T: {self.lidar_pos_z}"
+        self.position_text.set(f" X: {self.lidar_pos_x:.2f}"
+                               f" Y: {self.lidar_pos_y:.2f}"
+                               f" T: {self.lidar_pos_z:.2f}"
                                )
         self.position_label.update_idletasks()
 
