@@ -81,8 +81,8 @@ class IhmNode(Node):
         """Gère la réponse du service asynchrone."""
         try:
             response = future.result()
-            self.get_logger().info(f"Parameters updated successfully: "
-                                   f"{response}")
+            # self.get_logger().info(f"Parameters updated successfully: "
+            #                        f"{response}")
         except Exception as e:
             self.get_logger().error(f"Service call failed: {e}")
 
