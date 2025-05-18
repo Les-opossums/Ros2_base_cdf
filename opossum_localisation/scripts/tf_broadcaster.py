@@ -7,7 +7,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import TransformStamped
 from tf2_ros import TransformBroadcaster
 import functools
-from cdf_msgs.msg import PositionMap
+from opossum_msgs.msg import PositionMap
 from geometry_msgs.msg import Point
 from std_srvs.srv import Empty
 from visualization_msgs.msg import Marker

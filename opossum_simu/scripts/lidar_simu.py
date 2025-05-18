@@ -10,7 +10,7 @@ import numpy as np
 
 # Import des messages
 from rclpy.executors import ExternalShutdownException
-from cdf_msgs.msg import PositionMap
+from opossum_msgs.msg import PositionMap
 from obstacle_detector.msg import Obstacles, CircleObstacle
 from std_srvs.srv import Trigger
 from std_msgs.msg import Header

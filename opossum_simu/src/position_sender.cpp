@@ -43,7 +43,7 @@ void PositionSender::init_publishers()
   // The topic name is constructed as: "<robot_name>/<update_position_topic>"
   for (const auto & name : robot_names_) {
     std::string topic_name = name + "/" + update_position_topic_;
-    pub_update_position_[name] = this->create_publisher<cdf_msgs::msg::PositionMap>(topic_name, 10);
+    pub_update_position_[name] = this->create_publisher<opossum_msgs::msg::PositionMap>(topic_name, 10);
   }
 }
 
@@ -76,7 +76,7 @@ void PositionSender::init_clients()
     auto service_name = name + "/" + short_motor_srv_;
 
     // Create the client for the current robot.
-    auto client = this->create_client<cdf_msgs::srv::StringReq>(service_name);
+    auto client = this->create_client<opossum_msgs::srv::StringReq>(service_name);
 
     // Wait for the service to become available.
     while (!client->wait_for_service(1s)) {
@@ -84,7 +84,7 @@ void PositionSender::init_clients()
     }
 
     // Create and populate the request.
-    auto request = std::make_shared<cdf_msgs::srv::StringReq::Request>();
+    auto request = std::make_shared<opossum_msgs::srv::StringReq::Request>();
     request->data = "GETODOM,1,30.0";
 
     // Send the request asynchronously.
@@ -137,7 +137,7 @@ void PositionSender::publish_position_callback()
   // For each robot, if its current position is set, publish a PositionMap message.
   for (const auto & name : robot_names_) {
     if (current_pos_[name] != nullptr) {
-      cdf_msgs::msg::PositionMap msg;
+      opossum_msgs::msg::PositionMap msg;
       // Set the robot's own position.
       msg.robot = *current_pos_[name];
 

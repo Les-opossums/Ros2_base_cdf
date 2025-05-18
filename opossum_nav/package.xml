@@ -13,7 +13,7 @@
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
-  <depend>cdf_msgs</depend>
+  <depend>opossum_msgs</depend>
   <exec_depend>ros2launch</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>

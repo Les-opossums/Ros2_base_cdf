@@ -10,7 +10,7 @@ from rclpy.node import Node
 from PyQt5 import QtWidgets, QtGui, QtCore
 from ament_index_python.packages import get_package_share_directory
 import os
-from cdf_msgs.msg import LidarLoc
+from opossum_msgs.msg import LidarLoc
 from std_msgs.msg import String
 import functools
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas

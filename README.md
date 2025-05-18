@@ -11,7 +11,7 @@ cd ~/your_ros_cdf_ws/
 To build the packages of the GUI and of the robot simulation:
 
 ```
-colcon build --symlink-install --packages-select cdf_msgs
+colcon build --symlink-install --packages-select opossum_msgs
 colcon build --symlink-install --packages-select localization
 colcon build --symlink-install --packages-select orchestrator_gui
 ```
@@ -53,7 +53,7 @@ You should see after some time on the interface the robot teleport to a random i
 Now you can send him orders. Open a new terminal, do not forget to source again and then run the following command with the position you want:
 
 ```
-ros2 action send_goal --feedback /main_robot/moveto cdf_msgs/action/MoveTo "{goal: {x: 0.457, y: 0.367, z: 1}}"
+ros2 action send_goal --feedback /main_robot/moveto opossum_msgs/action/MoveTo "{goal: {x: 0.457, y: 0.367, z: 1}}"
 ```
 
 You should see the robot moving on the board. Not really functional, so it can plant, and axis arent set well so maybe 0 is at the wrong place. You can send other goals.

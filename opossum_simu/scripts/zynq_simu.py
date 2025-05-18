@@ -9,8 +9,8 @@ from ament_index_python.packages import get_package_share_directory
 import os
 import yaml
 from rclpy.action import ActionClient
-from cdf_msgs.srv import StringReq
-from cdf_msgs.action import StringAction
+from opossum_msgs.srv import StringReq
+from opossum_msgs.action import StringAction
 from std_msgs.msg import String
 
 
@@ -44,7 +44,7 @@ class ZynqSimulation(Node):
             .get_parameter_value()
             .string_array_value
         )
-        msgs_path = os.path.join(get_package_share_directory("cdf_msgs"), "resources")
+        msgs_path = os.path.join(get_package_share_directory("opossum_msgs"), "resources")
         self.timers_clb = {}
         comm_yaml_file = os.path.join(msgs_path, "com_msgs.yaml")
         msgs_yaml_file = os.path.join(msgs_path, "format_msgs.yaml")

@@ -13,7 +13,7 @@
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
-  <depend>cdf_msgs</depend>
+  <depend>opossum_msgs</depend>
   <depend>vision_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>obstacle_detector</depend>

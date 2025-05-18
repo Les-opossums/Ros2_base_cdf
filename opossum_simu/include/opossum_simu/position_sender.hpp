@@ -2,8 +2,8 @@
 #define POSITION_SENDER_HPP_
 
 // #include "geometry_msgs/msg/point.hpp"
-#include "cdf_msgs/msg/position_map.hpp"
-#include "cdf_msgs/srv/string_req.hpp"
+#include "opossum_msgs/msg/position_map.hpp"
+#include "opossum_msgs/srv/string_req.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 #include <string>
@@ -29,7 +29,7 @@ private:
   std::unordered_map<std::string, std::shared_ptr<geometry_msgs::msg::Point>> current_pos_;
 
   // Publishers: one publisher per robot to publish PositionMap messages
-  std::unordered_map<std::string, rclcpp::Publisher<cdf_msgs::msg::PositionMap>::SharedPtr> pub_update_position_;
+  std::unordered_map<std::string, rclcpp::Publisher<opossum_msgs::msg::PositionMap>::SharedPtr> pub_update_position_;
 
   // Subscriptions (one per robot)
   std::vector<rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr> subscriptions_;

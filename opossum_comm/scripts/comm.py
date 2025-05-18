@@ -18,7 +18,7 @@ from datetime import datetime
 # Msgs import
 from std_msgs.msg import String
 from geometry_msgs.msg import Point
-from cdf_msgs.msg import RobotData, GoalDetection
+from opossum_msgs.msg import RobotData, GoalDetection
 
 
 class Communication(Node):
@@ -49,7 +49,7 @@ class Communication(Node):
 
     def _init_parameters(self: Node) -> None:
         """Initialise parameters of the node."""
-        msgs_path = os.path.join(get_package_share_directory("cdf_msgs"), "resources")
+        msgs_path = os.path.join(get_package_share_directory("opossum_msgs"), "resources")
         comm_yaml_file = os.path.join(msgs_path, "com_msgs.yaml")
         msgs_yaml_file = os.path.join(msgs_path, "format_msgs.yaml")
         with open(comm_yaml_file, "r") as file:

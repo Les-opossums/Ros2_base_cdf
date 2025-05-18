@@ -2,10 +2,10 @@
 
 This package contains the nodes needed to communicate with the robot (currently only the Zynq), or simulate a communication.
 
-First build the opossum_comm package (and the cdf_msgs) and then source the workspace:
+First build the opossum_comm package (and the opossum_msgs) and then source the workspace:
 
 ```
-colcon build --packages-select opossum_comm cdf_msgs
+colcon build --packages-select opossum_comm opossum_msgs
 source install/setup.bash
 ```
 

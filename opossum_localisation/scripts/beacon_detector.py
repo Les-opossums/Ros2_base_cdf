@@ -16,7 +16,7 @@ from opossum_localisation.publisher import publish_pose_from_lidar
 
 # Msgs import
 from obstacle_detector.msg import Obstacles
-from cdf_msgs.msg import LidarLoc, MergedData
+from opossum_msgs.msg import LidarLoc, MergedData
 from std_msgs.msg import String
 
 

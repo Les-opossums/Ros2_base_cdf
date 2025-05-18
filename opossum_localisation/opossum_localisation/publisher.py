@@ -1,7 +1,7 @@
 """Convert point from the world frame to robot one."""
 
 from geometry_msgs.msg import Point
-from cdf_msgs.msg import LidarLoc
+from opossum_msgs.msg import LidarLoc
 import math
 
 

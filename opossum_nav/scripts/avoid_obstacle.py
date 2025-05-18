@@ -7,7 +7,7 @@ from rclpy.executors import ExternalShutdownException
 import numpy as np
 from rclpy.executors import MultiThreadedExecutor
 from sensor_msgs.msg import LaserScan
-from cdf_msgs.msg import RobotData, LidarLoc, GoalDetection
+from opossum_msgs.msg import RobotData, LidarLoc, GoalDetection
 from std_msgs.msg import Bool, String
 
 

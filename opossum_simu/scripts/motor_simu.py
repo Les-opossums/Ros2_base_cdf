@@ -12,8 +12,8 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 # Import des messages
-from cdf_msgs.action import StringAction
-from cdf_msgs.srv import StringReq
+from opossum_msgs.action import StringAction
+from opossum_msgs.srv import StringReq
 from std_msgs.msg import String
 from geometry_msgs.msg import Point
 import threading

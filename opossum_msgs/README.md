@@ -1,4 +1,4 @@
-# cdf_msgs
+# opossum_msgs
 Ce package contient toutes les définitions de messages utilisés pour le projet
 de la Coupe de France de Robotique.
 

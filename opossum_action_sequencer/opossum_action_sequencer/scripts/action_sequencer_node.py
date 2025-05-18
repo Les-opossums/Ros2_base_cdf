@@ -8,7 +8,7 @@ from rclpy.node import Node
 from rcl_interfaces.msg import ParameterEvent
 
 from std_msgs.msg import String, Bool, Int32
-from cdf_msgs.msg import RobotData, LidarLoc
+from opossum_msgs.msg import RobotData, LidarLoc
 
 from opossum_action_sequencer.utils import (
     Position,

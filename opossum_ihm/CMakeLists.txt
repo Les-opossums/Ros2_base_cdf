@@ -11,7 +11,7 @@ find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(cdf_msgs REQUIRED)
+find_package(opossum_msgs REQUIRED)
 
 include_directories(include)
 

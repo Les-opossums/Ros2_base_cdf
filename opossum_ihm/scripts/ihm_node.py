@@ -2,7 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
-from cdf_msgs.srv import Init
+from opossum_msgs.srv import Init
 from opossum_ihm.interface import GUI
 from std_msgs.msg import Int32, Bool
 import threading

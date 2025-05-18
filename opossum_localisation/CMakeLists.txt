@@ -11,7 +11,7 @@ find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(cdf_msgs REQUIRED)
+find_package(opossum_msgs REQUIRED)
 find_package(obstacle_detector REQUIRED)
 find_package(vision_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -27,7 +27,7 @@ install(DIRECTORY
 )
 
 add_executable(beacon_detector src/beacon_detector.cpp src/math_lidar.cpp src/BeaconSorter.cpp src/PositionFinder.cpp src/publisher.cpp)
-ament_target_dependencies(beacon_detector rclcpp std_msgs cdf_msgs vision_msgs geometry_msgs obstacle_detector)
+ament_target_dependencies(beacon_detector rclcpp std_msgs opossum_msgs vision_msgs geometry_msgs obstacle_detector)
 
 target_include_directories(beacon_detector PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

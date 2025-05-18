@@ -9,7 +9,7 @@ from PyQt5 import QtWidgets, QtGui, QtCore
 from ament_index_python.packages import get_package_share_directory
 import os
 import numpy as np
-from cdf_msgs.msg import LidarLoc
+from opossum_msgs.msg import LidarLoc
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import websocket
@@ -78,7 +78,7 @@ class RosbridgeClient:
         """Subscribe to all robot position topics."""
         for name in self.robot_names:
             topic = f"/{name}/{self.position_topic}"
-            msg = {"op": "subscribe", "topic": topic, "type": "cdf_msgs/msg/LidarLoc"}
+            msg = {"op": "subscribe", "topic": topic, "type": "opossum_msgs/msg/LidarLoc"}
             self.ws.send(json.dumps(msg))
             print(f"[RosbridgeClient] Subscribed to {topic}")
 

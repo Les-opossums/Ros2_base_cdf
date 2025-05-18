@@ -113,7 +113,7 @@ void BeaconDetectorNode::init_parameters()
 void BeaconDetectorNode::init_publishers()
 {
     position_topic_ = this->get_parameter("position_topic").as_string();
-    pub_location_ = this->create_publisher<cdf_msgs::msg::LidarLoc>(position_topic_, 10);
+    pub_location_ = this->create_publisher<opossum_msgs::msg::LidarLoc>(position_topic_, 10);
     pub_location_cmd_ = this->create_publisher<std_msgs::msg::String>("command", 10);
 }
 
@@ -125,7 +125,7 @@ void BeaconDetectorNode::init_subscribers()
     if (enable_robot_position_reception_)
     {
         robot_position_topic_ = this->get_parameter("robot_position_topic").as_string();
-        sub_robot_position_ = this->create_subscription<cdf_msgs::msg::MergedData>(
+        sub_robot_position_ = this->create_subscription<opossum_msgs::msg::MergedData>(
             robot_position_topic_, 10, std::bind(&BeaconDetectorNode::robot_position_callback, this, std::placeholders::_1));
     }
 }
@@ -172,7 +172,7 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
         {
             std::vector<Eigen::Vector2d> others;
             others = position_finder_->find_robots_on_plateau(new_objects_detected);
-            cdf_msgs::msg::LidarLoc msg = publish_pose_from_lidar(position_found.value(), others);
+            opossum_msgs::msg::LidarLoc msg = publish_pose_from_lidar(position_found.value(), others);
             pub_location_->publish(msg);
             std_msgs::msg::String msg_cmd;
             std::ostringstream ss;
@@ -194,7 +194,7 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
     // RCLCPP_INFO(this->get_logger(), "Last Time: %d seconds", ns_now - ns_last_time);
 }
 
-void BeaconDetectorNode::robot_position_callback(const cdf_msgs::msg::MergedData::SharedPtr msg)
+void BeaconDetectorNode::robot_position_callback(const opossum_msgs::msg::MergedData::SharedPtr msg)
 {
     RCLCPP_INFO(this->get_logger(), "Updating robot position...");
     // Add logic for robot position update

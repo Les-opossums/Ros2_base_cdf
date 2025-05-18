@@ -7,9 +7,9 @@ from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
 
 # Import des messages
-from cdf_msgs.srv import StringReq
+from opossum_msgs.srv import StringReq
 from geometry_msgs.msg import Point
-from cdf_msgs.msg import PositionMap
+from opossum_msgs.msg import PositionMap
 import functools
 
 
