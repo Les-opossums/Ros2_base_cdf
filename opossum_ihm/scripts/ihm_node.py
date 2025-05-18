@@ -19,6 +19,7 @@ class IhmNode(Node):
         self.current_score = 0
         self.clr = 'blue'
         self.scr = 0
+        self.ready_plot_pos = False
 
         # Initialisation de l'interface graphique
         self.gui = GUI()
@@ -56,11 +57,10 @@ class IhmNode(Node):
                 self.update_parameters()
             break
 
-        self.gui.initialized = True
         self.gui.run_score()
-        self.gui.score_app.update_position()
         self.gui.score_app.update_score()
         self.gui.score_app.update_au()
+        self.gui.score_app.update_position()
         self.gui.score_app.root.mainloop()
 
     def update_parameters(self):
