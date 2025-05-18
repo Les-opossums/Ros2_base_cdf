@@ -4,6 +4,7 @@ import rclpy
 from rclpy.node import Node
 from opossum_msgs.srv import Init
 from opossum_ihm.interface import GUI
+from opossum_msgs.msg import LidarLoc
 from std_msgs.msg import Int32, Bool
 import threading
 
@@ -89,17 +90,34 @@ class IhmNode(Node):
         self.get_logger().info("Setting up subscribers...")
 
         self.sub_score_topic = self.create_subscription(
-            Int32, "score", self.score_callback, 10
+            Int32,
+            "score",
+            self.score_callback,
+            10
         )
-        self.sub_au_topic = self.create_subscription(Bool,
-                                                     "au",
-                                                     self.au_callback,
-                                                     10)
+        self.sub_au_topic = self.create_subscription(
+            Bool,
+            "au",
+            self.au_callback,
+            10
+        )
         self.sub_enable_timer_topic = self.create_subscription(
-            Bool, "enable_timer", self.enable_timer_callback, 10
+            Bool,
+            "enable_timer",
+            self.enable_timer_callback,
+            10
         )
         self.sub_comm_state_topic = self.create_subscription(
-            Bool, "/main_robot/comm_state", self.comm_state_callback, 10
+            Bool,
+            "/main_robot/comm_state",
+            self.comm_state_callback,
+            10
+        )
+        self.lidar_loc_sub = self.create_subscription(
+            LidarLoc,
+            "/main_robot/position_out",
+            self.lidar_loc_callback,
+            1
         )
 
     def score_callback(self, msg):
@@ -129,6 +147,13 @@ class IhmNode(Node):
         if self.gui.initialized:
             self.gui.score_app.comm_state = msg.data
             self.get_logger().info(f"Comm State received: {msg.data}")
+
+    def lidar_loc_callback(self, msg: LidarLoc):
+        """Receive Lidar location."""
+        if self.gui.initialized:
+            self.gui.score_app.lidar_pos_x = msg.robot_position.x
+            self.gui.score_app.lidar_pos_y = msg.robot_position.y
+            self.gui.score_app.lidar_pos_t = msg.robot_position.z
 
 
 def main(args=None):

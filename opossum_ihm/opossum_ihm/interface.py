@@ -316,6 +316,9 @@ class ScoreApp:
         self.is_match = False
         self.is_au = False
         self.comm_state = True
+        self.lidar_pos_x = 0.
+        self.lidar_pos_y = 0.
+        self.lidar_pos_z = 0.
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         if screen_width == 480 and screen_height == 800:
@@ -333,6 +336,11 @@ class ScoreApp:
 
         self.display_score = tk.StringVar()
         self.display_score.set("0")
+        self.position_text = tk.StringVar()
+        self.position_text.set(f" X: {self.lidar_pos_x} "
+                               f" Y: {self.lidar_pos_y} "
+                               f" T: {self.lidar_pos_z} "
+                               )
 
         self.zero_label = tk.Label(
             frame,
@@ -342,6 +350,16 @@ class ScoreApp:
             fg="black",
         )
         self.zero_label.pack(expand=True)
+
+        self.position_label = tk.Label(
+            frame,
+            textvariable=self.position_text,
+            font=("Arial", 20),
+            bg="lightgray",
+            fg="black",
+            anchor="s"
+        )
+        self.position_label.pack(side="bottom", pady=10)
 
     def update_au(self):
         if self.is_au:
@@ -375,6 +393,17 @@ class ScoreApp:
 
         # Planifier la prochaine mise à jour dans 500ms
         self.root.after(500, self.update_score)
+
+    def update_position(self):
+        """Met à jour la position toutes les 500ms"""
+        self.position_text.set(f"X: {self.lidar_pos_x}"
+                               f"Y: {self.lidar_pos_y}"
+                               f"T: {self.lidar_pos_z}"
+                               )
+        self.position_label.update_idletasks()
+
+        # Planifier la prochaine mise à jour dans 500ms
+        self.root.after(500, self.update_position)
 
 
 class ImageLabel(tk.Label):
