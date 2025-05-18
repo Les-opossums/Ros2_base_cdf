@@ -3,6 +3,7 @@ main_robot:
     ros__parameters:
       rcv_comm_topic: zync_raspi
       send_comm_topic: raspi_zync
+      comm_state_topic: comm_state
 
       asserv_topic: asserv
       robot_data_topic: robot_data
@@ -22,6 +23,7 @@ second_robot:
     ros__parameters:
       rcv_comm_topic: zync_raspi
       send_comm_topic: raspi_zync
+      comm_state_topic: comm_state
 
       asserv_topic: asserv
       robot_data_topic: robot_data

@@ -19,8 +19,6 @@ class ZynqSimulation(Node):
 
     def __init__(self) -> None:
         super().__init__("zynq_simu_node")
-        # Declare parameters provided by the launch YAML (auto-declared)
-        super().__init__("zynq_simu_node")
         self.declare_parameters(
             namespace="",
             parameters=[
@@ -181,7 +179,7 @@ class ZynqSimulation(Node):
                 return
             res = " ".join(res.split(","))
             result_msg = String()
-            result_msg.data = res
+            result_msg.data = res + "\n"
             self.pub_comm_topic.publish(result_msg)
         except Exception as e:
             self.get_logger().error(f"Failed to get motor action result: {e}")
@@ -202,7 +200,7 @@ class ZynqSimulation(Node):
             res = future.result().response
             res = " ".join(res.split(","))
             result_msg = String()
-            result_msg.data = res
+            result_msg.data = res + "\n"
             self.pub_comm_topic.publish(result_msg)
         except Exception as e:
             self.get_logger().error(f"Motor service call failed: {e}")

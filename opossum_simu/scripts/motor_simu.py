@@ -82,7 +82,15 @@ class MotorSimu(Node):
             Point, self.real_position_topic, 10
         )
 
-        self.pub_feedback_command = self.create_publisher(String, "zync_raspi", 10)
+        self.pub_zync_raspi = self.create_publisher(String, "zync_raspi", 10)
+        self.timer = self.create_timer(0.1, self.send_robot_data)
+    
+    def send_robot_data(self):
+        self.pub_zync_raspi.publish(
+            String(
+                data=f"ROBOTDATA {self.position[0].item()} {self.position[1].item()} {self.position[2].item()} {np.linalg.norm(self.velocity[:2]).item()} {np.arctan2(self.velocity[1], self.velocity[0]).item() - self.position[2].item()} {self.velocity[2].item()}\n"
+            )
+        )
 
     def _init_action_server(self):
         """Init server actions of the node."""
@@ -225,11 +233,6 @@ class MotorSimu(Node):
                             x=float(self.position[0].item()),
                             y=float(self.position[1].item()),
                             z=float(self.position[2].item()),
-                        )
-                    )
-                    self.pub_feedback_command.publish(
-                        String(
-                            data=f"PDE {self.position[0].item()} {self.position[1].item()} {self.position[2].item()} {self.linear_velocity} {np.arctan2(self.velocity[1], self.velocity[0]).item()}"
                         )
                     )
                     time.sleep(self.compute_period)

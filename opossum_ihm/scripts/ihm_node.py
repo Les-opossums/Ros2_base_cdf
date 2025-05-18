@@ -4,6 +4,7 @@ import rclpy
 from rclpy.node import Node
 from opossum_msgs.srv import Init
 from opossum_ihm.interface import GUI
+from opossum_msgs.msg import LidarLoc
 from std_msgs.msg import Int32, Bool
 import threading
 
@@ -18,6 +19,7 @@ class IhmNode(Node):
         self.current_score = 0
         self.clr = 'blue'
         self.scr = 0
+        self.ready_plot_pos = False
 
         # Initialisation de l'interface graphique
         self.gui = GUI()
@@ -55,10 +57,10 @@ class IhmNode(Node):
                 self.update_parameters()
             break
 
-        self.gui.initialized = True
         self.gui.run_score()
         self.gui.score_app.update_score()
         self.gui.score_app.update_au()
+        # self.gui.score_app.update_position()
         self.gui.score_app.root.mainloop()
 
     def update_parameters(self):
@@ -79,8 +81,8 @@ class IhmNode(Node):
         """Gère la réponse du service asynchrone."""
         try:
             response = future.result()
-            self.get_logger().info(f"Parameters updated successfully: "
-                                   f"{response}")
+            # self.get_logger().info(f"Parameters updated successfully: "
+            #                        f"{response}")
         except Exception as e:
             self.get_logger().error(f"Service call failed: {e}")
 
@@ -89,14 +91,34 @@ class IhmNode(Node):
         self.get_logger().info("Setting up subscribers...")
 
         self.sub_score_topic = self.create_subscription(
-            Int32, "score", self.score_callback, 10
+            Int32,
+            "/main_robot/score",
+            self.score_callback,
+            10
         )
-        self.sub_au_topic = self.create_subscription(Bool,
-                                                     "au",
-                                                     self.au_callback,
-                                                     10)
+        self.sub_au_topic = self.create_subscription(
+            Bool,
+            "au",
+            self.au_callback,
+            10
+        )
         self.sub_enable_timer_topic = self.create_subscription(
-            Bool, "enable_timer", self.enable_timer_callback, 10
+            Bool,
+            "enable_timer",
+            self.enable_timer_callback,
+            10
+        )
+        self.sub_comm_state_topic = self.create_subscription(
+            Bool,
+            "/main_robot/comm_state",
+            self.comm_state_callback,
+            10
+        )
+        self.lidar_loc_sub = self.create_subscription(
+            LidarLoc,
+            "/main_robot/position_out",
+            self.lidar_loc_callback,
+            1
         )
 
     def score_callback(self, msg):
@@ -120,6 +142,19 @@ class IhmNode(Node):
         if self.gui.initialized:
             self.gui.score_app.is_match = msg.data
             self.get_logger().info(f"Enable Timer received: {msg.data}")
+
+    def comm_state_callback(self, msg):
+        """Callback pour le topic 'comm_state'."""
+        if self.gui.initialized:
+            self.gui.score_app.comm_state = msg.data
+            self.get_logger().info(f"Comm State received: {msg.data}")
+
+    def lidar_loc_callback(self, msg: LidarLoc):
+        """Receive Lidar location."""
+        if self.gui.initialized:
+            self.gui.score_app.lidar_pos_x = msg.robot_position.x
+            self.gui.score_app.lidar_pos_y = msg.robot_position.y
+            self.gui.score_app.lidar_pos_t = msg.robot_position.z
 
 
 def main(args=None):

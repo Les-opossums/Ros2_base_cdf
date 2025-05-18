@@ -7,7 +7,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import TransformStamped
 from tf2_ros import TransformBroadcaster
 import functools
-from opossum_msgs.msg import PositionMap
+from opossum_msgs.msg import PositionMap, RobotData
 from geometry_msgs.msg import Point
 from std_srvs.srv import Empty
 from visualization_msgs.msg import Marker
@@ -22,7 +22,9 @@ class TfBroadcaster(Node):
         self.declare_parameters(
             namespace="",
             parameters=[
+                ("display_all", rclpy.Parameter.Type.BOOL),
                 ("update_position_topic", rclpy.Parameter.Type.STRING),
+                ("robot_data_topic", rclpy.Parameter.Type.STRING),
                 ("visualization_topic", rclpy.Parameter.Type.STRING),
                 ("default_color", rclpy.Parameter.Type.STRING),
                 ("available_colors", rclpy.Parameter.Type.STRING_ARRAY),
@@ -45,6 +47,9 @@ class TfBroadcaster(Node):
         self.robot_names = (
             self.get_parameter("robot_names").get_parameter_value().string_array_value
         )
+        self.display_all = (
+            self.get_parameter("display_all").get_parameter_value().bool_value
+        )
         self.boundaries = (
             self.get_parameter("boundaries").get_parameter_value().double_array_value
         )
@@ -59,6 +64,7 @@ class TfBroadcaster(Node):
         self.beacons = (
             self.get_parameter("beacons").get_parameter_value().double_array_value
         )
+        self.robot_data_rcv = False
         if self.team_color not in self.available_colors:
             raise ValueError("Invalid team color")
         if self.team_color == self.available_colors[1]:
@@ -72,11 +78,22 @@ class TfBroadcaster(Node):
             .get_parameter_value()
             .string_value
         )
+        robot_data_topic = (
+            self.get_parameter("robot_data_topic")
+            .get_parameter_value()
+            .string_value
+        )
         for name in self.robot_names:
             self.sub_update_position = self.create_subscription(
                 PositionMap,
                 name + "/" + update_position_topic,
-                functools.partial(self.broadcast_tf, name=name),
+                functools.partial(self.broadcast_tf_from_update, name=name),
+                10,
+            )
+            self.sub_robot_data = self.create_subscription(
+                RobotData,
+                name + "/" + robot_data_topic,
+                functools.partial(self.broadcast_tf_from_robot_data, name=name),
                 10,
             )
 
@@ -153,24 +170,40 @@ class TfBroadcaster(Node):
 
             self.pub_visualization.publish(marker)
 
-    def broadcast_tf(self, msg, name):
+    def broadcast_tf_from_update(self, msg, name):
         """Link a frame to another."""
+        if self.robot_data_rcv:
+            return
+        if self.display_all:
+            self._init_display()
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = "map"
         t.child_frame_id = name + "/laser_frame"
-        # Define the translation (x, y, z)
-        # self.get_logger().info(f"x: {msg.robot.x}")
-        # self.get_logger().info(f"y: {msg.robot.y}")
-        # self.get_logger().info(f"th: {msg.robot.z}")
         t.transform.translation.x = msg.robot.x
         t.transform.translation.y = msg.robot.y
         t.transform.translation.z = 0.0
-        # Define the rotation (using a quaternion)
-        # Here, no rotation is applied (roll=pitch=yaw=0)
         q = quaternion_from_euler(0.0, 0.0, msg.robot.z)
-        t.transform.rotation.x = 0.0
-        t.transform.rotation.y = 0.0
+        t.transform.rotation.x = q[0]
+        t.transform.rotation.y = q[1]
+        t.transform.rotation.z = q[2]
+        t.transform.rotation.w = q[3]
+        self.br.sendTransform(t)
+
+    def broadcast_tf_from_robot_data(self, msg, name):
+        """Link a frame to another."""
+        t = TransformStamped()
+        if self.display_all:
+            self._init_display()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = "map"
+        t.child_frame_id = name + "/laser_frame"
+        t.transform.translation.x = msg.x
+        t.transform.translation.y = msg.y
+        t.transform.translation.z = 0.0
+        q = quaternion_from_euler(0.0, 0.0, msg.theta)
+        t.transform.rotation.x = q[0]
+        t.transform.rotation.y = q[1]
         t.transform.rotation.z = q[2]
         t.transform.rotation.w = q[3]
         self.br.sendTransform(t)
