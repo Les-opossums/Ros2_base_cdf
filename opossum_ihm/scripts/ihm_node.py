@@ -22,6 +22,7 @@ class IhmNode(Node):
         self.ready_plot_pos = False
         self.score = 0
         self.au = False
+        self.comm_state = True
         self.x, self.y, self.t = None, None, None
 
         # Initialisation de l'interface graphique
@@ -59,32 +60,19 @@ class IhmNode(Node):
             else:
                 self.update_parameters()
             break
-        
+
         self.gui.run_score()
-        #On crée un timer a partir d'ici pour update
         self.timer = self.create_timer(0.5, self.update_values)
-        # Mais tu pourrais aussi créer un sub:
-        #self.create_sub... Et donc il écouterait que mtnt
         self.gui.score_app.root.mainloop()
 
     def update_values(self):
-        # TODO: @greg Pour update fais comme ca, tu crée un timer comme au dessus, puis ensuite tu update le GUI avec les valeurs. 
-        # Evite de mélanger GUI et ROS Node. Idéalement self.gui.attribut doit pas se trouver dans ce fichier.
-        #PAs de self.gui.appscore.score, ou des choses comme ca. Autant l'appeler self.score ici, puis update le texte dans GUI 
-        # L'interface a pas de cerveau elle recupere juste les données et les affiche. Mais tu update avec des methodes
-        # Ici par exemple, c'est sur un timer, amsi tu peux aussi update dans les callbacks meme en soit
-        self.get_logger().info(f"Updating values:")
+        self.get_logger().info("Updating values:")
         self.get_logger().info(f"Score: {self.score}")
         self.get_logger().info(f"AU: {self.au}")
         self.get_logger().info(f"Posiiton: {self.x} {self.y} {self.t}")
         self.gui.score_app.update_score(self.score)
-        self.gui.score_app.update_au(self.au)
+        self.gui.score_app.update_au(self.au, self.comm_state)
         self.gui.score_app.update_position(self.x, self.y, self.t)
-
-    def exemple_de_callback_pos(self, msg):
-        # Un exemple de update dans un callback
-
-        self.gui_update_pos(msg.data)
 
     def update_parameters(self):
         """Met à jour les paramètres via un service ROS 2."""
@@ -166,15 +154,15 @@ class IhmNode(Node):
 
     def comm_state_callback(self, msg):
         """Callback pour le topic 'comm_state'."""
-        if self.gui.initialized:
-            self.gui.score_app.comm_state = msg.data
-            self.get_logger().info(f"Comm State received: {msg.data}")
+        self.comm_state = msg.data
+        self.get_logger().info(f"Comm State received: {msg.data}")
 
     def lidar_loc_callback(self, msg: LidarLoc):
         """Receive Lidar location."""
         self.x = msg.robot_position.x
         self.y = msg.robot_position.y
         self.t = msg.robot_position.z
+
 
 def main(args=None):
     rclpy.init(args=args)

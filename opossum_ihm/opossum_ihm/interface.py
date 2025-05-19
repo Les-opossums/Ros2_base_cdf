@@ -361,12 +361,12 @@ class ScoreApp:
         )
         self.position_label.pack(side="bottom", pady=10)
 
-    def update_au(self, au):
+    def update_au(self, au, comm_state):
         if au:
             self.root.configure(bg="red")
             # if self.is_match:
-            if True:
-                root = tk.Toplevel()
+            if False:
+                root = tk.Toplevel(self.root)
                 gif_path = os.path.join(
                     get_package_share_directory("opossum_ihm"),
                     "images",
@@ -377,7 +377,7 @@ class ScoreApp:
                 lbl.load(gif_path)
                 root.after(3000, root.destroy)
                 root.mainloop()
-        elif not self.comm_state:
+        elif not comm_state:
             self.root.configure(bg="orange")
         else:
             self.root.configure(bg=self.color)
@@ -393,17 +393,18 @@ class ScoreApp:
     def update_position(self, x, y, t):
         """Met à jour la position toutes les 500ms"""
         if x is None:
-            self.position_text.set(f" X: --:--"
-                                f" Y: --:--"
-                                f" T: --:--"
-                                )
+            self.position_text.set(
+                " X: --:--"
+                " Y: --:--"
+                " T: --:--"
+            )
         else:
-            self.position_text.set(f" X: {x:.2f}"
-                                f" Y: {y:.2f}"
-                                f" T: {t:.2f}"
-                                )
+            self.position_text.set(
+                f" X: {x:.2f}"
+                f" Y: {y:.2f}"
+                f" T: {t:.2f}"
+            )
         self.position_label.update_idletasks()
-
 
 
 class ImageLabel(tk.Label):
