@@ -105,6 +105,27 @@ class ActionManager(Node):
                     from opossum_action_sequencer.match.script2 import Script
 
                     self.get_logger().info("Script 2")
+
+                elif changed.value.integer_value == 3:
+                    from opossum_action_sequencer.match.script3 import Script
+
+                    self.get_logger().info("Script 3")
+
+                elif changed.value.integer_value == 4:
+                    from opossum_action_sequencer.match.script4 import Script
+
+                    self.get_logger().info("Script 4")
+
+                elif changed.value.integer_value == 5:
+                    from opossum_action_sequencer.match.script5 import Script
+
+                    self.get_logger().info("Script 5")
+
+                elif changed.value.integer_value == 6:
+                    from opossum_action_sequencer.match.script6 import Script
+
+                    self.get_logger().info("Script 6")
+
                 else:
                     from opossum_action_sequencer.match.script1 import Script
 
@@ -196,7 +217,7 @@ class ActionManager(Node):
             f"Delta x: {delta_x}, Delta y: {delta_y}, Delta t: {delta_t}"
         )
 
-        if delta_x < 0.2 and delta_y < 0.2 and delta_t < 0.2:
+        if delta_x < 0.1 and delta_y < 0.1 and delta_t < 0.1:
             self.get_logger().info("Robot arrived")
             self.is_robot_arrived = True
 
