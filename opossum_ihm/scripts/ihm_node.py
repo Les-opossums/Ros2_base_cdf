@@ -67,10 +67,10 @@ class IhmNode(Node):
         self.gui.score_app.root.mainloop()
 
     def update_values(self):
-        self.get_logger().info("Updating values:")
-        self.get_logger().info(f"Score: {self.score}")
-        self.get_logger().info(f"AU: {self.au}")
-        self.get_logger().info(f"Posiiton: {self.x} {self.y} {self.t}")
+        # self.get_logger().info("Updating values:")
+        # self.get_logger().info(f"Score: {self.score}")
+        # self.get_logger().info(f"AU: {self.au}")
+        # self.get_logger().info(f"Positon: {self.x} {self.y} {self.t}")
         self.gui.score_app.update_score(self.score)
         self.gui.score_app.update_au(self.au, self.comm_state)
         self.gui.score_app.update_position(self.x, self.y, self.t)
