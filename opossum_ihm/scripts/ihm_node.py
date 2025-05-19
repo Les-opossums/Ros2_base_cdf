@@ -63,6 +63,7 @@ class IhmNode(Node):
 
         self.gui.run_score()
         self.timer = self.create_timer(0.5, self.update_values)
+        self.gui.score_app.update_gif()
         self.gui.score_app.root.mainloop()
 
     def update_values(self):

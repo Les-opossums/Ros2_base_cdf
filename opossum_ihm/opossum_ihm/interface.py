@@ -362,25 +362,29 @@ class ScoreApp:
         self.position_label.pack(side="bottom", pady=10)
 
     def update_au(self, au, comm_state):
+        self.is_au = au
         if au:
             self.root.configure(bg="red")
             # if self.is_match:
-            if False:
-                root = tk.Toplevel(self.root)
-                gif_path = os.path.join(
-                    get_package_share_directory("opossum_ihm"),
-                    "images",
-                    "boulette.gif",
-                )
-                lbl = ImageLabel(root)
-                lbl.pack()
-                lbl.load(gif_path)
-                root.after(3000, root.destroy)
-                root.mainloop()
         elif not comm_state:
             self.root.configure(bg="orange")
         else:
             self.root.configure(bg=self.color)
+
+    def update_gif(self):
+        if self.is_au:
+            root = tk.Toplevel(self.root)
+            gif_path = os.path.join(
+                get_package_share_directory("opossum_ihm"),
+                "images",
+                "boulette.gif",
+            )
+            lbl = ImageLabel(root)
+            lbl.pack()
+            lbl.load(gif_path)
+            root.after(3000, root.destroy)
+            root.mainloop()
+        self.root.after(500, self.update_gif)
 
     def update_score(self, score):
         """Met à jour le score toutes les 500ms"""
@@ -412,7 +416,6 @@ class ImageLabel(tk.Label):
     A Label that displays images, and plays them if they are gifs
     :im: A PIL Image instance or a string filename
     """
-
     def load(self, im):
         if isinstance(im, str):
             im = Image.open(im)
