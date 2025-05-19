@@ -263,6 +263,8 @@ class Communication(Node):
                 self.pub_robot_data.publish(rdata)
             except Exception as e:
                 self.get_logger().warn(f"The splitted data was {splitted_data} and got: {e}")
+        elif splitted_data[0] == "ERROR":
+            self.get_logger().error(f"Error: {data}")
 
 def main(args=None):
     """Spin main loop."""
