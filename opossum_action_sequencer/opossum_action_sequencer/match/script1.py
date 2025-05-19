@@ -11,6 +11,7 @@ import time
 
 class Script():
     def run(self, node):
+        speed = [0.1, 1., 0.2, 0.5, 0.7]
         node.write_log('Script 1 is running...')
         # self.send_raw('SYNCHROLIDAR')
         # self.send_raw('SETX 0.6')
@@ -19,8 +20,9 @@ class Script():
         node.synchro_lidar()
         time.sleep(2)
         # self.move_to(self.pos_departure)
-        for _ in range(5):
+        for k in range(5):
             node.add_score(1)
+            node.send_raw(f'VMAX {speed[k]}')
             node.move_to(Position(0.6, 0.6, -1.2))
             node.pump(PUMP_struct(1, 1))
             node.pump(PUMP_struct(2, 1))
