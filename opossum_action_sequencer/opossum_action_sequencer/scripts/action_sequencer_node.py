@@ -113,7 +113,7 @@ class ActionManager(Node):
     def parameter_event_callback(self, event):
         """Handle the parameters event."""
         # Parcours des paramètres modifiés
-        self.get_logger().info(f"Parameter event received: {event}")
+        # self.get_logger().info(f"Parameter event received: {event}")
         for changed in event.changed_parameters:
             if changed.name == "script_number":
                 # Affiche la nouvelle valeur du paramètre script_number
