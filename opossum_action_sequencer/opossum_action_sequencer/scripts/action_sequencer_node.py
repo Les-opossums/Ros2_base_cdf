@@ -235,15 +235,17 @@ class ActionManager(Node):
         delta_y = abs(self.pos_obj.y - self.robot_pos.y)
         delta_t = abs(self.pos_obj.t - self.robot_pos.t)
         # Log des angles
-        self.get_logger().info(
-            f"Robot position: {self.robot_pos.x} {self.robot_pos.y} {self.robot_pos.t}"
-        )
-        self.get_logger().info(
-            f"Object position: {self.pos_obj.x} {self.pos_obj.y} {self.pos_obj.t}"
-        )
-        self.get_logger().info(
-            f"Delta x: {delta_x}, Delta y: {delta_y}, Delta t: {delta_t}"
-        )
+        # self.get_logger().info(
+        #     f"Robot position: {self.robot_pos.x} "
+        #     f"{self.robot_pos.y} {self.robot_pos.t}"
+        # )
+        # self.get_logger().info(
+        #     f"Object position: {self.pos_obj.x} "
+        #     f"{self.pos_obj.y} {self.pos_obj.t}"
+        # )
+        # self.get_logger().info(
+        #     f"Delta x: {delta_x}, Delta y: {delta_y}, Delta t: {delta_t}"
+        # )
 
         if delta_x < 0.1 and delta_y < 0.1 and delta_t < 0.1:
             self.get_logger().info("Robot arrived")
