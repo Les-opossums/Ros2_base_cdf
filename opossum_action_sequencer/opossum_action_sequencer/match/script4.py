@@ -30,9 +30,13 @@ class Script():
             node.wait_for_motion()
             node.stepper(STEPPER_struct(2))
             node.pump(PUMP_struct(3, 1))
+            time.sleep(2)
+            node.stepper(STEPPER_struct(1))
 
             node.move_to(Position(0.35, 1.7, -0.95))
             node.wait_for_motion()
+            node.stepper(STEPPER_struct(2))
+            time.sleep(2)
             node.pump(PUMP_struct(1, 0))
             node.pump(PUMP_struct(2, 0))
             node.pump(PUMP_struct(3, 0))
