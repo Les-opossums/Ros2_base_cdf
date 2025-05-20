@@ -33,6 +33,7 @@ class ActionManager(Node):
         self._init_subscribers()
         self.state_leash = False
         self.script_class = None
+        self.is_started = False
 
         # Action Done
         self.is_robot_moving = False
@@ -61,28 +62,52 @@ class ActionManager(Node):
 
     def _init_publishers(self):
         """Initialize the publishers of the node."""
-        self.pub_command = self.create_publisher(String, "/main_robot/command", 10)
+        self.pub_command = self.create_publisher(
+            String,
+            "/main_robot/command",
+            10
+        )
 
-        self.pub_score = self.create_publisher(Int32, "/main_robot/score", 10)
+        self.pub_score = self.create_publisher(
+            Int32,
+            "/main_robot/score",
+            10
+        )
 
-        self.pub_au = self.create_publisher(Bool, "/main_robot/au", 10)
+        self.pub_au = self.create_publisher(
+            Bool,
+            "/main_robot/au",
+            10
+        )
 
     def _init_subscribers(self):
         """Initialize the subscribers of the node."""
         self.subscription = self.create_subscription(
-            ParameterEvent, "/parameter_events", self.parameter_event_callback, 10
+            ParameterEvent,
+            "/parameter_events",
+            self.parameter_event_callback,
+            10
         )
 
         self.pub_feedback = self.create_subscription(
-            String, "/main_robot/feedback_command", self.feedback_callback, 10
+            String,
+            "/main_robot/feedback_command",
+            self.feedback_callback,
+            10
         )
 
         self.robot_data_sub = self.create_subscription(
-            RobotData, "/main_robot/robot_data", self.robot_data_callback, 1
+            RobotData,
+            "/main_robot/robot_data",
+            self.robot_data_callback,
+            1
         )
 
         self.lidar_loc_sub = self.create_subscription(
-            LidarLoc, "/main_robot/position_out", self.lidar_loc_callback, 1
+            LidarLoc,
+            "/main_robot/position_out",
+            self.lidar_loc_callback,
+            1
         )
 
     def parameter_event_callback(self, event):
@@ -145,19 +170,21 @@ class ActionManager(Node):
             self.state_leash = True
             if msg.data.startswith("LEASH"):
                 if self.ready:
+                    self.is_started = True
                     self.get_logger().info("Leash activated")
                     self.script_instance = self.script_class()
                     thread = threading.Thread(
                         target=self.script_instance.run, args=(self,)
                     )
                     thread.start()
-                self.state_leash = True
 
         elif msg.data.startswith("AU"):
             self.get_logger().info(f"AU_test : {msg.data[-1]}")
             if msg.data[-1] == "1":
                 self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
+                if self.is_started:
+                    self.script_instance.stop()
             else:
                 self.get_logger().info("AU deactivated")
                 self.pub_au.publish(Bool(data=False))
