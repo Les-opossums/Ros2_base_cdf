@@ -218,8 +218,9 @@ class ActionManager(Node):
             t=msg.robot_position.z
         )
 
-    def move_to(self, pos: Position):
+    def move_to(self, pos: Position, seuil=0.1):
         """Compute the move_to action."""
+        self.seuil = seuil
         self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
         self.motion_done = False
         self.is_robot_moving = True
@@ -247,9 +248,10 @@ class ActionManager(Node):
         #     f"Delta x: {delta_x}, Delta y: {delta_y}, Delta t: {delta_t}"
         # )
 
-        if delta_x < 0.1 and delta_y < 0.1 and delta_t < 0.1:
-            self.get_logger().info("Robot arrived")
-            self.is_robot_arrived = True
+        if delta_x < self.seuil and delta_y < self.seuil:
+            if delta_t < self.seuil:
+                self.get_logger().info("Robot arrived")
+                self.is_robot_arrived = True
 
     def wait_for_stop(self):
         """Compute the wait_for_stop action."""
