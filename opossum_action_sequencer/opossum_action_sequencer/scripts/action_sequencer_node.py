@@ -15,6 +15,7 @@ from opossum_action_sequencer.utils import (
     PUMP_struct,
     LED_struct,
     SERVO_struct,
+    STEPPER_struct,
 )
 
 import threading
@@ -246,6 +247,12 @@ class ActionManager(Node):
     def led(self, led: LED_struct):
         """Compute the led action."""
         self.pub_command.publish(String(data=f"LED {led.red} {led.green} {led.blue}"))
+
+    def stepper(self, stepper: STEPPER_struct):
+        """Compute the stepper action."""
+        self.pub_command.publish(
+            String(data=f"STEPPER1  {stepper.mode}")
+        )
 
     def write_log(self, message):
         """Write logs."""
