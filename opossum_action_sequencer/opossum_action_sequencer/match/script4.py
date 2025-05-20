@@ -31,8 +31,6 @@ class Script():
             node.stepper(STEPPER_struct(2))
             node.pump(PUMP_struct(3, 1))
 
-            node.move_to(Position(0.3, 1.32, 0.54))
-            node.wait_for_motion()
             node.move_to(Position(0.35, 1.7, -0.95))
             node.wait_for_motion()
             node.pump(PUMP_struct(1, 0))
@@ -46,6 +44,8 @@ class Script():
             node.wait_for_motion()
             node.move_to(Position(1.05, 0.37, -2.6))
             node.wait_for_motion()
+
+            break
 
     def stop(self):
         self._stop_event.set()
