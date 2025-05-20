@@ -20,7 +20,7 @@ class Script():
             node.write_log('Script 4 is running...')
             node.send_raw('VMAX 0.7')
             time.sleep(2)
-            node.move_to(Position(1.11, 0.76, -1.12))
+            node.move_to(Position(1., 0.76, -1.12))
             node.wait_for_motion()
             time.sleep(2)
             node.send_raw('VMAX 0.2')
