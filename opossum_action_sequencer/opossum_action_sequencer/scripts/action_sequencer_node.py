@@ -269,15 +269,21 @@ class ActionManager(Node):
 
     def servo(self, servo: SERVO_struct):
         """Compute the servo action."""
-        self.pub_command.publish(String(data=f"SERVO {servo.servo_id} {servo.angle}"))
+        self.pub_command.publish(String(data=f"SERVO {servo.servo_id} "
+                                             f"{servo.angle}")
+                                 )
 
     def pump(self, pump: PUMP_struct):
         """Compute the pump action."""
-        self.pub_command.publish(String(data=f"PUMP {pump.pump_id} {pump.enable}"))
+        self.pub_command.publish(String(data=f"PUMP {pump.pump_id} "
+                                             f"{pump.enable}")
+                                 )
 
     def led(self, led: LED_struct):
         """Compute the led action."""
-        self.pub_command.publish(String(data=f"LED {led.red} {led.green} {led.blue}"))
+        self.pub_command.publish(String(data=f"LED {led.red} "
+                                             f"{led.green} {led.blue}")
+                                 )
 
     def stepper(self, stepper: STEPPER_struct):
         """Compute the stepper action."""
