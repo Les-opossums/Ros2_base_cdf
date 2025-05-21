@@ -201,14 +201,15 @@ class ActionManager(Node):
             self.wait_for_arrival()
             self.wait_for_stop()
             if not self.is_robot_moving and self.is_robot_arrived:
-                self.get_logger().info("Robot stopped")
+                # self.get_logger().info("Robot stopped")
                 self.motion_done_event.set()
                 self.motion_done = True
 
             elif not self.is_robot_moving and not self.is_robot_arrived:
-                self.get_logger().info("Robot stopped but not arrived")
-            #     self.synchro_lidar()
-            #     self.move_to(self.pos_obj)
+                # self.get_logger().info("Robot stopped but not arrived")
+                # self.synchro_lidar()
+                # self.move_to(self.pos_obj)
+                pass
 
     def lidar_loc_callback(self, msg: LidarLoc):
         """Receive Lidar location."""
@@ -228,7 +229,7 @@ class ActionManager(Node):
         self.pub_command.publish(String(data=f"MOVE {pos.x} {pos.y} {pos.t}"))
         self.pos_obj = pos
         self.motion_done_event.clear()  # Block the wait
-        self.get_logger().info("Robot moving...")
+        # self.get_logger().info("Robot moving...")
 
     def wait_for_arrival(self):
         """Compute the wait_for_arrival action."""
@@ -258,7 +259,7 @@ class ActionManager(Node):
         speed_lin = abs(self.robot_speed.x)
         speed_t = abs(self.robot_speed.t)
         if speed_lin < 0.0001 and speed_t < 0.0001:
-            self.get_logger().info("Robot stopped")
+            # self.get_logger().info("Robot stopped")
             self.is_robot_moving = False
 
     def wait_for_motion(self):
@@ -278,6 +279,7 @@ class ActionManager(Node):
         self.pub_command.publish(String(data=f"PUMP {pump.pump_id} "
                                              f"{pump.enable}")
                                  )
+        self.get_logger().info(f"PUMP : PUMP {pump.pump_id} {pump.enable}")
 
     def led(self, led: LED_struct):
         """Compute the led action."""
