@@ -25,6 +25,7 @@ class Script():
             time.sleep(2)
             node.send_raw('VMAX 0.2')
             time.sleep(2)
+            node.send_raw('SERVO 1 20')
             node.pump(PUMP_struct(1, 1))
             node.send_raw('PUMP 1 1')
             node.send_raw('PUMP 2 1')
@@ -34,6 +35,7 @@ class Script():
             node.wait_for_motion()
             node.stepper(STEPPER_struct(2))
             node.pump(PUMP_struct(3, 1))
+            node.send_raw('SERVO 1 180')
             time.sleep(2)
             node.stepper(STEPPER_struct(1))
 
