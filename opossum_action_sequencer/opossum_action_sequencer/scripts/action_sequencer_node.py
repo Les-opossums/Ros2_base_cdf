@@ -270,15 +270,11 @@ class ActionManager(Node):
 
     def servo(self, servo: SERVO_struct):
         """Compute the servo action."""
-        self.pub_command.publish(String(data=f"SERVO {servo.servo_id} "
-                                             f"{servo.angle}")
-                                 )
+        self.pub_command.publish(String(data=f"SERVO {servo.servo_id} {servo.angle}"))
 
     def pump(self, pump: PUMP_struct):
         """Compute the pump action."""
-        self.pub_command.publish(String(data=f"PUMP {pump.pump_id} "
-                                             f"{pump.enable}")
-                                 )
+        self.pub_command.publish(String(data=f"PUMP {pump.pump_id} {pump.enable}"))
         self.get_logger().info(f"PUMP : PUMP {pump.pump_id} {pump.enable}")
 
     def led(self, led: LED_struct):
