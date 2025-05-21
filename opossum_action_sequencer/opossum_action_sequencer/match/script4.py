@@ -24,7 +24,7 @@ class Script():
             node.wait_for_motion()
             time.sleep(2)
             node.send_raw('VMAX 0.2')
-            # node.pump(PUMP_struct(1, 1))
+            node.pump(PUMP_struct(1, 1))
             node.send_raw('PUMP 1 1')
             node.pump(PUMP_struct(2, 1))
             node.pump(PUMP_struct(3, 1))
