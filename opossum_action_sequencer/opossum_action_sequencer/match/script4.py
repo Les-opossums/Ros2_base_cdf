@@ -18,32 +18,45 @@ class Script():
     def run(self, node):
         while not self._stop_event.is_set():
             node.write_log('Script 4 is running...')
+            node.send_raw('SERVO 2 20')
+            # Deplacement vers boites
             node.send_raw('VMAX 0.7')
             time.sleep(1)
             node.move_to(Position(1.1, 0.7, -1.12))
             node.wait_for_motion()
+
+            # Ramassage des boites
             node.send_raw('VMAX 0.2')
             time.sleep(1)
-            node.send_raw('SERVO 1 20')
             node.pump(PUMP_struct(1, 1))
-            node.pump(PUMP_struct(2, 1))
             node.pump(PUMP_struct(3, 1))
+            node.pump(PUMP_struct(4, 1))
             node.move_to(Position(1.1, 0.9, -1.12), seuil=0.05)
             node.wait_for_motion()
-            node.stepper(STEPPER_struct(2))
-            node.pump(PUMP_struct(3, 1))
-            node.send_raw('SERVO 1 180')
             time.sleep(2)
-            node.stepper(STEPPER_struct(1))
 
+            # Poussette vers zone
             node.move_to(Position(0.35, 1.7, -0.95))
             node.wait_for_motion()
+
+            # Ramassage planche
+            node.pump(PUMP_struct(2, 1))
             node.stepper(STEPPER_struct(2))
             time.sleep(2)
+
+            # Eteint pompe bas et monte plance et conserve cote
             node.pump(PUMP_struct(1, 0))
-            node.pump(PUMP_struct(2, 0))
-            node.pump(PUMP_struct(3, 0))
+
             node.stepper(STEPPER_struct(1))
+            node.send_raw('SERVO 1 20')
+            node.send_raw('SERVO 2 180')
+            time.sleep(1)
+            node.pump(PUMP_struct(3, 0))
+            node.pump(PUMP_struct(4, 0))
+            node.stepper(STEPPER_struct(1))
+            time.sleep(2)
+            node.send_raw('SERVO 1 180')
+            node.send_raw('SERVO 2 20')
             node.add_score(10)
 
             node.send_raw('VMAX 0.7')
@@ -52,7 +65,7 @@ class Script():
             node.move_to(Position(1.05, 0.37, -2.6))
             node.wait_for_motion()
 
-            # break
+            break
 
     def stop(self):
         self._stop_event.set()
