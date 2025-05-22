@@ -84,6 +84,18 @@ def generate_launch_description():
         parameters=[param_loc],
     )
 
+    param_nav = PathJoinSubstitution(
+        [FindPackageShare("opossum_nav"), "config", "nav_params.yaml"]
+    )
+    
+    node_avoid_obstacle = Node(
+        namespace=namespace,
+        package="opossum_nav",
+        executable="avoid_obstacle.py",
+        name="avoid_obstacle_node",
+        parameters=[param_nav],
+        )
+
     ld.add_action(node_ihm)
     ld.add_action(param_server)
     ld.add_action(node_com)
@@ -91,5 +103,6 @@ def generate_launch_description():
     ld.add_action(node_rplidar)
     ld.add_action(node_beacon_detector)
     ld.add_action(node_obstacle_extractor)
+    ld.add_action(node_avoid_obstacle)
 
     return ld
