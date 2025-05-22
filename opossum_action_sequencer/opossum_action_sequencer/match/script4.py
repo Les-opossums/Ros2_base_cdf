@@ -34,7 +34,11 @@ class Script():
             node.pump(PUMP_struct(3, 1))
             node.pump(PUMP_struct(4, 1))
             time.sleep(0.5)
-            node.move_to(Position(1.1, 1, -1.12), seuil=0.05)
+            node.move_to(Position(1.1, 0.95, -1.12), seuil=0.05)
+            node.wait_for_motion()
+            node.move_to(Position(1.1, 0.95, -1.05), seuil=0.02)
+            node.wait_for_motion()
+            node.move_to(Position(1.1, 0.95, -1.19), seuil=0.02)
             node.wait_for_motion()
             time.sleep(1)
 
@@ -45,7 +49,7 @@ class Script():
             # Ramassage planche
             node.pump(PUMP_struct(2, 1))
             node.stepper(STEPPER_struct(2))
-            time.sleep(1)
+            time.sleep(2)
 
             # Eteint pompe bas et recule
             node.pump(PUMP_struct(1, 0))
