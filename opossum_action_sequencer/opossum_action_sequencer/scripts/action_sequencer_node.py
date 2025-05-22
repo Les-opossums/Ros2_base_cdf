@@ -20,6 +20,7 @@ from opossum_action_sequencer.utils import (
 
 import threading
 from threading import Event
+import time
 
 
 class ActionManager(Node):
@@ -271,11 +272,14 @@ class ActionManager(Node):
     def servo(self, servo: SERVO_struct):
         """Compute the servo action."""
         self.pub_command.publish(String(data=f"SERVO {servo.servo_id} {servo.angle}"))
+        self.get_logger().info(f"SERVO : SERVO {servo.servo_id} {servo.angle}")
+        time.sleep(0.1)
 
     def pump(self, pump: PUMP_struct):
         """Compute the pump action."""
         self.pub_command.publish(String(data=f"PUMP {pump.pump_id} {pump.enable}"))
         self.get_logger().info(f"PUMP : PUMP {pump.pump_id} {pump.enable}")
+        time.sleep(0.1)
 
     def led(self, led: LED_struct):
         """Compute the led action."""
@@ -288,6 +292,8 @@ class ActionManager(Node):
         self.pub_command.publish(
             String(data=f"STEPPER1  {stepper.mode}")
         )
+        self.get_logger().info(f"STEPPER : STEPPER1 {stepper.mode}")
+        time.sleep(0.1)
 
     def write_log(self, message):
         """Write logs."""
@@ -297,6 +303,7 @@ class ActionManager(Node):
         """Send raw commands."""
         self.get_logger().info(f"Sending raw command: {raw_command}")
         self.pub_command.publish(String(data=raw_command))
+        time.sleep(0.1)
 
     def synchro_lidar(self):
         """Synchronize odom with lidar."""
@@ -311,6 +318,7 @@ class ActionManager(Node):
     def add_score(self, score):
         """Update the score."""
         self.pub_score.publish(Int32(data=score))
+        time.sleep(0.1)
 
 
 def main(args=None):
