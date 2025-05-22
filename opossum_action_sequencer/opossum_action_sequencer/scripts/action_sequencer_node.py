@@ -181,7 +181,7 @@ class ActionManager(Node):
                     thread.start()
 
         elif msg.data.startswith("AU"):
-            self.get_logger().info(f"AU_test : {msg.data[-1]}")
+            # self.get_logger().info(f"AU_test : {msg.data[-1]}")
             if msg.data[-1] == "1":
                 self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))

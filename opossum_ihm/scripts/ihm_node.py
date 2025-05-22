@@ -145,7 +145,7 @@ class IhmNode(Node):
     def au_callback(self, msg):
         """Callback pour le topic 'au'."""
         self.au = msg.data
-        self.get_logger().info(f"AU received: {msg.data}")
+        # self.get_logger().info(f"AU received: {msg.data}")
 
     def enable_timer_callback(self, msg):
         """Callback pour le topic 'enable_timer'."""
