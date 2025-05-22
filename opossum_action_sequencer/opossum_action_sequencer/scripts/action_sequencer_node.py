@@ -187,6 +187,9 @@ class ActionManager(Node):
                 self.pub_au.publish(Bool(data=True))
                 if self.is_started:
                     self.script_instance.stop()
+            elif msg.data[-1] == "2":
+                self.get_logger().info("AU activated")
+                self.pub_au.publish(Bool(data=True))
             else:
                 self.get_logger().info("AU deactivated")
                 self.pub_au.publish(Bool(data=False))
