@@ -31,6 +31,14 @@ def generate_launch_description():
                      "debug_mode": False}],
     )
 
+    node_action_sequencer = Node(
+        package="opossum_action_sequencer",
+        namespace=namespace,
+        executable="action_sequencer_node.py",
+        name="action_sequencer_node",
+        parameters=[{}],
+    )
+
     param_com_path = PathJoinSubstitution(
         [FindPackageShare("opossum_comm"),
          "config",
@@ -98,6 +106,7 @@ def generate_launch_description():
 
     ld.add_action(node_ihm)
     ld.add_action(param_server)
+    ld.add_action(node_action_sequencer)
     ld.add_action(node_com)
     ld.add_action(node_tf_broadcaster)
     ld.add_action(node_rplidar)
