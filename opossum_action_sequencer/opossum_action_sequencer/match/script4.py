@@ -27,6 +27,7 @@ class Script():
 
             # Ramassage des boites
             node.send_raw('VMAX 0.2')
+            time.sleep(1)
             node.pump(PUMP_struct(1, 1))
             node.pump(PUMP_struct(3, 1))
             node.pump(PUMP_struct(4, 1))
