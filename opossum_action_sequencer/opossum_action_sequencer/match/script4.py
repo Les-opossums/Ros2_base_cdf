@@ -19,6 +19,8 @@ class Script():
         while not self._stop_event.is_set():
             node.write_log('Script 4 is running...')
             node.send_raw('SERVO 2 20')
+            node.move_to(Position(1.25, 0.23, -0.41))
+            node.send_raw('FREE')
             # Deplacement vers boites
             node.send_raw('VMAX 0.7')
             time.sleep(1)
