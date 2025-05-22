@@ -36,9 +36,9 @@ class Script():
             time.sleep(0.5)
             node.move_to(Position(1.1, 0.95, -1.12), seuil=0.05)
             node.wait_for_motion()
-            node.move_to(Position(1.1, 0.95, -1.05), seuil=0.02)
+            node.move_to(Position(1.1, 0.95, -0.6), seuil=0.02)
             node.wait_for_motion()
-            node.move_to(Position(1.1, 0.95, -1.19), seuil=0.02)
+            node.move_to(Position(1.1, 0.95, -1.6), seuil=0.02)
             node.wait_for_motion()
             time.sleep(1)
 
