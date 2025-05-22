@@ -22,7 +22,7 @@ class Script():
             # Deplacement vers boites
             node.send_raw('VMAX 0.7')
             time.sleep(1)
-            node.move_to(Position(1.1, 0.7, -1.12))
+            node.move_to(Position(1., 0.7, -1.12))
             node.wait_for_motion()
 
             # Ramassage des boites
@@ -42,6 +42,7 @@ class Script():
             # Ramassage planche
             node.pump(PUMP_struct(2, 1))
             node.stepper(STEPPER_struct(2))
+            time.sleep(1)
 
             # Eteint pompe bas et recule
             node.pump(PUMP_struct(1, 0))
