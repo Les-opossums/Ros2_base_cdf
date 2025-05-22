@@ -21,6 +21,7 @@ from opossum_action_sequencer.utils import (
 import threading
 from threading import Event
 import time
+import os
 
 
 class ActionManager(Node):
@@ -192,6 +193,10 @@ class ActionManager(Node):
 
         elif msg.data.startswith("YELLOWSWITCH"):
             self.synchro_lidar()
+
+        elif msg.data.startswith("BLUESWITCH"):
+            self.get_logger().info("Reload Ros")
+            os.system('systemctl --user restart launch.service')
 
     def robot_data_callback(self, msg: RobotData):
         """Receive the Robot Datas from Zynq."""
