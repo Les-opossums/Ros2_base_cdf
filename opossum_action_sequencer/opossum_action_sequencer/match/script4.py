@@ -27,13 +27,13 @@ class Script():
 
             # Ramassage des boites
             node.send_raw('VMAX 0.2')
-            time.sleep(1)
             node.pump(PUMP_struct(1, 1))
             node.pump(PUMP_struct(3, 1))
             node.pump(PUMP_struct(4, 1))
-            node.move_to(Position(1.1, 0.9, -1.12), seuil=0.05)
+            time.sleep(0.5)
+            node.move_to(Position(1.1, 1, -1.12), seuil=0.05)
             node.wait_for_motion()
-            time.sleep(2)
+            time.sleep(1)
 
             # Poussette vers zone
             node.move_to(Position(0.35, 1.7, -0.95))
@@ -61,6 +61,8 @@ class Script():
             node.wait_for_motion()
             node.pump(PUMP_struct(3, 0))
             node.pump(PUMP_struct(4, 0))
+            time.sleep(1)
+            node.pump(PUMP_struct(2, 0))
             time.sleep(2)
             node.add_score(10)
 
