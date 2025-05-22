@@ -1,0 +1,14 @@
+[Unit]
+Description=Run my script at boot
+After=network.target
+
+[Service]
+ExecStart=/home/opossum/robot_ws/src/utils/service_launch.sh
+User=opossum
+WorkingDirectory=/home/opossum/robot_ws
+StandardOutput=journal
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
