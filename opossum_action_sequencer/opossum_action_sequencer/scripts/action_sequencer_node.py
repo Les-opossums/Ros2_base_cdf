@@ -236,6 +236,7 @@ class ActionManager(Node):
         self.motion_done = False
         self.is_robot_moving = True
         self.is_robot_arrived = False
+        time.sleep(0.1)
         self.pub_command.publish(String(data=f"MOVE {pos.x} {pos.y} {pos.t}"))
         self.pos_obj = pos
         self.motion_done_event.clear()  # Block the wait
@@ -252,6 +253,7 @@ class ActionManager(Node):
         self.motion_done = False
         self.is_robot_moving = True
         self.is_robot_arrived = False
+        time.sleep(0.1)
         self.pub_command.publish(String(data=f"MOVE {pos.x} {pos.y} {pos.t}"))
         self.pos_obj = pos
         self.motion_done_event.clear()  # Block the wait
