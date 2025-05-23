@@ -1,14 +1,17 @@
 [Unit]
 Description=Run my script at boot
-After=network.target
+After=graphical.target
+Requires=graphical.target
 
 [Service]
-ExecStart=/home/opossum/robot_ws/src/utils/service_launch.sh
+ExecStart=/home/opossum/robot_ws/src/utils/script_service.sh
 User=opossum
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/opossum/.Xauthority
 WorkingDirectory=/home/opossum/robot_ws
 StandardOutput=journal
 Restart=on-failure
+TimeoutStopSec=2
 
 [Install]
-WantedBy=multi-user.target
-
+WantedBy=graphical.target
