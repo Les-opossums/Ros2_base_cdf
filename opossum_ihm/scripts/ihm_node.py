@@ -7,6 +7,7 @@ from opossum_ihm.interface import GUI
 from opossum_msgs.msg import LidarLoc
 from std_msgs.msg import Int32, Bool
 import threading
+import time
 
 
 class IhmNode(Node):
@@ -38,6 +39,7 @@ class IhmNode(Node):
         while True:
             self.gui.reload = False
             self.update_parameters()
+            time.sleep(0.2)
             self.gui.run_color(self.au)
             if self.gui.reload:
                 continue
