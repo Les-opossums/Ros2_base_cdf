@@ -109,7 +109,7 @@ class Script():
             node.relative_move_to(Position(0.0, -0.05, 0), seuil=0.01)
             node.wait_for_motion()
 
-            node.servo(SERVO_struct(2, 180))
+            node.servo(SERVO_struct(1, 180))
             node.relative_move_to(Position(-0.0, 0.05, 0), seuil=0.01)
             node.wait_for_motion()
             node.relative_move_to(Position(0, 0, -0.75), seuil=0.01)
