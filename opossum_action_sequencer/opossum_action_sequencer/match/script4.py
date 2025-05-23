@@ -58,8 +58,10 @@ class Script():
             node.move_to(Position(0.35, 1.7, -0.95))
             node.wait_for_motion()
 
+            # CONSTRUCTION DOUBLE ETAGE
             node.kalman(False)
 
+            # Montée planche
             node.stepper(STEPPER_struct(2))
             time.sleep(2)
             node.pump(PUMP_struct(2, 1))
@@ -67,11 +69,21 @@ class Script():
             time.sleep(2)
 
             # node.move_to(Position(0.35, 1.65, -0.95), seuil=0.05)
+            # Recule et monte les boites
             node.relative_move_to(Position(0, -0.05, 0), seuil=0.01)
             node.wait_for_motion()
 
-            node.servo(SERVO_struct(2, 180))
+            node.relative_move_to(Position(0, -0.1, 0), seuil=0.01)
+            node.wait_for_motion()
 
+            node.servo(SERVO_struct(2, 180))
+            node.servo(SERVO_struct(1, 20))
+
+            # Reavance pour construction
+            node.relative_move_to(Position(0, 0.1, 0), seuil=0.01)
+            node.wait_for_motion()
+
+            # Construction gauche
             # node.move_to(Position(0.35, 1.65, -1.7), seuil=0.05)
             node.relative_move_to(Position(0, 0, -0.75), seuil=0.01)
             node.wait_for_motion()
@@ -80,7 +92,26 @@ class Script():
             node.relative_move_to(Position(-0.08, 0.05, 0), seuil=0.01)
             node.wait_for_motion()
 
-            node.valve(VALVE_struct(3, 1))
+            node.servo(SERVO_struct(2, 20))
+
+            node.relative_move_to(Position(0.08, -0.05, 0), seuil=0.01)
+            node.wait_for_motion()
+            node.relative_move_to(Position(0, 0, 0.75), seuil=0.01)
+            node.wait_for_motion()
+
+            # Construction droite
+            node.relative_move_to(Position(0, 0, 0.75), seuil=0.01)
+            node.wait_for_motion()
+            node.relative_move_to(Position(0.08, -0.05, 0), seuil=0.01)
+            node.wait_for_motion()
+
+            node.servo(SERVO_struct(2, 180))
+            node.relative_move_to(Position(-0.08, 0.05, 0), seuil=0.01)
+            node.wait_for_motion()
+            node.relative_move_to(Position(0, 0, -0.75), seuil=0.01)
+            node.wait_for_motion()
+
+            node.valve(VALVE_struct(3))
 
             time.sleep(1)
             node.kalman(True)
