@@ -160,5 +160,6 @@ class Script():
 
             break
 
-    def stop(self):
+    def stop(self, node):
+        node.write_log('Script 4 is stopping...')
         self._stop_event.set()
