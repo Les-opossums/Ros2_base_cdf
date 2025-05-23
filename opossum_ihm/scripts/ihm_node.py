@@ -38,7 +38,7 @@ class IhmNode(Node):
         while True:
             self.gui.reload = False
             self.update_parameters()
-            self.gui.run_color()
+            self.gui.run_color(self.au)
             if self.gui.reload:
                 continue
 

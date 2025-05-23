@@ -7,7 +7,7 @@ from rclpy.logging import get_logger
 
 
 class ColorChoiceApp:
-    def __init__(self):
+    def __init__(self, au_state):
         self.reload = False
         self.root = tk.Tk()
         self.root.title("Choisir une couleur")
@@ -21,6 +21,9 @@ class ColorChoiceApp:
             self.root.geometry("480x800")
         self.label = tk.Label(self.root, text="Choisissez une couleur :")
         self.label.pack(pady=10)
+
+        if au_state:
+            self.root.configure(bg="red")
 
         self.button_yellow = tk.Button(
             self.root,
