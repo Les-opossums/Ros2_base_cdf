@@ -241,6 +241,22 @@ class ActionManager(Node):
         self.motion_done_event.clear()  # Block the wait
         # self.get_logger().info("Robot moving...")
 
+    def relative_move_to(self, delta: Position, seuil=0.1):
+        """Compute the relative move_to action."""
+        pos = Position(
+            x=self.robot_pos.x + delta.x,
+            y=self.robot_pos.y + delta.y,
+            t=self.robot_pos.t + delta.t
+        )
+        self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
+        self.motion_done = False
+        self.is_robot_moving = True
+        self.is_robot_arrived = False
+        self.pub_command.publish(String(data=f"MOVE {pos.x} {pos.y} {pos.t}"))
+        self.pos_obj = pos
+        self.motion_done_event.clear()  # Block the wait
+        # self.get_logger().info("Robot moving...")
+
     def wait_for_arrival(self):
         """Compute the wait_for_arrival action."""
         delta_x = abs(self.pos_obj.x - self.robot_pos.x)
