@@ -348,10 +348,10 @@ class ActionManager(Node):
     def kalman(self, kalman: bool):
         """Compute the kalman action."""
         if kalman:
-            self.pub_command.publish(String(data="KALMAN 1"))
+            self.pub_command.publish(String(data="ENKALMAN 1"))
             self.get_logger().info("KALMAN ON")
         else:
-            self.pub_command.publish(String(data="KALMAN 0"))
+            self.pub_command.publish(String(data="ENKALMAN 0"))
             self.get_logger().info("KALMAN OFF")
         time.sleep(0.1)
 
