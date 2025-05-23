@@ -7,6 +7,7 @@ from opossum_action_sequencer.action_manager import Version, Position, Speed
 from opossum_action_sequencer.action_manager import PUMP_struct, LED_struct
 from opossum_action_sequencer.action_manager import ODOM_struct, SERVO_struct
 from opossum_action_sequencer.action_manager import STEPPER_struct
+from opossum_action_sequencer.action_manager import VALVE_struct
 import time
 import threading
 
@@ -35,14 +36,14 @@ class Script():
             node.send_raw('VMAX 0.2')
             time.sleep(1)
             node.pump(PUMP_struct(1, 1))
-            node.pump(PUMP_struct(3, 1))
-            node.pump(PUMP_struct(4, 1))
+            # node.pump(PUMP_struct(3, 1))
+            # node.pump(PUMP_struct(4, 1))
             time.sleep(0.5)
             node.move_to(Position(1.1, 0.85, -1.12), seuil=0.05)
             node.wait_for_motion()
-            node.move_to(Position(1.1, 0.95, -1.12), seuil=0.05)
+            node.move_to(Position(1.1, 1., -1.12), seuil=0.05)
             node.wait_for_motion()
-            time.sleep(2)
+            time.sleep(1)
             # node.move_to(Position(1.1, 0.9, -0.6), seuil=0.02)
             # node.wait_for_motion()
             # node.move_to(Position(1.1, 0.9, -1.6), seuil=0.02)
@@ -52,13 +53,18 @@ class Script():
             # time.sleep(1)
             # node.move_to(Position(1.04, 0.87, -1.12))
             # node.wait_for_motion()
-            time.sleep(1)
 
             # Poussette vers zone
             node.move_to(Position(0.35, 1.7, -0.95))
             node.wait_for_motion()
 
             node.kalman(False)
+
+            node.stepper(STEPPER_struct(2))
+            time.sleep(2)
+            node.pump(PUMP_struct(2, 1))
+            node.stepper(STEPPER_struct(1))
+            time.sleep(2)
 
             # node.move_to(Position(0.35, 1.65, -0.95), seuil=0.05)
             node.relative_move_to(Position(0, -0.05, 0), seuil=0.01)
@@ -73,6 +79,8 @@ class Script():
             # node.move_to(Position(0.27, 1.7, -1.7), seuil=0.05)
             node.relative_move_to(Position(-0.08, 0.05, 0), seuil=0.01)
             node.wait_for_motion()
+
+            node.valve(VALVE_struct(3, 1))
 
             time.sleep(1)
             node.kalman(True)
