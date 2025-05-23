@@ -26,7 +26,7 @@ class Script():
             node.move_to(Position(1.25, 0.23, -0.41))
             node.send_raw('FREE')
             # Deplacement vers boites
-            node.send_raw('VMAX 0.7')
+            node.send_raw('VMAX 0.5')
             time.sleep(1)
             node.move_to(Position(1.1, 0.6, -1.12))
             node.wait_for_motion()
@@ -40,11 +40,15 @@ class Script():
             time.sleep(0.5)
             node.move_to(Position(1.1, 0.9, -1.12), seuil=0.05)
             node.wait_for_motion()
+            time.sleep(2)
             # node.move_to(Position(1.1, 0.9, -0.6), seuil=0.02)
             # node.wait_for_motion()
             # node.move_to(Position(1.1, 0.9, -1.6), seuil=0.02)
             # node.wait_for_motion()
             node.move_to(Position(1.1, 0.8, -1.12), seuil=0.05)
+            node.wait_for_motion()
+            time.sleep(1)
+            node.move_to(Position(1.1, 0.9, -1.12), seuil=0.05)
             node.wait_for_motion()
             time.sleep(1)
 
@@ -79,7 +83,7 @@ class Script():
             time.sleep(2)
             node.add_score(10)
 
-            node.send_raw('VMAX 0.7')
+            node.send_raw('VMAX 0.5')
             time.sleep(1)
             node.move_to(Position(0.35, 1.55, -0.95))
             node.send_raw('SERVO 1 180')
