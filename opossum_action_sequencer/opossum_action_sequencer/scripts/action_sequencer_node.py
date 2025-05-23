@@ -237,6 +237,7 @@ class ActionManager(Node):
         self.is_robot_moving = True
         self.is_robot_arrived = False
         self.pub_command.publish(String(data=f"MOVE {pos.x} {pos.y} {pos.t}"))
+        time.sleep(0.1)
         self.pos_obj = pos
         self.motion_done_event.clear()  # Block the wait
         # self.get_logger().info("Robot moving...")
@@ -293,6 +294,7 @@ class ActionManager(Node):
         self.get_logger().info("Waiting for robot to stop...")
         self.motion_done_event.wait()
         self.get_logger().info("Motion done")
+        time.sleep(0.1)
 
     def servo(self, servo: SERVO_struct):
         """Compute the servo action."""
