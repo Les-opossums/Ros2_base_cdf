@@ -1,5 +1,10 @@
 Base Ros pour le robot oppossum
 
+### After automatic launch
+A service launch ros at boot. You can find the scripts in the utils folder.
+To read logs on the raspberry, you can use the following command:
+
+```roslog```
 
 
 ### For the test of the beacon detectors, and for the robot GUI during game, you have to do the following:
