@@ -49,3 +49,8 @@ class SERVO_struct:
 class STEPPER_struct:
     def __init__(self, mode):
         self.mode = mode
+
+
+class VALVE_struct:
+    def __init__(self, valve_id):
+        self.valve_id = valve_id

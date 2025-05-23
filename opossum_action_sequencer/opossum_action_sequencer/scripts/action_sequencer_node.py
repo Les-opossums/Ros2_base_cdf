@@ -16,6 +16,7 @@ from opossum_action_sequencer.utils import (
     LED_struct,
     SERVO_struct,
     STEPPER_struct,
+    VALVE_struct,
 )
 
 import threading
@@ -279,13 +280,21 @@ class ActionManager(Node):
 
     def servo(self, servo: SERVO_struct):
         """Compute the servo action."""
-        self.pub_command.publish(String(data=f"SERVO {servo.servo_id} {servo.angle}"))
+        self.pub_command.publish(String(data=f"SERVO {servo.servo_id} "
+                                             f"{servo.angle}"
+                                        )
+                                 )
+
         self.get_logger().info(f"SERVO : SERVO {servo.servo_id} {servo.angle}")
         time.sleep(0.1)
 
     def pump(self, pump: PUMP_struct):
         """Compute the pump action."""
-        self.pub_command.publish(String(data=f"PUMP {pump.pump_id} {pump.enable}"))
+        self.pub_command.publish(String(data=f"PUMP {pump.pump_id} "
+                                             f"{pump.enable}"
+                                        )
+                                 )
+
         self.get_logger().info(f"PUMP : PUMP {pump.pump_id} {pump.enable}")
         time.sleep(0.1)
 
@@ -303,6 +312,13 @@ class ActionManager(Node):
         self.get_logger().info(f"STEPPER : STEPPER1 {stepper.mode}")
         time.sleep(0.1)
 
+    def valve(self, valve: VALVE_struct):
+        """Compute the valve action."""
+        self.pub_command.publish(String(data=f"VALVE {valve.valve_id}"))
+
+        self.get_logger().info(f"VALVE {valve.valve_id} {valve.enable}")
+        time.sleep(0.1)
+
     def write_log(self, message):
         """Write logs."""
         self.get_logger().info(f"{message}")
@@ -318,7 +334,8 @@ class ActionManager(Node):
         if self.robot_pos is None:
             return
         command = (
-            f"SYNCHROLIDAR {self.lidar_pos.x} {self.lidar_pos.y} {self.lidar_pos.t}"
+            f"SYNCHROLIDAR {self.lidar_pos.x} "
+            f"{self.lidar_pos.y} {self.lidar_pos.t}"
         )
         self.get_logger().info(f"Synchro : {command}")
         self.pub_command.publish(String(data=f"{command}"))
