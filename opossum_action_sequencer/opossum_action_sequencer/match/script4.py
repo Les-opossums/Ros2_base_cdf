@@ -58,6 +58,19 @@ class Script():
             node.move_to(Position(0.35, 1.7, -0.95))
             node.wait_for_motion()
 
+
+            node.move_to(Position(0.35, 1.65, -0.95), seuil=0.05)
+            node.wait_for_motion()
+
+            node.servo(SERVO_struct(2, 180))
+
+            node.move_to(Position(0.35, 1.65, -1.7), seuil=0.05)
+            node.wait_for_motion()
+
+            node.move_to(Position(0.27, 1.7, -1.7), seuil=0.05)
+            node.wait_for_motion()
+
+            """
             # Ramassage planche
             node.pump(PUMP_struct(2, 1))
             node.stepper(STEPPER_struct(2))
@@ -84,7 +97,7 @@ class Script():
             node.pump(PUMP_struct(2, 0))
             time.sleep(2)
             node.add_score(10)
-
+            """
             node.send_raw('VMAX 0.5')
             time.sleep(1)
             node.move_to(Position(0.35, 1.55, -0.95))
