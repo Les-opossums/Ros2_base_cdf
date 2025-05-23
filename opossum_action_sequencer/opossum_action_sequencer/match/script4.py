@@ -10,6 +10,7 @@ from opossum_action_sequencer.action_manager import STEPPER_struct
 from opossum_action_sequencer.action_manager import VALVE_struct
 import time
 import threading
+from rclpy.logging import get_logger
 
 
 class Script():
@@ -160,6 +161,7 @@ class Script():
 
             break
 
-    def stop(self, node):
-        node.write_log('Script 4 is stopping...')
+    def stop(self):
+        logger = get_logger('script4')
+        logger.warn('Script 4 is stopping...')
         self._stop_event.set()
