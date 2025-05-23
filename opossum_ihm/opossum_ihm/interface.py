@@ -457,8 +457,8 @@ class GUI:
         self.reload = False
         self.initialized = False
 
-    def run_color(self):
-        self.color_app = ColorChoiceApp()
+    def run_color(self, au_state):
+        self.color_app = ColorChoiceApp(au_state)
         self.reload = self.color_app.reload
 
     def get_color(self):
