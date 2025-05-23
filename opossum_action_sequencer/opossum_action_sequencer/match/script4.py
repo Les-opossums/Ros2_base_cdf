@@ -58,18 +58,25 @@ class Script():
             node.move_to(Position(0.35, 1.7, -0.95))
             node.wait_for_motion()
 
+            node.kalman(False)
 
-            node.move_to(Position(0.35, 1.65, -0.95), seuil=0.05)
+            # node.move_to(Position(0.35, 1.65, -0.95), seuil=0.05)
+            node.relative_move_to(Position(0, -0.05, 0), seuil=0.01)
             node.wait_for_motion()
 
             node.servo(SERVO_struct(2, 180))
 
-            node.move_to(Position(0.35, 1.65, -1.7), seuil=0.05)
+            # node.move_to(Position(0.35, 1.65, -1.7), seuil=0.05)
+            node.relative_move_to(Position(0, 0, -0.75), seuil=0.01)
             node.wait_for_motion()
 
-            node.move_to(Position(0.27, 1.7, -1.7), seuil=0.05)
+            # node.move_to(Position(0.27, 1.7, -1.7), seuil=0.05)
+            node.relative_move_to(Position(-0.08, 0.05, 0), seuil=0.01)
             node.wait_for_motion()
 
+            time.sleep(1)
+            node.kalman(True)
+            time.sleep(1)
             """
             # Ramassage planche
             node.pump(PUMP_struct(2, 1))
