@@ -59,7 +59,6 @@ class Script():
             node.wait_for_motion()
 
             # CONSTRUCTION DOUBLE ETAGE
-            node.kalman(False)
 
             # Montée planche
             node.stepper(STEPPER_struct(2))
@@ -67,6 +66,8 @@ class Script():
             node.pump(PUMP_struct(2, 1))
             node.stepper(STEPPER_struct(1))
             time.sleep(2)
+
+            node.kalman(False)
 
             # node.move_to(Position(0.35, 1.65, -0.95), seuil=0.05)
             # Recule et monte les boites
@@ -106,7 +107,7 @@ class Script():
             # Construction droite
             node.relative_move_to(Position(0, 0, 0.75), seuil=0.01)
             node.wait_for_motion()
-            node.relative_move_to(Position(0.0, -0.05, 0), seuil=0.01)
+            node.relative_move_to(Position(0.0, 0.05, 0), seuil=0.01)
             node.wait_for_motion()
 
             node.servo(SERVO_struct(1, 180))
