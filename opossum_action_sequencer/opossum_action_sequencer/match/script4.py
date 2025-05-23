@@ -73,6 +73,9 @@ class Script():
             node.relative_move_to(Position(0, -0.05, 0), seuil=0.01)
             node.wait_for_motion()
 
+            node.pump(PUMP_struct(1, 0))
+            node.valve(VALVE_struct(2))
+
             node.relative_move_to(Position(0, -0.1, 0), seuil=0.01)
             node.wait_for_motion()
 
