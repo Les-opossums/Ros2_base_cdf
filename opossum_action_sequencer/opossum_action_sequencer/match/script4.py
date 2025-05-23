@@ -38,17 +38,17 @@ class Script():
             node.pump(PUMP_struct(3, 1))
             node.pump(PUMP_struct(4, 1))
             time.sleep(0.5)
-            node.move_to(Position(1.1, 0.85, -1.12), seuil=0.05)
+            node.move_to(Position(1.1, 0.87, -1.12), seuil=0.05)
             node.wait_for_motion()
             time.sleep(2)
             # node.move_to(Position(1.1, 0.9, -0.6), seuil=0.02)
             # node.wait_for_motion()
             # node.move_to(Position(1.1, 0.9, -1.6), seuil=0.02)
             # node.wait_for_motion()
-            node.move_to(Position(1.12, 0.85, -1.12))
+            node.move_to(Position(1.16, 0.87, -1.12))
             # node.wait_for_motion()
             time.sleep(1)
-            node.move_to(Position(1.08, 0.9, -1.12))
+            node.move_to(Position(1.04, 0.87, -1.12))
             # node.wait_for_motion()
             time.sleep(1)
 
@@ -60,15 +60,15 @@ class Script():
             node.pump(PUMP_struct(2, 1))
             node.stepper(STEPPER_struct(2))
             time.sleep(2)
+            node.stepper(STEPPER_struct(1))
+            time.sleep(1)
 
             # Eteint pompe bas et recule
             node.pump(PUMP_struct(1, 0))
             node.move_to(Position(0.35, 1.55, -0.95), seuil=0.05)
             node.wait_for_motion()
 
-            # Monte les objets
-            node.stepper(STEPPER_struct(1))
-            time.sleep(1)
+            # Monte les boites
             node.send_raw('SERVO 1 20')
             node.send_raw('SERVO 2 180')
             time.sleep(1)
