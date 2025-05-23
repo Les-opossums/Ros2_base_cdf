@@ -330,9 +330,9 @@ class ActionManager(Node):
 
     def valve(self, valve: VALVE_struct):
         """Compute the valve action."""
-        self.pub_command.publish(String(data=f"VALVE {valve.valve_id}"))
+        self.pub_command.publish(String(data=f"VALVE {valve.valve_id} 1"))
 
-        self.get_logger().info(f"VALVE {valve.valve_id} {valve.enable}")
+        self.get_logger().info(f"VALVE {valve.valve_id} 1")
         time.sleep(0.1)
 
     def write_log(self, message):
