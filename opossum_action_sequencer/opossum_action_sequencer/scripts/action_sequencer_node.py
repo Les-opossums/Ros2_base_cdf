@@ -261,6 +261,7 @@ class ActionManager(Node):
 
     def wait_for_arrival(self):
         """Compute the wait_for_arrival action."""
+        time.sleep(0.2)
         delta_x = abs(self.pos_obj.x - self.robot_pos.x)
         delta_y = abs(self.pos_obj.y - self.robot_pos.y)
         delta_t = abs(self.pos_obj.t - self.robot_pos.t)
