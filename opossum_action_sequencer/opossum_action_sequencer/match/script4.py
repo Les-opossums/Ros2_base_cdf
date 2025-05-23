@@ -92,12 +92,13 @@ class Script():
             node.wait_for_motion()
 
             # node.move_to(Position(0.27, 1.7, -1.7), seuil=0.05)
-            node.relative_move_to(Position(-0.08, 0.05, 0), seuil=0.01)
+            # node.relative_move_to(Position(-0.08, 0.05, 0), seuil=0.01)
+            node.relative_move_to(Position(-0.0, 0.05, 0), seuil=0.01)
             node.wait_for_motion()
 
             node.servo(SERVO_struct(2, 20))
 
-            node.relative_move_to(Position(0.08, -0.05, 0), seuil=0.01)
+            node.relative_move_to(Position(0.0, -0.05, 0), seuil=0.01)
             node.wait_for_motion()
             node.relative_move_to(Position(0, 0, 0.75), seuil=0.01)
             node.wait_for_motion()
@@ -105,11 +106,11 @@ class Script():
             # Construction droite
             node.relative_move_to(Position(0, 0, 0.75), seuil=0.01)
             node.wait_for_motion()
-            node.relative_move_to(Position(0.08, -0.05, 0), seuil=0.01)
+            node.relative_move_to(Position(0.0, -0.05, 0), seuil=0.01)
             node.wait_for_motion()
 
             node.servo(SERVO_struct(2, 180))
-            node.relative_move_to(Position(-0.08, 0.05, 0), seuil=0.01)
+            node.relative_move_to(Position(-0.0, 0.05, 0), seuil=0.01)
             node.wait_for_motion()
             node.relative_move_to(Position(0, 0, -0.75), seuil=0.01)
             node.wait_for_motion()
