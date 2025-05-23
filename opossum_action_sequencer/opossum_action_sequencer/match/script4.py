@@ -18,7 +18,7 @@ class Script():
     def run(self, node):
         while not self._stop_event.is_set():
             node.write_log('Script 4 is running...')
-            node.send_raw('SERVO 2 20')
+            node.stepper(STEPPER_struct(0))
             node.send_raw('PUMP 1 1')
             time.sleep(1)
             node.send_raw('PUMP 1 0')
@@ -38,18 +38,18 @@ class Script():
             node.pump(PUMP_struct(3, 1))
             node.pump(PUMP_struct(4, 1))
             time.sleep(0.5)
-            node.move_to(Position(1.1, 0.9, -1.12), seuil=0.05)
+            node.move_to(Position(1.1, 0.85, -1.12), seuil=0.05)
             node.wait_for_motion()
             time.sleep(2)
             # node.move_to(Position(1.1, 0.9, -0.6), seuil=0.02)
             # node.wait_for_motion()
             # node.move_to(Position(1.1, 0.9, -1.6), seuil=0.02)
             # node.wait_for_motion()
-            node.move_to(Position(1.1, 0.8, -1.12), seuil=0.05)
-            node.wait_for_motion()
+            node.move_to(Position(1.12, 0.85, -1.12))
+            # node.wait_for_motion()
             time.sleep(1)
-            node.move_to(Position(1.1, 0.9, -1.12), seuil=0.05)
-            node.wait_for_motion()
+            node.move_to(Position(1.08, 0.9, -1.12))
+            # node.wait_for_motion()
             time.sleep(1)
 
             # Poussette vers zone
