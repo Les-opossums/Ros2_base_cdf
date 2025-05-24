@@ -45,6 +45,7 @@ class Script():
             node.relative_move(Position(0, 0, 3))
             node.wait_for_motion()
             node.write_log('Script Init completed.')
+            break
 
     def stop(self):
         self._stop_event.set()
