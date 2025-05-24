@@ -165,6 +165,16 @@ class ActionManager(Node):
                     self.script_class = Script
                 else:
                     pass
+            
+            elif changed.name == "debug_mode":
+                # Affiche la nouvelle valeur du paramètre debug_mode
+                if changed.value.bool_value:
+                    self.get_logger().info("Debug mode enabled")
+                    from opossum_action_sequencer.match.script_init import Script as ScriptInit
+                    self.script_init_class = ScriptInit
+                    self.run_script_init()
+                else:
+                    self.get_logger().info("Debug mode disabled")
 
     def feedback_callback(self, msg):
         """Receive the data from Zynq."""
@@ -221,6 +231,15 @@ class ActionManager(Node):
                 # self.synchro_lidar()
                 # self.move_to(self.pos_obj)
                 pass
+
+    def run_script_init(self):
+        """Run the script initialization."""
+        assert self.script_init_class is not None 
+        self.script_init_instance = self.script_init_class()
+        thread = threading.Thread(
+            target=self.script_init_instance.run, args=(self,)
+        )
+        thread.start()
 
     def lidar_loc_callback(self, msg: LidarLoc):
         """Receive Lidar location."""

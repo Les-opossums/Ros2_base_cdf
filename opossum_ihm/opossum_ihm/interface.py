@@ -3,7 +3,7 @@ from PIL import Image, ImageTk
 import os
 from itertools import count, cycle
 from ament_index_python.packages import get_package_share_directory
-from rclpy.logging import get_logger
+# from rclpy.logging import get_logger
 
 
 class ColorChoiceApp:
@@ -227,6 +227,7 @@ class ValidationApp:
         self.color = color
         self.script = script
         self.reload = False
+        self.launched_init = False
 
         # Initialisation de la fenêtre principale
         self.root = tk.Tk()
@@ -292,6 +293,15 @@ class ValidationApp:
                                     )
         validate_button.pack(pady=10)
 
+        script_init_button = tk.Button(self.root,
+                                       text="Init",
+                                       command=self.launch_init,
+                                       bg="yellow",
+                                       height=5,
+                                       width=10
+                                       )
+        script_init_button.pack(pady=10)
+
         reload_button = tk.Button(self.root,
                                   text="Reload",
                                   command=self.on_reload,
@@ -303,6 +313,10 @@ class ValidationApp:
 
     def on_validate(self):
         print("Validation effectuée.")
+        self.root.destroy()
+
+    def launch_init(self):
+        self.launched_init = True
         self.root.destroy()
 
     def on_reload(self):
@@ -434,7 +448,7 @@ class ImageLabel(tk.Label):
 
         try:
             self.delay = im.info["duration"]
-        except:
+        except Exception:
             self.delay = 100
 
         if len(frames) == 1:
@@ -455,6 +469,7 @@ class ImageLabel(tk.Label):
 class GUI:
     def __init__(self):
         self.reload = False
+        self.launched_init = False
         self.initialized = False
 
     def run_color(self, au_state):
@@ -480,6 +495,7 @@ class GUI:
             self.img_app.selected_script
         )
         self.reload = self.validation_app.reload
+        self.launched_init = self.validation_app.launched_init
 
     def run_score(self):
         self.score_app = ScoreApp(self.color_app.selected_color)
