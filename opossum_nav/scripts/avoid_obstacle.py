@@ -196,8 +196,10 @@ class ObstacleAvoider(Node):
 
         if self.enable_detection:
             if self.in_avoid:
+                self.get_logger().info(f"Im in avoid")
                 self.in_avoid = self._find_new_path()
             else:
+                self.get_logger().info(f"Im out")
                 lidar_range = (
                     msg.ranges[-self.index_correction :]
                     + msg.ranges[: -self.index_correction]
