@@ -36,6 +36,7 @@ class ActionManager(Node):
         self._init_subscribers()
         self.state_leash = False
         self.script_class = None
+        self.ready = False
         self.is_started = False
 
         # Action Done
@@ -166,6 +167,16 @@ class ActionManager(Node):
                 else:
                     pass
 
+            elif changed.name == "debug_mode":
+                # Affiche la nouvelle valeur du paramètre debug_mode
+                if changed.value.bool_value:
+                    self.get_logger().info("Debug mode enabled")
+                    from opossum_action_sequencer.match.script_init import Script as ScriptInit
+                    self.script_init_class = ScriptInit
+                    self.run_script_init()
+                else:
+                    self.get_logger().info("Debug mode disabled")
+
     def feedback_callback(self, msg):
         """Receive the data from Zynq."""
         # self.get_logger().info(f"Feedback received: {msg.data}")
@@ -222,6 +233,15 @@ class ActionManager(Node):
                 # self.move_to(self.pos_obj)
                 pass
 
+    def run_script_init(self):
+        """Run the script initialization."""
+        assert self.script_init_class is not None
+        self.script_init_instance = self.script_init_class()
+        thread = threading.Thread(
+            target=self.script_init_instance.run, args=(self,)
+        )
+        thread.start()
+
     def lidar_loc_callback(self, msg: LidarLoc):
         """Receive Lidar location."""
         self.lidar_pos = Position(
@@ -245,6 +265,7 @@ class ActionManager(Node):
 
     def relative_move_to(self, delta: Position, seuil=0.1):
         """Compute the relative move_to action."""
+        self.seuil = seuil
         pos = Position(
             x=self.robot_pos.x + delta.x,
             y=self.robot_pos.y + delta.y,
