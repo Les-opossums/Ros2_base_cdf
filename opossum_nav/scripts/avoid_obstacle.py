@@ -194,33 +194,34 @@ class ObstacleAvoider(Node):
             self.len_scan = int((msg.angle_max - msg.angle_min) / msg.angle_increment)
             self._compute_security_rectangle_distances()
 
-        if self.enable_detection:
-            if self.in_avoid:
-                self.in_avoid = self._find_new_path()
-            else:
-                lidar_range = (
-                    msg.ranges[-self.index_correction :]
-                    + msg.ranges[: -self.index_correction]
-                )
-                last_obs_detected = self.obstacle_detected
-                self.obstacle_detected = self.detect_obstacle(lidar_range)
-                if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
-                    self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
-                    return
-                if self.obstacle_detected:
-                    if (
-                        self.enable_new_path
-                        and self.robot_data is not None
-                        and self.robot_position is not None
-                        and self.goal_position is not None
-                    ):
-                        self._send_block()
-                        self.in_avoid = self._find_new_path()
-                    else:
-                        self._send_block()
+        if not self.enable_detection:
+            return
+        if self.in_avoid:
+            self.in_avoid = self._find_new_path()
+        else:
+            lidar_range = (
+                msg.ranges[-self.index_correction :]
+                + msg.ranges[: -self.index_correction]
+            )
+            last_obs_detected = self.obstacle_detected
+            self.obstacle_detected = self.detect_obstacle(lidar_range)
+            if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
+                self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
+                return
+            if self.obstacle_detected:
+                if (
+                    self.enable_new_path
+                    and self.robot_data is not None
+                    and self.robot_position is not None
+                    and self.goal_position is not None
+                ):
+                    self._send_block()
+                    self.in_avoid = self._find_new_path()
                 else:
-                    self.ptheta = None
-            self.pub_obstacle_detected.publish(Bool(data=self.obstacle_detected))
+                    self._send_block()
+            else:
+                self.ptheta = None
+        self.pub_obstacle_detected.publish(Bool(data=self.obstacle_detected))
 
     def detect_obstacle(self, lidar_range) -> bool:
         """Detect if there is an obstacle depending on the option."""
@@ -418,7 +419,7 @@ class ObstacleAvoider(Node):
         
     def _find_new_path(self) -> None:
         """Try to find a new path."""
-        v1 = [
+        v_rg = [
             self.goal_position.x - self.robot_position.x,
             self.goal_position.y - self.robot_position.y,
         ]
@@ -427,20 +428,19 @@ class ObstacleAvoider(Node):
         if closest_obstacle is None:
             self._send_block()
             return False
-        v2 = [
+        v_ro = [
             closest_obstacle.x - self.robot_position.x,
             closest_obstacle.y - self.robot_position.y,
         ]
         if self._obstacle_on_goal(closest_obstacle):
             self._send_block()
             return False
-        if not self._in_front(v1, v2):
-            # self.get_logger().info
-            # self._send_block()
+        if not self._is_obstacle_blocking(v_rg, v_ro, closest_obstacle, self.thickness / 2):
+            self.get_logger().info("Path is now clear, resuming to goal.")
             self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.theta)
             return False
-        cross_product = 1 if v1[0] * v2[1] - v1[1] * v2[0] > 0 else -1
-        pos = self._check_ways(closest_obstacle, cross_product, v1, v2)
+        cross_product = 1 if v_rg[0] * v_ro[1] - v_rg[1] * v_ro[0] > 0 else -1
+        pos = self._check_ways(closest_obstacle, cross_product, v_rg, v_ro)
         if pos is not None:
             self._send_move(pos[0], pos[1], self.robot_data.theta)
             return True
@@ -572,6 +572,23 @@ class ObstacleAvoider(Node):
                 marker.points.append(Point(x=x, y=y, z=0.0))
         self.pub_visualization.publish(marker)
 
+    def _is_obstacle_blocking(self, v_rg, v_ro, obstacle_pos, threshold=0.3) -> bool:
+        """Return True if obstacle lies close to the line from robot to goal."""
+        norm_rg = np.linalg.norm(v_rg)
+        if norm_rg == 0:
+            return False  # Already at goal
+
+        v_rg_unit = v_rg / norm_rg
+        proj_len = np.dot(v_ro, v_rg_unit)
+
+        if proj_len < 0:
+            return False  # Obstacle is behind
+
+        proj_point = np.array([self.robot_position.x, self.robot_position.y]) + proj_len * v_rg_unit
+        obstacle_point = np.array([obstacle_pos.x, obstacle_pos.y])
+        dist_to_path = np.linalg.norm(obstacle_point - proj_point)
+
+        return dist_to_path < threshold
 
 def main(args=None):
     """Spin main loop."""
