@@ -410,8 +410,8 @@ class ObstacleAvoider(Node):
     def _send_move(self, x, y, t) -> None:
         """Send move to motors."""
         cmd_msg = String()
-        cmd_msg.data = f"FREE"
-        self.pub_command.publish(cmd_msg)
+        # cmd_msg.data = f"FREE"
+        # self.pub_command.publish(cmd_msg)
         cmd_msg.data = f"MOVE {x} {y} {t} 10"
         self.pub_command.publish(cmd_msg)
         
