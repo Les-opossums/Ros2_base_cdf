@@ -331,6 +331,7 @@ class ActionManager(Node):
 
 
     def update_arrival_status(self):
+        time.sleep(0.2)
         delta_x = abs(self.pos_obj.x - self.robot_pos.x)
         delta_y = abs(self.pos_obj.y - self.robot_pos.y)
         delta_t = abs(self.pos_obj.t - self.robot_pos.t)
@@ -340,6 +341,7 @@ class ActionManager(Node):
             self.is_robot_arrived = True
 
     def update_motion_status(self):
+        time.sleep(0.2)
         speed_lin = abs(self.robot_speed.x)
         speed_t = abs(self.robot_speed.t)
         if speed_lin < 0.0001 and speed_t < 0.0001:
