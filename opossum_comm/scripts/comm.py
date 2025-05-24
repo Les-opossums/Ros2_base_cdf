@@ -46,7 +46,9 @@ class Communication(Node):
 
     def _init_parameters(self: Node) -> None:
         """Initialise parameters of the node."""
-        msgs_path = os.path.join(get_package_share_directory("opossum_msgs"), "resources")
+        msgs_path = os.path.join(
+            get_package_share_directory("opossum_msgs"), "resources"
+        )
         comm_yaml_file = os.path.join(msgs_path, "com_msgs.yaml")
         msgs_yaml_file = os.path.join(msgs_path, "format_msgs.yaml")
         with open(comm_yaml_file, "r") as file:
@@ -109,15 +111,25 @@ class Communication(Node):
                 10,
                 callback_group=self.mutex_clb,
             )
-            self.read_timer = self.create_timer(1 / self.frequency, self.read_card_simu, callback_group=self.mutex_clb)
+            self.read_timer = self.create_timer(
+                1 / self.frequency, self.read_card_simu, callback_group=self.mutex_clb
+            )
             self.sub_command = self.create_subscription(
                 String, command_topic, self.send_card_simu, 10
             )
         else:
-            self.read_timer = self.create_timer(1 / self.frequency, self.read_card, callback_group=self.mutex_clb)
-            self.sub_command = {name: self.create_subscription(
-                String, command_topic, functools.partial(self.send_card, name=name), 10
-            ) for name in list(self.cards.keys())} # Here, if more than one card, we will have to add /card/command especially
+            self.read_timer = self.create_timer(
+                1 / self.frequency, self.read_card, callback_group=self.mutex_clb
+            )
+            self.sub_command = {
+                name: self.create_subscription(
+                    String,
+                    command_topic,
+                    functools.partial(self.send_card, name=name),
+                    10,
+                )
+                for name in list(self.cards.keys())
+            }  # Here, if more than one card, we will have to add /card/command especially
 
     def _init_publishers(self: Node) -> None:
         """Initialize publishers of the node."""
@@ -148,7 +160,9 @@ class Communication(Node):
             GoalDetection, goal_position_topic, 10
         )
         self.pub_comm_state = self.create_publisher(
-            Bool, self.get_parameter("comm_state_topic").get_parameter_value().string_value, 10
+            Bool,
+            self.get_parameter("comm_state_topic").get_parameter_value().string_value,
+            10,
         )
 
     def _init_card(self, name):
@@ -215,6 +229,7 @@ class Communication(Node):
                 self.process_data_rcv(data)
 
     def save_in_buffer(self, msg):
+        """Simulate the Zynq sending data."""
         self.buffer_simu_rcv += msg.data
 
     def send_card_simu(self, msg):
@@ -225,18 +240,22 @@ class Communication(Node):
         self.pub_comm.publish(msg)
 
     def process_data_send(self, data):
+        """Process data to send."""
         splitted_data = data.split()
         if (
             splitted_data[0] == "MOVE" and len(splitted_data) > 3
         ):  # >4 but for thest # Move will need more options to enable the avoid node
-            goal_pos = GoalDetection()
-            goal_pos.goal_position.x = float(splitted_data[1])
-            goal_pos.goal_position.y = float(splitted_data[2])
-            goal_pos.goal_position.z = float(splitted_data[3])
-            goal_pos.detection_mode = -1  # int(splitted_data[4])
-            goal_pos.obstacle_detection_distance = 0.5  # float(splitted_data[5])
-            self.pub_goal_position.publish(goal_pos)
-            data = " ".join(splitted_data[:4])
+            try:
+                goal_pos = GoalDetection()
+                goal_pos.goal_position.x = float(splitted_data[1])
+                goal_pos.goal_position.y = float(splitted_data[2])
+                goal_pos.goal_position.z = float(splitted_data[3])
+                goal_pos.detection_mode = -1  # int(splitted_data[4])
+                goal_pos.obstacle_detection_distance = 0.5  # float(splitted_data[5])
+                self.pub_goal_position.publish(goal_pos)
+                data = " ".join(splitted_data[:4])
+            except ValueError as e:
+                self.get_logger().warn(f"GREGOIRE SEND GOOD COMMAND: {e}")
 
     def process_data_rcv(self, data):
         """Publish the asserv data if necessary."""
@@ -262,9 +281,12 @@ class Communication(Node):
                 rdata.vt = float(splitted_data[6])
                 self.pub_robot_data.publish(rdata)
             except Exception as e:
-                self.get_logger().warn(f"The splitted data was {splitted_data} and got: {e}")
+                self.get_logger().warn(
+                    f"The splitted data was {splitted_data} and got: {e}"
+                )
         elif splitted_data[0] == "ERROR":
             self.get_logger().error(f"Error: {data}")
+
 
 def main(args=None):
     """Spin main loop."""
