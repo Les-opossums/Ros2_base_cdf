@@ -22,7 +22,8 @@ public:
         const std::array<double, 6>& dst_beacons, // AB, AC, BC, AD, BD, CD
         const std::array<bool, 4>& angle_sign, // ABC, ABD, ACD, BCD
         double ang_tol,
-        double dst_tol);
+        double dst_tol,
+        double dst_tol_beacons);
 
         std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> find_possible_beacons(
             const std::optional<std::array<Eigen::Vector2d, 4>>& previous_beacons,
@@ -33,6 +34,7 @@ private:
     std::array<bool, 4> angle_sign_;
     double ang_tol_;
     double dst_tol_;
+    double dst_tol_beacons_;
 
     std::map<char, std::vector<Eigen::Vector2d>> sort_comparison(
         const std::array<Eigen::Vector2d, 4>& previous_beacons,

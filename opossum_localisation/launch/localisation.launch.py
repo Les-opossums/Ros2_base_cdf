@@ -33,7 +33,6 @@ def launch_setup(context, *args, **kwargs):
                 package="rplidar_ros",
                 namespace=robot,
                 executable="rplidar_node",
-                name="rplidar_node",
                 parameters=[param_file],
             )
             nodes.append(node_rplidar)

@@ -64,8 +64,6 @@ class RPlidarNode : public rclcpp::Node
     RPlidarNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
     : Node("rplidar_node", options)
     {
-
-
     }
 
   private:
@@ -87,6 +85,7 @@ class RPlidarNode : public rclcpp::Node
         this->declare_parameter<std::string>("scan_mode",std::string());
         this->declare_parameter<float>("scan_frequency",10);
         this->declare_parameter<float>("angle_correction", -3.6651914);
+        this->declare_parameter<float>("max_distance_soft", 4.0);
 
         this->get_parameter_or<std::string>("channel_type", channel_type, "serial");
         this->get_parameter_or<std::string>("tcp_ip", tcp_ip, "192.168.0.7");
@@ -103,6 +102,8 @@ class RPlidarNode : public rclcpp::Node
         this->get_parameter_or<std::string>("topic_name", topic_name, "scan");
         this->get_parameter_or<std::string>("scan_mode", scan_mode, std::string());
         this->get_parameter_or<float>("angle_correction", angle_correction, -3.6651914);
+        this->get_parameter_or<float>("max_distance_soft", max_distance_soft, 4.0);
+
         if(channel_type == "udp")
             this->get_parameter_or<float>("scan_frequency", scan_frequency, 20.0);
         else
@@ -257,7 +258,7 @@ class RPlidarNode : public rclcpp::Node
         scan_msg->scan_time = scan_time;
         scan_msg->time_increment = scan_time / (double)(node_count-1);
         scan_msg->range_min = 0.15;
-        scan_msg->range_max = max_distance;//8.0;
+        scan_msg->range_max = max_distance_soft;//8.0;
 
         scan_msg->intensities.resize(node_count);
         scan_msg->ranges.resize(node_count);
@@ -277,8 +278,7 @@ class RPlidarNode : public rclcpp::Node
                 else
                     apply_index = apply_index + scan_midpoint;
             }
-
-            if (read_value == 0.0)
+            if (read_value == 0.0 || read_value > max_distance_soft)
                 scan_msg->ranges[apply_index] = std::numeric_limits<float>::infinity();
             else
                 scan_msg->ranges[apply_index] = read_value;
@@ -592,6 +592,7 @@ public:
     std::string scan_mode;
     float scan_frequency;
     float angle_correction;
+    float max_distance_soft;
     /* State */
     bool is_scanning = false;
 

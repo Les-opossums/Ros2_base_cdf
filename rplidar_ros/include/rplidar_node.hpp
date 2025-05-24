@@ -111,7 +111,6 @@ private:
   bool flip_x_axis_;
   int m_angle_compensate_multiple;
   std::string scan_mode_;
-  float angle_correction_;
   bool auto_standby_;
   /* Publisher */
   LaserScanPub m_publisher;
