@@ -22,6 +22,7 @@ class IhmNode(Node):
         self.scr = 0
         self.ready_plot_pos = False
         self.score = 0
+        self.debug = False
         self.au = False
         self.comm_state = True
         self.x, self.y, self.t = None, None, None
@@ -59,9 +60,15 @@ class IhmNode(Node):
             self.gui.run_validation()
             if self.gui.reload:
                 continue
+            elif self.gui.launched_init:
+                self.debug = self.gui.launched_init
+                self.update_parameters()
+                self.debug = False
+                self.update_parameters()
+                continue
             else:
                 self.update_parameters()
-            break
+                break
 
         self.gui.run_score()
         self.timer = self.create_timer(0.5, self.update_values)
@@ -87,6 +94,7 @@ class IhmNode(Node):
         request.team_color = self.clr
         request.script_number = self.scr
         request.current_score = self.current_score
+        request.debug_mode = self.debug
 
         future = client.call_async(request)
         future.add_done_callback(self.handle_service_response)

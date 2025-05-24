@@ -36,6 +36,7 @@ class ActionManager(Node):
         self._init_subscribers()
         self.state_leash = False
         self.script_class = None
+        self.ready = False
         self.is_started = False
 
         # Action Done
@@ -166,6 +167,16 @@ class ActionManager(Node):
                 else:
                     pass
 
+            elif changed.name == "debug_mode":
+                # Affiche la nouvelle valeur du paramètre debug_mode
+                if changed.value.bool_value:
+                    self.get_logger().info("Debug mode enabled")
+                    from opossum_action_sequencer.match.script_init import Script as ScriptInit
+                    self.script_init_class = ScriptInit
+                    self.run_script_init()
+                else:
+                    self.get_logger().info("Debug mode disabled")
+
     def feedback_callback(self, msg):
         """Receive the data from Zynq."""
         # self.get_logger().info(f"Feedback received: {msg.data}")
@@ -203,24 +214,49 @@ class ActionManager(Node):
             self.get_logger().info("Reload Ros")
             os.system('systemctl --user restart launch.service')
 
+    #def robot_data_callback(self, msg: RobotData):
+    #    """Receive the Robot Datas from Zynq."""
+    #    # self.get_logger().info(f"Robot data received: {msg}")
+    #    self.robot_pos = Position(x=msg.x, y=msg.y, t=msg.theta)
+    #    self.robot_speed = Position(x=msg.vlin, y=msg.vdir, t=msg.vt)
+    #    if not self.motion_done:
+    #        self.wait_for_arrival()
+    #        self.wait_for_stop()
+    #        if not self.is_robot_moving and self.is_robot_arrived:
+    #            # self.get_logger().info("Robot stopped")
+    #            self.motion_done_event.set()
+    #            self.motion_done = True
+#
+    #        elif not self.is_robot_moving and not self.is_robot_arrived:
+    #            # self.get_logger().info("Robot stopped but not arrived")
+    #            # self.synchro_lidar()
+    #            # self.move_to(self.pos_obj)
+    #            pass
+
     def robot_data_callback(self, msg: RobotData):
-        """Receive the Robot Datas from Zynq."""
-        # self.get_logger().info(f"Robot data received: {msg}")
+        """Receive the Robot Data from Zynq."""
         self.robot_pos = Position(x=msg.x, y=msg.y, t=msg.theta)
         self.robot_speed = Position(x=msg.vlin, y=msg.vdir, t=msg.vt)
-        if not self.motion_done:
-            self.wait_for_arrival()
-            self.wait_for_stop()
-            if not self.is_robot_moving and self.is_robot_arrived:
-                # self.get_logger().info("Robot stopped")
-                self.motion_done_event.set()
-                self.motion_done = True
 
-            elif not self.is_robot_moving and not self.is_robot_arrived:
-                # self.get_logger().info("Robot stopped but not arrived")
-                # self.synchro_lidar()
-                # self.move_to(self.pos_obj)
-                pass
+        if not self.motion_done:
+            # Update motion state
+            self.update_arrival_status()
+            self.update_motion_status()
+
+            # Final check
+            if self.is_robot_arrived and not self.is_robot_moving:
+                self.get_logger().info("Motion complete. Signaling.")
+                self.motion_done = True
+                self.motion_done_event.set()
+
+    def run_script_init(self):
+        """Run the script initialization."""
+        assert self.script_init_class is not None
+        self.script_init_instance = self.script_init_class()
+        thread = threading.Thread(
+            target=self.script_init_instance.run, args=(self,)
+        )
+        thread.start()
 
     def lidar_loc_callback(self, msg: LidarLoc):
         """Receive Lidar location."""
@@ -245,6 +281,7 @@ class ActionManager(Node):
 
     def relative_move_to(self, delta: Position, seuil=0.1):
         """Compute the relative move_to action."""
+        self.seuil = seuil
         pos = Position(
             x=self.robot_pos.x + delta.x,
             y=self.robot_pos.y + delta.y,
@@ -260,36 +297,54 @@ class ActionManager(Node):
         self.motion_done_event.clear()  # Block the wait
         # self.get_logger().info("Robot moving...")
 
-    def wait_for_arrival(self):
-        """Compute the wait_for_arrival action."""
-        time.sleep(0.2)
+    # def wait_for_arrival(self):
+    #     """Compute the wait_for_arrival action."""
+    #     time.sleep(0.2)
+    #     delta_x = abs(self.pos_obj.x - self.robot_pos.x)
+    #     delta_y = abs(self.pos_obj.y - self.robot_pos.y)
+    #     delta_t = abs(self.pos_obj.t - self.robot_pos.t)
+    #     # Log des angles
+    #     # self.get_logger().info(
+    #     #     f"Robot position: {self.robot_pos.x} "
+    #     #     f"{self.robot_pos.y} {self.robot_pos.t}"
+    #     # )
+    #     # self.get_logger().info(
+    #     #     f"Object position: {self.pos_obj.x} "
+    #     #     f"{self.pos_obj.y} {self.pos_obj.t}"
+    #     # )
+    #     # self.get_logger().info(
+    #     #     f"Delta x: {delta_x}, Delta y: {delta_y}, Delta t: {delta_t}"
+    #     # )
+# 
+    #     if delta_x < self.seuil and delta_y < self.seuil:
+    #         if delta_t < self.seuil:
+    #             self.get_logger().info("Robot arrived")
+    #             self.is_robot_arrived = True
+# 
+    # def wait_for_stop(self):
+    #     """Compute the wait_for_stop action."""
+    #     speed_lin = abs(self.robot_speed.x)
+    #     speed_t = abs(self.robot_speed.t)
+    #     if speed_lin < 0.0001 and speed_t < 0.0001:
+    #         # self.get_logger().info("Robot stopped")
+    #         self.is_robot_moving = False
+
+
+    def update_arrival_status(self):
         delta_x = abs(self.pos_obj.x - self.robot_pos.x)
         delta_y = abs(self.pos_obj.y - self.robot_pos.y)
         delta_t = abs(self.pos_obj.t - self.robot_pos.t)
-        # Log des angles
-        # self.get_logger().info(
-        #     f"Robot position: {self.robot_pos.x} "
-        #     f"{self.robot_pos.y} {self.robot_pos.t}"
-        # )
-        # self.get_logger().info(
-        #     f"Object position: {self.pos_obj.x} "
-        #     f"{self.pos_obj.y} {self.pos_obj.t}"
-        # )
-        # self.get_logger().info(
-        #     f"Delta x: {delta_x}, Delta y: {delta_y}, Delta t: {delta_t}"
-        # )
+        if delta_x < self.seuil and delta_y < self.seuil and delta_t < self.seuil:
+            if not self.is_robot_arrived:
+                self.get_logger().info("Robot has arrived.")
+            self.is_robot_arrived = True
 
-        if delta_x < self.seuil and delta_y < self.seuil:
-            if delta_t < self.seuil:
-                self.get_logger().info("Robot arrived")
-                self.is_robot_arrived = True
-
-    def wait_for_stop(self):
-        """Compute the wait_for_stop action."""
+    def update_motion_status(self):
         speed_lin = abs(self.robot_speed.x)
         speed_t = abs(self.robot_speed.t)
         if speed_lin < 0.0001 and speed_t < 0.0001:
-            # self.get_logger().info("Robot stopped")
+            if self.is_robot_moving:
+                self.get_logger().info("Robot has stopped.")
             self.is_robot_moving = False
 
     def wait_for_motion(self):
