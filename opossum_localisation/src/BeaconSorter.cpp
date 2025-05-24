@@ -4,11 +4,13 @@ BeaconSorter::BeaconSorter(
     const std::array<double, 6>& dst_beacons,
     const std::array<bool, 4>& angle_sign,
     double ang_tol,
-    double dst_tol)
+    double dst_tol,
+    double dst_tol_beacons)
     : dst_beacons_(dst_beacons),
       angle_sign_(angle_sign),
       ang_tol_(ang_tol),
-      dst_tol_(dst_tol)
+      dst_tol_(dst_tol),
+      dst_tol_beacons_(dst_tol_beacons)
 {
 }
 
@@ -73,7 +75,7 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
         {
             int j = static_cast<int>(j0);
             flags[0] = false;
-            if (approx(dt(sort_list['A'][i], sort_list['B'][j]), dst_beacons_[0], dst_tol_))
+            if (approx(dt(sort_list['A'][i], sort_list['B'][j]), dst_beacons_[0], dst_tol_beacons_))
             {
                 flags[0] = true;
                 indexes2.push_back({i, j, -1, -1});
@@ -83,12 +85,12 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
                 int k = static_cast<int>(k0);
                 flags[1] = false;
                 flags[2] = false;
-                if (approx(dt(sort_list['A'][i], sort_list['C'][k]), dst_beacons_[1], dst_tol_))
+                if (approx(dt(sort_list['A'][i], sort_list['C'][k]), dst_beacons_[1], dst_tol_beacons_))
                 {
                     flags[1] = true;
                     indexes2.push_back({i, -1, k, -1});
                 }
-                if (approx(dt(sort_list['B'][j], sort_list['C'][k]), dst_beacons_[2], dst_tol_))
+                if (approx(dt(sort_list['B'][j], sort_list['C'][k]), dst_beacons_[2], dst_tol_beacons_))
                 {
                     flags[2] = true;
                     indexes2.push_back({-1, j, k, -1});
@@ -103,17 +105,17 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
                     flags[3] = false;
                     flags[4] = false;
                     flags[5] = false;
-                    if (approx(dt(sort_list['A'][i], sort_list['D'][l]), dst_beacons_[3], dst_tol_))
+                    if (approx(dt(sort_list['A'][i], sort_list['D'][l]), dst_beacons_[3], dst_tol_beacons_))
                     {
                         flags[3] = true;
                         indexes2.push_back({i, -1, -1, l});
                     }
-                    if (approx(dt(sort_list['B'][j], sort_list['D'][l]), dst_beacons_[4], dst_tol_))
+                    if (approx(dt(sort_list['B'][j], sort_list['D'][l]), dst_beacons_[4], dst_tol_beacons_))
                     {
                         flags[4] = true;
                         indexes2.push_back({-1, j, -1, l});
                     }
-                    if (approx(dt(sort_list['C'][k], sort_list['D'][l]), dst_beacons_[5], dst_tol_))
+                    if (approx(dt(sort_list['C'][k], sort_list['D'][l]), dst_beacons_[5], dst_tol_beacons_))
                     {
                         flags[5] = true;
                         indexes2.push_back({-1, -1, k, l});
@@ -292,37 +294,37 @@ std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> Beaco
         {
             int i = static_cast<int>(i0);
             double distance = dt(beacon1, olist[i]);
-            if (approx(distance, dst_beacons_[0], dst_tol_))
+            if (approx(distance, dst_beacons_[0], dst_tol_beacons_))
             {
                 indexes[0].push_back(i);
                 beacon_list2.push_back({olist[i], beacon1, std::nullopt, std::nullopt});
                 beacon_list2.push_back({beacon1, olist[i], std::nullopt, std::nullopt});
             }
-            if (approx(distance, dst_beacons_[1], dst_tol_))
+            if (approx(distance, dst_beacons_[1], dst_tol_beacons_))
             {
                 indexes[1].push_back(i);
                 beacon_list2.push_back({olist[i], std::nullopt, beacon1, std::nullopt});
                 beacon_list2.push_back({beacon1, std::nullopt, olist[i], std::nullopt});
             }
-            if (approx(distance, dst_beacons_[2], dst_tol_))
+            if (approx(distance, dst_beacons_[2], dst_tol_beacons_))
             {
                 indexes[2].push_back(i);
                 beacon_list2.push_back({std::nullopt, olist[i], beacon1, std::nullopt});
                 beacon_list2.push_back({std::nullopt, beacon1, olist[i], std::nullopt});
             }
-            if (approx(distance, dst_beacons_[3], dst_tol_))
+            if (approx(distance, dst_beacons_[3], dst_tol_beacons_))
             {
                 indexes[3].push_back(i);
                 beacon_list2.push_back({olist[i], std::nullopt, std::nullopt, beacon1});
                 beacon_list2.push_back({beacon1, std::nullopt, std::nullopt, olist[i]});
             }
-            if (approx(distance, dst_beacons_[4], dst_tol_))
+            if (approx(distance, dst_beacons_[4], dst_tol_beacons_))
             {
                 indexes[4].push_back(i);
                 beacon_list2.push_back({std::nullopt, olist[i], std::nullopt, beacon1});
                 beacon_list2.push_back({std::nullopt, beacon1, std::nullopt, olist[i]});
             }
-            if (approx(distance, dst_beacons_[5], dst_tol_))
+            if (approx(distance, dst_beacons_[5], dst_tol_beacons_))
             {
                 indexes[5].push_back(i);
                 beacon_list2.push_back({std::nullopt, std::nullopt, olist[i], beacon1});

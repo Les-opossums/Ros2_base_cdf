@@ -15,6 +15,7 @@ void BeaconDetectorNode::init_main_parameters()
     this->declare_parameter("enable_robot_position_reception", false);
     this->declare_parameter("enable_initial_position", false);
     this->declare_parameter("distance_tolerance", 0.0);
+    this->declare_parameter("distance_tolerance_beacons", 0.0);
     this->declare_parameter("angle_tolerance", 0.0);
     this->declare_parameter("init_position", std::vector<double>());
     this->declare_parameter("boundaries", std::vector<double>());
@@ -63,6 +64,7 @@ void BeaconDetectorNode::init_parameters()
     }
     std::copy(init_pos.begin(), init_pos.end(), init_position_.begin());
     distance_tolerance_ = this->get_parameter("distance_tolerance").as_double();
+    distance_tolerance_beacons_ = this->get_parameter("distance_tolerance_beacons").as_double();
     angle_tolerance_ = this->get_parameter("angle_tolerance").as_double();
     auto bound = this->get_parameter("boundaries").as_double_array();
     if (bound.size() != 4) {
@@ -104,7 +106,7 @@ void BeaconDetectorNode::init_parameters()
         dt(fixed_beacons_[1], fixed_beacons_[3]),
         dt(fixed_beacons_[2], fixed_beacons_[3])};
 
-    beacon_sorter_ = std::make_shared<BeaconSorter>(dst_beacons, angle_sign, angle_tolerance_, distance_tolerance_);
+    beacon_sorter_ = std::make_shared<BeaconSorter>(dst_beacons, angle_sign, angle_tolerance_, distance_tolerance_, distance_tolerance_beacons_);
     position_finder_ = std::make_shared<PositionFinder>(fixed_beacons_, boundaries_, distance_tolerance_, init_position_);
 
     RCLCPP_INFO(this->get_logger(), "Initialized beacon_detector_node.");
@@ -137,7 +139,7 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
     // rclcpp::Time last_time = msg->header.stamp;
     // int64_t ns_last_time = last_time.nanoseconds();
 
-    if ((!enable_robot_position_reception_ || !position_finder_->previous_robot.has_value()) && position_finder_->current_robot.has_value())
+    if ((!enable_robot_position_reception_ || !position_finder_->previous_robot.has_value()))
     {
         position_finder_->previous_robot = position_finder_->current_robot;
     }
@@ -162,7 +164,6 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
     }
     std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> beacons_result;
     beacons_result = beacon_sorter_->find_possible_beacons(previous_beacons, new_objects_detected);
-    // RCLCPP_INFO(this->get_logger(), "NUMBER BEACONS %d", beacons_result.first);
     if (beacons_result.first > 1)
     {
         std::pair<std::array<std::optional<Eigen::Vector2d>, 4>, std::optional<Eigen::Vector3d>> output = position_finder_->search_pos(beacons_result.first, beacons_result.second, new_objects_detected);

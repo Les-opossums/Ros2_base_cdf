@@ -40,6 +40,7 @@ private:
     bool enable_robot_position_reception_;
     bool enable_initial_position_;
     double distance_tolerance_;
+    double distance_tolerance_beacons_;
     double angle_tolerance_;
     std::array<double, 4> boundaries_;
     std::array<double, 3> init_position_;

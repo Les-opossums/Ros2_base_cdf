@@ -21,6 +21,7 @@ main_robot:
       angle_compensate: true
       scan_mode: Sensitivity
       angle_correction: -3.6651914
+      max_distance_soft: 3.8
 
   obstacle_extractor_node:
     ros__parameters:
@@ -62,6 +63,7 @@ main_robot:
       boundaries:  [0.0, 3.0, 0.0, 2.0]
       init_position: [1.77, 0.23, 0.0]
       distance_tolerance: 0.3
+      distance_tolerance_beacons: 0.1
       angle_tolerance: 0.7853981633974483
       robot_position_topic: robot_position_input
       enable_wait_color: False
