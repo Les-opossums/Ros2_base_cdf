@@ -206,6 +206,7 @@ class ObstacleAvoider(Node):
                 self.obstacle_detected = self.detect_obstacle(lidar_range)
                 if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
                     self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
+                    return
                 if self.obstacle_detected:
                     if (
                         self.enable_new_path
@@ -409,9 +410,11 @@ class ObstacleAvoider(Node):
     def _send_move(self, x, y, t) -> None:
         """Send move to motors."""
         cmd_msg = String()
+        cmd_msg.data = f"FREE"
+        self.pub_command.publish(cmd_msg)
         cmd_msg.data = f"MOVE {x} {y} {t} 10"
         self.pub_command.publish(cmd_msg)
-
+        
     def _find_new_path(self) -> None:
         """Try to find a new path."""
         v1 = [
