@@ -61,7 +61,9 @@ class IhmNode(Node):
             if self.gui.reload:
                 continue
             elif self.gui.launched_init:
-                self.debug = self.gui.launched_init 
+                self.debug = self.gui.launched_init
+                self.update_parameters()
+                self.debug = False
                 self.update_parameters()
                 continue
             else:
