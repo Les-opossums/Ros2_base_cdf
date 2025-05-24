@@ -195,8 +195,8 @@ class Communication(Node):
         """Send the received message frome ActionSequencer to real card."""
         if not self.enable_send:
             return
-        self.process_data_send(msg.data)
-        self.cards[name]["serial"].write((msg.data + "\n").encode("utf-8"))
+        out = self.process_data_send(msg.data)
+        self.cards[name]["serial"].write((out + "\n").encode("utf-8"))
 
     def read_card(self):
         """Read the messages that could have been sent by the Zynq."""
@@ -236,14 +236,14 @@ class Communication(Node):
         """Send to the card the command in simulation."""
         if not self.enable_send:
             return
-        self.process_data_send(msg.data)
-        self.pub_comm.publish(msg)
+        out = self.process_data_send(msg.data)
+        self.pub_comm.publish(out)
 
     def process_data_send(self, data):
         """Process data to send."""
         splitted_data = data.split()
         if (
-            splitted_data[0] == "MOVE" and len(splitted_data) > 3
+            splitted_data[0] == "MOVE" and len(splitted_data) == 4
         ):  # >4 but for thest # Move will need more options to enable the avoid node
             try:
                 goal_pos = GoalDetection()
@@ -256,7 +256,13 @@ class Communication(Node):
                 data = " ".join(splitted_data[:4])
             except ValueError as e:
                 self.get_logger().warn(f"GREGOIRE SEND GOOD COMMAND: {e}")
-
+            return data
+        elif (
+            splitted_data[0] == "MOVE" and len(splitted_data) == 5
+        ):
+            self.get_logger().info(f"In avoid: sending {' '.join(splitted_data[:4])}")
+            return " ".join(splitted_data[:4])
+        return data
     def process_data_rcv(self, data):
         """Publish the asserv data if necessary."""
         if len(data) == 0:

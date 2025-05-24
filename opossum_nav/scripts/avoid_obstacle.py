@@ -205,7 +205,8 @@ class ObstacleAvoider(Node):
                 last_obs_detected = self.obstacle_detected
                 self.obstacle_detected = self.detect_obstacle(lidar_range)
                 if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
-                    self.pub_command.publish(String(data=f"MOVE {self.goal_position.x} {self.goal_position.y} {self.goal_position.z}"))
+                    self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
+                    return
                 if self.obstacle_detected:
                     if (
                         self.enable_new_path
@@ -213,6 +214,7 @@ class ObstacleAvoider(Node):
                         and self.robot_position is not None
                         and self.goal_position is not None
                     ):
+                        self._send_block()
                         self.in_avoid = self._find_new_path()
                     else:
                         self._send_block()
@@ -409,9 +411,11 @@ class ObstacleAvoider(Node):
     def _send_move(self, x, y, t) -> None:
         """Send move to motors."""
         cmd_msg = String()
-        cmd_msg.data = f"MOVE {x} {y} {t}"
+        cmd_msg.data = f"VMAX 0.3"
         self.pub_command.publish(cmd_msg)
-
+        cmd_msg.data = f"MOVE {x} {y} {t} 10"
+        self.pub_command.publish(cmd_msg)
+        
     def _find_new_path(self) -> None:
         """Try to find a new path."""
         v1 = [
@@ -431,26 +435,27 @@ class ObstacleAvoider(Node):
             self._send_block()
             return False
         if not self._in_front(v1, v2):
-            self._send_block()
+            # self.get_logger().info
+            # self._send_block()
+            self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.theta)
             return False
-        else:
-            cross_product = 1 if v1[0] * v2[1] - v1[1] * v2[0] > 0 else -1
-            pos = self._check_ways(closest_obstacle, cross_product, v1, v2)
-            if pos is not None:
-                self._send_move(pos[0], pos[1], self.robot_data.theta.data)
-                return True
-            else:
-                self._send_block()
-                self.get_logger().info("No way to avoid obstacle")
-                return False
+        cross_product = 1 if v1[0] * v2[1] - v1[1] * v2[0] > 0 else -1
+        pos = self._check_ways(closest_obstacle, cross_product, v1, v2)
+        if pos is not None:
+            self._send_move(pos[0], pos[1], self.robot_data.theta)
+            return True
+        self._send_block()
+        self.get_logger().info("No way to avoid obstacle")
+        return False
 
     def _check_ways(self, obstacle, cross, v1, v2) -> None:
         """Check if the way is possible."""
+        # n is the vector to go perpendicular to the ennemi on the side of the goal
         n = [v2[1], -v2[0]]
         n = [cross * i for i in n]
         n = [i / np.linalg.norm(n) for i in n]
         limit_bound = []
-        dst_bd = 0.22
+        dst_bd = 0.33
         # Following lines can be reduced using 2 for loops using // 2
         # Boundary left
         k1 = (self.boundaries[0] - self.robot_position.x) / n[0]
@@ -485,16 +490,17 @@ class ObstacleAvoider(Node):
             x_bottom_2 = self.robot_position.x + k2 * n[0]
             limit_bound.append([x_bottom_2, self.boundaries[2] + dst_bd, 2])
 
+        add_scene = 0.5
         # Boundary top
-        k1 = (self.boundaries[3] - self.robot_position.y) / n[1]
+        k1 = (self.boundaries[3] - add_scene - self.robot_position.y) / n[1]
         x_top = self.robot_position.x + k1 * n[0]
         if (
             self.boundaries[0] < x_top < self.boundaries[1]
-            and abs(self.boundaries[3] - obstacle.y) > self.obstacle_detection_distance
+            and abs(self.boundaries[3] - add_scene - obstacle.y) > self.obstacle_detection_distance
         ):
-            k2 = (self.boundaries[3] - dst_bd - self.robot_position.y) / n[1]
+            k2 = (self.boundaries[3] - add_scene - dst_bd - self.robot_position.y) / n[1]
             x_top_2 = self.robot_position.x + k2 * n[0]
-            limit_bound.append([x_top_2, self.boundaries[3] - dst_bd, 3])
+            limit_bound.append([x_top_2, self.boundaries[3] - add_scene - dst_bd, 3])
 
         for val in limit_bound:
             v3 = [val[0] - self.robot_position.x, val[1] - self.robot_position.y]
