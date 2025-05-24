@@ -63,9 +63,10 @@ class IhmNode(Node):
             elif self.gui.launched_init:
                 self.debug = self.gui.launched_init 
                 self.update_parameters()
+                continue
             else:
                 self.update_parameters()
-            break
+                break
 
         self.gui.run_score()
         self.timer = self.create_timer(0.5, self.update_values)
