@@ -434,7 +434,9 @@ class ObstacleAvoider(Node):
             self._send_block()
             return False
         if not self._in_front(v1, v2):
-            self._send_block()
+            # self.get_logger().info
+            # self._send_block()
+            self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.theta)
             return False
         cross_product = 1 if v1[0] * v2[1] - v1[1] * v2[0] > 0 else -1
         pos = self._check_ways(closest_obstacle, cross_product, v1, v2)
