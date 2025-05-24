@@ -260,7 +260,7 @@ class Communication(Node):
         elif (
             splitted_data[0] == "MOVE" and len(splitted_data) == 5
         ):
-            self.get_logger(f"In avoid: sending {' '.join(splitted_data[:4])}")
+            self.get_logger().info(f"In avoid: sending {' '.join(splitted_data[:4])}")
             return " ".join(splitted_data[:4])
         return data
     def process_data_rcv(self, data):
