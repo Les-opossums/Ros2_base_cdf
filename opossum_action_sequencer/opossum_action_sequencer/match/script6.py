@@ -16,7 +16,7 @@ class Script():
 
     def run(self, node):
         while not self._stop_event.is_set():
-            node.send_raw('VMAX 0.3')
+            node.send_raw('VMAX 0.6')
             for _ in range(10):
                 node.move_to(Position(0.6, 0.6, 0))
                 node.wait_for_motion()
