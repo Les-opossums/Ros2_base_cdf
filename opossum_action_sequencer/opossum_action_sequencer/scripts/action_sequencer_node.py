@@ -36,6 +36,7 @@ class ActionManager(Node):
         self._init_subscribers()
         self.state_leash = False
         self.script_class = None
+        self.ready = False
         self.is_started = False
 
         # Action Done
