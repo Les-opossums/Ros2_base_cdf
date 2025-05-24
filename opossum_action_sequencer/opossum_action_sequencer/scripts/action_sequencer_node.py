@@ -166,7 +166,7 @@ class ActionManager(Node):
                     self.script_class = Script
                 else:
                     pass
-            
+
             elif changed.name == "debug_mode":
                 # Affiche la nouvelle valeur du paramètre debug_mode
                 if changed.value.bool_value:
@@ -235,7 +235,7 @@ class ActionManager(Node):
 
     def run_script_init(self):
         """Run the script initialization."""
-        assert self.script_init_class is not None 
+        assert self.script_init_class is not None
         self.script_init_instance = self.script_init_class()
         thread = threading.Thread(
             target=self.script_init_instance.run, args=(self,)
@@ -265,6 +265,7 @@ class ActionManager(Node):
 
     def relative_move_to(self, delta: Position, seuil=0.1):
         """Compute the relative move_to action."""
+        self.seuil = seuil
         pos = Position(
             x=self.robot_pos.x + delta.x,
             y=self.robot_pos.y + delta.y,
