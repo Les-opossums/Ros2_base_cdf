@@ -214,6 +214,7 @@ class ObstacleAvoider(Node):
                         and self.robot_position is not None
                         and self.goal_position is not None
                     ):
+                        self._send_block()
                         self.in_avoid = self._find_new_path()
                     else:
                         self._send_block()

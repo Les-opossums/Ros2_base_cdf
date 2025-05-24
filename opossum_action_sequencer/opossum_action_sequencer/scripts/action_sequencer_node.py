@@ -228,6 +228,7 @@ class ActionManager(Node):
                         self.motion_done_event.set()
             else:
                 self.move_to(self.pos_obj, seuil=0.05)
+                self.get_logger().warn('Dead end, resending order')
 
     def robot_data_callback(self, msg: RobotData):
         """Receive the Robot Data from Zynq."""
