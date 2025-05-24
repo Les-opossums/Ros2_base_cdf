@@ -452,7 +452,7 @@ class ObstacleAvoider(Node):
         n = [cross * i for i in n]
         n = [i / np.linalg.norm(n) for i in n]
         limit_bound = []
-        dst_bd = 0.18
+        dst_bd = 0.33
         # Following lines can be reduced using 2 for loops using // 2
         # Boundary left
         k1 = (self.boundaries[0] - self.robot_position.x) / n[0]
@@ -487,7 +487,7 @@ class ObstacleAvoider(Node):
             x_bottom_2 = self.robot_position.x + k2 * n[0]
             limit_bound.append([x_bottom_2, self.boundaries[2] + dst_bd, 2])
 
-        add_scene = 0.6
+        add_scene = 0.5
         # Boundary top
         k1 = (self.boundaries[3] - add_scene - self.robot_position.y) / n[1]
         x_top = self.robot_position.x + k1 * n[0]
