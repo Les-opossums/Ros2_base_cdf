@@ -217,10 +217,17 @@ class ActionManager(Node):
         elif msg.data.strip() == "Pos,done":
             self.get_logger().info("Motion done message received from Zynq")
             if not self.motion_done:
-                self.is_robot_arrived = True
-                self.is_robot_moving = False
-                self.motion_done = True
-                self.motion_done_event.set()
+                delta_x = abs(self.pos_obj.x - self.robot_pos.x)
+                delta_y = abs(self.pos_obj.y - self.robot_pos.y)
+                delta_t = abs(self.pos_obj.t - self.robot_pos.t)
+                if delta_x < 0.05 and delta_y < 0.05:
+                    if delta_t < 0.05:
+                        self.is_robot_arrived = True
+                        self.is_robot_moving = False
+                        self.motion_done = True
+                        self.motion_done_event.set()
+            else:
+                self.move_to(self.pos_obj, seuil=0.05)
 
     def robot_data_callback(self, msg: RobotData):
         """Receive the Robot Data from Zynq."""
