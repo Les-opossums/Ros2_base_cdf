@@ -412,7 +412,7 @@ class ObstacleAvoider(Node):
     def _send_move(self, x, y, t) -> None:
         """Send move to motors."""
         cmd_msg = String()
-        cmd_msg.data = f"VMAX 0.3"
+        cmd_msg.data = f"VMAX 0.6"
         self.pub_command.publish(cmd_msg)
         cmd_msg.data = f"MOVE {x} {y} {t} 10"
         self.pub_command.publish(cmd_msg)
@@ -455,7 +455,7 @@ class ObstacleAvoider(Node):
         n = [cross * i for i in n]
         n = [i / np.linalg.norm(n) for i in n]
         limit_bound = []
-        dst_bd = 0.33
+        dst_bd = 0.25
         # Following lines can be reduced using 2 for loops using // 2
         # Boundary left
         k1 = (self.boundaries[0] - self.robot_position.x) / n[0]
