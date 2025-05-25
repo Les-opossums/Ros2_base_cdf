@@ -73,7 +73,7 @@ class ObstacleAvoider(Node):
         self.cone_range = (
             self.get_parameter("cone_range").get_parameter_value().double_value
         )
-        self.thickness = (
+        self.thickness_default = (
             self.get_parameter("thickness").get_parameter_value().double_value
         )
         self.boundaries = (
@@ -206,7 +206,7 @@ class ObstacleAvoider(Node):
             last_obs_detected = self.obstacle_detected
             self.obstacle_detected = self.detect_obstacle(lidar_range)
             if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
-                self._send_vmax(0.9)
+                self._send_vmax(0.7)
                 self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
                 return
             if self.obstacle_detected:
@@ -364,7 +364,7 @@ class ObstacleAvoider(Node):
 
     def _compute_security_rectangle_distances(self) -> None:
         """Compute the security distance if rectangle."""
-        x = self.thickness / 2
+        x = self.thickness_default / 2
         y = self.obstacle_detection_distance
         theta = np.arctan(y / x)
         limit_incr = int(theta / self.angle_increment)
@@ -440,9 +440,9 @@ class ObstacleAvoider(Node):
         if self._obstacle_on_goal(closest_obstacle):
             self._send_block()
             return False
-        if not self._is_obstacle_blocking(v_rg, v_ro, closest_obstacle, self.thickness / 2):
+        if not self._is_obstacle_blocking(v_rg, v_ro, closest_obstacle, self.thickness_default / 2):
             self.get_logger().info("Path is now clear, resuming to goal.")
-            self._send_vmax(0.9)
+            self._send_vmax(0.7)
             self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
             return False
         cross_product = 1 if v_rg[0] * v_ro[1] - v_rg[1] * v_ro[0] > 0 else -1

@@ -13,7 +13,7 @@ main_robot:
       obstacle_detection_distance: 0.6
       detection_mode: rectangle
       cone_range: 60.0 # deg
-      thickness: 0.45
+      thickness: 80
       boundaries: [0.0, 3.0, 0.0, 2.0]
       boundary_limit_detection: 0.05
       enable_detection: true
