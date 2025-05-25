@@ -437,7 +437,7 @@ class ObstacleAvoider(Node):
             return False
         if not self._is_obstacle_blocking(v_rg, v_ro, closest_obstacle, self.thickness / 2):
             self.get_logger().info("Path is now clear, resuming to goal.")
-            self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.theta)
+            self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
             return False
         cross_product = 1 if v_rg[0] * v_ro[1] - v_rg[1] * v_ro[0] > 0 else -1
         pos = self._check_ways(closest_obstacle, cross_product, v_rg, v_ro)
