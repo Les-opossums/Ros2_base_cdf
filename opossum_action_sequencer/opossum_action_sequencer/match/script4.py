@@ -69,40 +69,40 @@ class Script:
 
             # node.wait_for_motion()
 
-            node.relative_move_to(Position(0, -0.1, 0), seuil=0.01)
+            node.relative_move_to(Position(0, -0.1, 0), seuil=0.03)
             node.wait_for_motion()
 
             node.servo(SERVO_struct(2, 180))
             node.servo(SERVO_struct(1, 20))
 
             # Reavance pour construction
-            node.relative_move_to(Position(0, 0.0, 0), seuil=0.01)
+            node.relative_move_to(Position(0, 0.0, 0), seuil=0.03)
             node.wait_for_motion()
 
             # Construction gauche
-            node.relative_move_to(Position(0, 0, -0.75), seuil=0.01)
+            node.relative_move_to(Position(0, 0, -0.75), seuil=0.03)
             node.wait_for_motion()
 
-            node.relative_move_to(Position(0, 0.05, 0), seuil=0.01)
+            node.relative_move_to(Position(0, 0.05, 0), seuil=0.03)
             node.wait_for_motion()
 
             node.servo(SERVO_struct(2, 20))
 
-            node.relative_move_to(Position(0.0, -0.05, 0), seuil=0.01)
+            node.relative_move_to(Position(0.0, -0.05, 0), seuil=0.03)
             node.wait_for_motion()
-            node.relative_move_to(Position(0, 0, 0.75), seuil=0.01)
+            node.relative_move_to(Position(0, 0, 0.75), seuil=0.03)
             node.wait_for_motion()
 
             # Construction droite
-            node.relative_move_to(Position(0, 0, 0.75), seuil=0.01)
+            node.relative_move_to(Position(0, 0, 0.75), seuil=0.03)
             node.wait_for_motion()
-            node.relative_move_to(Position(0.0, 0.05, 0), seuil=0.01)
+            node.relative_move_to(Position(0.0, 0.05, 0), seuil=0.03)
             node.wait_for_motion()
 
             node.servo(SERVO_struct(1, 180))
-            node.relative_move_to(Position(0.0, 0.05, 0), seuil=0.01)
+            node.relative_move_to(Position(0.0, 0.05, 0), seuil=0.03)
             node.wait_for_motion()
-            node.relative_move_to(Position(0, 0, -0.75), seuil=0.01)
+            node.relative_move_to(Position(0, 0, -0.75), seuil=0.03)
             node.wait_for_motion()
 
             # Lacher la planche
