@@ -88,7 +88,6 @@ class PositionSender(Node):
                 self.get_logger().warn(f"No position to update currently for {name}...")
             req = StringReq.Request()
             req.data = "GETODOM,1,30.0"
-            self.get_logger().info("Is it where it bugs?")
             future = cli_motor_srv.call_async(req)
             rclpy.spin_until_future_complete(self, future)
             res = future.result().response.split(",")

@@ -237,7 +237,7 @@ class Communication(Node):
         if not self.enable_send:
             return
         out = self.process_data_send(msg.data)
-        self.pub_comm.publish(out)
+        self.pub_comm.publish(String(data=out))
 
     def process_data_send(self, data):
         """Process data to send."""
