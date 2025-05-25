@@ -206,6 +206,7 @@ class ObstacleAvoider(Node):
             last_obs_detected = self.obstacle_detected
             self.obstacle_detected = self.detect_obstacle(lidar_range)
             if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
+                self._send_vmax(0.9)
                 self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
                 return
             if self.obstacle_detected:
@@ -412,9 +413,13 @@ class ObstacleAvoider(Node):
     def _send_move(self, x, y, t) -> None:
         """Send move to motors."""
         cmd_msg = String()
-        cmd_msg.data = f"VMAX 0.6"
-        self.pub_command.publish(cmd_msg)
         cmd_msg.data = f"MOVE {x} {y} {t} 10"
+        self.pub_command.publish(cmd_msg)
+
+    def _send_vmax(self, vmax) -> None:
+        """Send move to motors."""
+        cmd_msg = String()
+        cmd_msg.data = f"VMAX {vmax}"
         self.pub_command.publish(cmd_msg)
         
     def _find_new_path(self) -> None:
@@ -437,11 +442,13 @@ class ObstacleAvoider(Node):
             return False
         if not self._is_obstacle_blocking(v_rg, v_ro, closest_obstacle, self.thickness / 2):
             self.get_logger().info("Path is now clear, resuming to goal.")
+            self._send_vmax(0.9)
             self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
             return False
         cross_product = 1 if v_rg[0] * v_ro[1] - v_rg[1] * v_ro[0] > 0 else -1
         pos = self._check_ways(closest_obstacle, cross_product, v_rg, v_ro)
         if pos is not None:
+            self._send_vmax(0.4)
             self._send_move(pos[0], pos[1], self.robot_data.theta)
             return True
         self._send_block()
