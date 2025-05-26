@@ -67,6 +67,7 @@ class Communication(Node):
         self.frequency = (
             self.get_parameter("frequency").get_parameter_value().double_value
         )
+        self.custom_handled_commands = ("GREENSWITCH", "ROBOTDATA", "ERROR")
         if not self.simulation:
             cards_name = (
                 self.get_parameter("cards_name")
@@ -213,7 +214,8 @@ class Communication(Node):
                         data_seq = []
                     for data in data_seq:
                         if data and data[0].isalpha():
-                            self.pub_feedback_command.publish(String(data=data))
+                            if not data.startswith(self.custom_handled_commands):
+                                self.pub_feedback_command.publish(String(data=data))
                             self.process_data_rcv(data)
 
         except Exception as e:
@@ -225,7 +227,8 @@ class Communication(Node):
         self.buffer_simu_rcv = ""
         for data in data_seq:
             if data and data[0].isalpha():
-                self.pub_feedback_command.publish(String(data=data))
+                if not data.startswith(self.custom_handled_commands):
+                    self.pub_feedback_command.publish(String(data=data))
                 self.process_data_rcv(data)
 
     def save_in_buffer(self, msg):
@@ -242,6 +245,8 @@ class Communication(Node):
     def process_data_send(self, data):
         """Process data to send."""
         splitted_data = data.split()
+        if len(splitted_data) == 0:
+            return
         if (
             splitted_data[0] == "MOVE" and len(splitted_data) == 4
         ):  # >4 but for thest # Move will need more options to enable the avoid node

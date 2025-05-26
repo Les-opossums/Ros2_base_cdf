@@ -216,7 +216,12 @@ class ActionManager(Node):
 
         elif msg.data.strip() == "Pos,done":
             self.get_logger().info("Motion done message received from Zynq")
-            if not self.motion_done:
+            self.get_logger().info("Robot position from Zynq: "
+                                   f"{self.robot_pos.x} {self.robot_pos.y} "
+                                   f"{self.robot_pos.t}")
+            self.motion_done = True
+            self.motion_done_event.set()
+            if False:  # not self.motion_done:
                 delta_x = abs(self.pos_obj.x - self.robot_pos.x)
                 delta_y = abs(self.pos_obj.y - self.robot_pos.y)
                 delta_t = abs(self.pos_obj.t - self.robot_pos.t)
@@ -226,9 +231,9 @@ class ActionManager(Node):
                         self.is_robot_moving = False
                         self.motion_done = True
                         self.motion_done_event.set()
-            else:
-                self.move_to(self.pos_obj, seuil=0.1)
-                self.get_logger().warn('Dead end, resending order')
+            # else:
+            #     self.move_to(self.pos_obj, seuil=self.seuil)
+            #     self.get_logger().warn('Dead end, resending order')
 
     def robot_data_callback(self, msg: RobotData):
         """Receive the Robot Data from Zynq."""
@@ -241,10 +246,22 @@ class ActionManager(Node):
             self.update_motion_status()
 
             # Final check
-            if self.is_robot_arrived and not self.is_robot_moving:
-                self.get_logger().info("Motion complete. Signaling.")
-                self.motion_done = True
-                self.motion_done_event.set()
+            # if self.is_robot_arrived and not self.is_robot_moving:
+            #     # self.get_logger().info("Motion complete. Signaling.")
+            #      self.motion_done = True
+            #      self.motion_done_event.set()
+
+            # Timer if robot is not moving but not arrived
+            # if not self.is_robot_arrived and not self.is_robot_moving:
+            if not self.is_robot_moving and not self.motion_done:
+                if self.timer is None:
+                    self.timer = time.time()
+                delta_time = time.time() - self.timer
+                if delta_time > 10.0:
+                    self.get_logger().warn(
+                        "Motion timed out, resending order."
+                    )
+                    self.move_to(self.pos_obj, seuil=self.seuil)
 
     def run_script_init(self):
         """Run the script initialization."""
@@ -265,6 +282,7 @@ class ActionManager(Node):
 
     def move_to(self, pos: Position, seuil=0.1):
         """Compute the move_to action."""
+        self.timer = None
         self.seuil = seuil
         self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
         self.motion_done = False
@@ -278,6 +296,7 @@ class ActionManager(Node):
 
     def relative_move_to(self, delta: Position, seuil=0.1):
         """Compute the relative move_to action."""
+        self.timer = None
         self.seuil = seuil
         pos = Position(
             x=self.robot_pos.x + delta.x,
@@ -315,9 +334,11 @@ class ActionManager(Node):
 
     def wait_for_motion(self):
         """Compute the wait_for_motion action."""
-        self.get_logger().info("Waiting for robot to stop...")
+        # self.get_logger().info("Waiting for robot to stop...")
         self.motion_done_event.wait()
-        self.get_logger().info("Motion done")
+        time.sleep(0.2)
+        self.get_logger().info("Motion done from Ros")
+        self.motion_done = True
 
     def servo(self, servo: SERVO_struct):
         """Compute the servo action."""

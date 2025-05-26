@@ -142,6 +142,9 @@ void ObstacleExtractor::updateParams(const std::shared_ptr<rmw_request_id_t> req
 }
 
 void ObstacleExtractor::scanCallback(const sensor_msgs::msg::LaserScan& scan_msg) {
+
+  // rclcpp::Time begin = nh_->now();
+  // int64_t ns_begin = begin.nanoseconds();
   base_frame_id_ = scan_msg.header.frame_id;
   stamp_ = scan_msg.header.stamp;
   // RCLCPP_INFO(nh_->get_logger(), "Using LaserScan topic");
@@ -162,6 +165,17 @@ void ObstacleExtractor::scanCallback(const sensor_msgs::msg::LaserScan& scan_msg
   }
 
   processPoints();
+  // rclcpp::Time now = nh_->now();
+  // int64_t ns_now = now.nanoseconds();
+  // rclcpp::Time last_time(scan_msg.header.stamp, nh_->get_clock()->get_clock_type());
+  // int ms_now = static_cast<int>(now.nanoseconds() / 1'000'000);
+  // int ms_last_time = static_cast<int>(last_time.nanoseconds() / 1'000'000);
+  // int ms_since_last = static_cast<int>((now - last_time).nanoseconds() / 1'000'000);
+  // int ms_since_begin = static_cast<int>((ns_now - ns_begin) / 1'000'000);
+  // RCLCPP_INFO(nh_->get_logger(), "Current time obs: %d ms", ms_since_begin);
+  // RCLCPP_INFO(nh_->get_logger(), "Current time (now): %d ms", ms_now);
+  // RCLCPP_INFO(nh_->get_logger(), "Last stamp time: %d ms", ms_last_time);
+  // RCLCPP_INFO(nh_->get_logger(), "Latency: %d ms", ms_now - ms_last_time);
 }
 
 void ObstacleExtractor::pclCallback(const sensor_msgs::msg::PointCloud& pcl_msg) {

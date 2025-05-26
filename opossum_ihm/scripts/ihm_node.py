@@ -5,7 +5,7 @@ from rclpy.node import Node
 from opossum_msgs.srv import Init
 from opossum_ihm.interface import GUI
 from opossum_msgs.msg import LidarLoc
-from std_msgs.msg import Int32, Bool
+from std_msgs.msg import Int32, Bool, String
 import threading
 import time
 
@@ -26,6 +26,7 @@ class IhmNode(Node):
         self.au = False
         self.comm_state = True
         self.x, self.y, self.t = None, None, None
+        self._init_publishers()
 
         # Initialisation de l'interface graphique
         self.gui = GUI()
@@ -34,6 +35,9 @@ class IhmNode(Node):
         self.logic_thread = threading.Thread(target=self.main_logic,
                                              daemon=True)
         self.logic_thread.start()
+
+    def _init_publishers(self):
+        self.pub_team_color = self.create_publisher(String, "init/team_color", 10)
 
     def main_logic(self):
         """Logique principale pour interagir avec l'utilisateur."""
@@ -46,6 +50,7 @@ class IhmNode(Node):
                 continue
 
             self.clr = self.gui.get_color()
+            self.pub_team_color.publish(String(data=self.clr))
             self.get_logger().info(f"Color selected: {self.clr}")
 
             self.gui.run_script()

@@ -161,7 +161,7 @@ class BeaconDetectorNode(Node):
         beacons = self.get_parameter("beacons").get_parameter_value().double_array_value
         if self.team_color not in self.available_colors:
             raise ValueError("Invalid team color")
-        if self.team_color == self.available_colors[1]:
+        if self.team_color == "blue":
             for i in range(1, len(beacons), 2):
                 beacons[i] = self.boundaries[3] - beacons[i]
         self.fixed_beacons = [

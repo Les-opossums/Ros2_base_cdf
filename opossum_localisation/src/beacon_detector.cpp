@@ -79,8 +79,8 @@ void BeaconDetectorNode::init_parameters()
     }
 
     if (team_color_ == "blue") {
-        for (size_t i = 1; i < beacons.size(); i += 2) {
-            beacons[i] = boundaries_[3] - beacons[i];
+        for (size_t i = 0; i < beacons.size(); i += 2) {
+            beacons[i] = boundaries_[1] - beacons[i];
         }
     }
 
@@ -109,7 +109,7 @@ void BeaconDetectorNode::init_parameters()
     beacon_sorter_ = std::make_shared<BeaconSorter>(dst_beacons, angle_sign, angle_tolerance_, distance_tolerance_, distance_tolerance_beacons_);
     position_finder_ = std::make_shared<PositionFinder>(fixed_beacons_, boundaries_, distance_tolerance_, init_position_);
 
-    RCLCPP_INFO(this->get_logger(), "Initialized beacon_detector_node.");
+    RCLCPP_INFO(this->get_logger(), "Initialized beacon_detector_node with color %s.", team_color_.c_str());
 }
 
 void BeaconDetectorNode::init_publishers()
@@ -136,8 +136,6 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
 {
     // rclcpp::Time begin = this->now();
     // int64_t ns_begin = begin.nanoseconds();
-    // rclcpp::Time last_time = msg->header.stamp;
-    // int64_t ns_last_time = last_time.nanoseconds();
 
     if ((!enable_robot_position_reception_ || !position_finder_->previous_robot.has_value()))
     {
@@ -173,26 +171,27 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
         {
             std::vector<Eigen::Vector2d> others;
             others = position_finder_->find_robots_on_plateau(new_objects_detected);
-            opossum_msgs::msg::LidarLoc msg = publish_pose_from_lidar(position_found.value(), others);
-            pub_location_->publish(msg);
+            opossum_msgs::msg::LidarLoc msg_loc = publish_pose_from_lidar(position_found.value(), others);
+            pub_location_->publish(msg_loc);
+            rclcpp::Time now = this->now();
+            int64_t ns_now = now.nanoseconds();
+            rclcpp::Time last_time = msg->header.stamp;
+            int64_t ns_last_time = last_time.nanoseconds();
+            // int ms_since_begin = static_cast<int>((ns_now - ns_begin) / 1'000'000);
+            int ms_since_last = static_cast<int>((ns_now - ns_last_time) / 1'000'000);
             std_msgs::msg::String msg_cmd;
             std::ostringstream ss;
             ss << "SETLIDAR "
             << position_found->x() << " "
             << position_found->y() << " "
-            << position_found->z();
+            << position_found->z() << " "
+            << ms_since_last;
             msg_cmd.data = ss.str();
-            // Log the message to console
-            // RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", msg_cmd.data.c_str());
-
-            // Publish the message.
             pub_location_cmd_->publish(msg_cmd);
+            // RCLCPP_INFO(this->get_logger(), "Current time: %d ms", ms_since_begin);
+            // RCLCPP_INFO(this->get_logger(), "Last Time: %d ms", ms_since_last);
         }
     }
-    // rclcpp::Time now = this->now();
-    // int64_t ns_now = now.nanoseconds();
-    // RCLCPP_INFO(this->get_logger(), "Current time: %d seconds", ns_now - ns_begin);
-    // RCLCPP_INFO(this->get_logger(), "Last Time: %d seconds", ns_now - ns_last_time);
 }
 
 void BeaconDetectorNode::robot_position_callback(const opossum_msgs::msg::MergedData::SharedPtr msg)

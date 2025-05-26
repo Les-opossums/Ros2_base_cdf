@@ -10,6 +10,7 @@ import functools
 from opossum_msgs.msg import PositionMap, RobotData
 from geometry_msgs.msg import Point
 from std_srvs.srv import Empty
+from std_msgs.msg import String
 from visualization_msgs.msg import Marker
 from opossum_localisation.math_lidar import quaternion_from_euler
 
@@ -32,14 +33,52 @@ class TfBroadcaster(Node):
                 ("boundaries", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("beacons", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("robot_names", rclpy.Parameter.Type.STRING_ARRAY),
+                ("enable_wait_color", rclpy.Parameter.Type.BOOL),
+                ("color_topic", rclpy.Parameter.Type.STRING),
             ],
         )
+        self._init_main_parameters()
+
+    def _init_main_parameters(self: Node) -> None:
+        self.available_colors = (
+            self.get_parameter("available_colors")
+            .get_parameter_value()
+            .string_array_value
+        )
+        if self.get_parameter("enable_wait_color").get_parameter_value().bool_value:
+            self.color_topic = (
+                self.get_parameter("color_topic").get_parameter_value().string_value
+            )
+            _ = self.create_subscription(
+                String,
+                self.color_topic,
+                self._init_color_callback,
+                10,
+            )
+        else:
+            self.team_color = (
+                self.get_parameter("default_color").get_parameter_value().string_value
+            ).lower()
+            if self.team_color not in self.available_colors:
+                raise ValueError("Invalid team color")
+            self._init_parameters()
+            self._init_publishers()
+            self._init_subscribers()
+
+    def _init_color_callback(self: Node, msg: String) -> None:
+        """
+        Wait for the reception of the color message and set all the parameters once the message has been received.
+
+        :param msg: The message containing the color of the team
+        :type msg: String
+        """
+        color = msg.data.lower()
+        if color not in self.available_colors:
+            raise ValueError("Invalid team color")
+        self.team_color = color
         self._init_parameters()
-        self._init_subscribers()
         self._init_publishers()
-        self._init_services()
-        self._init_display()
-        self.get_logger().info("TfBroadcaster node initialized.")
+        self._init_subscribers()
 
     def _init_parameters(self):
         """Initialize parameters."""
@@ -53,23 +92,17 @@ class TfBroadcaster(Node):
         self.boundaries = (
             self.get_parameter("boundaries").get_parameter_value().double_array_value
         )
-        self.team_color = (
-            self.get_parameter("default_color").get_parameter_value().string_value
-        )
-        self.available_colors = (
-            self.get_parameter("available_colors")
-            .get_parameter_value()
-            .string_array_value
-        )
         self.beacons = (
             self.get_parameter("beacons").get_parameter_value().double_array_value
         )
         self.robot_data_rcv = False
         if self.team_color not in self.available_colors:
             raise ValueError("Invalid team color")
-        if self.team_color == self.available_colors[1]:
-            for i in range(1, len(self.beacons), 2):
-                self.beacons[i] = self.boundaries[3] - self.beacons[i]
+        if self.team_color == "blue":
+            for i in range(0, len(self.beacons), 2):
+                self.beacons[i] = self.boundaries[1] - self.beacons[i]
+        self.get_logger().info("TfBroadcaster node initialized.")
+        
 
     def _init_subscribers(self):
         """Initialize subscribers."""
