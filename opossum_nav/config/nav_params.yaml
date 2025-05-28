@@ -10,10 +10,10 @@ main_robot:
       command_topic: command
       obstacle_detected_topic: obstacle_detected
       visualization_topic: visualization_limit
-      obstacle_detection_distance: 0.6
+      obstacle_detection_distance: 0.45
       detection_mode: rectangle
       cone_range: 60.0 # deg
-      thickness: 0.8
+      thickness: 0.7
       boundaries: [0.0, 3.0, 0.0, 2.0]
       boundary_limit_detection: 0.05
       enable_detection: true
@@ -39,4 +39,4 @@ second_robot:
       boundary_limit_detection: 0.05
       enable_detection: true
       enable_boundary_check: true
-      enable_new_path: false
+      enable_new_path: true

@@ -6,48 +6,205 @@ from opossum_action_sequencer.scripts.action_sequencer_node import ActionManager
 from opossum_action_sequencer.action_manager import Version, Position, Speed
 from opossum_action_sequencer.action_manager import PUMP_struct, LED_struct
 from opossum_action_sequencer.action_manager import ODOM_struct, SERVO_struct
+from opossum_action_sequencer.action_manager import STEPPER_struct
+from opossum_action_sequencer.action_manager import VALVE_struct
 import time
-import threading
+from rclpy.logging import get_logger
 
 
-class Script():
+class Script:
     def __init__(self):
-        self._stop_event = threading.Event()
+        self.id_mvt = 0
+
+    def log_mvt(self, node):
+        node.write_log(f"Mouvement ID: {self.id_mvt}")
+        self.id_mvt += 1
 
     def run(self, node):
-        while not self._stop_event.is_set():
-            node.write_log('Script 3 is running...')
-            # self.send_raw('SYNCHROLIDAR')
-            # self.send_raw('SETX 0.6')
-            # self.send_raw('SETY 0.6')
-            # self.send_raw('SETT -1.2')
-            # node.synchro_lidar()
-            # self.move_to(self.pos_departure)
-            node.send_raw(f'VMAX 0.7')
-            time.sleep(2)
-            node.move_to(Position(0.5, 1.32, 0.54))
-            node.wait_for_motion()
-            time.sleep(2)
-            node.send_raw(f'VMAX 0.2')
-            node.move_to(Position(0.1, 1.32, 0.54))
-            node.wait_for_motion()
-            node.pump(PUMP_struct(1, 1))
-            node.pump(PUMP_struct(2, 1))
+        node.write_log("Script 3 is running...")
 
+        # Banderole
+        node.kalman(False)
+        node.send_raw("VMAX 0.1")
+        time.sleep(0.5)
+        node.move_to(Position(1.22, 0.12, 2.03), seuil=0.05)
+        node.wait_for_motion()
+        node.stepper(STEPPER_struct(3))
+        time.sleep(1.5)
+        node.stepper(STEPPER_struct(1))
+        node.add_score(20)
 
-            node.move_to(Position(0.3, 1.32, 0.54))
-            node.wait_for_motion()
-            node.move_to(Position(0.35, 1.7, -0.95))
-            node.wait_for_motion()
-            node.pump(PUMP_struct(1, 0))
-            node.pump(PUMP_struct(2, 0))
-            node.add_score(10)
+        node.send_raw("VMAX 0.5")
+        node.relative_move_to(Position(0, 0.15, 0), seuil=0.05)
+        node.wait_for_motion()
 
-            node.send_raw(f'VMAX 0.7')
-            node.move_to(Position(0.35, 1.55, -0.95))
-            node.wait_for_motion()
-            node.move_to(Position(1.05, 0.37, -2.6))
-            node.wait_for_motion()
+        node.stepper(STEPPER_struct(1))
 
-    def stop(self):
-        self._stop_event.set()
+        # Fin banderole
+        node.kalman(True)
+        time.sleep(1)
+
+        # Poussette
+        node.send_raw("VMAX 0.5")
+        node.move_to(Position(1.2, 0.5, 2.03))
+        node.servo(SERVO_struct(1, 10))
+        node.servo(SERVO_struct(2, 180))
+        node.stepper(STEPPER_struct(1))
+        node.wait_for_motion()
+
+        node.move_to(Position(0.77, 0.5, 2.03))
+        node.wait_for_motion()
+
+        node.move_to(Position(0.77, 0.2, 2.03))
+        node.wait_for_motion()
+        node.add_score(4)
+
+        ### Ramassage des boites
+        ###---------------------
+
+        # Deplacement vers boites en baissant les pinces et
+        node.move_to(Position(0.6, 1.24, 2.03))
+        node.wait_for_motion()
+
+        node.move_to(Position(1.1, 1.24, 2.03))
+        node.servo(SERVO_struct(1, 180))
+        node.servo(SERVO_struct(2, 10))
+        node.pump(PUMP_struct(1, 1))
+        node.wait_for_motion()
+
+        # Ramassage des boites
+        node.send_raw("VMAX 0.2")
+        node.relative_move_to(Position(0, -0.25, 0))
+        node.wait_for_motion()
+
+        node.pump(PUMP_struct(2, 1))
+        time.sleep(0.1)
+        node.pump(PUMP_struct(3, 1))
+        time.sleep(0.1)
+        node.pump(PUMP_struct(4, 1))
+        time.sleep(0.1)
+        node.stepper(STEPPER_struct(2))
+        time.sleep(2)
+        node.stepper(STEPPER_struct(1))
+
+        node.send_raw("VMAX 0.5")
+        node.move_to(Position(1.22, 0.35, 2.03))
+        node.wait_for_motion()
+
+        ### Construction double étage
+        ###----------------------
+        node.send_raw("VMAX 0.2")
+
+        node.kalman(False)
+        time.sleep(1)
+
+        # Recule et monte les boites
+        node.write_log("Recule et monte les boites")
+        node.write_log("---------------------------")
+        node.pump(PUMP_struct(1, 0))
+        node.valve(VALVE_struct(2))
+        time.sleep(0.5)
+
+        self.log_mvt(node)
+        node.relative_move_to(Position(0, 0.1, 0))
+        node.wait_for_motion()
+
+        # Boite a la moitie pour replacer planche
+        node.write_log("Boite a la moitie pour replacer planche")
+        node.write_log("---------------------------")
+        node.servo(SERVO_struct(1, 95))
+        node.servo(SERVO_struct(2, 95))
+
+        node.relative_move_to(Position(0, -0.08, 0))
+        node.wait_for_motion()
+        node.relative_move_to(Position(0, 0.08, 0))
+        node.wait_for_motion()
+
+        node.servo(SERVO_struct(2, 180))
+        node.servo(SERVO_struct(1, 10))
+        node.add_score(4)
+
+        # Reavance pour construction
+        node.write_log("Reavance pour construction")
+        node.write_log("---------------------------")
+        self.log_mvt(node)
+
+        # Construction gauche
+        node.write_log("Construction gauche")
+        node.write_log("---------------------------")
+        time.sleep(1)
+        self.log_mvt(node)
+        node.relative_move_to(Position(0, 0, -0.75), seuil=0.02)
+        node.wait_for_motion()
+
+        time.sleep(1)
+        self.log_mvt(node)
+        node.relative_move_to(Position(0, -0.05, 0), seuil=0.02)
+        node.wait_for_motion()
+        time.sleep(1)
+
+        node.servo(SERVO_struct(2, 10))
+
+        # On se remet droit
+        node.write_log("On se remet droit")
+        node.write_log("---------------------------")
+        time.sleep(1)
+        self.log_mvt(node)
+        node.relative_move_to(Position(0.0, 0.05, 0), seuil=0.02)
+        node.wait_for_motion()
+        time.sleep(1)
+        self.log_mvt(node)
+        # node.relative_move_to(Position(0, 0, 0.75), seuil=0.02)
+        # node.wait_for_motion()
+
+        # Construction droite
+        node.write_log("Construction droite")
+        node.write_log("---------------------------")
+        self.log_mvt(node)
+        node.relative_move_to(Position(0, 0, 1.5))
+        node.wait_for_motion()
+        time.sleep(1)
+        self.log_mvt(node)
+        node.relative_move_to(Position(0.0, -0.05, 0))
+        node.wait_for_motion()
+        time.sleep(1)
+
+        time.sleep(1)
+        node.servo(SERVO_struct(1, 180))
+
+        # On se remet droit
+        node.write_log("On se remet droit")
+        node.write_log("---------------------------")
+        time.sleep(1)
+        time.sleep(1)
+        self.log_mvt(node)
+        node.relative_move_to(Position(0.0, 0.05, 0))
+        node.wait_for_motion()
+        time.sleep(1)
+        self.log_mvt(node)
+        time.sleep(1)
+        node.relative_move_to(Position(0, 0, -0.75))
+        node.wait_for_motion()
+
+        # Lacher la planche
+        node.write_log("Lacher la planche")
+        node.write_log("---------------------------")
+        time.sleep(1)
+        node.relative_move_to(Position(0, -0.08, 0))
+        node.wait_for_motion()
+        node.add_score(8)
+        node.pump(PUMP_struct(2, 0))
+        node.pump(PUMP_struct(3, 0))
+        node.pump(PUMP_struct(4, 0))
+        node.valve(VALVE_struct(1))
+        node.valve(VALVE_struct(3))
+        node.valve(VALVE_struct(4))
+
+        node.kalman(True)
+        time.sleep(1)
+
+        # Retour a la base
+        node.send_raw("VMAX 0.7")
+        node.move_to(Position(0.35, 1.7, -0.95))
+        node.wait_for_motion()
+        node.add_score(10)

@@ -37,7 +37,7 @@ class IhmNode(Node):
         self.logic_thread.start()
 
     def _init_publishers(self):
-        self.pub_team_color = self.create_publisher(String, "init/team_color", 10)
+        self.pub_team_color = self.create_publisher(String, "init_team_color", 10)
 
     def main_logic(self):
         """Logique principale pour interagir avec l'utilisateur."""

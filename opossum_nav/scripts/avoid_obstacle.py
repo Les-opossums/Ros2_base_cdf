@@ -93,6 +93,7 @@ class ObstacleAvoider(Node):
         self.ptheta = None
         self.obstacle_detected = False
         self.in_avoid = False
+        self.last_command_sent = None
 
     def _init_publishers(self) -> None:
         """Initialize publishers."""
@@ -142,6 +143,47 @@ class ObstacleAvoider(Node):
         self.sub_goal_position = self.create_subscription(
             GoalDetection, self.goal_position_topic, self.goal_position_callback, 10
         )
+        self.sub_au = self.create_subscription(
+            Bool, "au", self.reset_all_au, 10
+        )
+
+        self.sub_end_of_match = self.create_subscription(
+            Bool, "end_of_match", self.reset_all_end_of_match, 10
+        )
+
+    def reset_all_au(self, msg):
+        self.get_logger().info(f"I received a stop from AU")
+        if msg.data:
+            self.get_logger().info(f"I received a stop from AU")
+            self.enable_detection = False
+            self.robot_data = None
+            self.robot_position = None
+            self.goal_position = None
+            self.obstacles = None
+            self.ptheta = None
+            self.obstacle_detected = False
+            self.in_avoid = False
+            self.last_command_sent = None
+            self._send_block()
+        else:
+            self.enable_detection = self.enable_detection_default
+    
+    def reset_all_end_of_match(self, msg):
+        if msg.data:
+            self.get_logger().info(f"I received a stop from END OF MATCH")
+            self.enable_detection = False
+            self.robot_data = None
+            self.robot_position = None
+            self.goal_position = None
+            self.obstacles = None
+            self.ptheta = None
+            self.obstacle_detected = False
+            self.in_avoid = False
+            self.last_command_sent = None
+            self._send_block()
+        else:
+            self.enable_detection = self.enable_detection_default
+
 
     def robot_data_callback(self, msg: RobotData) -> None:
         """Retrieve the robot datas from Zynq."""
@@ -195,6 +237,7 @@ class ObstacleAvoider(Node):
             self._compute_security_rectangle_distances()
 
         if not self.enable_detection:
+            self.get_logger().info(f"Out")
             return
         if self.in_avoid:
             self.in_avoid = self._find_new_path()
@@ -206,7 +249,7 @@ class ObstacleAvoider(Node):
             last_obs_detected = self.obstacle_detected
             self.obstacle_detected = self.detect_obstacle(lidar_range)
             if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
-                self._send_vmax(0.3)
+                self._send_vmax(0.4)
                 self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
                 return
             if self.obstacle_detected:
@@ -228,7 +271,7 @@ class ObstacleAvoider(Node):
         """Detect if there is an obstacle depending on the option."""
         if self.robot_data is None:
             return self._detect_obstacle_full(lidar_range)
-        elif self.robot_data.vlin < 0.001 and not self.obstacle_detected:
+        elif self.robot_data.vlin < 0.01 and not self.obstacle_detected:
             self.publish_visualization("full")
             return False
         elif self.detection_mode == "full":
@@ -259,16 +302,21 @@ class ObstacleAvoider(Node):
         """Detect obstacles around robot."""
         if self.display_all:
             self.publish_visualization("full")
-        if self.robot_data is None or not self.enable_boundary_check:
-            for dist in lidar_range:
-                if dist < self.obstacle_detection_distance:
-                    return True
-            return False
-        
-        for i in range(len(lidar_range)):
-            if lidar_range[i] < self.obstacle_detection_distance:
-                if self._check_in_boundaries(i, lidar_range[i]):
-                    return True
+        try:
+            if self.robot_data is None or not self.enable_boundary_check:
+                for dist in lidar_range:
+                    if dist < self.obstacle_detection_distance:
+                        return True
+                return False
+            
+            for i in range(len(lidar_range)):
+                if lidar_range[i] < self.obstacle_detection_distance:
+                    if self._check_in_boundaries(i, lidar_range[i]):
+                        return True
+        except Exception as e: 
+            self.get_logger().info(f"Error: {e} \n" 
+                                   f"len_lidar {len(lidar_range)} \n" 
+                                   f"len_scan: {self.len_scan}")
         return False
 
     def _detect_obstacle_cone(self, lidar_range: list) -> bool:
@@ -308,18 +356,21 @@ class ObstacleAvoider(Node):
             )
         if self.display_all:
             self.publish_visualization("cone", angle_range)
-        if not self.enable_boundary_check:
-            for i in angle_range:
-                if lidar_range[i] < self.obstacle_detection_distance:
-                    return True
-            return False
         try:
+            if not self.enable_boundary_check:
+                for i in angle_range:
+                    if lidar_range[i] < self.obstacle_detection_distance:
+                        return True
+                return False
             for i in angle_range:
                 if lidar_range[i] < self.obstacle_detection_distance:
                     if self._check_in_boundaries(i, lidar_range[i]):
                         return True
-        except Exception:
-            pass
+        except Exception as e: 
+            self.get_logger().info(f"Error: {e} \n" 
+                                   f"angle_range: {angle_range[i]} \n" 
+                                   f"len_lidar {len(lidar_range)} \n" 
+                                   f"len_scan: {self.len_scan}")
         return False
 
     def _detect_obstacle_rectangle(self, lidar_range: list) -> bool:
@@ -349,17 +400,23 @@ class ObstacleAvoider(Node):
         angle_range = angle_range[: len(self.security_dst)]
         if self.display_all:
             self.publish_visualization("rectangle", angle_range)
-        if not self.enable_boundary_check:
+        try:
+            if not self.enable_boundary_check:
+                for i in range(len(angle_range)):
+                    if lidar_range[angle_range[i]] < self.security_dst[i]:
+                        return True
+                return False
             for i in range(len(angle_range)):
                 if lidar_range[angle_range[i]] < self.security_dst[i]:
-                    return True
-            return False
-        for i in range(len(angle_range)):
-            if lidar_range[angle_range[i]] < self.security_dst[i]:
-                if self._check_in_boundaries(
-                    angle_range[i], lidar_range[angle_range[i]]
-                ):
-                    return True
+                    if self._check_in_boundaries(
+                        angle_range[i], lidar_range[angle_range[i]]
+                    ):
+                        return True
+        except Exception as e: 
+            self.get_logger().info(f"Error: {e} \n" 
+                                   f"angle_range: {angle_range[i]} \n" 
+                                   f"len_lidar {len(lidar_range)} \n" 
+                                   f"len_scan: {self.len_scan}")
         return False
 
     def _compute_security_rectangle_distances(self) -> None:
@@ -406,15 +463,19 @@ class ObstacleAvoider(Node):
 
     def _send_block(self) -> None:
         """Send block to motors."""
+        if self.last_command_sent == "BLOCK":
+            return
         cmd_msg = String()
         cmd_msg.data = "BLOCK"
         self.pub_command.publish(cmd_msg)
+        self.last_command_sent = "BLOCK"
 
     def _send_move(self, x, y, t) -> None:
         """Send move to motors."""
         cmd_msg = String()
         cmd_msg.data = f"MOVE {x} {y} {t} 10"
         self.pub_command.publish(cmd_msg)
+        self.last_command_sent = "MOVE"
 
     def _send_vmax(self, vmax) -> None:
         """Send move to motors."""
@@ -424,36 +485,35 @@ class ObstacleAvoider(Node):
         
     def _find_new_path(self) -> None:
         """Try to find a new path."""
-        v_rg = [
-            self.goal_position.x - self.robot_position.x,
-            self.goal_position.y - self.robot_position.y,
-        ]
-
         closest_obstacle = self._find_closest_obstacle()
         if closest_obstacle is None:
             self._send_block()
             return False
+        if self._obstacle_on_goal(closest_obstacle):
+            self.get_logger().info("Obstacle on goal we re fucked")
+            self._send_block()
+            return True
+        v_rg = [
+            self.goal_position.x - self.robot_position.x,
+            self.goal_position.y - self.robot_position.y,
+        ]
         v_ro = [
             closest_obstacle.x - self.robot_position.x,
             closest_obstacle.y - self.robot_position.y,
         ]
-        if self._obstacle_on_goal(closest_obstacle):
-            self._send_block()
-            return False
         if not self._is_obstacle_blocking(v_rg, v_ro, closest_obstacle, self.thickness_default / 2):
             self.get_logger().info("Path is now clear, resuming to goal.")
-            self._send_vmax(0.7)
-            self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
             return False
         cross_product = 1 if v_rg[0] * v_ro[1] - v_rg[1] * v_ro[0] > 0 else -1
         pos = self._check_ways(closest_obstacle, cross_product, v_rg, v_ro)
         if pos is not None:
-            self._send_vmax(0.4)
+            self.get_logger().info(f"FOUND PATH {pos[0]}, {pos[1]}, {self.robot_data.theta}")
+            self._send_vmax(0.3)
             self._send_move(pos[0], pos[1], self.robot_data.theta)
             return True
         self._send_block()
         self.get_logger().info("No way to avoid obstacle")
-        return False
+        return True
 
     def _check_ways(self, obstacle, cross, v1, v2) -> None:
         """Check if the way is possible."""
@@ -462,7 +522,7 @@ class ObstacleAvoider(Node):
         n = [cross * i for i in n]
         n = [i / np.linalg.norm(n) for i in n]
         limit_bound = []
-        dst_bd = 0.25
+        dst_bd = 0.27
         # Following lines can be reduced using 2 for loops using // 2
         # Boundary left
         k1 = (self.boundaries[0] - self.robot_position.x) / n[0]

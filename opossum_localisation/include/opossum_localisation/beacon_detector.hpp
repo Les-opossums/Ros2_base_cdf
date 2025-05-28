@@ -66,6 +66,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_location_cmd_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_debug_;
 
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_color_;
     rclcpp::Subscription<obstacle_detector::msg::Obstacles>::SharedPtr sub_object_;
     rclcpp::Subscription<opossum_msgs::msg::MergedData>::SharedPtr sub_robot_position_;
 

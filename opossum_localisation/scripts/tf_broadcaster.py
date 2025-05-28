@@ -40,6 +40,9 @@ class TfBroadcaster(Node):
         self._init_main_parameters()
 
     def _init_main_parameters(self: Node) -> None:
+        self.robot_names = (
+            self.get_parameter("robot_names").get_parameter_value().string_array_value
+        )
         self.available_colors = (
             self.get_parameter("available_colors")
             .get_parameter_value()
@@ -51,7 +54,7 @@ class TfBroadcaster(Node):
             )
             _ = self.create_subscription(
                 String,
-                self.color_topic,
+                '/' + self.robot_names[0] + '/' + self.color_topic,
                 self._init_color_callback,
                 10,
             )
@@ -83,9 +86,6 @@ class TfBroadcaster(Node):
     def _init_parameters(self):
         """Initialize parameters."""
         self.br = TransformBroadcaster(self)
-        self.robot_names = (
-            self.get_parameter("robot_names").get_parameter_value().string_array_value
-        )
         self.display_all = (
             self.get_parameter("display_all").get_parameter_value().bool_value
         )

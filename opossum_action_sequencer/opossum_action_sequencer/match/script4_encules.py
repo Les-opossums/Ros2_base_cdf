@@ -43,18 +43,26 @@ class Script:
         # Fin banderole
         node.kalman(True)
         time.sleep(1)
-
-        # Poussette
+        self.log_mvt(node)
+        node.move_to(Position(1.75, 0.23, -0.41))
+        node.send_raw("FREE")
+        # Deplacement vers boites
         node.send_raw("VMAX 0.5")
         node.move_to(Position(1.2, 0.5, 2.03))
         node.servo(SERVO_struct(1, 10))
         node.servo(SERVO_struct(2, 180))
         node.wait_for_motion()
 
-        node.move_to(Position(0.77, 0.5, 2.03))
+        # Ramassage des boites
+        node.send_raw("VMAX 0.35")
+        time.sleep(1)
+        node.pump(PUMP_struct(1, 1))
+        time.sleep(0.5)
+        self.log_mvt(node)
+        node.move_to(Position(1.9, 0.85, -1.12), seuil=0.05)
         node.wait_for_motion()
-
-        node.move_to(Position(0.77, 0.2, 2.03))
+        self.log_mvt(node)
+        node.move_to(Position(1.9, 1.0, -1.12), seuil=0.05)
         node.wait_for_motion()
 
         ### Ramassage des boites
@@ -64,19 +72,19 @@ class Script:
         node.move_to(Position(0.6, 1.24, 2.03))
         node.wait_for_motion()
 
-        node.move_to(Position(1.1, 1.24, 2.03))
-        node.servo(SERVO_struct(1, 180))
-        node.servo(SERVO_struct(2, 10))
-        node.pump(PUMP_struct(1, 1))
+        self.log_mvt(node)
+        node.move_to(Position(2.65, 1.7, -0.95))
         node.wait_for_motion()
 
-        # Ramassage des boites
+        # CONSTRUCTION DOUBLE ETAGE
         node.send_raw("VMAX 0.2")
         node.relative_move_to(Position(0, -0.3, 0))
         node.wait_for_motion()
 
         node.pump(PUMP_struct(2, 1))
+        time.sleep(0.1)
         node.pump(PUMP_struct(3, 1))
+        time.sleep(0.1)
         node.pump(PUMP_struct(4, 1))
         node.stepper(STEPPER_struct(2))
         time.sleep(1.5)
@@ -100,7 +108,7 @@ class Script:
         time.sleep(0.5)
 
         self.log_mvt(node)
-        node.relative_move_to(Position(0, 0.1, 0))
+        node.relative_move_to(Position(0, -0.1, 0), seuil=0.02)
         node.wait_for_motion()
 
         # Boite a la moitie pour replacer planche
@@ -109,18 +117,21 @@ class Script:
         node.servo(SERVO_struct(1, 95))
         node.servo(SERVO_struct(2, 95))
 
-        node.relative_move_to(Position(0, -0.08, 0))
+        node.relative_move_to(Position(0, 0.075, 0), seuil=0.02)
         node.wait_for_motion()
-        node.relative_move_to(Position(0, 0.08, 0))
+        node.relative_move_to(Position(0, -0.075, 0), seuil=0.02)
         node.wait_for_motion()
 
         node.servo(SERVO_struct(2, 180))
         node.servo(SERVO_struct(1, 10))
+        node.add_score(4)
 
         # Reavance pour construction
         node.write_log("Reavance pour construction")
         node.write_log("---------------------------")
         self.log_mvt(node)
+        node.relative_move_to(Position(0, 0.0, 0), seuil=0.02)
+        node.wait_for_motion()
 
         # Construction gauche
         node.write_log("Construction gauche")
@@ -132,7 +143,7 @@ class Script:
 
         time.sleep(1)
         self.log_mvt(node)
-        node.relative_move_to(Position(0, -0.05, 0), seuil=0.02)
+        node.relative_move_to(Position(0, 0.05, 0), seuil=0.02)
         node.wait_for_motion()
         time.sleep(1)
 
@@ -143,22 +154,23 @@ class Script:
         node.write_log("---------------------------")
         time.sleep(1)
         self.log_mvt(node)
-        node.relative_move_to(Position(0.0, 0.05, 0), seuil=0.02)
+        node.relative_move_to(Position(0.0, -0.05, 0), seuil=0.02)
         node.wait_for_motion()
         time.sleep(1)
         self.log_mvt(node)
-        # node.relative_move_to(Position(0, 0, 0.75), seuil=0.02)
-        # node.wait_for_motion()
+        node.relative_move_to(Position(0, 0, 0.75), seuil=0.02)
+        node.wait_for_motion()
 
         # Construction droite
         node.write_log("Construction droite")
         node.write_log("---------------------------")
+        time.sleep(1)
         self.log_mvt(node)
-        node.relative_move_to(Position(0, 0, 1.5))
+        node.relative_move_to(Position(0, 0, 0.75), seuil=0.02)
         node.wait_for_motion()
         time.sleep(1)
         self.log_mvt(node)
-        node.relative_move_to(Position(0.0, -0.05, 0))
+        node.relative_move_to(Position(0.0, 0.05, 0), seuil=0.02)
         node.wait_for_motion()
         time.sleep(1)
 
@@ -171,20 +183,21 @@ class Script:
         time.sleep(1)
         time.sleep(1)
         self.log_mvt(node)
-        node.relative_move_to(Position(0.0, 0.05, 0))
+        node.relative_move_to(Position(0.0, -0.05, 0), seuil=0.02)
         node.wait_for_motion()
         time.sleep(1)
         self.log_mvt(node)
         time.sleep(1)
-        node.relative_move_to(Position(0, 0, -0.75))
+        node.relative_move_to(Position(0, 0, -0.75), seuil=0.02)
         node.wait_for_motion()
 
         # Lacher la planche
         node.write_log("Lacher la planche")
         node.write_log("---------------------------")
         time.sleep(1)
-        node.relative_move_to(Position(0, -0.08, 0))
+        node.relative_move_to(Position(0, 0.08, 0), seuil=0.05)
         node.wait_for_motion()
+        node.add_score(8)
         node.pump(PUMP_struct(2, 0))
         node.pump(PUMP_struct(3, 0))
         node.pump(PUMP_struct(4, 0))
@@ -192,6 +205,11 @@ class Script:
         node.valve(VALVE_struct(3))
         node.valve(VALVE_struct(4))
 
+        # Construction finie
+        node.add_score(12)
+        node.write_log("Construction finie")
+        node.write_log("---------------------------")
+        time.sleep(1)
         node.kalman(True)
         time.sleep(1)
 

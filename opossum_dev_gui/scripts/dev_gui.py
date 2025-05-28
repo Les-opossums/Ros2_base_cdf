@@ -191,7 +191,7 @@ class MapScene(QtWidgets.QGraphicsView):
                 e_y = height * (1 - rob.y / 2) - self.m_icon_height / 2
                 e_pos = QtCore.QPointF(e_x, e_y)
                 self.ennemis_items[index].setPos(e_pos)
-                # self.scene.addItem(self.ennemis_items[index])
+                self.scene.addItem(self.ennemis_items[index])
             index += 1
         # logger = get_logger("HEY")
         # logger.info(f"NUM robo: {len(self.ennemis_items)}")

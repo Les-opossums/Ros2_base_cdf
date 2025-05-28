@@ -30,10 +30,11 @@ void BeaconDetectorNode::init_main_parameters()
     available_colors_ = this->get_parameter("available_colors").as_string_array();
     default_color_ = this->get_parameter("default_color").as_string();
     team_color_ = default_color_;
+    RCLCPP_WARN(this->get_logger(), "ENABLE WAIT COLOR: %s", enable_wait_color_ ? "true" : "false");
 
     // Subscribe to color topic if enabled
     if (enable_wait_color_) {
-        this->create_subscription<std_msgs::msg::String>(
+        sub_color_ = this->create_subscription<std_msgs::msg::String>(
             color_topic_, 10, std::bind(&BeaconDetectorNode::init_color_callback, this, std::placeholders::_1));
     } else {
         init_parameters();
@@ -48,6 +49,7 @@ void BeaconDetectorNode::init_color_callback(const std_msgs::msg::String::Shared
         RCLCPP_ERROR(this->get_logger(), "Invalid team color");
         return;
     }
+    RCLCPP_INFO(this->get_logger(), "I received color %s", msg->data.c_str());
     team_color_ = msg->data;
     init_parameters();
     init_publishers();

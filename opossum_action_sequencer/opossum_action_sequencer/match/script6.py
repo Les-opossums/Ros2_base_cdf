@@ -11,22 +11,13 @@ import threading
 
 
 class Script():
-    def __init__(self):
-        self._stop_event = threading.Event()
-
     def run(self, node):
-        while not self._stop_event.is_set():
-            for _ in range(10):
-                node.send_raw('VMAX 0.6')
-                node.move_to(Position(0.6, 0.6, 0))
-                node.wait_for_motion()
-                node.add_score(1)
-                node.send_raw('VMAX 0.6')
-                node.move_to(Position(2.4, 0.6, 0))
-                node.wait_for_motion()
-                node.add_score(1)
-
-            break
-
-    def stop(self):
-        self._stop_event.set()
+        for _ in range(1000):
+            node.send_raw('VMAX 0.6')
+            node.move_to(Position(0.6, 0.6, 0))
+            node.wait_for_motion()
+            node.add_score(1)
+            node.send_raw('VMAX 0.6')
+            node.move_to(Position(2.4, 0.6, 0))
+            node.wait_for_motion()
+            node.add_score(1)
