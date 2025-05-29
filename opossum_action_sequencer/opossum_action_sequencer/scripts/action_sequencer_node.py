@@ -213,16 +213,15 @@ class ActionManager(Node):
 
         if msg.data.startswith("LEASH"):
             self.state_leash = True
-            if msg.data.startswith("LEASH"):
-                if self.ready:
-                    self.is_started = True
-                    self.match_time = time.time()
-                    self.get_logger().info("Leash activated")
-                    self.script_instance = self.script_class()
-                    self.script_thread = threading.Thread(
-                        target=self.script_instance.run, args=(self,)
-                    )
-                    self.script_thread.start()
+            if self.ready:
+                self.is_started = True
+                self.match_time = time.time()
+                self.get_logger().info("Leash activated")
+                self.script_instance = self.script_class()
+                self.script_thread = threading.Thread(
+                    target=self.script_instance.run, args=(self,)
+                )
+                self.script_thread.start()
 
         elif msg.data.startswith("AU"):
             # self.get_logger().info(f"AU_test : {msg.data[-1]}")
@@ -395,7 +394,7 @@ class ActionManager(Node):
             # self.get_logger().info("Robot moving...")
 
     def update_arrival_status(self):
-        self.get_logger().info("Updating arrival status...")
+        # self.get_logger().info("Updating arrival status...")
         time.sleep(0.2)
         delta_x = abs(self.pos_obj.x - self.robot_pos.x)
         delta_y = abs(self.pos_obj.y - self.robot_pos.y)
@@ -406,7 +405,7 @@ class ActionManager(Node):
             self.is_robot_arrived = True
 
     def update_motion_status(self):
-        self.get_logger().info("Updating motion status...")
+        # self.get_logger().info("Updating motion status...")
         time.sleep(0.2)
         self.get_logger().info(f"Robot speed: vlin={self.robot_speed.x}, vt={self.robot_speed.t}")
         if self.robot_speed.x < 0.0001 and self.robot_speed.t < 0.0001:
