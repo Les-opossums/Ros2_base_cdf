@@ -392,8 +392,8 @@ class ActionManager(Node):
                     v1_norm = np.sqrt(v1_x ** 2 + v1_y ** 2)
                     v1_x /= v1_norm
                     v1_y /= v1_norm
-                    pos_x = self.x_enn + v1_x * 0.5
-                    pos_y = self.y_enn + v1_y * 0.5
+                    pos_x = self.x_enn # + v1_x * 0.5
+                    pos_y = self.y_enn # + v1_y * 0.5
                     dir = np.arctan2(v1_y, v1_x)
                     self.move_to(Position(pos_x, pos_y, dir))
                     self.get_logger().info(f"Move to ennemi: {pos_x} {pos_y} {dir}")
