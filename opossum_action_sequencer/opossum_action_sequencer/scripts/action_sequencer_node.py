@@ -44,6 +44,7 @@ class ActionManager(Node):
         self.is_ended = False
         self.match_time = None
         self.timer_move = None
+        self.in_end_zone = False
 
         self.x_enn = None
         self.y_enn = None
@@ -315,6 +316,9 @@ class ActionManager(Node):
             now = self.get_clock().now()
             duration = now - self.start_time
             elapsed_time = duration.nanoseconds / 1e9
+            if elapsed_time > 91. and elapsed_time < 94.:
+                if not self.in_end_zone and self.end_zone is not None:
+                    self.move_to(Position(self.pos_end))
             if elapsed_time > 95.0 and not self.is_ended:
                 self.get_logger().warn("Match time exceeded: "
                                        f"{elapsed_time:.2f} seconds")
