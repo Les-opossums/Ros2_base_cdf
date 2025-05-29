@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Display all the information gathered by captors."""
 
+import signal
 import sys
 import random
 import rclpy
@@ -598,10 +599,11 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
 def main():
     """Run main loop."""
     rclpy.init(args=None)
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
     app = QtWidgets.QApplication(sys.argv)
     window = OrchestratorGUI()
     window.show()
-    app.exec_()
+    sys.exit(app.exec_())
     rclpy.shutdown()
 
 
