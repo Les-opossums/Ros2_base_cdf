@@ -45,6 +45,7 @@ class ActionManager(Node):
         self.match_time = None
         self.timer_move = None
         self.in_end_zone = False
+        self.end_zone = None
 
         self.x_enn = None
         self.y_enn = None
