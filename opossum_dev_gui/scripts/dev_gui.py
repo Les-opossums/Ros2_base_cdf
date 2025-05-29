@@ -221,11 +221,12 @@ class GlobalViewPage(QtWidgets.QWidget):
         self.parent = parent
         self.name = name
         main_layout = QtWidgets.QVBoxLayout(self)
-        self.button_cmd = QtWidgets.QPushButton("REALEASE LEASH")
+        self.button_leash = QtWidgets.QPushButton("REALEASE LEASH")
+        self.button_au = QtWidgets.QPushButton("AUUUUUUUUU")
         self.map_scene = MapScene(name, self.parent, use_map=False)
         form_layout = QtWidgets.QFormLayout()
-
-        self.button_cmd.clicked.connect(self.send_leash_command)
+        self.button_leash.clicked.connect(functools.partial(self.send_command, command="LEASH"))
+        self.button_au.clicked.connect(functools.partial(self.send_command, command="AU 1"))
 
         # Create QLabel objects for the static labels (the keys)
         # and QLabel objects for the dynamic values.
@@ -238,7 +239,8 @@ class GlobalViewPage(QtWidgets.QWidget):
         form_layout.addRow("y:", self.y_value_label)
         form_layout.addRow("theta:", self.t_value_label)
         main_layout.addWidget(self.map_scene)
-        main_layout.addWidget(self.button_cmd)
+        main_layout.addWidget(self.button_au)
+        main_layout.addWidget(self.button_leash)
         
         main_layout.addLayout(form_layout)
         # self.setLayout(main_layout)
@@ -253,9 +255,9 @@ class GlobalViewPage(QtWidgets.QWidget):
         """Update the map of the robots."""
         self.map_scene.update_map_position(msg)
 
-    def send_leash_command(self):
+    def send_command(self, command):
         """Send command to ROS."""
-        command_name = "LEASH"
+        command_name = command
         args = []
         self.parent.send_cmd(self.name, command_name, args)
 
@@ -363,6 +365,12 @@ class MotorsPage(QtWidgets.QWidget):
         y = float(y) if y != "" else -1
         theta = float(theta) if theta != "" else -1
         if x != -1 or y != -1 or theta != -1:
+            if x == -1:
+                x = float(self.x_value_label.text())
+            if y == -1:
+                y = float(self.y_value_label.text())
+            if theta == -1:
+                theta = float(self.t_value_label.text())
             command_name = "MOVE"
             args = [x, y, theta]
             self.parent.send_cmd(self.name, command_name, args)
@@ -370,11 +378,15 @@ class MotorsPage(QtWidgets.QWidget):
         ang_vel = self.ang_vel_edit.text()
         lin_vel = float(lin_vel) if lin_vel != "" else -1
         ang_vel = float(ang_vel) if ang_vel != "" else -1
-        if lin_vel != -1 or ang_vel != -1:
-            command_name = "SPEED"
-            args = [lin_vel, lin_vel, ang_vel]
+        if lin_vel != -1: 
+            command_name = "VMAX"
+            args = [lin_vel]
             self.parent.send_cmd(self.name, command_name, args)
             self.lin_vel_value_label.setText(f"{lin_vel:.2f}")
+        if ang_vel != -1:
+            command_name = "VTMAX"
+            args = [ang_vel]
+            self.parent.send_cmd(self.name, command_name, args)
             self.ang_vel_value_label.setText(f"{ang_vel:.2f}")
 
     def update_text_position(self, msg):
