@@ -237,7 +237,6 @@ class ObstacleAvoider(Node):
             self._compute_security_rectangle_distances()
 
         if not self.enable_detection:
-            self.get_logger().info(f"Out")
             return
         if self.in_avoid:
             self.in_avoid = self._find_new_path()

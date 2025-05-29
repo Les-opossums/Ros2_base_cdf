@@ -27,18 +27,19 @@ class Script:
         node.kalman(False)
         node.send_raw("VMAX 0.1")
         time.sleep(0.5)
-        node.move_to(Position(1.22, 0.12, 2.03), seuil=0.05)
+        # node.move_to(Position(1.22, 0.12, 2.03), seuil=0.05)
+        node.move_to(Position(1.8, 0.1, -0.95))
         node.wait_for_motion()
-        node.stepper(STEPPER_struct(2))
-        time.sleep(0.5)
+        node.stepper(STEPPER_struct(3))
+        time.sleep(1.5)
         node.stepper(STEPPER_struct(1))
         node.add_score(20)
 
         node.send_raw("VMAX 0.5")
-        node.relative_move_to(Position(0, 0.15, 0), seuil=0.05)
-        node.wait_for_motion()
+        # node.relative_move_to(Position(0, 0.15, 0), seuil=0.05)
+        # node.wait_for_motion()
 
-        node.stepper(STEPPER_struct(0))
+        node.stepper(STEPPER_struct(1))
 
         # Fin banderole
         node.kalman(True)
@@ -46,25 +47,28 @@ class Script:
 
         # Poussette
         node.send_raw("VMAX 0.5")
-        node.move_to(Position(1.2, 0.5, 2.03))
+        time.sleep(0.1)
+        node.move_to(Position(1.8, 0.5, -0.95))
         node.servo(SERVO_struct(1, 10))
         node.servo(SERVO_struct(2, 180))
+        node.stepper(STEPPER_struct(1))
         node.wait_for_motion()
 
-        node.move_to(Position(0.77, 0.5, 2.03))
+        node.move_to(Position(2.22, 0.5, -0.95))
         node.wait_for_motion()
 
-        node.move_to(Position(0.77, 0.2, 2.03))
+        node.move_to(Position(2.22, 0.2, -0.95))
         node.wait_for_motion()
+        node.add_score(4)
 
         ### Ramassage des boites
         ###---------------------
 
-        # Deplacement vers boites en baissant les pinces et 
-        node.move_to(Position(0.6, 1.24, 2.03))
+        # Deplacement vers boites en baissant les pinces et
+        node.move_to(Position(2.4, 1.24, -0.95))
         node.wait_for_motion()
 
-        node.move_to(Position(1.1, 1.24, 2.03))
+        node.move_to(Position(1.9, 1.24, -0.95))
         node.servo(SERVO_struct(1, 180))
         node.servo(SERVO_struct(2, 10))
         node.pump(PUMP_struct(1, 1))
@@ -72,18 +76,24 @@ class Script:
 
         # Ramassage des boites
         node.send_raw("VMAX 0.2")
-        node.relative_move_to(Position(0, -0.3, 0))
+        time.sleep(0.1)
+        node.relative_move_to(Position(0, -0.25, 0))
         node.wait_for_motion()
 
         node.pump(PUMP_struct(2, 1))
+        time.sleep(0.1)
         node.pump(PUMP_struct(3, 1))
+        time.sleep(0.1)
         node.pump(PUMP_struct(4, 1))
+        time.sleep(0.1)
         node.stepper(STEPPER_struct(2))
-        time.sleep(1.5)
+        time.sleep(2)
         node.stepper(STEPPER_struct(1))
 
         node.send_raw("VMAX 0.5")
-        node.move_to(Position(1.22, 0.2, 2.03))
+        time.sleep(0.1)
+        node.move_to(Position(1.8, 0.35, -0.95))
+        node.wait_for_motion()
 
         ### Construction double étage
         ###----------------------
@@ -100,7 +110,8 @@ class Script:
         time.sleep(0.5)
 
         self.log_mvt(node)
-        node.relative_move_to(Position(0, 0.1, 0))
+        # node.relative_move_to(Position(0, 0.1, 0))
+        node.relative_move_to(Position(0, 0.15, 0))
         node.wait_for_motion()
 
         # Boite a la moitie pour replacer planche
@@ -109,18 +120,21 @@ class Script:
         node.servo(SERVO_struct(1, 95))
         node.servo(SERVO_struct(2, 95))
 
-        node.relative_move_to(Position(0, -0.08, 0))
+        # node.relative_move_to(Position(0, -0.08, 0))
+        node.relative_move_to(Position(0, -0.13, 0))
         node.wait_for_motion()
         node.relative_move_to(Position(0, 0.08, 0))
         node.wait_for_motion()
 
         node.servo(SERVO_struct(2, 180))
         node.servo(SERVO_struct(1, 10))
+        node.add_score(4)
 
         # Reavance pour construction
         node.write_log("Reavance pour construction")
         node.write_log("---------------------------")
         self.log_mvt(node)
+        node.relative_move_to(Position(0, -0.04, 0))
 
         # Construction gauche
         node.write_log("Construction gauche")
@@ -185,6 +199,7 @@ class Script:
         time.sleep(1)
         node.relative_move_to(Position(0, -0.08, 0))
         node.wait_for_motion()
+        node.add_score(8)
         node.pump(PUMP_struct(2, 0))
         node.pump(PUMP_struct(3, 0))
         node.pump(PUMP_struct(4, 0))
@@ -197,4 +212,6 @@ class Script:
 
         # Retour a la base
         node.send_raw("VMAX 0.7")
-        node.move_to(Position(0.35, 1.3, -0.95))
+        node.move_to(Position(2.7, 1.7, -0.95))
+        node.wait_for_motion()
+        node.add_score(10)

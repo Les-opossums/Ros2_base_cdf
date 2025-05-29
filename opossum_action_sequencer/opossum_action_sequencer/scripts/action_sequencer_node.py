@@ -10,7 +10,7 @@ from rcl_interfaces.msg import ParameterEvent
 from std_msgs.msg import String, Bool, Int32
 from opossum_msgs.msg import RobotData, LidarLoc
 
-import numpy as np 
+import numpy as np
 from opossum_action_sequencer.utils import (
     Position,
     PUMP_struct,
@@ -59,7 +59,10 @@ class ActionManager(Node):
                                               "vlin": 0.0,
                                               "vt": 0.0,
                                               "x_enn": 0.0,
-                                              "y_enn": 0.0}
+                                              "y_enn": 0.0,
+                                              "x_obj": 0.0,
+                                              "y_obj": 0.0,
+                                              "t_obj": 0.0}
                                              )
 
     def _init_parameters(self) -> None:
@@ -298,7 +301,7 @@ class ActionManager(Node):
         if self.is_started and self.match_time is not None:
             if self.script_process is not None:
                 self.current_time = time.time() - self.match_time
-                if self.current_time > 98.0:
+                if self.current_time > 95.0:
                     # End of match
                     self.pub_end_of_match.publish(Bool(data=True))
                     self.get_logger().warn("End of time, stopping script.")
@@ -351,9 +354,11 @@ class ActionManager(Node):
         else:
             command = f"MOVE {pos.x} {pos.y} {pos.t}"
         self.pub_command.publish(String(data=command))
-        self.pos_obj = pos
+        self.shared_data["x_obj"] = pos.x
+        self.shared_data["y_obj"] = pos.y
+        self.shared_data["t_obj"] = pos.t
         self.motion_done_event.clear()  # Block the wait
-    
+
     def follow_ennemi(self):
         x_middle = 1.5
         y_middle = 1.0
@@ -396,7 +401,9 @@ class ActionManager(Node):
         self.is_robot_arrived = False
         time.sleep(0.1)
         self.pub_command.publish(String(data=f"MOVE {pos.x} {pos.y} {pos.t}"))
-        self.pos_obj = pos
+        self.shared_data["x_obj"] = pos.x
+        self.shared_data["y_obj"] = pos.y
+        self.shared_data["t_obj"] = pos.t
         self.motion_done_event.clear()  # Block the wait
         # self.get_logger().info("Robot moving...")
 
@@ -405,21 +412,22 @@ class ActionManager(Node):
         x_share = self.shared_data["x"]
         y_share = self.shared_data["y"]
         t_share = self.shared_data["t"]
-        delta_x = abs(self.pos_obj.x - x_share)
-        delta_y = abs(self.pos_obj.y - y_share)
-        delta_t = abs(self.pos_obj.t - t_share)
-        if delta_x < self.seuil and delta_y < self.seuil and delta_t < self.seuil:
+        x_obj = self.shared_data["x_obj"]
+        y_obj = self.shared_data["y_obj"]
+        t_obj = self.shared_data["t_obj"]
+        delta_x = abs(x_obj - x_share)
+        delta_y = abs(y_obj - y_share)
+        delta_t = abs(t_obj - t_share)
+        if delta_x < 0.5 and delta_y < 0.5 and delta_t < 0.5:
             if not self.is_robot_arrived:
                 self.get_logger().info("Robot has arrived.")
             self.is_robot_arrived = True
 
     def update_motion_status(self):
         time.sleep(0.2)
-        vlin_share = self.shared_data["vlin"]
-        vt_share = self.shared_data["vt"]
-        speed_lin = abs(self.robot_speed.x)
-        speed_t = abs(self.robot_speed.t)
-        if speed_lin < 0.0001 and speed_t < 0.0001:
+        vlin_share = abs(self.shared_data["vlin"])
+        vt_share = abs(self.shared_data["vt"])
+        if vlin_share < 0.0001 and vt_share < 0.0001:
             if self.is_robot_moving:
                 self.get_logger().info("Robot has stopped.")
             self.is_robot_moving = False
