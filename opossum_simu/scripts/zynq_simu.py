@@ -133,6 +133,7 @@ class ZynqSimulation(Node):
             or name == "MAPASSERV"
             or name == "BLOCK"
             or name == "VMAX"
+            or name == "VTMAX"
         ):
             self.send_short_cmd_motor(name, args)
         elif name == "MOVE":
