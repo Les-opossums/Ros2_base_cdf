@@ -69,12 +69,12 @@ class Script:
         node.move_to(Position(0.6, 1.24, 2.03))
         node.wait_for_motion()
 
-        node.move_to(Position(1.1, 1.24, 2.03))
+        node.move_to(Position(1.1, 1., 2.03))
         node.wait_for_motion()
 
         # Ramassage des boites
-        node.relative_move_to(Position(0, -0.25, 0))
-        node.wait_for_motion()
+        # node.relative_move_to(Position(0, -0.25, 0))
+        # node.wait_for_motion()
 
         node.send_raw("VMAX 0.5")
         node.sleep(0.1)
@@ -93,9 +93,9 @@ class Script:
         node.kalman(False)
         node.sleep(0.1)
         node.pump(PUMP_struct(1, 1))
-        node.move_to(Position(2.6, 1.34, -2.54))
+        node.move_to(Position(2.65, 1.3, -2.54))
         node.wait_for_motion()
-        node.relative_move_to(Position(0.2, 0, 0))
+        node.relative_move_to(Position(0.3, 0, 0))
         node.wait_for_motion()
 
         # Decalage des boites
