@@ -41,12 +41,13 @@ class ActionManager(Node):
         self.script_class = None
         self.ready = False
         self.is_started = False
+        self.is_ended = False
         self.match_time = None
         self.timer_move = None
 
         self.x_enn = None
         self.y_enn = None
-        
+
         # Action Done
         self.is_robot_moving = False
         self.is_robot_arrived = False
@@ -77,6 +78,11 @@ class ActionManager(Node):
                 ("pub_velocity", "/main_robot/asserv/vel"),
             ],
         )
+
+    def _init_timer_match(self):
+        """Initialize the timers of the node."""
+        self.timer_match = self.create_timer(0.1, self.timer_match_callback)
+        self.start_time = self.get_clock().now()
 
     def _init_publishers(self):
         """Initialize the publishers of the node."""
@@ -210,10 +216,10 @@ class ActionManager(Node):
     def feedback_callback(self, msg):
         """Receive the data from Zynq."""
         # self.get_logger().info(f"Feedback received: {msg.data}")
-
         if msg.data.startswith("LEASH"):
             self.state_leash = True
             if self.ready:
+                self._init_timer_match()
                 self.is_started = True
                 self.match_time = time.time()
                 self.get_logger().info("Leash activated")
@@ -229,14 +235,16 @@ class ActionManager(Node):
                 self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
                 if self.is_started and self.script_thread is not None:
-                    self.stop = True
+                    self.get_logger().warn("Stop script from AU")
+                    self.stop_script()
+                    """self.stop = True
                     self.get_logger().warn("Stopping script")
                     self.script_instance = None
                     self.script_thread = None
                     self.send_raw("BLOCK")
                     self.end_match_event.set()
                     time.sleep(0.1)
-                    self.send_raw("BLOCK")
+                    self.send_raw("BLOCK")"""
             elif msg.data[-1] == "2":
                 # self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
@@ -283,8 +291,9 @@ class ActionManager(Node):
                                           self.pos_obj.y,
                                           self.pos_obj.t)
                                  )
+                    self.timer_move = None
 
-        # Handle match time
+        """ # Handle match time
         if self.is_started and self.match_time is not None:
             if self.script_thread is not None:
                 self.current_time = time.time() - self.match_time
@@ -298,7 +307,18 @@ class ActionManager(Node):
                     time.sleep(0.1)
                     self.send_raw("BLOCK")
                     self.script_instance = None
-                    self.script_thread = None
+                    self.script_thread = None"""
+
+    def timer_match_callback(self):
+        """Timer callback for match time."""
+        if self.is_started and self.start_time is not None:
+            now = self.get_clock().now()
+            duration = now - self.start_time
+            elapsed_time = duration.nanoseconds / 1e9
+            if elapsed_time > 5.0 and not self.is_ended:
+                self.get_logger().warn("Match time exceeded: "
+                                       f"{elapsed_time:.2f} seconds")
+                self.stop_script()
 
     def run_script_init(self):
         """Run the script initialization."""
@@ -308,6 +328,19 @@ class ActionManager(Node):
             target=self.script_init_instance.run, args=(self,)
         )
         self.process_init.start()
+
+    def stop_script(self):
+        """Stop the current script."""
+        if self.script_instance is not None:
+            self.get_logger().warn("Stopping script")
+            self.stop = True
+            self.is_ended = True
+            self.send_raw("BLOCK")
+            self.end_match_event.set()
+            time.sleep(0.1)
+            self.send_raw("BLOCK")
+            self.script_instance = None
+            self.script_thread = None
 
     def lidar_loc_callback(self, msg: LidarLoc):
         """Receive Lidar location."""
@@ -518,7 +551,7 @@ class ActionManager(Node):
 
     def smart_moves(self):
         pass
-    
+
 def main(args=None):
     """Run main loop."""
     rclpy.init(args=args)
