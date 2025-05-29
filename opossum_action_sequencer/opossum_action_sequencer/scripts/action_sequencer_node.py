@@ -318,6 +318,8 @@ class ActionManager(Node):
             elapsed_time = duration.nanoseconds / 1e9
             if elapsed_time > 91. and elapsed_time < 94.:
                 if not self.in_end_zone and self.end_zone is not None:
+                    self.send_raw("VMAX 0.5")
+                    time.sleep(0.1)
                     self.move_to(Position(self.pos_end))
             if elapsed_time > 95.0 and not self.is_ended:
                 self.pub_end_of_match.publish(Bool(data=True))
