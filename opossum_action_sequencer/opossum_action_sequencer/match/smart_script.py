@@ -13,7 +13,9 @@ position_cans = {
 }
 
 position_cans = position_cans | {key + 5: [3 - val[0], val[1], val[2]] for key, val in position_cans.items()}
-
+end_poses = {
+    
+}
 from opossum_action_sequencer.scripts.action_sequencer_node import ActionManager
 from opossum_action_sequencer.action_manager import Version, Position, Speed
 from opossum_action_sequencer.action_manager import PUMP_struct, LED_struct
