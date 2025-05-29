@@ -385,7 +385,7 @@ class ActionManager(Node):
             x_middle = 1.5
             y_middle = 1.0
             while True:
-                if self.shared_data["x_enn"] is not None:
+                if self.x_enn is not None:
                     self.send_raw("VMAX 0.7")
                     v1_x = x_middle - self.x_enn
                     v1_y = y_middle - self.y_enn
