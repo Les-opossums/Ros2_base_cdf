@@ -5,8 +5,14 @@ import numpy as np
 available_cans = {i: True for i in range(16)}
 
 position_cans = {
-    0: 
+    0: [0.075, 1.325, 1],
+    1: [0.075, 0.4, 1],
+    2: [0.825, 1.725, 0],
+    3: [1.1, 0.95, 0],
+    4: [0.775, 0.25, 0],
 }
+
+position_cans = position_cans | {key + 5: [3 - val[0], val[1], val[2]] for key, val in position_cans.items()}
 
 from opossum_action_sequencer.scripts.action_sequencer_node import ActionManager
 from opossum_action_sequencer.action_manager import Version, Position, Speed
