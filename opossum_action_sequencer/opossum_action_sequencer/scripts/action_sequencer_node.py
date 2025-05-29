@@ -62,7 +62,11 @@ class ActionManager(Node):
                                               "y_enn": 0.0,
                                               "x_obj": 0.0,
                                               "y_obj": 0.0,
-                                              "t_obj": 0.0}
+                                              "t_obj": 0.0,
+                                              "robot_moving": False,
+                                              "robot_arrived": True,
+                                              "motion_done": True,
+                                              "timer_move": None}
                                              )
 
     def _init_parameters(self) -> None:
@@ -225,6 +229,9 @@ class ActionManager(Node):
                         target=self.script_instance.run, args=(self,)
                     )
                     self.script_process.start()
+                    self.shared_data["robot_moving"] = False
+                    self.shared_data["robot_arrived"] = True
+                    self.shared_data["motion_done"] = True
 
         elif msg.data.startswith("AU"):
             # self.get_logger().info(f"AU_test : {msg.data[-1]}")
@@ -257,7 +264,11 @@ class ActionManager(Node):
                                    f"{self.robot_pos.x} {self.robot_pos.y} "
                                    f"{self.robot_pos.t}")
             self.motion_done = True
+            self.shared_data["robot_moving"] = False
+            self.shared_data["robot_arrived"] = True
+            self.shared_data["timer_move"] = None
             self.motion_done_event.set()
+
             if False:  # not self.motion_done:
                 delta_x = abs(self.pos_obj.x - self.robot_pos.x)
                 delta_y = abs(self.pos_obj.y - self.robot_pos.y)
@@ -267,6 +278,7 @@ class ActionManager(Node):
                         self.is_robot_arrived = True
                         self.is_robot_moving = False
                         self.motion_done = True
+                        self.shared_data["motion_done"] = True
                         self.motion_done_event.set()
             # else:
             #     self.move_to(self.pos_obj, seuil=self.seuil)
@@ -282,20 +294,28 @@ class ActionManager(Node):
         self.shared_data["vlin"] = self.robot_speed.x
         self.shared_data["vt"] = self.robot_speed.t
 
-        if not self.motion_done:
+        if not self.shared_data["motion_done"]:
+            self.get_logger().info(f"Verifying motion status: "
+                                   f"{self.is_robot_moving} {self.motion_done}")
             # Update motion state
             self.update_arrival_status()
             self.update_motion_status()
 
-            if not self.is_robot_moving and not self.motion_done:
-                if self.timer is None:
-                    self.timer = time.time()
-                delta_time = time.time() - self.timer
+            is_robot_moving2 = self.shared_data["robot_moving"]
+            is_motion_done2 = self.shared_data["motion_done"]
+
+            if not is_robot_moving2 and not is_motion_done2:
+                if self.shared_data["timer_move"] is None:
+                    self.shared_data["timer_move"] = time.time()
+                delta_time = time.time() - self.shared_data["timer_move"]
                 if delta_time > 2.0:
                     self.get_logger().warn(
                         "Motion timed out."
                     )
-                    # self.move_to(self.pos_obj, seuil=self.seuil)
+                    self.move_to(Position(self.shared_data["x_obj"],
+                                          self.shared_data["y_obj"],
+                                          self.shared_data["t_obj"])
+                                 )
 
         # Handle match time
         if self.is_started and self.match_time is not None:
@@ -348,6 +368,9 @@ class ActionManager(Node):
         self.motion_done = False
         self.is_robot_moving = True
         self.is_robot_arrived = False
+        self.shared_data["robot_moving"] = True
+        self.shared_data["robot_arrived"] = False
+        self.shared_data["motion_done"] = False
         time.sleep(0.1)
         if params is not None:
             command = f"MOVE {pos.x} {pos.y} {pos.t} {' '.join(params)}"
@@ -364,6 +387,7 @@ class ActionManager(Node):
         y_middle = 1.0
         while True:
             if self.shared_data["x_enn"] is not None:
+                self.send_raw("VMAX 0.7")
                 v1_x = x_middle - self.shared_data["x_enn"]
                 v1_y = y_middle - self.shared_data["y_enn"]
                 v1_norm = np.sqrt(v1_x ** 2 + v1_y ** 2)
@@ -399,6 +423,9 @@ class ActionManager(Node):
         self.motion_done = False
         self.is_robot_moving = True
         self.is_robot_arrived = False
+        self.shared_data["robot_moving"] = True
+        self.shared_data["robot_arrived"] = False
+        self.shared_data["motion_done"] = False
         time.sleep(0.1)
         self.pub_command.publish(String(data=f"MOVE {pos.x} {pos.y} {pos.t}"))
         self.shared_data["x_obj"] = pos.x
@@ -408,6 +435,7 @@ class ActionManager(Node):
         # self.get_logger().info("Robot moving...")
 
     def update_arrival_status(self):
+        self.get_logger().info("Updating arrival status...")
         time.sleep(0.2)
         x_share = self.shared_data["x"]
         y_share = self.shared_data["y"]
@@ -424,9 +452,11 @@ class ActionManager(Node):
             self.is_robot_arrived = True
 
     def update_motion_status(self):
+        self.get_logger().info("Updating motion status...")
         time.sleep(0.2)
         vlin_share = abs(self.shared_data["vlin"])
         vt_share = abs(self.shared_data["vt"])
+        self.get_logger().info(f"Robot speed: vlin={vlin_share}, vt={vt_share}")
         if vlin_share < 0.0001 and vt_share < 0.0001:
             if self.is_robot_moving:
                 self.get_logger().info("Robot has stopped.")
@@ -517,7 +547,9 @@ class ActionManager(Node):
         self.pub_score.publish(Int32(data=score))
         time.sleep(0.1)
 
-
+    def smart_moves(self):
+        pass
+    
 def main(args=None):
     """Run main loop."""
     rclpy.init(args=args)

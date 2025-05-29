@@ -239,15 +239,16 @@ class MotorSimu(Node):
                 if self.ask_for_block:
                     self.ask_for_block = False
                     self.velocity = np.array([[0.0], [0.0], [0.0]])
+                result = StringAction.Result()
                 if not self.blocking:
                     with self._goal_lock:
                         if not goal_handle.is_active:
-                            return StringAction.Result()
+                            result.response = "Pos,done"
+                            return result
                         goal_handle.succeed()
                 else:
                     goal_handle.succeed()
-                result = StringAction.Result()
-                result.response = moveto_feedback.current_state
+                result.response = "Pos,done"
                 return result
             finally:
                 if self.blocking:

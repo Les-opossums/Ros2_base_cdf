@@ -489,9 +489,9 @@ class ObstacleAvoider(Node):
             self._send_block()
             return False
         if self._obstacle_on_goal(closest_obstacle):
-            self.get_logger().info("Obstacle on goal we re fucked")
-            self._send_block()
-            return True
+            self.get_logger().info("Obstacle difficult goal we re fucked")
+            # self._send_block()
+            # return True
         v_rg = [
             self.goal_position.x - self.robot_position.x,
             self.goal_position.y - self.robot_position.y,
@@ -507,7 +507,7 @@ class ObstacleAvoider(Node):
         pos = self._check_ways(closest_obstacle, cross_product, v_rg, v_ro)
         if pos is not None:
             self.get_logger().info(f"FOUND PATH {pos[0]}, {pos[1]}, {self.robot_data.theta}")
-            self._send_vmax(0.3)
+            self._send_vmax(0.4)
             self._send_move(pos[0], pos[1], self.robot_data.theta)
             return True
         self._send_block()
@@ -556,7 +556,7 @@ class ObstacleAvoider(Node):
             x_bottom_2 = self.robot_position.x + k2 * n[0]
             limit_bound.append([x_bottom_2, self.boundaries[2] + dst_bd, 2])
 
-        add_scene = 0.5
+        add_scene = 0.45
         # Boundary top
         k1 = (self.boundaries[3] - add_scene - self.robot_position.y) / n[1]
         x_top = self.robot_position.x + k1 * n[0]

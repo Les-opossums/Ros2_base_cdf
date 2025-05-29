@@ -220,9 +220,11 @@ class GlobalViewPage(QtWidgets.QWidget):
         self.parent = parent
         self.name = name
         main_layout = QtWidgets.QVBoxLayout(self)
-
+        self.button_cmd = QtWidgets.QPushButton("REALEASE LEASH")
         self.map_scene = MapScene(name, self.parent, use_map=False)
         form_layout = QtWidgets.QFormLayout()
+
+        self.button_cmd.clicked.connect(self.send_leash_command)
 
         # Create QLabel objects for the static labels (the keys)
         # and QLabel objects for the dynamic values.
@@ -235,6 +237,8 @@ class GlobalViewPage(QtWidgets.QWidget):
         form_layout.addRow("y:", self.y_value_label)
         form_layout.addRow("theta:", self.t_value_label)
         main_layout.addWidget(self.map_scene)
+        main_layout.addWidget(self.button_cmd)
+        
         main_layout.addLayout(form_layout)
         # self.setLayout(main_layout)
 
@@ -248,6 +252,11 @@ class GlobalViewPage(QtWidgets.QWidget):
         """Update the map of the robots."""
         self.map_scene.update_map_position(msg)
 
+    def send_leash_command(self):
+        """Send command to ROS."""
+        command_name = "LEASH"
+        args = []
+        self.parent.send_cmd(self.name, command_name, args)
 
 class MotorsPage(QtWidgets.QWidget):
     """Page dedicated for Motors."""

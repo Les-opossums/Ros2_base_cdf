@@ -59,7 +59,7 @@ def generate_launch_description():
     """Generate launch description."""
     robot_names_arg = DeclareLaunchArgument(
         "robot_names",
-        default_value="main_robot, second_robot",  # For multiple names, e.g., "main_robot,other_robot,third_robot"
+        default_value="main_robot",  # For multiple names, e.g., "main_robot,other_robot,third_robot"
         description="Set all the simulated robots",
     )
 

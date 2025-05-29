@@ -138,6 +138,9 @@ class ZynqSimulation(Node):
             self.send_long_cmd_motor(name, args)
         elif name == "SETLIDAR":
             pass
+        elif name == "LEASH":
+            self.get_logger().info('Received leash')
+            self.pub_comm_topic.publish(String(data="LEASH"))
         else:
             self.get_logger().warn(f"Action {name} is not implemented.")
 
@@ -177,7 +180,8 @@ class ZynqSimulation(Node):
             res = future.result().result.response
             if res == "":
                 return
-            res = " ".join(res.split(","))
+            if res != "Pos,done":
+                res = " ".join(res.split(","))
             result_msg = String()
             result_msg.data = res + "\n"
             self.pub_comm_topic.publish(result_msg)
