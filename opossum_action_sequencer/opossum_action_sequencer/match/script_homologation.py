@@ -24,12 +24,12 @@ class Script:
         node.write_log("Script PD is running...")
 
         for _ in range(20):
-            node.send_raw("VMAX 1.")
+            node.send_raw("VMAX 1.5")
             node.move_to(Position(0.6, 0.5, -2.5))
             node.wait_for_motion()
             node.sleep(0.5)
 
-            node.send_raw("VMAX 1.")
+            node.send_raw("VMAX 1.5")
             node.move_to(Position(2.4, 0.5, -2.5))
             node.wait_for_motion()
             node.sleep(0.5)
