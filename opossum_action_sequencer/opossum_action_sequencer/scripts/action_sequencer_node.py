@@ -321,7 +321,7 @@ class ActionManager(Node):
                 if not self.in_end_zone and self.end_zone is not None:
                     self.send_raw("VMAX 0.5")
                     time.sleep(0.1)
-                    self.move_to(Position(self.pos_end))
+                    self.move_to(Position(self.end_zone))
             if elapsed_time > 95.0 and not self.is_ended:
                 self.pub_end_of_match.publish(Bool(data=True))
                 self.get_logger().warn("Match time exceeded: "
