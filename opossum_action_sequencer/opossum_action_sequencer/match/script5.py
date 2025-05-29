@@ -22,7 +22,7 @@ class Script:
 
     def run(self, node):
         node.write_log("Script 3 is running...")
-        node.end_zone(Position(0.35, 1.7, -0.95))
+        node.end_zone = Position(0.35, 1.7, -0.95)
 
         # Banderole
         node.kalman(False)
