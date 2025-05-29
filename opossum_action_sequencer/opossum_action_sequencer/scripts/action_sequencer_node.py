@@ -22,6 +22,8 @@ from opossum_action_sequencer.utils import (
 
 import multiprocessing
 from multiprocessing import Event, Manager
+import threading
+from threading import Event
 import time
 import os
 
@@ -40,7 +42,11 @@ class ActionManager(Node):
         self.ready = False
         self.is_started = False
         self.match_time = None
+        self.timer_move = None
 
+        self.x_enn = None
+        self.y_enn = None
+        
         # Action Done
         self.is_robot_moving = False
         self.is_robot_arrived = False
@@ -52,22 +58,10 @@ class ActionManager(Node):
         # Process
         self.motion_done_event = Event()
         self.motion_done_event.set()
-        self.manager = Manager()
-        self.shared_data = self.manager.dict({"x": 0.0,
-                                              "y": 0.0,
-                                              "t": 0.0,
-                                              "vlin": 0.0,
-                                              "vt": 0.0,
-                                              "x_enn": 0.0,
-                                              "y_enn": 0.0,
-                                              "x_obj": 0.0,
-                                              "y_obj": 0.0,
-                                              "t_obj": 0.0,
-                                              "robot_moving": False,
-                                              "robot_arrived": True,
-                                              "motion_done": True,
-                                              "timer_move": None}
-                                             )
+
+        self.end_match_event = Event()
+        self.end_match_event.set()
+        self.stop = False
 
     def _init_parameters(self) -> None:
         """Initialize the parameters of the node."""
@@ -225,25 +219,25 @@ class ActionManager(Node):
                     self.match_time = time.time()
                     self.get_logger().info("Leash activated")
                     self.script_instance = self.script_class()
-                    self.script_process = multiprocessing.Process(
+                    self.script_thread = threading.Thread(
                         target=self.script_instance.run, args=(self,)
                     )
-                    self.script_process.start()
-                    self.shared_data["robot_moving"] = False
-                    self.shared_data["robot_arrived"] = True
-                    self.shared_data["motion_done"] = True
+                    self.script_thread.start()
 
         elif msg.data.startswith("AU"):
             # self.get_logger().info(f"AU_test : {msg.data[-1]}")
             if msg.data[-1] == "1":
                 self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
-                if self.is_started and self.script_process is not None:
+                if self.is_started and self.script_thread is not None:
                     self.get_logger().warn("Stopping script")
-                    self.script_process.terminate()
-                    # self.script_process.join()
                     self.script_instance = None
-                    self.script_process = None
+                    self.script_thread = None
+                    self.send_raw("BLOCK")
+                    self.end_match_event.set()
+                    self.stop = True
+                    time.sleep(0.1)
+                    self.send_raw("BLOCK")
             elif msg.data[-1] == "2":
                 # self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
@@ -264,78 +258,54 @@ class ActionManager(Node):
                                    f"{self.robot_pos.x} {self.robot_pos.y} "
                                    f"{self.robot_pos.t}")
             self.motion_done = True
-            self.shared_data["robot_moving"] = False
-            self.shared_data["robot_arrived"] = True
-            self.shared_data["timer_move"] = None
             self.motion_done_event.set()
-
-            if False:  # not self.motion_done:
-                delta_x = abs(self.pos_obj.x - self.robot_pos.x)
-                delta_y = abs(self.pos_obj.y - self.robot_pos.y)
-                delta_t = abs(self.pos_obj.t - self.robot_pos.t)
-                if delta_x < 0.05 and delta_y < 0.05:
-                    if delta_t < 0.05:
-                        self.is_robot_arrived = True
-                        self.is_robot_moving = False
-                        self.motion_done = True
-                        self.shared_data["motion_done"] = True
-                        self.motion_done_event.set()
-            # else:
-            #     self.move_to(self.pos_obj, seuil=self.seuil)
-            #     self.get_logger().warn('Dead end, resending order')
 
     def robot_data_callback(self, msg: RobotData):
         """Receive the Robot Data from Zynq."""
         self.robot_pos = Position(x=msg.x, y=msg.y, t=msg.theta)
         self.robot_speed = Position(x=msg.vlin, y=msg.vdir, t=msg.vt)
-        self.shared_data["x"] = self.robot_pos.x
-        self.shared_data["y"] = self.robot_pos.y
-        self.shared_data["t"] = self.robot_pos.t
-        self.shared_data["vlin"] = self.robot_speed.x
-        self.shared_data["vt"] = self.robot_speed.t
 
-        if not self.shared_data["motion_done"]:
+        if not self.motion_done:
             self.get_logger().info(f"Verifying motion status: "
                                    f"{self.is_robot_moving} {self.motion_done}")
             # Update motion state
             self.update_arrival_status()
             self.update_motion_status()
 
-            is_robot_moving2 = self.shared_data["robot_moving"]
-            is_motion_done2 = self.shared_data["motion_done"]
-
-            if not is_robot_moving2 and not is_motion_done2:
-                if self.shared_data["timer_move"] is None:
-                    self.shared_data["timer_move"] = time.time()
-                delta_time = time.time() - self.shared_data["timer_move"]
+            if not self.is_robot_moving and not self.motion_done:
+                if self.timer_move is None:
+                    self.timer_move = time.time()
+                delta_time = time.time() - self.timer_move
                 if delta_time > 2.0:
                     self.get_logger().warn(
                         "Motion timed out."
                     )
-                    self.move_to(Position(self.shared_data["x_obj"],
-                                          self.shared_data["y_obj"],
-                                          self.shared_data["t_obj"])
+                    self.move_to(Position(self.pos_obj.x,
+                                          self.pos_obj.y,
+                                          self.pos_obj.t)
                                  )
 
         # Handle match time
         if self.is_started and self.match_time is not None:
-            if self.script_process is not None:
+            if self.script_thread is not None:
                 self.current_time = time.time() - self.match_time
                 if self.current_time > 95.0:
                     # End of match
                     self.pub_end_of_match.publish(Bool(data=True))
                     self.get_logger().warn("End of time, stopping script.")
                     self.send_raw("BLOCK")
-                    self.script_process.terminate()
-                    self.script_process.join()
+                    self.end_match_event.set()
+                    self.stop = True
+                    time.sleep(0.1)
+                    self.send_raw("BLOCK")
                     self.script_instance = None
-                    self.script_process = None
+                    self.script_thread = None
 
     def run_script_init(self):
         """Run the script initialization."""
         assert self.script_init_class is not None
         self.script_init_instance = self.script_init_class()
-        self.process_init = multiprocessing.Process(
+        self.process_init = threading.Thread(
             target=self.script_init_instance.run, args=(self,)
         )
         self.process_init.start()
@@ -348,104 +318,88 @@ class ActionManager(Node):
             t=msg.robot_position.z
         )
         if len(msg.other_robot_position) == 0:
-            self.shared_data["x_enn"] = None
-            self.shared_data["y_enn"] = None
+            self.x_enn = None
+            self.y_enn = None
             return
         closer = np.sqrt((msg.other_robot_position[0].x - msg.robot_position.x) ** 2 + (msg.other_robot_position[0].y - msg.robot_position.y) ** 2)
-        self.shared_data["x_enn"] = msg.other_robot_position[0].x
-        self.shared_data["y_enn"] = msg.other_robot_position[0].y
+        self.x_enn = msg.other_robot_position[0].x
+        self.y_enn = msg.other_robot_position[0].y
         for pos in msg.other_robot_position:
             dst = np.sqrt((pos.x - msg.robot_position.x) ** 2 + (pos.y - msg.robot_position.y) ** 2)
             if dst < closer:
-                self.shared_data["x_enn"] = pos.x
-                self.shared_data["y_enn"] = pos.y
+                self.x_enn = pos.x
+                self.y_enn = pos.y
 
     def move_to(self, pos: Position, seuil=0.1, params=None):
         """Compute the move_to action."""
-        self.timer = None
-        self.seuil = seuil
-        self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
-        self.motion_done = False
-        self.is_robot_moving = True
-        self.is_robot_arrived = False
-        self.shared_data["robot_moving"] = True
-        self.shared_data["robot_arrived"] = False
-        self.shared_data["motion_done"] = False
-        time.sleep(0.1)
-        if params is not None:
-            command = f"MOVE {pos.x} {pos.y} {pos.t} {' '.join(params)}"
-        else:
-            command = f"MOVE {pos.x} {pos.y} {pos.t}"
-        self.pub_command.publish(String(data=command))
-        self.shared_data["x_obj"] = pos.x
-        self.shared_data["y_obj"] = pos.y
-        self.shared_data["t_obj"] = pos.t
-        self.motion_done_event.clear()  # Block the wait
+        if not self.stop:
+            self.timer = None
+            self.seuil = seuil
+            self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
+            self.motion_done = False
+            self.is_robot_moving = True
+            self.is_robot_arrived = False
+            time.sleep(0.1)
+            if params is not None:
+                command = f"MOVE {pos.x} {pos.y} {pos.t} {' '.join(params)}"
+            else:
+                command = f"MOVE {pos.x} {pos.y} {pos.t}"
+            self.pub_command.publish(String(data=command))
+            self.pos_obj = Position(x=pos.x, y=pos.y, t=pos.t)
+            self.motion_done_event.clear()  # Block the wait
 
     def follow_ennemi(self):
-        x_middle = 1.5
-        y_middle = 1.0
-        while True:
-            if self.shared_data["x_enn"] is not None:
-                self.send_raw("VMAX 0.7")
-                v1_x = x_middle - self.shared_data["x_enn"]
-                v1_y = y_middle - self.shared_data["y_enn"]
-                v1_norm = np.sqrt(v1_x ** 2 + v1_y ** 2)
-                v1_x /= v1_norm
-                v1_y /= v1_norm
-                pos_x = self.shared_data["x_enn"] + v1_x * 0.5
-                pos_y = self.shared_data["y_enn"] + v1_y * 0.5
-                dir = np.arctan2(v1_y, v1_x)
-                self.move_to(Position(pos_x, pos_y, dir))
-                self.get_logger().info(f"Move to ennemi: {pos_x} {pos_y} {dir}")
-                time.sleep(0.1)
-            else:
-                self.send_raw("BLOCK")
-                self.get_logger().info(f"Sending BLOCK")
-                time.sleep(0.1)
+        if not self.stop:
+            x_middle = 1.5
+            y_middle = 1.0
+            while True:
+                if self.shared_data["x_enn"] is not None:
+                    self.send_raw("VMAX 0.7")
+                    v1_x = x_middle - self.x_enn
+                    v1_y = y_middle - self.y_enn
+                    v1_norm = np.sqrt(v1_x ** 2 + v1_y ** 2)
+                    v1_x /= v1_norm
+                    v1_y /= v1_norm
+                    pos_x = self.x_enn + v1_x * 0.5
+                    pos_y = self.y_enn + v1_y * 0.5
+                    dir = np.arctan2(v1_y, v1_x)
+                    self.move_to(Position(pos_x, pos_y, dir))
+                    self.get_logger().info(f"Move to ennemi: {pos_x} {pos_y} {dir}")
+                    time.sleep(0.1)
+                else:
+                    self.send_raw("BLOCK")
+                    self.get_logger().info(f"Sending BLOCK")
+                    time.sleep(0.1)
 
-            # self.get_logger().info("Robot moving...")
+                # self.get_logger().info("Robot moving...")
 
     def relative_move_to(self, delta: Position, seuil=0.1):
         """Compute the relative move_to action."""
-        self.timer = None
-        self.seuil = seuil
-        x_share = self.shared_data["x"]
-        y_share = self.shared_data["y"]
-        t_share = self.shared_data["t"]
-        pos = Position(
-            x=x_share + delta.x,
-            y=y_share + delta.y,
-            t=t_share + delta.t
-        )
-        self.get_logger().info(f"Robot_data : {self.robot_pos.x} {self.robot_pos.y} {self.robot_pos.t}")
-        self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
-        self.motion_done = False
-        self.is_robot_moving = True
-        self.is_robot_arrived = False
-        self.shared_data["robot_moving"] = True
-        self.shared_data["robot_arrived"] = False
-        self.shared_data["motion_done"] = False
-        time.sleep(0.1)
-        self.pub_command.publish(String(data=f"MOVE {pos.x} {pos.y} {pos.t}"))
-        self.shared_data["x_obj"] = pos.x
-        self.shared_data["y_obj"] = pos.y
-        self.shared_data["t_obj"] = pos.t
-        self.motion_done_event.clear()  # Block the wait
-        # self.get_logger().info("Robot moving...")
+        if not self.stop:
+            self.timer = None
+            self.seuil = seuil
+            pos = Position(
+                x=self.robot_pos.x + delta.x,
+                y=self.robot_pos.y + delta.y,
+                t=self.robot_pos.t + delta.t
+            )
+            self.get_logger().info(f"Robot_data : {self.robot_pos.x} {self.robot_pos.y} {self.robot_pos.t}")
+            self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
+            self.motion_done = False
+            self.is_robot_moving = True
+            self.is_robot_arrived = False
+            time.sleep(0.1)
+            self.pub_command.publish(String(data=f"MOVE {pos.x} {pos.y} {pos.t}"))
+            self.pos_obj = Position(x=pos.x, y=pos.y, t=pos.t)
+            self.motion_done_event.clear()  # Block the wait
+            # self.get_logger().info("Robot moving...")
 
     def update_arrival_status(self):
         self.get_logger().info("Updating arrival status...")
         time.sleep(0.2)
-        x_share = self.shared_data["x"]
-        y_share = self.shared_data["y"]
-        t_share = self.shared_data["t"]
-        x_obj = self.shared_data["x_obj"]
-        y_obj = self.shared_data["y_obj"]
-        t_obj = self.shared_data["t_obj"]
-        delta_x = abs(x_obj - x_share)
-        delta_y = abs(y_obj - y_share)
-        delta_t = abs(t_obj - t_share)
+        delta_x = abs(self.pos_obj.x - self.robot_pos.x)
+        delta_y = abs(self.pos_obj.y - self.robot_pos.y)
+        delta_t = abs(self.pos_obj.t - self.robot_pos.t)
         if delta_x < 0.5 and delta_y < 0.5 and delta_t < 0.5:
             if not self.is_robot_arrived:
                 self.get_logger().info("Robot has arrived.")
@@ -454,10 +408,8 @@ class ActionManager(Node):
     def update_motion_status(self):
         self.get_logger().info("Updating motion status...")
         time.sleep(0.2)
-        vlin_share = abs(self.shared_data["vlin"])
-        vt_share = abs(self.shared_data["vt"])
-        self.get_logger().info(f"Robot speed: vlin={vlin_share}, vt={vt_share}")
-        if vlin_share < 0.0001 and vt_share < 0.0001:
+        self.get_logger().info(f"Robot speed: vlin={self.robot_speed.x}, vt={self.robot_speed.t}")
+        if self.robot_speed.x < 0.0001 and self.robot_speed.t < 0.0001:
             if self.is_robot_moving:
                 self.get_logger().info("Robot has stopped.")
             self.is_robot_moving = False
@@ -472,23 +424,25 @@ class ActionManager(Node):
 
     def servo(self, servo: SERVO_struct):
         """Compute the servo action."""
-        self.pub_command.publish(String(data=f"SERVO {servo.servo_id} "
-                                             f"{servo.angle}"
-                                        )
-                                 )
+        if not self.stop:
+            self.pub_command.publish(String(data=f"SERVO {servo.servo_id} "
+                                                 f"{servo.angle}"
+                                            )
+                                     )
 
-        self.get_logger().info(f"SERVO : SERVO {servo.servo_id} {servo.angle}")
-        time.sleep(0.1)
+            self.get_logger().info(f"SERVO : SERVO {servo.servo_id} {servo.angle}")
+            time.sleep(0.1)
 
     def pump(self, pump: PUMP_struct):
         """Compute the pump action."""
-        self.pub_command.publish(String(data=f"PUMP {pump.pump_id} "
-                                             f"{pump.enable}"
-                                        )
-                                 )
+        if not self.stop:
+            self.pub_command.publish(String(data=f"PUMP {pump.pump_id} "
+                                                 f"{pump.enable}"
+                                            )
+                                     )
 
-        self.get_logger().info(f"PUMP : PUMP {pump.pump_id} {pump.enable}")
-        time.sleep(0.1)
+            self.get_logger().info(f"PUMP : PUMP {pump.pump_id} {pump.enable}")
+            time.sleep(0.1)
 
     def led(self, led: LED_struct):
         """Compute the led action."""
@@ -498,18 +452,20 @@ class ActionManager(Node):
 
     def stepper(self, stepper: STEPPER_struct):
         """Compute the stepper action."""
-        self.pub_command.publish(
-            String(data=f"STEPPER1  {stepper.mode}")
-        )
-        self.get_logger().info(f"STEPPER : STEPPER1 {stepper.mode}")
-        time.sleep(0.1)
+        if not self.stop:
+            self.pub_command.publish(
+                String(data=f"STEPPER1  {stepper.mode}")
+            )
+            self.get_logger().info(f"STEPPER : STEPPER1 {stepper.mode}")
+            time.sleep(0.1)
 
     def valve(self, valve: VALVE_struct):
         """Compute the valve action."""
-        self.pub_command.publish(String(data=f"VALVE {valve.valve_id} 1"))
+        if not self.stop:
+            self.pub_command.publish(String(data=f"VALVE {valve.valve_id} 1"))
 
-        self.get_logger().info(f"VALVE {valve.valve_id} 1")
-        time.sleep(0.1)
+            self.get_logger().info(f"VALVE {valve.valve_id} 1")
+            time.sleep(0.1)
 
     def write_log(self, message):
         """Write logs."""
@@ -517,9 +473,10 @@ class ActionManager(Node):
 
     def send_raw(self, raw_command):
         """Send raw commands."""
-        self.get_logger().info(f"Sending raw command: {raw_command}")
-        self.pub_command.publish(String(data=raw_command))
-        time.sleep(0.1)
+        if not self.stop:
+            self.get_logger().info(f"Sending raw command: {raw_command}")
+            self.pub_command.publish(String(data=raw_command))
+            time.sleep(0.1)
 
     def kalman(self, kalman: bool):
         """Compute the kalman action."""
@@ -544,8 +501,9 @@ class ActionManager(Node):
 
     def add_score(self, score):
         """Update the score."""
-        self.pub_score.publish(Int32(data=score))
-        time.sleep(0.1)
+        if not self.stop:
+            self.pub_score.publish(Int32(data=score))
+            time.sleep(0.1)
 
     def smart_moves(self):
         pass
