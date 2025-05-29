@@ -85,7 +85,7 @@ class Script:
         # Deplacement dans la zone adverse
         node.send_raw("VMAX 0.7")
         node.move_to(Position(1.22, 1.22, -2.54))
-        node.sleep(0.5)
+        node.sleep(0.4)
         node.move_to(Position(2.4, 1.34, -2.54))
 
         # Ramassage des boites adverses
@@ -93,7 +93,7 @@ class Script:
         node.kalman(False)
         node.sleep(0.1)
         node.pump(PUMP_struct(1, 1))
-        node.move_to(Position(2.4, 1.34, -2.54))
+        node.move_to(Position(2.6, 1.34, -2.54))
         node.wait_for_motion()
         node.relative_move_to(Position(0.2, 0, 0))
         node.wait_for_motion()
@@ -102,6 +102,10 @@ class Script:
         node.relative_move_to(Position(0, -0.45, 0))
         node.wait_for_motion()
         node.add_score(4)
+
+        # Stop la pompe
+        node.pump(PUMP_struct(1, 0))
+        node.valve(VALVE_struct(2))
 
         # Retour dans la zone de depart
         node.kalman(True)
