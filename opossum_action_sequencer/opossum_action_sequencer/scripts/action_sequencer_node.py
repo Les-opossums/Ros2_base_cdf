@@ -291,10 +291,10 @@ class ActionManager(Node):
                 if self.current_time > 95.0:
                     # End of match
                     self.pub_end_of_match.publish(Bool(data=True))
+                    self.stop = True
                     self.get_logger().warn("End of time, stopping script.")
                     self.send_raw("BLOCK")
                     self.end_match_event.set()
-                    self.stop = True
                     time.sleep(0.1)
                     self.send_raw("BLOCK")
                     self.script_instance = None
