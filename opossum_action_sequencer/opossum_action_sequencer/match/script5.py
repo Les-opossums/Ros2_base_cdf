@@ -88,3 +88,4 @@ class Script:
         node.wait_for_motion()
         node.in_end_zone = True
         node.add_score(10)
+        node.is_ended = True

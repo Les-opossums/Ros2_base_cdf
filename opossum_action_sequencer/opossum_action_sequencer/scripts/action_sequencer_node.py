@@ -20,8 +20,6 @@ from opossum_action_sequencer.utils import (
     VALVE_struct,
 )
 
-import multiprocessing
-from multiprocessing import Event, Manager
 import threading
 from threading import Event
 import time
@@ -81,10 +79,16 @@ class ActionManager(Node):
             ],
         )
 
-    def _init_timer_match(self):
+    def _init_timers(self):
         """Initialize the timers of the node."""
-        self.timer_match = self.create_timer(0.1, self.timer_match_callback)
-        self.start_time = self.get_clock().now()
+        self.timer_match = self.create_timer(
+            96,
+            self.timer_match_callback
+        )
+        self.timer_backstage = self.create_timer(
+            92,
+            self.timer_backstage_callback
+        )
 
     def _init_publishers(self):
         """Initialize the publishers of the node."""
@@ -221,7 +225,7 @@ class ActionManager(Node):
         if msg.data.startswith("LEASH"):
             self.state_leash = True
             if self.ready:
-                self._init_timer_match()
+                self._init_timers()
                 self.is_started = True
                 self.match_time = time.time()
                 self.get_logger().info("Leash activated")
@@ -239,14 +243,6 @@ class ActionManager(Node):
                 if self.is_started and self.script_thread is not None:
                     self.get_logger().warn("Stop script from AU")
                     self.stop_script()
-                    """self.stop = True
-                    self.get_logger().warn("Stopping script")
-                    self.script_instance = None
-                    self.script_thread = None
-                    self.send_raw("BLOCK")
-                    self.end_match_event.set()
-                    time.sleep(0.1)
-                    self.send_raw("BLOCK")"""
             elif msg.data[-1] == "2":
                 # self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
@@ -295,38 +291,20 @@ class ActionManager(Node):
                                  )
                     self.timer_move = None
 
-        """ # Handle match time
-        if self.is_started and self.match_time is not None:
-            if self.script_thread is not None:
-                self.current_time = time.time() - self.match_time
-                if self.current_time > 95.0:
-                    # End of match
-                    self.pub_end_of_match.publish(Bool(data=True))
-                    self.stop = True
-                    self.get_logger().warn("End of time, stopping script.")
-                    self.send_raw("BLOCK")
-                    self.end_match_event.set()
-                    time.sleep(0.1)
-                    self.send_raw("BLOCK")
-                    self.script_instance = None
-                    self.script_thread = None"""
-
     def timer_match_callback(self):
         """Timer callback for match time."""
-        if self.is_started and self.start_time is not None:
-            now = self.get_clock().now()
-            duration = now - self.start_time
-            elapsed_time = duration.nanoseconds / 1e9
-            if elapsed_time > 91. and elapsed_time < 94.:
-                if not self.in_end_zone and self.end_zone is not None:
-                    self.send_raw("VMAX 0.5")
-                    time.sleep(0.1)
-                    self.move_to(self.end_zone)
-            if elapsed_time > 95.0 and not self.is_ended:
-                self.pub_end_of_match.publish(Bool(data=True))
-                self.get_logger().warn("Match time exceeded: "
-                                       f"{elapsed_time:.2f} seconds")
-                self.stop_script()
+        if not self.is_ended:
+            self.pub_end_of_match.publish(Bool(data=True))
+            self.get_logger().warn("Match time exceeded")
+            self.stop_script()
+
+    def timer_backstage_callback(self):
+        if self.end_zone is not None:
+            if not self.is_ended and not self.in_end_zone:
+                self.get_logger().warn("Abort, go back home")
+                self.send_raw("VMAX 0.5")
+                time.sleep(0.1)
+                self.move_to(self.end_zone)
 
     def run_script_init(self):
         """Run the script initialization."""
