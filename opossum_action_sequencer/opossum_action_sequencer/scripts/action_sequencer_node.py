@@ -320,6 +320,7 @@ class ActionManager(Node):
                 if not self.in_end_zone and self.end_zone is not None:
                     self.move_to(Position(self.pos_end))
             if elapsed_time > 95.0 and not self.is_ended:
+                self.pub_end_of_match.publish(Bool(data=True))
                 self.get_logger().warn("Match time exceeded: "
                                        f"{elapsed_time:.2f} seconds")
                 self.stop_script()
