@@ -315,7 +315,7 @@ class ActionManager(Node):
             now = self.get_clock().now()
             duration = now - self.start_time
             elapsed_time = duration.nanoseconds / 1e9
-            if elapsed_time > 5.0 and not self.is_ended:
+            if elapsed_time > 95.0 and not self.is_ended:
                 self.get_logger().warn("Match time exceeded: "
                                        f"{elapsed_time:.2f} seconds")
                 self.stop_script()
