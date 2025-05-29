@@ -26,11 +26,11 @@ class Script:
         # Banderole
         node.kalman(False)
         node.send_raw("VMAX 0.1")
-        time.sleep(0.5)
+        node.sleep(0.5)
         node.move_to(Position(1.22, 0.12, 2.03), seuil=0.05)
         node.wait_for_motion()
         node.stepper(STEPPER_struct(2))
-        time.sleep(0.5)
+        node.sleep(0.5)
         node.stepper(STEPPER_struct(1))
         node.add_score(20)
 
@@ -44,23 +44,23 @@ class Script:
         node.kalman(True)
 
         # Deplacement vers boites
-        time.sleep(1)
+        node.sleep(1)
         self.log_mvt(node)
         node.move_to(Position(1.1, 0.6, -1.12))
         node.wait_for_motion()
 
         # Ramassage des boites
         node.send_raw("VMAX 0.2")
-        time.sleep(0.5)
+        node.sleep(0.5)
         node.pump(PUMP_struct(1, 1))
-        time.sleep(0.5)
+        node.sleep(0.5)
         self.log_mvt(node)
         node.move_to(Position(1.1, 0.85, -1.12), seuil=0.05)
         node.wait_for_motion()
         self.log_mvt(node)
         node.move_to(Position(1.1, 1.0, -1.12), seuil=0.05)
         node.wait_for_motion()
-        time.sleep(0.5)
+        node.sleep(0.5)
 
         # Poussette vers zone
         self.log_mvt(node)
@@ -79,22 +79,22 @@ class Script:
         node.write_log("---------------------------")
         node.send_raw("FREE")
         node.stepper(STEPPER_struct(2))
-        time.sleep(2)
+        node.sleep(2)
         node.pump(PUMP_struct(2, 1))
         node.pump(PUMP_struct(3, 1))
         node.pump(PUMP_struct(4, 1))
         node.stepper(STEPPER_struct(1))
-        time.sleep(0.5)
+        node.sleep(0.5)
 
         node.kalman(False)
-        time.sleep(1)
+        node.sleep(1)
 
         # Recule et monte les boites
         node.write_log("Recule et monte les boites")
         node.write_log("---------------------------")
         node.pump(PUMP_struct(1, 0))
         node.valve(VALVE_struct(2))
-        time.sleep(0.5)
+        node.sleep(0.5)
 
         self.log_mvt(node)
         node.relative_move_to(Position(0, -0.1, 0), seuil=0.02)
@@ -122,27 +122,27 @@ class Script:
         # Construction gauche
         node.write_log("Construction gauche")
         node.write_log("---------------------------")
-        time.sleep(1)
+        node.sleep(1)
         self.log_mvt(node)
         node.relative_move_to(Position(0, 0, -0.75), seuil=0.02)
         node.wait_for_motion()
 
-        time.sleep(1)
+        node.sleep(1)
         self.log_mvt(node)
         node.relative_move_to(Position(0, 0.05, 0), seuil=0.02)
         node.wait_for_motion()
-        time.sleep(1)
+        node.sleep(1)
 
         node.servo(SERVO_struct(2, 10))
 
         # On se remet droit
         node.write_log("On se remet droit")
         node.write_log("---------------------------")
-        time.sleep(1)
+        node.sleep(1)
         self.log_mvt(node)
         node.relative_move_to(Position(0.0, -0.05, 0), seuil=0.02)
         node.wait_for_motion()
-        time.sleep(1)
+        node.sleep(1)
         self.log_mvt(node)
         # node.relative_move_to(Position(0, 0, 0.75), seuil=0.02)
         # node.wait_for_motion()
@@ -153,33 +153,33 @@ class Script:
         self.log_mvt(node)
         node.relative_move_to(Position(0, 0, 1.5), seuil=0.02)
         node.wait_for_motion()
-        time.sleep(1)
+        node.sleep(1)
         self.log_mvt(node)
         node.relative_move_to(Position(0.0, 0.05, 0), seuil=0.02)
         node.wait_for_motion()
-        time.sleep(1)
+        node.sleep(1)
 
-        time.sleep(1)
+        node.sleep(1)
         node.servo(SERVO_struct(1, 180))
 
         # On se remet droit
         node.write_log("On se remet droit")
         node.write_log("---------------------------")
-        time.sleep(1)
-        time.sleep(1)
+        node.sleep(1)
+        node.sleep(1)
         self.log_mvt(node)
         node.relative_move_to(Position(0.0, -0.05, 0), seuil=0.02)
         node.wait_for_motion()
-        time.sleep(1)
+        node.sleep(1)
         self.log_mvt(node)
-        time.sleep(1)
+        node.sleep(1)
         node.relative_move_to(Position(0, 0, -0.75), seuil=0.02)
         node.wait_for_motion()
 
         # Lacher la planche
         node.write_log("Lacher la planche")
         node.write_log("---------------------------")
-        time.sleep(1)
+        node.sleep(1)
         node.relative_move_to(Position(0, 0.08, 0), seuil=0.05)
         node.wait_for_motion()
         node.pump(PUMP_struct(2, 0))
@@ -193,19 +193,19 @@ class Script:
         node.add_score(12)
         node.write_log("Construction finie")
         node.write_log("---------------------------")
-        time.sleep(1)
+        node.sleep(1)
         node.kalman(True)
-        time.sleep(1)
+        node.sleep(1)
 
         # Recule
         node.send_raw("VMAX 0.5")
-        time.sleep(1)
+        node.sleep(1)
         self.log_mvt(node)
         node.move_to(Position(0.35, 1.55, -0.95))
         node.send_raw("SERVO 1 180")
         node.send_raw("SERVO 2 10")
         node.wait_for_motion()
-        time.sleep(1)
+        node.sleep(1)
 
         # POUSSE LES BOITES DE LA SCENE
         # On se place en face
@@ -213,9 +213,9 @@ class Script:
         node.move_to(Position(0.82, 1.45, -0.95))
         node.wait_for_motion()
 
-        time.sleep(1)
+        node.sleep(1)
         node.kalman(False)
-        time.sleep(1)
+        node.sleep(1)
 
         # On s'avance
         node.send_raw("VMAX 0.2")
@@ -226,7 +226,7 @@ class Script:
 
         # Baisse la planche
         node.stepper(STEPPER_struct(2))
-        time.sleep(2)
+        node.sleep(2)
         node.pump(PUMP_struct(2, 1))
         node.pump(PUMP_struct(3, 1))
         node.pump(PUMP_struct(4, 1))
@@ -246,15 +246,15 @@ class Script:
         node.valve(VALVE_struct(4))
         node.stepper(STEPPER_struct(1))
         node.add_score(4)
-        time.sleep(0.5)
+        node.sleep(0.5)
 
         # On recule
         node.relative_move_to(Position(0, -0.3, 0), seuil=0.05)
         node.wait_for_motion()
 
-        time.sleep(1)
+        node.sleep(1)
         node.kalman(True)
-        time.sleep(1)
+        node.sleep(1)
 
         node.send_raw("VMAX 0.5")
 

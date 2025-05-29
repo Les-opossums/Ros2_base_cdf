@@ -229,12 +229,12 @@ class ActionManager(Node):
                 self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
                 if self.is_started and self.script_thread is not None:
+                    self.stop = True
                     self.get_logger().warn("Stopping script")
                     self.script_instance = None
                     self.script_thread = None
                     self.send_raw("BLOCK")
                     self.end_match_event.set()
-                    self.stop = True
                     time.sleep(0.1)
                     self.send_raw("BLOCK")
             elif msg.data[-1] == "2":
@@ -265,8 +265,8 @@ class ActionManager(Node):
         self.robot_speed = Position(x=msg.vlin, y=msg.vdir, t=msg.vt)
 
         if not self.motion_done:
-            self.get_logger().info(f"Verifying motion status: "
-                                   f"{self.is_robot_moving} {self.motion_done}")
+            # self.get_logger().info(f"Verifying motion status: "
+            #                        f"{self.is_robot_moving} {self.motion_done}")
             # Update motion state
             self.update_arrival_status()
             self.update_motion_status()
@@ -394,32 +394,35 @@ class ActionManager(Node):
             # self.get_logger().info("Robot moving...")
 
     def update_arrival_status(self):
-        # self.get_logger().info("Updating arrival status...")
-        time.sleep(0.2)
-        delta_x = abs(self.pos_obj.x - self.robot_pos.x)
-        delta_y = abs(self.pos_obj.y - self.robot_pos.y)
-        delta_t = abs(self.pos_obj.t - self.robot_pos.t)
-        if delta_x < 0.5 and delta_y < 0.5 and delta_t < 0.5:
-            if not self.is_robot_arrived:
-                self.get_logger().info("Robot has arrived.")
-            self.is_robot_arrived = True
+        if not self.stop:
+            # self.get_logger().info("Updating arrival status...")
+            time.sleep(0.2)
+            delta_x = abs(self.pos_obj.x - self.robot_pos.x)
+            delta_y = abs(self.pos_obj.y - self.robot_pos.y)
+            delta_t = abs(self.pos_obj.t - self.robot_pos.t)
+            if delta_x < 0.5 and delta_y < 0.5 and delta_t < 0.5:
+                if not self.is_robot_arrived:
+                    self.get_logger().info("Robot has arrived.")
+                self.is_robot_arrived = True
 
     def update_motion_status(self):
-        # self.get_logger().info("Updating motion status...")
-        time.sleep(0.2)
-        self.get_logger().info(f"Robot speed: vlin={self.robot_speed.x}, vt={self.robot_speed.t}")
-        if self.robot_speed.x < 0.0001 and self.robot_speed.t < 0.0001:
-            if self.is_robot_moving:
-                self.get_logger().info("Robot has stopped.")
-            self.is_robot_moving = False
+        if not self.stop:
+            # self.get_logger().info("Updating motion status...")
+            time.sleep(0.2)
+            # self.get_logger().info(f"Robot speed: vlin={self.robot_speed.x}, vt={self.robot_speed.t}")
+            if self.robot_speed.x < 0.0001 and self.robot_speed.t < 0.0001:
+                if self.is_robot_moving:
+                    self.get_logger().info("Robot has stopped.")
+                self.is_robot_moving = False
 
     def wait_for_motion(self):
         """Compute the wait_for_motion action."""
-        # self.get_logger().info("Waiting for robot to stop...")
-        self.motion_done_event.wait()
-        time.sleep(0.2)
-        self.get_logger().info("Motion done from Ros")
-        self.motion_done = True
+        if not self.stop:
+            # self.get_logger().info("Waiting for robot to stop...")
+            self.motion_done_event.wait()
+            time.sleep(0.2)
+            self.get_logger().info("Motion done from Ros")
+            self.motion_done = True
 
     def servo(self, servo: SERVO_struct):
         """Compute the servo action."""
@@ -468,7 +471,14 @@ class ActionManager(Node):
 
     def write_log(self, message):
         """Write logs."""
-        self.get_logger().info(f"{message}")
+        if not self.stop:
+            self.get_logger().info(f"{message}")
+
+    def sleep(self, duration):
+        """Sleep for a given duration."""
+        if not self.stop:
+            # self.get_logger().info(f"Sleeping for {duration} seconds")
+            time.sleep(duration)
 
     def send_raw(self, raw_command):
         """Send raw commands."""
@@ -479,24 +489,26 @@ class ActionManager(Node):
 
     def kalman(self, kalman: bool):
         """Compute the kalman action."""
-        if kalman:
-            self.pub_command.publish(String(data="ENKALMAN 1"))
-            self.get_logger().info("KALMAN ON")
-        else:
-            self.pub_command.publish(String(data="ENKALMAN 0"))
-            self.get_logger().info("KALMAN OFF")
-        time.sleep(0.1)
+        if not self.stop:
+            if kalman:
+                self.pub_command.publish(String(data="ENKALMAN 1"))
+                self.get_logger().info("KALMAN ON")
+            else:
+                self.pub_command.publish(String(data="ENKALMAN 0"))
+                self.get_logger().info("KALMAN OFF")
+            time.sleep(0.1)
 
     def synchro_lidar(self):
         """Synchronize odom with lidar."""
-        if self.robot_pos is None:
-            return
-        command = (
-            f"SYNCHROLIDAR {self.lidar_pos.x} "
-            f"{self.lidar_pos.y} {self.lidar_pos.t}"
-        )
-        self.get_logger().info(f"Synchro : {command}")
-        self.pub_command.publish(String(data=f"{command}"))
+        if not self.stop:
+            if self.robot_pos is None:
+                return
+            command = (
+                f"SYNCHROLIDAR {self.lidar_pos.x} "
+                f"{self.lidar_pos.y} {self.lidar_pos.t}"
+            )
+            self.get_logger().info(f"Synchro : {command}")
+            self.pub_command.publish(String(data=f"{command}"))
 
     def add_score(self, score):
         """Update the score."""

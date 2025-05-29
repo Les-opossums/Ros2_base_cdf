@@ -26,12 +26,12 @@ class Script:
         # Banderole
         node.kalman(False)
         node.send_raw("VMAX 0.1")
-        time.sleep(0.5)
+        node.sleep(0.5)
         # node.move_to(Position(1.22, 0.12, 2.03), seuil=0.05)
         node.move_to(Position(1.22, 0.1, 2.03), seuil=0.05)
         node.wait_for_motion()
         node.stepper(STEPPER_struct(3))
-        time.sleep(1.5)
+        node.sleep(1.5)
         node.stepper(STEPPER_struct(1))
         node.add_score(20)
 
@@ -43,11 +43,11 @@ class Script:
 
         # Fin banderole
         node.kalman(True)
-        time.sleep(1)
+        node.sleep(1)
 
         # Poussette
         node.send_raw("VMAX 0.5")
-        time.sleep(0.1)
+        node.sleep(0.1)
         node.move_to(Position(1.2, 0.5, 2.03))
         node.servo(SERVO_struct(1, 10))
         node.servo(SERVO_struct(2, 180))
@@ -76,7 +76,7 @@ class Script:
         node.wait_for_motion()
 
         node.send_raw("VMAX 0.5")
-        time.sleep(0.1)
+        node.sleep(0.1)
         node.move_to(Position(1.22, 0.35, 2.03))
         node.wait_for_motion()
         node.add_score(4)
