@@ -132,15 +132,22 @@ class ZynqSimulation(Node):
             or name == "SPEED"
             or name == "MAPASSERV"
             or name == "BLOCK"
+            or name == "VMAX"
+            or name == "VTMAX"
         ):
             self.send_short_cmd_motor(name, args)
         elif name == "MOVE":
             self.send_long_cmd_motor(name, args)
         elif name == "SETLIDAR":
             pass
+        # elif name == "LEASH" or name == "AU":
+        #     self.get_logger().info(f'Received {name}, {args[0]}')
+        #     self.pub_comm_topic.publish(String(data=name + " " + args[0]))
         elif name == "LEASH":
-            self.get_logger().info('Received leash')
-            self.pub_comm_topic.publish(String(data="LEASH"))
+            self.pub_comm_topic.publish(String(data="LEASH\n"))
+        elif name == "AU":
+            self.pub_comm_topic.publish(String(data="AU 1\n"))
+        
         else:
             self.get_logger().warn(f"Action {name} is not implemented.")
 

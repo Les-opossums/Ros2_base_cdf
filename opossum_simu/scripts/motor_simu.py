@@ -134,6 +134,14 @@ class MotorSimu(Node):
             self.angular_velocity = float(request_split[3])
             response.response = request_split[0] + "," + "1"
 
+        elif request_split[0] == "VMAX":
+            self.linear_velocity = float(request_split[1])
+            response.response = request_split[0] + "," + "1"
+
+        elif request_split[0] == "VTMAX":
+            self.angular_velocity = float(request_split[1])
+            response.response = request_split[0] + "," + "1"
+
         elif request_split[0] == "MAPASSERV":
             begin = time.time()
             response.response = ""
