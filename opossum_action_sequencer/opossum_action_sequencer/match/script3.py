@@ -69,12 +69,12 @@ class Script:
         node.move_to(Position(0.6, 1.24, 2.03))
         node.wait_for_motion()
 
-        node.move_to(Position(1.1, 1., 2.03))
+        node.move_to(Position(1.1, 1.24, 2.03))
         node.wait_for_motion()
 
         # Ramassage des boites
-        # node.relative_move_to(Position(0, -0.25, 0))
-        # node.wait_for_motion()
+        node.relative_move_to(Position(0, -0.25, 0))
+        node.wait_for_motion()
 
         node.send_raw("VMAX 0.5")
         node.sleep(0.1)
