@@ -605,7 +605,7 @@ class ActionManager(Node):
                         self.wait_for_motion()
                         # Pick the cans.
                     else:
-                        if self.robot_pos.y - can_valid[1] < tol:
+                        if can_valid[1] - self.robot_pos.y < tol:
                             self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] - tol, np.pi / 2 + default_angle))
                             self.wait_for_motion()
                         self.move_to(Position(can_valid[0], can_valid[1] - tol, np.pi / 2 + default_angle))
