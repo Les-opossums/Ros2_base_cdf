@@ -18,7 +18,7 @@ main_robot:
       boundary_limit_detection: 0.05
       enable_detection: true
       enable_boundary_check: true
-      enable_new_path: false
+      enable_new_path: true
 
 second_robot:
   avoid_obstacle_node:
