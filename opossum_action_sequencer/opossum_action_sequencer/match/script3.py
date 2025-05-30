@@ -90,13 +90,13 @@ class Script:
         node.move_to(Position(2.4, 1.25, -2.54))
 
         # Ramassage des boites adverses
-        node.send_raw("VMAX 0.3")
-        node.kalman(False)
+        node.send_raw("VMAX 0.4")
         node.sleep(0.1)
         node.pump(PUMP_struct(1, 1))
         node.move_to(Position(2.65, 1.3, -2.54))
         node.wait_for_motion()
-        node.relative_move_to(Position(0.3, 0.05, 0))
+        node.kalman(False)
+        node.relative_move_to(Position(0.3, 0.15, 0))
         node.wait_for_motion()
 
         # Baisse le stepper
@@ -105,6 +105,7 @@ class Script:
         node.pump(PUMP_struct(2, 1))
         node.pump(PUMP_struct(3, 1))
         node.pump(PUMP_struct(4, 1))
+        node.sleep(1.5)
 
         # Decalage des boites
         node.relative_move_to(Position(0, -0.45, 0))
