@@ -593,7 +593,7 @@ class ActionManager(Node):
 
     def smart_moves(self):
         default_angle = -2.60
-        tol = 0.25
+        tol = 0.3
         if self.color.lower() == "yellow":
             en_color = 0
         elif self.color.lower() == "blue":
@@ -616,7 +616,7 @@ class ActionManager(Node):
             if can_valid is not None:
                 if can_valid[2] % 2 == 0:
                     # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
-                    self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * 0.2, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
+                    self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * tol, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
                     fpos = self.find_final_pos(ind_valid, en_color)
                     self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
                     self.take_cans(can_valid[2])
@@ -702,7 +702,7 @@ class ActionManager(Node):
         self.kalman(False)
         self.pump(PUMP_struct(1, 1))
         self.sleep(0.1)
-        push_dst = 0.15
+        push_dst = 0.12
         if angle == 0:
             self.relative_move_to(Position(push_dst, 0, 0))
         elif angle == 1:
@@ -720,7 +720,7 @@ class ActionManager(Node):
         self.sleep(0.1)
 
     def drop_cans(self, destination, default_angle):
-        push_dst = 0.15
+        push_dst = 0.12
         self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
         self.wait_for_motion()
 
