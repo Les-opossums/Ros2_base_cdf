@@ -78,7 +78,7 @@ class ActionManager(Node):
             1: [0.075, 0.4, 2],
             2: [0.825, 1.725, 1],
             3: [1.1, 0.95, 1],
-            4: [0.775, 0.25, 1], 
+            4: [0.775, 0.25, 1],
         }
         self.position_cans = self.position_cans | {key + 5: [3 - val[0], val[1], 2 - val[2]] for key, val in self.position_cans.items()}
         self.available_cans = {i: True for i in range(len(list(self.position_cans.keys())))}
@@ -574,14 +574,14 @@ class ActionManager(Node):
 
     def sign(self, val):
         return -1 if val < 0 else 1
-    
+
     def smart_moves(self):
         default_angle = 0
         tol = 0.25
         while True:
             self.send_raw("VMAX 0.1")
             max = -2
-            can_valid = None 
+            can_valid = None
             ind_valid = None
             for ind, cans in self.position_cans.items():
                 if self.available_cans[ind]:
@@ -595,7 +595,7 @@ class ActionManager(Node):
                     # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
                     self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * 0.2, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
                     # Pick the cans.
-                    pass 
+                    pass
                 else: # CANS THAT ARE FRONT ON BOARD
                     if self.robot_pos.y > can_valid[1] or can_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
                         if self.robot_pos.y - can_valid[1] < tol:
@@ -621,7 +621,7 @@ class ActionManager(Node):
                     self.move_to(Position(3 - 0.5, 1.4, 0))
 
 
-    
+
     def angular_distance(a1, a2):
         diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
         return abs(diff)
@@ -637,9 +637,9 @@ class ActionManager(Node):
         if pos[2] % 2 == 0:
             angle = pos[2] * np.pi / 2
         else:
-            if self.robot_pos.y > pos[1] and pos[1] > 0.5: 
+            if self.robot_pos.y > pos[1] and pos[1] > 0.5:
                 angle = 3 * np.pi / 2
-            else: 
+            else:
                 angle = np.pi / 2
         val_dst = (self.robot_pos.x - pos[0]) ** 2 + (self.robot_pos.y - pos[1]) ** 2 + angle_coeff * (self.robot_pos.t - angle) ** 2
         if self.x_enn is not None:
@@ -647,6 +647,44 @@ class ActionManager(Node):
         else:
             val_ennemi = 0
         return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
+
+    def take_cans(self, angle):
+        self.kalman(False)
+        self.pump(PUMP_struct(1, 1))
+        self.sleep(0.1)
+        if angle == 0:
+            self.relative_move_to(Position(0.3, 0, 0))
+        elif angle == np.pi / 2:
+            self.relative_move_to(Position(0, 0.3, 0))
+        elif angle == np.pi:
+            self.relative_move_to(Position(-0.3, 0, 0))
+        elif angle == 3 * np.pi / 2:
+            self.relative_move_to(Position(0, -0.3, 0))
+        else:
+            self.get_logger().error(f"Invalid angle for taking cans: {angle}")
+            pass
+        self.kalman(True)
+        self.sleep(0.1)
+
+    def drop_cans(self, destination):
+        self.move_to(Position(
+            self.dest_cans[destination][0],
+            self.dest_cans[destination][1],
+            self.dest_cans[destination][2]
+        ))
+        self.pump(PUMP_struct(1, 0))
+        self.valve(VALVE_struct(2))
+
+        if self.dest_cans[destination][2] == 0:
+            self.relative_move_to(Position(-0.3, 0, 0))
+        elif self.dest_cans[destination][2] == np.pi:
+            self.relative_move_to(Position(0.3, 0, 0))
+        elif self.dest_cans[destination][2] == 3 * np.pi / 2:
+            self.relative_move_to(Position(0, -0.3, 0))
+        else:
+            self.get_logger().error(f"Invalid angle for dropping cans: "
+                                    f"{self.dest_cans[destination][2]}")
+
 
 def main(args=None):
     """Run main loop."""
