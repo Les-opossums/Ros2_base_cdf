@@ -22,14 +22,14 @@ class Script:
 
     def run(self, node):
         node.write_log("Script 3 is running...")
-        node.end_zone = Position(2.7, 1.7, -0.95)
+        node.end_zone = Position(2.7, 1.7, 2.03)
 
         # Banderole
         node.kalman(False)
         node.send_raw("VMAX 0.1")
         node.sleep(0.5)
         # node.move_to(Position(1.22, 0.12, 2.03), seuil=0.05)
-        node.move_to(Position(1.8, 0.1, -0.95))
+        node.move_to(Position(1.8, 0.1, 2.03))
         node.wait_for_motion()
         node.stepper(STEPPER_struct(3))
         node.sleep(1.5)
@@ -49,16 +49,16 @@ class Script:
         # Poussette
         node.send_raw("VMAX 0.5")
         node.sleep(0.1)
-        node.move_to(Position(1.8, 0.5, -0.95))
+        node.move_to(Position(1.8, 0.5, 2.03))
         node.servo(SERVO_struct(1, 10))
         node.servo(SERVO_struct(2, 180))
         node.stepper(STEPPER_struct(1))
         node.wait_for_motion()
 
-        node.move_to(Position(2.22, 0.5, -0.95))
+        node.move_to(Position(2.22, 0.5, 2.03))
         node.wait_for_motion()
 
-        node.move_to(Position(2.22, 0.2, -0.95))
+        node.move_to(Position(2.22, 0.2, 2.03))
         node.wait_for_motion()
         node.add_score(4)
 
@@ -66,10 +66,10 @@ class Script:
         ###---------------------
 
         # Deplacement vers boites en baissant les pinces et
-        node.move_to(Position(2.4, 1.24, -0.95))
+        node.move_to(Position(2.4, 1.24, 2.03))
         node.wait_for_motion()
 
-        node.move_to(Position(1.9, 1.24, -0.95))
+        node.move_to(Position(1.9, 1.24, 2.03))
         node.wait_for_motion()
 
         # Ramassage des boites
@@ -78,22 +78,22 @@ class Script:
 
         node.send_raw("VMAX 0.5")
         node.sleep(0.1)
-        node.move_to(Position(1.8, 0.35, -0.95))
+        node.move_to(Position(1.8, 0.35, 2.03))
         node.wait_for_motion()
         node.add_score(4)
 
         # Deplacement dans la zone adverse
         node.send_raw("VMAX 0.7")
-        node.move_to(Position(1.8, 1.22, 3.74))
+        node.move_to(Position(1.8, 1.22, 0.2))
         node.sleep(0.6)
-        node.move_to(Position(0.6, 1.25, 3.74))
+        node.move_to(Position(0.6, 1.25, 0.2))
 
         # Ramassage des boites adverses
         node.send_raw("VMAX 0.3")
         node.kalman(False)
         node.sleep(0.1)
         node.pump(PUMP_struct(1, 1))
-        node.move_to(Position(0.35, 1.3, 3.74))
+        node.move_to(Position(0.35, 1.3, 0.2))
         node.wait_for_motion()
         node.relative_move_to(Position(-0.3, 0, 0))
         node.wait_for_motion()
@@ -115,7 +115,7 @@ class Script:
         node.send_raw("VMAX 0.7")
         node.move_to(Position(2., 0.9, 2.03))
         node.wait_for_motion()
-        node.move_to(Position(2.7, 1.7, -0.95))
+        node.move_to(Position(2.7, 1.7, 2.03))
         node.wait_for_motion()
         node.in_end_zone = True
         node.add_score(10)
