@@ -96,17 +96,32 @@ class Script:
         node.pump(PUMP_struct(1, 1))
         node.move_to(Position(2.65, 1.3, -2.54))
         node.wait_for_motion()
-        node.relative_move_to(Position(0.3, -0.05, 0))
+        node.relative_move_to(Position(0.3, 0.05, 0))
         node.wait_for_motion()
+
+        # Baisse le stepper
+        node.sleep(0.1)
+        node.stepper(2)
+        node.pump(PUMP_struct(2, 1))
+        node.pump(PUMP_struct(3, 1))
+        node.pump(PUMP_struct(4, 1))
 
         # Decalage des boites
         node.relative_move_to(Position(0, -0.45, 0))
         node.wait_for_motion()
+
+        # Lache
+        node.pump(PUMP_struct(2, 0))
+        node.pump(PUMP_struct(3, 0))
+        node.pump(PUMP_struct(4, 0)) 
         node.add_score(4)
 
         # Stop la pompe
         node.pump(PUMP_struct(1, 0))
+        node.valve(VALVE_struct(1))
         node.valve(VALVE_struct(2))
+        node.valve(VALVE_struct(3))
+        node.valve(VALVE_struct(4))
 
         # Retour dans la zone de depart
         node.kalman(True)
