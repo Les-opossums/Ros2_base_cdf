@@ -22,15 +22,35 @@ class Script:
 
     def run(self, node):
         node.write_log("Script PD is running...")
-        node.end_zone = Position(0.6, 0.6, 0.0)
+        node.end_zone = Position(1.5, 1.0, 0.0)
 
         for k in range(20):
             node.send_raw("VMAX 1.5")
-            node.move_to(Position(2.4, 0.35, -2.5 + k * 0.3))
+            node.move_to(Position(2.4, 1.65, 0))
             node.wait_for_motion()
             node.sleep(0.5)
 
             node.send_raw("VMAX 1.5")
-            node.move_to(Position(2.4, 1.65, -2.5 + k * 0.3))
+            node.move_to(Position(2.4, 0.35, 0))
+            node.wait_for_motion()
+            node.sleep(0.5)
+
+            node.send_raw("VMAX 1.5")
+            node.move_to(Position(0.6, 0.35, 0))
+            node.wait_for_motion()
+            node.sleep(0.5)
+
+            node.send_raw("VMAX 1.5")
+            node.move_to(Position(0.6, 1.65, 0))
+            node.wait_for_motion()
+            node.sleep(0.5)
+
+            node.send_raw("VMAX 1.5")
+            node.move_to(Position(0.6, 0.35, 0))
+            node.wait_for_motion()
+            node.sleep(0.5)
+
+            node.send_raw("VMAX 1.5")
+            node.move_to(Position(2.4, 0.35, 0))
             node.wait_for_motion()
             node.sleep(0.5)
