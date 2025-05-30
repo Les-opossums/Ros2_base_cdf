@@ -468,7 +468,7 @@ class ActionManager(Node):
             delta_y = abs(self.pos_obj.y - self.robot_pos.y)
             delta_t = abs(self.pos_obj.t - self.robot_pos.t)
             if delta_x < 0.5 and delta_y < 0.5 and delta_t < 0.5:
-                if not self.is_robot_arrived:
+                # if not self.is_robot_arrived:
                     # self.get_logger().info("Robot has arrived.")
                 self.is_robot_arrived = True
 
