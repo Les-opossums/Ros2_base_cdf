@@ -64,6 +64,38 @@ class ActionManager(Node):
         self.end_match_event.set()
         self.stop = False
 
+        self.end_poses = {
+            0: [0, 0.875, 2],
+            1: [0.225, 0, 1],
+            2: [1.775, 0, 1],
+            3: [2.225, 0, 1],
+        }
+        self.end_poses = self.end_poses | {key + 4: [3 - val[0], val [1], 2 - val[2]] for key, val in self.end_poses.items()}
+        self.available_end = {i: 0 for i in range(len(list(self.end_poses.keys())))}
+
+        self.position_cans = {
+            0: [0.075, 1.325, 2],
+            1: [0.075, 0.4, 2],
+            2: [0.825, 1.725, 1],
+            3: [1.1, 0.95, 1],
+            4: [0.775, 0.25, 1], 
+        }
+        self.position_cans = self.position_cans | {key + 5: [3 - val[0], val[1], 2 - val[2]] for key, val in self.position_cans.items()}
+        self.available_cans = {i: True for i in range(len(list(self.position_cans.keys())))}
+
+        self.dest_cans = {
+            0: [6, 0],
+            1: [6, 0],
+            2: [6, 0],
+            3: [6, 0],
+            4: [7, 1],
+            5: [4, 2],
+            6: [4, 2],
+            7: [4, 2],
+            8: [4, 2],
+            9: [5, 3],
+        }
+
     def _init_parameters(self) -> None:
         """Initialize the parameters of the node."""
         self.declare_parameters(
@@ -197,6 +229,11 @@ class ActionManager(Node):
                     from opossum_action_sequencer.match.follow_ennemi import Script
 
                     self.get_logger().info("Script Follow Ennemi")
+
+                elif changed.value.integer_value == 11:
+                    from opossum_action_sequencer.match.smart_script import Script
+
+                    self.get_logger().info("Script SMART")
 
                 else:
                     from opossum_action_sequencer.match.script1 import Script
@@ -535,8 +572,81 @@ class ActionManager(Node):
             self.pub_score.publish(Int32(data=score))
             time.sleep(0.1)
 
+    def sign(self, val):
+        return -1 if val < 0 else 1
+    
     def smart_moves(self):
-        pass
+        default_angle = 0
+        tol = 0.25
+        while True:
+            self.send_raw("VMAX 0.1")
+            max = -2
+            can_valid = None 
+            ind_valid = None
+            for ind, cans in self.position_cans.items():
+                if self.available_cans[ind]:
+                    temp = self.compute_penality(cans)
+                    if temp > max:
+                        max = temp
+                        ind_valid = ind
+                        can_valid = cans
+            if can_valid is not None:
+                if can_valid[2] % 2 == 0:
+                    # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
+                    self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * 0.2, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
+                    # Pick the cans.
+                    pass 
+                else: # CANS THAT ARE FRONT ON BOARD
+                    if self.robot_pos.y > can_valid[1] or can_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
+                        if self.robot_pos.y - can_valid[1] < tol:
+                            self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
+                            self.wait_for_motion()
+                        self.move_to(Position(can_valid[0], can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
+                        self.wait_for_motion()
+                        # Pick the cans.
+                    else:
+                        if self.robot_pos.y - can_valid[1] < tol:
+                            self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] - tol, np.pi / 2 + default_angle))
+                            self.wait_for_motion()
+                        self.move_to(Position(can_valid[0], can_valid[1] - tol, np.pi / 2 + default_angle))
+                        self.wait_for_motion()
+                        # Pick the cans.
+                self.available_cans[ind_valid] = False
+                self.get_logger().info(f"Available cans now: {self.available_cans}")
+            else:
+                if True: # color is yellow
+                    self.move_to(Position(0.5, 1.4, 0))
+                    break
+                else:
+                    self.move_to(Position(3 - 0.5, 1.4, 0))
+
+
+    
+    def angular_distance(a1, a2):
+        diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
+        return abs(diff)
+
+    def compute_penality(self, pos):
+        angle_coeff = 0.05
+        coeff_center = -0.005
+        coeff_dst = -1
+        coeff_enn = 0.05
+        # coeef_end = -0.0001
+        val_center = (1.5 - pos[0]) ** 2 + (1 - pos[1]) ** 2
+        # val_center = (1.5 - pos[0]) ** 2 + (1 - pos[1]) ** 2
+        if pos[2] % 2 == 0:
+            angle = pos[2] * np.pi / 2
+        else:
+            if self.robot_pos.y > pos[1] and pos[1] > 0.5: 
+                angle = 3 * np.pi / 2
+            else: 
+                angle = np.pi / 2
+        val_dst = (self.robot_pos.x - pos[0]) ** 2 + (self.robot_pos.y - pos[1]) ** 2 + angle_coeff * (self.robot_pos.t - angle) ** 2
+        if self.x_enn is not None:
+            val_ennemi = (self.x_enn - pos[0]) ** 2 + (self.y_enn - pos[1]) ** 2
+        else:
+            val_ennemi = 0
+        return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
 
 def main(args=None):
     """Run main loop."""
