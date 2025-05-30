@@ -704,22 +704,22 @@ class ActionManager(Node):
 
     def drop_cans(self, destination):
         self.move_to(Position(
-            self.dest_cans[destination][0],
-            self.dest_cans[destination][1],
-            self.dest_cans[destination][2]
+            destination[0],
+            destination[1],
+            destination[2]
         ))
         self.pump(PUMP_struct(1, 0))
         self.valve(VALVE_struct(2))
 
-        if self.dest_cans[destination][2] == 0:
+        if destination[2] == 0:
             self.relative_move_to(Position(-0.3, 0, 0))
-        elif self.dest_cans[destination][2] == np.pi:
+        elif destination[2] == np.pi:
             self.relative_move_to(Position(0.3, 0, 0))
-        elif self.dest_cans[destination][2] == 3 * np.pi / 2:
+        elif destination[2] == 3 * np.pi / 2:
             self.relative_move_to(Position(0, -0.3, 0))
         else:
             self.get_logger().error(f"Invalid angle for dropping cans: "
-                                    f"{self.dest_cans[destination][2]}")
+                                    f"{destination[2]}")
 
 
 def main(args=None):
