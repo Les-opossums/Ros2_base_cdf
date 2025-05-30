@@ -576,7 +576,7 @@ class ActionManager(Node):
         return -1 if val < 0 else 1
 
     def smart_moves(self):
-        default_angle = 0
+        default_angle = -2.60
         tol = 0.25
         while True:
             self.send_raw("VMAX 0.1")
