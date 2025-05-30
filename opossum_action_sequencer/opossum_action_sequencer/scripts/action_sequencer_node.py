@@ -586,6 +586,7 @@ class ActionManager(Node):
             for ind, cans in self.position_cans.items():
                 if self.available_cans[ind]:
                     temp = self.compute_penality(cans)
+                    self.get_logger().info(f"Current value: {ind}, {temp}")
                     if temp > max:
                         max = temp
                         ind_valid = ind
@@ -594,6 +595,7 @@ class ActionManager(Node):
                 if can_valid[2] % 2 == 0:
                     # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
                     self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * 0.2, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
+                    fpos = self.find_final_pos(ind_valid)
                     # Pick the cans.
                     self.take_cans(can_valid[2] * np.pi / 2 + default_angle)
                     pass
@@ -604,6 +606,7 @@ class ActionManager(Node):
                             self.wait_for_motion()
                         self.move_to(Position(can_valid[0], can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
                         self.wait_for_motion()
+                        fpos = self.find_final_pos(ind_valid)
                         # Pick the cans.
                         self.take_cans(3 * np.pi / 2 + default_angle)
                     else:
@@ -612,19 +615,30 @@ class ActionManager(Node):
                             self.wait_for_motion()
                         self.move_to(Position(can_valid[0], can_valid[1] - tol, np.pi / 2 + default_angle))
                         self.wait_for_motion()
+                        fpos = self.find_final_pos(ind_valid)
                         # Pick the cans.
                         self.take_cans(np.pi / 2 + default_angle)
                 self.available_cans[ind_valid] = False
+                self.available_end[self.dest_cans[ind_valid][0]] += 1 # If yellow 0, else blue
                 self.get_logger().info(f"Available cans now: {self.available_cans}")
             else:
                 if True: # color is yellow
                     self.move_to(Position(0.5, 1.4, 0))
+                    self.wait_for_motion()
+                    self.move_to(Position(0.5, 1.7, 0))
+                    self.send_raw("BLOCK")
                     break
                 else:
                     self.move_to(Position(3 - 0.5, 1.4, 0))
 
-
-
+    def find_final_pos(self, index):
+        pos_out = self.end_poses[self.dest_cans[index][0]] #If yellow 0
+        incr = self.available_end[self.dest_cans[index][0]]
+        if pos_out[2] % 2 == 0:
+            return [pos_out[0] + (pos_out[2] - 1) * (0.05 + 0.1 * incr), pos_out[1], pos_out[2] * np.pi / 2]
+        else:
+            return [pos_out[0], pos_out[1] + 0.05 + 0.1 * incr, pos_out[2] * np.pi / 2]
+    
     def angular_distance(a1, a2):
         diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
         return abs(diff)
