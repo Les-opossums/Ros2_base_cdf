@@ -469,7 +469,7 @@ class ActionManager(Node):
             delta_t = abs(self.pos_obj.t - self.robot_pos.t)
             if delta_x < 0.5 and delta_y < 0.5 and delta_t < 0.5:
                 if not self.is_robot_arrived:
-                    self.get_logger().info("Robot has arrived.")
+                    # self.get_logger().info("Robot has arrived.")
                 self.is_robot_arrived = True
 
     def update_motion_status(self):
@@ -479,7 +479,7 @@ class ActionManager(Node):
             # self.get_logger().info(f"Robot speed: vlin={self.robot_speed.x}, vt={self.robot_speed.t}")
             if self.robot_speed.x < 0.0001 and self.robot_speed.t < 0.0001:
                 if self.is_robot_moving:
-                    self.get_logger().info("Robot has stopped.")
+                    # self.get_logger().info("Robot has stopped.")
                 self.is_robot_moving = False
 
     def wait_for_motion(self):
@@ -488,7 +488,7 @@ class ActionManager(Node):
             # self.get_logger().info("Waiting for robot to stop...")
             self.motion_done_event.wait()
             time.sleep(0.2)
-            self.get_logger().info("Motion done from Ros")
+            # self.get_logger().info("Motion done from Ros")
             self.motion_done = True
 
     def servo(self, servo: SERVO_struct):
@@ -657,7 +657,7 @@ class ActionManager(Node):
             return [pos_out[0] + (pos_out[2] - 1) * (0.05 + 0.1 * incr), pos_out[1], pos_out[2]]
         else:
             return [pos_out[0], pos_out[1] + 0.05 + 0.1 * incr, pos_out[2]]
-    
+
     def angular_distance(a1, a2):
         diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
         return abs(diff)
