@@ -490,8 +490,8 @@ class ObstacleAvoider(Node):
             return False
         if self._obstacle_on_goal(closest_obstacle):
             self.get_logger().info("Obstacle difficult goal we re fucked")
-            # self._send_block()
-            # return True
+            self._send_block()
+            return True
         v_rg = [
             self.goal_position.x - self.robot_position.x,
             self.goal_position.y - self.robot_position.y,
