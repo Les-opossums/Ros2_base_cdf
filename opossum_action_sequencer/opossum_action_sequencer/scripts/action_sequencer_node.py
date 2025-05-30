@@ -55,6 +55,7 @@ class ActionManager(Node):
         self.is_pump_bottom_on = False
         self.robot_pos = None
         self.motion_done = True
+        self.color = None
 
         # Process
         self.motion_done_event = Event()
@@ -178,6 +179,13 @@ class ActionManager(Node):
             10
         )
 
+        self.color_sub = self.create_subscription(
+            String,
+            "/main_robot/init/team_color",
+            self.color_callback,
+            10
+        )
+
     def parameter_event_callback(self, event):
         """Handle the parameters event."""
         # Parcours des paramètres modifiés
@@ -255,6 +263,9 @@ class ActionManager(Node):
                     self.run_script_init()
                 else:
                     self.get_logger().info("Debug mode disabled")
+
+    def color_callback(self, msg):
+        self.color = msg.data
 
     def feedback_callback(self, msg):
         """Receive the data from Zynq."""
@@ -578,6 +589,12 @@ class ActionManager(Node):
     def smart_moves(self):
         default_angle = -2.60
         tol = 0.25
+        if self.color.lower() == "yellow":
+            en_color = 0
+        elif self.color.lower() == "blue":
+            en_color = 1
+        else:
+            self.get_logger().error(f"NO COLOR")
         while True:
             self.send_raw("VMAX 0.1")
             max = -2
@@ -595,7 +612,7 @@ class ActionManager(Node):
                 if can_valid[2] % 2 == 0:
                     # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
                     self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * 0.2, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
-                    fpos = self.find_final_pos(ind_valid)
+                    fpos = self.find_final_pos(ind_valid, en_color)
                     self.take_cans(can_valid[2] * np.pi / 2 + default_angle)
                     self.drop_cans(Position(fpos[0], fpos[1], fpos[2] + default_angle))
                 else: # CANS THAT ARE FRONT ON BOARD
@@ -605,7 +622,7 @@ class ActionManager(Node):
                             self.wait_for_motion()
                         self.move_to(Position(can_valid[0], can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
                         self.wait_for_motion()
-                        fpos = self.find_final_pos(ind_valid)
+                        fpos = self.find_final_pos(ind_valid, en_color)
                         self.take_cans(3 * np.pi / 2 + default_angle)
                         self.drop_cans(Position(fpos[0], fpos[1], fpos[2] + default_angle))
                     else:
@@ -614,14 +631,14 @@ class ActionManager(Node):
                             self.wait_for_motion()
                         self.move_to(Position(can_valid[0], can_valid[1] - tol, np.pi / 2 + default_angle))
                         self.wait_for_motion()
-                        fpos = self.find_final_pos(ind_valid)
+                        fpos = self.find_final_pos(ind_valid, en_color)
                         self.take_cans(np.pi / 2 + default_angle)
                         self.drop_cans(Position(fpos[0], fpos[1], fpos[2] + default_angle))
                 self.available_cans[ind_valid] = False
-                self.available_end[self.dest_cans[ind_valid][0]] += 1 # If yellow 0, else blue
+                self.available_end[self.dest_cans[ind_valid][en_color]] += 1 # If yellow 0, else blue
                 self.get_logger().info(f"Available cans now: {self.available_cans}")
             else:
-                if True: # color is yellow
+                if en_color == 0: # color is yellow
                     self.move_to(Position(0.5, 1.4, 0))
                     self.wait_for_motion()
                     self.move_to(Position(0.5, 1.7, 0))
@@ -629,10 +646,13 @@ class ActionManager(Node):
                     break
                 else:
                     self.move_to(Position(3 - 0.5, 1.4, 0))
+                    self.wait_for_motion()
+                    self.move_to(Position(3 - 0.5, 1.7, 0))
+                    self.send_raw("BLOCK")
 
-    def find_final_pos(self, index):
-        pos_out = self.end_poses[self.dest_cans[index][0]] #If yellow 0
-        incr = self.available_end[self.dest_cans[index][0]]
+    def find_final_pos(self, index, en_color):
+        pos_out = self.end_poses[self.dest_cans[index][en_color]] #If yellow 0
+        incr = self.available_end[self.dest_cans[index][en_color]]
         if pos_out[2] % 2 == 0:
             return [pos_out[0] + (pos_out[2] - 1) * (0.05 + 0.1 * incr), pos_out[1], pos_out[2] * np.pi / 2]
         else:
