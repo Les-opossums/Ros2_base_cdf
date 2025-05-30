@@ -478,7 +478,7 @@ class ActionManager(Node):
             time.sleep(0.2)
             # self.get_logger().info(f"Robot speed: vlin={self.robot_speed.x}, vt={self.robot_speed.t}")
             if self.robot_speed.x < 0.0001 and self.robot_speed.t < 0.0001:
-                if self.is_robot_moving:
+                # if self.is_robot_moving:
                     # self.get_logger().info("Robot has stopped.")
                 self.is_robot_moving = False
 
