@@ -101,7 +101,7 @@ class Script:
 
         # Baisse le stepper
         node.sleep(0.1)
-        node.stepper(2)
+        node.stepper(STEPPER_struct(2))
         node.pump(PUMP_struct(2, 1))
         node.pump(PUMP_struct(3, 1))
         node.pump(PUMP_struct(4, 1))
@@ -122,6 +122,7 @@ class Script:
         node.valve(VALVE_struct(2))
         node.valve(VALVE_struct(3))
         node.valve(VALVE_struct(4))
+        node.stepper(STEPPER_struct(1))
 
         # Retour dans la zone de depart
         node.kalman(True)
