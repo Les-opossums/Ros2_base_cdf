@@ -664,7 +664,7 @@ class ActionManager(Node):
         if pos_out[2] % 2 == 0:
             return [pos_out[0] + (pos_out[2] - 1) * (0.05 + size_robot + 0.1 * incr), pos_out[1], pos_out[2]]
         else:
-            return [pos_out[0], pos_out[1] + 0.05 + size_robot + 0.1 * incr, pos_out[2]]
+            return [pos_out[0], pos_out[1] + 0.05 + size_robot + 0.1 * incr, 3 * pos_out[2]]
 
     def angular_distance(a1, a2):
         diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
@@ -720,19 +720,24 @@ class ActionManager(Node):
 
         self.pump(PUMP_struct(1, 0))
         self.valve(VALVE_struct(2))
-
         if destination[2] == 0:
-            self.relative_move_to(Position(-push_dst, 0, 0))
-        elif destination[2] == 1:
             self.relative_move_to(Position(push_dst, 0, 0))
+            self.wait_for_motion()
+            self.relative_move_to(Position(-push_dst, 0, 0))
+            self.wait_for_motion()
+        elif destination[2] == 2:
+            self.relative_move_to(Position(-push_dst, 0, 0))
+            self.wait_for_motion()
+            self.relative_move_to(Position(push_dst, 0, 0))
+            self.wait_for_motion()
         elif destination[2] == 3:
             self.relative_move_to(Position(0, -push_dst, 0))
+            self.wait_for_motion()
+            self.relative_move_to(Position(0, push_dst, 0))
+            self.wait_for_motion()
         else:
-            self.relative_move_to(Position(0, 0, 0))
             self.get_logger().error(f"Invalid angle for dropping cans: "
                                     f"{destination[2]}")
-        self.wait_for_motion()
-        
 
 
 def main(args=None):
