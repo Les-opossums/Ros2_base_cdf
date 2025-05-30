@@ -181,7 +181,7 @@ class ActionManager(Node):
 
         self.color_sub = self.create_subscription(
             String,
-            "init/team_color",
+            "init_team_color",
             self.color_callback,
             10
         )
