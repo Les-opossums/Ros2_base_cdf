@@ -388,14 +388,18 @@ class ActionManager(Node):
             y=msg.robot_position.y,
             t=msg.robot_position.z
         )
-        if len(msg.other_robot_position) == 0:
+        list_enn = []
+        for rob in msg.other_robot_position:
+            if rob.x > 0.3 and rob.x < 2.7 and rob.y > 0.3 and rob.y < 1.7:
+                list_enn.append(rob)
+        if len(list_enn) == 0:
             self.x_enn = None
             self.y_enn = None
             return
-        closer = np.sqrt((msg.other_robot_position[0].x - msg.robot_position.x) ** 2 + (msg.other_robot_position[0].y - msg.robot_position.y) ** 2)
-        self.x_enn = msg.other_robot_position[0].x
-        self.y_enn = msg.other_robot_position[0].y
-        for pos in msg.other_robot_position:
+        closer = np.sqrt((list_enn[0].x - msg.robot_position.x) ** 2 + (list_enn[0].y - msg.robot_position.y) ** 2)
+        self.x_enn = list_enn[0].x
+        self.y_enn = list_enn[0].y
+        for pos in list_enn:
             dst = np.sqrt((pos.x - msg.robot_position.x) ** 2 + (pos.y - msg.robot_position.y) ** 2)
             if dst < closer:
                 self.x_enn = pos.x
