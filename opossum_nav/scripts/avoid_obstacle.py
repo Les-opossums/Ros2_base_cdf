@@ -462,8 +462,8 @@ class ObstacleAvoider(Node):
 
     def _send_block(self) -> None:
         """Send block to motors."""
-        if self.last_command_sent == "BLOCK":
-            return
+        # if self.last_command_sent == "BLOCK":
+            # return
         cmd_msg = String()
         cmd_msg.data = "BLOCK"
         self.pub_command.publish(cmd_msg)
@@ -491,7 +491,7 @@ class ObstacleAvoider(Node):
         if self._obstacle_on_goal(closest_obstacle):
             self.get_logger().info("Obstacle difficult goal we re fucked")
             self._send_block()
-            return True
+            return False
         v_rg = [
             self.goal_position.x - self.robot_position.x,
             self.goal_position.y - self.robot_position.y,
