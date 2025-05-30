@@ -181,7 +181,7 @@ class ActionManager(Node):
 
         self.color_sub = self.create_subscription(
             String,
-            "/main_robot/init/team_color",
+            "init/team_color",
             self.color_callback,
             10
         )
@@ -265,6 +265,7 @@ class ActionManager(Node):
                     self.get_logger().info("Debug mode disabled")
 
     def color_callback(self, msg):
+        self.get_logger(f"IM IN THE CALLBACK NTM {self.color}")
         self.color = msg.data
 
     def feedback_callback(self, msg):
