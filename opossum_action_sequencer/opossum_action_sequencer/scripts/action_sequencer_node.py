@@ -425,7 +425,7 @@ class ActionManager(Node):
             y_middle = 1.0
             while True:
                 if self.x_enn is not None:
-                    self.send_raw("VMAX 0.7")
+                    self.send_raw("VMAX 0.8")
                     v1_x = x_middle - self.x_enn
                     v1_y = y_middle - self.y_enn
                     v1_norm = np.sqrt(v1_x ** 2 + v1_y ** 2)
