@@ -618,7 +618,9 @@ class ActionManager(Node):
                     # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
                     self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * 0.2, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
                     fpos = self.find_final_pos(ind_valid, en_color)
+                    self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
                     self.take_cans(can_valid[2])
+                    self.get_logger().info(f"Drop")
                     self.drop_cans(fpos, default_angle)
                 else: # CANS THAT ARE FRONT ON BOARD
                     if self.robot_pos.y > can_valid[1] or can_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
@@ -628,7 +630,9 @@ class ActionManager(Node):
                         self.move_to(Position(can_valid[0], can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
                         self.wait_for_motion()
                         fpos = self.find_final_pos(ind_valid, en_color)
+                        self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
                         self.take_cans(3)
+                        self.get_logger().info(f"Drop")
                         self.drop_cans(fpos, default_angle)
                     else:
                         if can_valid[1] - self.robot_pos.y < tol:
@@ -637,7 +641,9 @@ class ActionManager(Node):
                         self.move_to(Position(can_valid[0], can_valid[1] - tol, np.pi / 2 + default_angle))
                         self.wait_for_motion()
                         fpos = self.find_final_pos(ind_valid, en_color)
+                        self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
                         self.take_cans(1)
+                        self.get_logger().info(f"Drop")
                         self.drop_cans(fpos, default_angle)
                 self.available_cans[ind_valid] = False
                 self.available_end[self.dest_cans[ind_valid][en_color]] += 1 # If yellow 0, else blue
