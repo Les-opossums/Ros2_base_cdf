@@ -595,6 +595,7 @@ class ActionManager(Node):
                     # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
                     self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * 0.2, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
                     # Pick the cans.
+                    self.take_cans(can_valid[2] * np.pi / 2 + default_angle)
                     pass
                 else: # CANS THAT ARE FRONT ON BOARD
                     if self.robot_pos.y > can_valid[1] or can_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
@@ -604,6 +605,7 @@ class ActionManager(Node):
                         self.move_to(Position(can_valid[0], can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
                         self.wait_for_motion()
                         # Pick the cans.
+                        self.take_cans(3 * np.pi / 2 + default_angle)
                     else:
                         if can_valid[1] - self.robot_pos.y < tol:
                             self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] - tol, np.pi / 2 + default_angle))
@@ -611,6 +613,7 @@ class ActionManager(Node):
                         self.move_to(Position(can_valid[0], can_valid[1] - tol, np.pi / 2 + default_angle))
                         self.wait_for_motion()
                         # Pick the cans.
+                        self.take_cans(np.pi / 2 + default_angle)
                 self.available_cans[ind_valid] = False
                 self.get_logger().info(f"Available cans now: {self.available_cans}")
             else:
