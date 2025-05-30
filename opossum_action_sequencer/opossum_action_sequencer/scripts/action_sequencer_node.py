@@ -243,6 +243,11 @@ class ActionManager(Node):
 
                     self.get_logger().info("Script SMART")
 
+                elif changed.value.integer_value == 12:
+                    from opossum_action_sequencer.match.smart_script import Script
+
+                    self.get_logger().info("Script SMART")
+
                 else:
                     from opossum_action_sequencer.match.script1 import Script
 
@@ -596,14 +601,14 @@ class ActionManager(Node):
         else:
             self.get_logger().error(f"NO COLOR")
         while True:
-            self.send_raw("VMAX 0.1")
+            self.send_raw("VMAX 0.4")
             max = -2
             can_valid = None
             ind_valid = None
             for ind, cans in self.position_cans.items():
                 if self.available_cans[ind]:
                     temp = self.compute_penality(cans)
-                    self.get_logger().info(f"Current value: {ind}, {temp}")
+                    self.get_logger().info(f"Reward for cans: {ind}, {temp}")
                     if temp > max:
                         max = temp
                         ind_valid = ind
@@ -642,21 +647,24 @@ class ActionManager(Node):
                     self.move_to(Position(0.5, 1.4, 0))
                     self.wait_for_motion()
                     self.move_to(Position(0.5, 1.7, 0))
+                    self.wait_for_motion()
                     self.send_raw("BLOCK")
                     break
                 else:
                     self.move_to(Position(3 - 0.5, 1.4, 0))
                     self.wait_for_motion()
                     self.move_to(Position(3 - 0.5, 1.7, 0))
+                    self.wait_for_motion()
                     self.send_raw("BLOCK")
 
     def find_final_pos(self, index, en_color):
+        size_robot = 0.18
         pos_out = self.end_poses[self.dest_cans[index][en_color]] #If yellow 0
         incr = self.available_end[self.dest_cans[index][en_color]]
         if pos_out[2] % 2 == 0:
-            return [pos_out[0] + (pos_out[2] - 1) * (0.05 + 0.1 * incr), pos_out[1], pos_out[2]]
+            return [pos_out[0] + (pos_out[2] - 1) * (0.05 + size_robot + 0.1 * incr), pos_out[1], pos_out[2]]
         else:
-            return [pos_out[0], pos_out[1] + 0.05 + 0.1 * incr, pos_out[2]]
+            return [pos_out[0], pos_out[1] + 0.05 + size_robot + 0.1 * incr, pos_out[2]]
 
     def angular_distance(a1, a2):
         diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
@@ -688,34 +696,43 @@ class ActionManager(Node):
         self.kalman(False)
         self.pump(PUMP_struct(1, 1))
         self.sleep(0.1)
+        push_dst = 0.15
         if angle == 0:
-            self.relative_move_to(Position(0.3, 0, 0))
+            self.relative_move_to(Position(push_dst, 0, 0))
         elif angle == 1:
-            self.relative_move_to(Position(0, 0.3, 0))
+            self.relative_move_to(Position(0, push_dst, 0))
         elif angle == 2:
-            self.relative_move_to(Position(-0.3, 0, 0))
+            self.relative_move_to(Position(-push_dst, 0, 0))
         elif angle == 3:
-            self.relative_move_to(Position(0, -0.3, 0))
+            self.relative_move_to(Position(0, -push_dst, 0))
         else:
+            self.relative_move_to(Position(0, 0, 0))
             self.get_logger().error(f"Invalid angle for taking cans: {angle}")
             pass
+        self.wait_for_motion()
         self.kalman(True)
         self.sleep(0.1)
 
     def drop_cans(self, destination, default_angle):
+        push_dst = 0.15
         self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
+        self.wait_for_motion()
+
         self.pump(PUMP_struct(1, 0))
         self.valve(VALVE_struct(2))
 
         if destination[2] == 0:
-            self.relative_move_to(Position(-0.3, 0, 0))
+            self.relative_move_to(Position(-push_dst, 0, 0))
         elif destination[2] == 1:
-            self.relative_move_to(Position(0.3, 0, 0))
+            self.relative_move_to(Position(push_dst, 0, 0))
         elif destination[2] == 3:
-            self.relative_move_to(Position(0, -0.3, 0))
+            self.relative_move_to(Position(0, -push_dst, 0))
         else:
+            self.relative_move_to(Position(0, 0, 0))
             self.get_logger().error(f"Invalid angle for dropping cans: "
                                     f"{destination[2]}")
+        self.wait_for_motion()
+        
 
 
 def main(args=None):
