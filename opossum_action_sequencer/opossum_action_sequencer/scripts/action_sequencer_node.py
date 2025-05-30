@@ -311,10 +311,10 @@ class ActionManager(Node):
             os.system('systemctl --user restart launch.service')
 
         elif msg.data.strip() == "Pos,done":
-            self.get_logger().info("Motion done message received from Zynq")
-            self.get_logger().info("Robot position from Zynq: "
-                                   f"{self.robot_pos.x} {self.robot_pos.y} "
-                                   f"{self.robot_pos.t}")
+            # self.get_logger().info("Motion done message received from Zynq")
+            # self.get_logger().info("Robot position from Zynq: "
+            #                        f"{self.robot_pos.x} {self.robot_pos.y} "
+            #                        f"{self.robot_pos.t}")
             self.motion_done = True
             self.motion_done_event.set()
 
@@ -406,7 +406,7 @@ class ActionManager(Node):
         if not self.stop:
             self.timer = None
             self.seuil = seuil
-            self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
+            # self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
             self.motion_done = False
             self.is_robot_moving = True
             self.is_robot_arrived = False
@@ -435,7 +435,7 @@ class ActionManager(Node):
                     pos_y = self.y_enn # + v1_y * 0.5
                     dir = np.arctan2(v1_y, v1_x)
                     self.move_to(Position(pos_x, pos_y, dir))
-                    self.get_logger().info(f"Move to ennemi: {pos_x} {pos_y} {dir}")
+                    # self.get_logger().info(f"Move to ennemi: {pos_x} {pos_y} {dir}")
                     time.sleep(0.1)
                 else:
                     self.send_raw("BLOCK")
@@ -454,8 +454,8 @@ class ActionManager(Node):
                 y=self.robot_pos.y + delta.y,
                 t=self.robot_pos.t + delta.t
             )
-            self.get_logger().info(f"Robot_data : {self.robot_pos.x} {self.robot_pos.y} {self.robot_pos.t}")
-            self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
+            # self.get_logger().info(f"Robot_data : {self.robot_pos.x} {self.robot_pos.y} {self.robot_pos.t}")
+            # self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
             self.motion_done = False
             self.is_robot_moving = True
             self.is_robot_arrived = False
