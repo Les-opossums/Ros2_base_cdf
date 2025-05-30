@@ -664,7 +664,7 @@ class ActionManager(Node):
                     self.send_raw("BLOCK")
 
     def find_final_pos(self, index, en_color):
-        size_robot = 0.18
+        size_robot = 0.27
         pos_out = self.end_poses[self.dest_cans[index][en_color]] #If yellow 0
         incr = self.available_end[self.dest_cans[index][en_color]]
         if pos_out[2] % 2 == 0:
@@ -702,7 +702,7 @@ class ActionManager(Node):
         self.kalman(False)
         self.pump(PUMP_struct(1, 1))
         self.sleep(0.1)
-        push_dst = 0.12
+        push_dst = 0.14
         if angle == 0:
             self.relative_move_to(Position(push_dst, 0, 0))
         elif angle == 1:
