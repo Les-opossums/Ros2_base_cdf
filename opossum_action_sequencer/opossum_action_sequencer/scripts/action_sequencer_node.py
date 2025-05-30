@@ -265,7 +265,6 @@ class ActionManager(Node):
                     self.get_logger().info("Debug mode disabled")
 
     def color_callback(self, msg):
-        self.get_logger(f"IM IN THE CALLBACK NTM {self.color}")
         self.color = msg.data
 
     def feedback_callback(self, msg):
