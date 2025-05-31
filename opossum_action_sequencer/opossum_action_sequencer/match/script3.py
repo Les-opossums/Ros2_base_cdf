@@ -24,6 +24,8 @@ class Script:
         node.write_log("Script 3 is running...")
         node.end_zone = Position(0.35, 1.7, -0.95)
 
+        node.send_raw("AMAX 0.7")
+
         # Banderole
         node.kalman(False)
         node.send_raw("VMAX 0.1")
@@ -36,7 +38,7 @@ class Script:
         node.stepper(STEPPER_struct(1))
         node.add_score(20)
 
-        node.send_raw("VMAX 0.5")
+        node.send_raw("VMAX 0.6")
         # node.relative_move_to(Position(0, 0.15, 0), seuil=0.05)
         # node.wait_for_motion()
 
@@ -47,7 +49,7 @@ class Script:
         node.sleep(1)
 
         # Poussette
-        node.send_raw("VMAX 0.5")
+        node.send_raw("VMAX 0.6")
         node.sleep(0.1)
         node.move_to(Position(1.2, 0.5, 2.03))
         node.servo(SERVO_struct(1, 10))
@@ -76,14 +78,14 @@ class Script:
         node.relative_move_to(Position(0, -0.25, 0))
         node.wait_for_motion()
 
-        node.send_raw("VMAX 0.5")
+        node.send_raw("VMAX 0.6")
         node.sleep(0.1)
         node.move_to(Position(1.22, 0.35, 2.03))
         node.wait_for_motion()
         node.add_score(4)
 
         # Deplacement dans la zone adverse
-        node.send_raw("VMAX 0.7")
+        node.send_raw("VMAX 0.8")
         node.move_to(Position(1.22, 1.22, -2.54))
         # node.sleep(0.6)
         node.wait_for_motion()
@@ -129,6 +131,8 @@ class Script:
         node.kalman(True)
         node.sleep(0.5)
 
+        node.send_raw("AMAX 1.1")
+
         # Retour a la base
         node.send_raw("VMAX 0.8")
         node.move_to(Position(2.3, 1.1, 0.0))
@@ -137,13 +141,19 @@ class Script:
         node.move_to(Position(0.5, 1.1, 0.0))
         node.wait_for_motion()
         node.send_raw("VMAX 1.5")
-        node.move_to(Position(2.3, 1.1, 0.0))
+        node.move_to(Position(0.3, 0.4, 1.6))
         node.wait_for_motion()
         node.send_raw("VMAX 1.5")
-        node.move_to(Position(0.5, 1.1, 0.0))
+        node.move_to(Position(0.3, 1.4, 1.6))
+        node.wait_for_motion()
+        node.send_raw("VMAX 1.5")
+        node.move_to(Position(0.3, 0.4, 1.6))
+        node.wait_for_motion()
+        node.send_raw("VMAX 1.5")
+        node.move_to(Position(0.3, 1.4, 1.6))
         node.wait_for_motion()
         node.send_raw("VMAX 1.0")
-        node.move_to(Position(0.35, 1.7, 0.0))
+        node.move_to(Position(0.35, 1.7, 1.6))
         node.wait_for_motion()
         node.in_end_zone = True
         node.add_score(10)
