@@ -92,7 +92,7 @@ class Script:
         node.move_to(Position(0.6, 1.25, 0.2))
 
         # Ramassage des boites adverses
-        node.send_raw("VMAX 0.6")
+        node.send_raw("VMAX 0.3")
         node.sleep(0.1)
         node.pump(PUMP_struct(1, 1))
         node.move_to(Position(0.35, 1.3, 0.2))
