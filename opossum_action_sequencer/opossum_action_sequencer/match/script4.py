@@ -89,16 +89,16 @@ class Script:
         # Deplacement dans la zone adverse
         node.send_raw("VMAX 0.8")
         node.sleep(0.1)
-        node.move_to(Position(1.8, 1.22, 0.2))
+        node.move_to(Position(1.8, 1.22, 0.57))
         node.wait_for_motion()
-        node.move_to(Position(0.6, 1.25, 0.2))
+        node.move_to(Position(0.6, 1.25, 0.57))
         node.wait_for_motion()
 
         # Ramassage des boites adverses
         node.send_raw("VMAX 0.3")
         node.sleep(0.1)
         node.pump(PUMP_struct(1, 1))
-        node.move_to(Position(0.35, 1.3, 0.2))
+        node.move_to(Position(0.35, 1.3, 0.57))
         node.wait_for_motion()
         node.kalman(False)
         node.relative_move_to(Position(-0.3, 0.05, 0))
