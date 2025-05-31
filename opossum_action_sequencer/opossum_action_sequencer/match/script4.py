@@ -137,7 +137,7 @@ class Script:
         node.move_to(Position(0.7, 1.1, 0.0))
         node.wait_for_motion()
         node.send_raw("VMAX 1.5")
-        node.move_to(Position(2.5, 1.1, 0.0))
+        node.move_to(Position(2.3, 1.1, 0.0))
         node.wait_for_motion()
         node.send_raw("VMAX 1.5")
         node.move_to(Position(2.3, 0.4, 1.6))
