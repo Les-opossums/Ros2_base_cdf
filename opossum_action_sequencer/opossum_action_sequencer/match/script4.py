@@ -25,6 +25,7 @@ class Script:
         node.end_zone = Position(2.7, 1.7, 2.03)
 
         node.send_raw("AMAX 0.7")
+        node.sleep(0.1)
 
         # Banderole
         node.kalman(False)
@@ -86,10 +87,11 @@ class Script:
 
         # Deplacement dans la zone adverse
         node.send_raw("VMAX 0.8")
+        node.sleep(0.1)
         node.move_to(Position(1.8, 1.22, 0.2))
-        # node.sleep(0.6)
         node.wait_for_motion()
         node.move_to(Position(0.6, 1.25, 0.2))
+        node.wait_for_motion()
 
         # Ramassage des boites adverses
         node.send_raw("VMAX 0.3")
@@ -98,7 +100,7 @@ class Script:
         node.move_to(Position(0.35, 1.3, 0.2))
         node.wait_for_motion()
         node.kalman(False)
-        node.relative_move_to(Position(-0.3, 0.5, 0))
+        node.relative_move_to(Position(-0.3, 0.05, 0))
         node.wait_for_motion()
 
         # Baisse le stepper
@@ -130,7 +132,8 @@ class Script:
         # Retour dans la zone de depart
         node.kalman(True)
         node.sleep(0.5)
-        node.send_raw("AMAX 1.1")
+        node.send_raw("AMAX 1.5")
+        node.sleep(0.1)
 
         # Retour a la base
         node.send_raw("VMAX 0.8")
@@ -162,3 +165,4 @@ class Script:
         node.wait_for_motion()
         node.in_end_zone = True
         node.add_score(10)
+        node.is_ended = True

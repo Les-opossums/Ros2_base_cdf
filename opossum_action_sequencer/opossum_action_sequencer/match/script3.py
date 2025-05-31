@@ -25,6 +25,7 @@ class Script:
         node.end_zone = Position(0.35, 1.7, -0.95)
 
         node.send_raw("AMAX 0.7")
+        node.sleep(0.1)
 
         # Banderole
         node.kalman(False)
@@ -86,10 +87,12 @@ class Script:
 
         # Deplacement dans la zone adverse
         node.send_raw("VMAX 0.8")
+        node.sleep(0.1)
         node.move_to(Position(1.22, 1.22, -2.54))
         # node.sleep(0.6)
         node.wait_for_motion()
         node.move_to(Position(2.4, 1.25, -2.54))
+        node.wait_for_motion()
 
         # Ramassage des boites adverses
         node.send_raw("VMAX 0.3")
@@ -132,6 +135,7 @@ class Script:
         node.sleep(0.5)
 
         node.send_raw("AMAX 1.5")
+        node.sleep(0.1)
 
         # Retour a la base
         node.send_raw("VMAX 0.8")
