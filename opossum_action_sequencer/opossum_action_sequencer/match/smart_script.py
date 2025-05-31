@@ -2,11 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-available_cans = {i: True for i in range(16)}
-
-position_cans = {
-    0: 
-}
 
 from opossum_action_sequencer.scripts.action_sequencer_node import ActionManager
 from opossum_action_sequencer.action_manager import Version, Position, Speed
@@ -26,5 +21,5 @@ class Script:
         node.write_log("Script GNAAAAAAAAAAAAAais running...")
 
         # Banderole
-        node.send_raw("VMAX 0.5")
+        node.send_raw("VMAX 0.4")
         node.smart_moves()

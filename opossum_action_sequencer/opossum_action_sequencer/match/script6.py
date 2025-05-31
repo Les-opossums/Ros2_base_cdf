@@ -22,6 +22,7 @@ class Script:
 
     def run(self, node):
         node.write_log("Script 3 is running...")
+        node.end_zone = Position(2.7, 1.7, 2.03)
 
         # Banderole
         node.kalman(False)
@@ -87,4 +88,6 @@ class Script:
         node.send_raw("VMAX 0.7")
         node.move_to(Position(2.7, 1.7, 2.03))
         node.wait_for_motion()
+        node.in_end_zone = True
         node.add_score(10)
+        node.is_ended = True

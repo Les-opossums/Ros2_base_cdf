@@ -20,8 +20,6 @@ from opossum_action_sequencer.utils import (
     VALVE_struct,
 )
 
-import multiprocessing
-from multiprocessing import Event, Manager
 import threading
 from threading import Event
 import time
@@ -41,12 +39,16 @@ class ActionManager(Node):
         self.script_class = None
         self.ready = False
         self.is_started = False
+        self.is_ended = False
         self.match_time = None
         self.timer_move = None
+        self.in_end_zone = False
+        self.end_zone = None
+        self.middle_zone = None
 
         self.x_enn = None
         self.y_enn = None
-        
+
         # Action Done
         self.is_robot_moving = False
         self.is_robot_arrived = False
@@ -54,6 +56,7 @@ class ActionManager(Node):
         self.is_pump_bottom_on = False
         self.robot_pos = None
         self.motion_done = True
+        self.color = None
 
         # Process
         self.motion_done_event = Event()
@@ -62,6 +65,38 @@ class ActionManager(Node):
         self.end_match_event = Event()
         self.end_match_event.set()
         self.stop = False
+
+        self.end_poses = {
+            0: [0, 0.875, 2],
+            1: [0.225, 0, 1],
+            2: [1.775, 0, 1],
+            3: [2.225, 0, 1],
+        }
+        self.end_poses = self.end_poses | {key + 4: [3 - val[0], val [1], 2 - val[2]] for key, val in self.end_poses.items()}
+        self.available_end = {i: 0 for i in range(len(list(self.end_poses.keys())))}
+
+        self.position_cans = {
+            0: [0.075, 1.325, 2],
+            1: [0.075, 0.4, 2],
+            2: [0.825, 1.725, 1],
+            3: [1.1, 0.95, 1],
+            4: [0.775, 0.25, 1],
+        }
+        self.position_cans = self.position_cans | {key + 5: [3 - val[0], val[1], 2 - val[2]] for key, val in self.position_cans.items()}
+        self.available_cans = {i: True for i in range(len(list(self.position_cans.keys())))}
+
+        self.dest_cans = {
+            0: [6, 0],
+            1: [6, 0],
+            2: [6, 0],
+            3: [6, 0],
+            4: [7, 1],
+            5: [4, 2],
+            6: [4, 2],
+            7: [4, 2],
+            8: [4, 2],
+            9: [5, 3],
+        }
 
     def _init_parameters(self) -> None:
         """Initialize the parameters of the node."""
@@ -76,6 +111,17 @@ class ActionManager(Node):
                 ("pub_position", "/main_robot/position_out"),
                 ("pub_velocity", "/main_robot/asserv/vel"),
             ],
+        )
+
+    def _init_timers(self):
+        """Initialize the timers of the node."""
+        self.timer_match = self.create_timer(
+            96,
+            self.timer_match_callback
+        )
+        self.timer_backstage = self.create_timer(
+            92,
+            self.timer_backstage_callback
         )
 
     def _init_publishers(self):
@@ -134,6 +180,13 @@ class ActionManager(Node):
             10
         )
 
+        self.color_sub = self.create_subscription(
+            String,
+            "init_team_color",
+            self.color_callback,
+            10
+        )
+
     def parameter_event_callback(self, event):
         """Handle the parameters event."""
         # Parcours des paramètres modifiés
@@ -186,6 +239,16 @@ class ActionManager(Node):
 
                     self.get_logger().info("Script Follow Ennemi")
 
+                elif changed.value.integer_value == 11:
+                    from opossum_action_sequencer.match.smart_script import Script
+
+                    self.get_logger().info("Script SMART")
+
+                elif changed.value.integer_value == 12:
+                    from opossum_action_sequencer.match.smart_script import Script
+
+                    self.get_logger().info("Script SMART")
+
                 else:
                     from opossum_action_sequencer.match.script1 import Script
 
@@ -207,13 +270,16 @@ class ActionManager(Node):
                 else:
                     self.get_logger().info("Debug mode disabled")
 
+    def color_callback(self, msg):
+        self.color = msg.data
+
     def feedback_callback(self, msg):
         """Receive the data from Zynq."""
         # self.get_logger().info(f"Feedback received: {msg.data}")
-
         if msg.data.startswith("LEASH"):
             self.state_leash = True
             if self.ready:
+                self._init_timers()
                 self.is_started = True
                 self.match_time = time.time()
                 self.get_logger().info("Leash activated")
@@ -229,14 +295,8 @@ class ActionManager(Node):
                 self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
                 if self.is_started and self.script_thread is not None:
-                    self.stop = True
-                    self.get_logger().warn("Stopping script")
-                    self.script_instance = None
-                    self.script_thread = None
-                    self.send_raw("BLOCK")
-                    self.end_match_event.set()
-                    time.sleep(0.1)
-                    self.send_raw("BLOCK")
+                    self.get_logger().warn("Stop script from AU")
+                    self.stop_script()
             elif msg.data[-1] == "2":
                 # self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
@@ -252,10 +312,10 @@ class ActionManager(Node):
             os.system('systemctl --user restart launch.service')
 
         elif msg.data.strip() == "Pos,done":
-            self.get_logger().info("Motion done message received from Zynq")
-            self.get_logger().info("Robot position from Zynq: "
-                                   f"{self.robot_pos.x} {self.robot_pos.y} "
-                                   f"{self.robot_pos.t}")
+            # self.get_logger().info("Motion done message received from Zynq")
+            # self.get_logger().info("Robot position from Zynq: "
+            #                        f"{self.robot_pos.x} {self.robot_pos.y} "
+            #                        f"{self.robot_pos.t}")
             self.motion_done = True
             self.motion_done_event.set()
 
@@ -283,22 +343,24 @@ class ActionManager(Node):
                                           self.pos_obj.y,
                                           self.pos_obj.t)
                                  )
+                    self.timer_move = None
 
-        # Handle match time
-        if self.is_started and self.match_time is not None:
-            if self.script_thread is not None:
-                self.current_time = time.time() - self.match_time
-                if self.current_time > 95.0:
-                    # End of match
-                    self.pub_end_of_match.publish(Bool(data=True))
-                    self.stop = True
-                    self.get_logger().warn("End of time, stopping script.")
-                    self.send_raw("BLOCK")
-                    self.end_match_event.set()
-                    time.sleep(0.1)
-                    self.send_raw("BLOCK")
-                    self.script_instance = None
-                    self.script_thread = None
+    def timer_match_callback(self):
+        """Timer callback for match time."""
+        if not self.is_ended:
+            self.pub_end_of_match.publish(Bool(data=True))
+            self.get_logger().warn("Match time exceeded")
+            self.stop_script()
+
+    def timer_backstage_callback(self):
+        if self.end_zone is not None and self.middle_zone is not None:
+            if not self.is_ended and not self.in_end_zone:
+                self.get_logger().warn("Abort, go back home")
+                self.send_raw("VMAX 0.5")
+                self.move_to(self.middle_zone)
+                self.wait_for_motion()
+                time.sleep(0.1)
+                self.move_to(self.end_zone)
 
     def run_script_init(self):
         """Run the script initialization."""
@@ -309,6 +371,19 @@ class ActionManager(Node):
         )
         self.process_init.start()
 
+    def stop_script(self):
+        """Stop the current script."""
+        if self.script_instance is not None:
+            self.get_logger().warn("Stopping script")
+            self.stop = True
+            self.is_ended = True
+            self.send_raw("BLOCK")
+            self.end_match_event.set()
+            time.sleep(0.1)
+            self.send_raw("BLOCK")
+            self.script_instance = None
+            self.script_thread = None
+
     def lidar_loc_callback(self, msg: LidarLoc):
         """Receive Lidar location."""
         self.lidar_pos = Position(
@@ -316,14 +391,18 @@ class ActionManager(Node):
             y=msg.robot_position.y,
             t=msg.robot_position.z
         )
-        if len(msg.other_robot_position) == 0:
+        list_enn = []
+        for rob in msg.other_robot_position:
+            if rob.x > 0.3 and rob.x < 2.7 and rob.y > 0.3 and rob.y < 1.7:
+                list_enn.append(rob)
+        if len(list_enn) == 0:
             self.x_enn = None
             self.y_enn = None
             return
-        closer = np.sqrt((msg.other_robot_position[0].x - msg.robot_position.x) ** 2 + (msg.other_robot_position[0].y - msg.robot_position.y) ** 2)
-        self.x_enn = msg.other_robot_position[0].x
-        self.y_enn = msg.other_robot_position[0].y
-        for pos in msg.other_robot_position:
+        closer = np.sqrt((list_enn[0].x - msg.robot_position.x) ** 2 + (list_enn[0].y - msg.robot_position.y) ** 2)
+        self.x_enn = list_enn[0].x
+        self.y_enn = list_enn[0].y
+        for pos in list_enn:
             dst = np.sqrt((pos.x - msg.robot_position.x) ** 2 + (pos.y - msg.robot_position.y) ** 2)
             if dst < closer:
                 self.x_enn = pos.x
@@ -334,7 +413,7 @@ class ActionManager(Node):
         if not self.stop:
             self.timer = None
             self.seuil = seuil
-            self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
+            # self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
             self.motion_done = False
             self.is_robot_moving = True
             self.is_robot_arrived = False
@@ -352,18 +431,18 @@ class ActionManager(Node):
             x_middle = 1.5
             y_middle = 1.0
             while True:
-                if self.shared_data["x_enn"] is not None:
-                    self.send_raw("VMAX 0.7")
+                if self.x_enn is not None:
+                    self.send_raw("VMAX 0.8")
                     v1_x = x_middle - self.x_enn
                     v1_y = y_middle - self.y_enn
                     v1_norm = np.sqrt(v1_x ** 2 + v1_y ** 2)
                     v1_x /= v1_norm
                     v1_y /= v1_norm
-                    pos_x = self.x_enn + v1_x * 0.5
-                    pos_y = self.y_enn + v1_y * 0.5
+                    pos_x = self.x_enn # + v1_x * 0.5
+                    pos_y = self.y_enn # + v1_y * 0.5
                     dir = np.arctan2(v1_y, v1_x)
                     self.move_to(Position(pos_x, pos_y, dir))
-                    self.get_logger().info(f"Move to ennemi: {pos_x} {pos_y} {dir}")
+                    # self.get_logger().info(f"Move to ennemi: {pos_x} {pos_y} {dir}")
                     time.sleep(0.1)
                 else:
                     self.send_raw("BLOCK")
@@ -382,8 +461,8 @@ class ActionManager(Node):
                 y=self.robot_pos.y + delta.y,
                 t=self.robot_pos.t + delta.t
             )
-            self.get_logger().info(f"Robot_data : {self.robot_pos.x} {self.robot_pos.y} {self.robot_pos.t}")
-            self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
+            # self.get_logger().info(f"Robot_data : {self.robot_pos.x} {self.robot_pos.y} {self.robot_pos.t}")
+            # self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
             self.motion_done = False
             self.is_robot_moving = True
             self.is_robot_arrived = False
@@ -401,8 +480,8 @@ class ActionManager(Node):
             delta_y = abs(self.pos_obj.y - self.robot_pos.y)
             delta_t = abs(self.pos_obj.t - self.robot_pos.t)
             if delta_x < 0.5 and delta_y < 0.5 and delta_t < 0.5:
-                if not self.is_robot_arrived:
-                    self.get_logger().info("Robot has arrived.")
+                # if not self.is_robot_arrived:
+                    # self.get_logger().info("Robot has arrived.")
                 self.is_robot_arrived = True
 
     def update_motion_status(self):
@@ -411,8 +490,8 @@ class ActionManager(Node):
             time.sleep(0.2)
             # self.get_logger().info(f"Robot speed: vlin={self.robot_speed.x}, vt={self.robot_speed.t}")
             if self.robot_speed.x < 0.0001 and self.robot_speed.t < 0.0001:
-                if self.is_robot_moving:
-                    self.get_logger().info("Robot has stopped.")
+                # if self.is_robot_moving:
+                    # self.get_logger().info("Robot has stopped.")
                 self.is_robot_moving = False
 
     def wait_for_motion(self):
@@ -421,7 +500,7 @@ class ActionManager(Node):
             # self.get_logger().info("Waiting for robot to stop...")
             self.motion_done_event.wait()
             time.sleep(0.2)
-            self.get_logger().info("Motion done from Ros")
+            # self.get_logger().info("Motion done from Ros")
             self.motion_done = True
 
     def servo(self, servo: SERVO_struct):
@@ -516,9 +595,164 @@ class ActionManager(Node):
             self.pub_score.publish(Int32(data=score))
             time.sleep(0.1)
 
+    def sign(self, val):
+        return -1 if val < 0 else 1
+
     def smart_moves(self):
-        pass
-    
+        default_angle = -2.60
+        tol = 0.3
+        if self.color.lower() == "yellow":
+            en_color = 0
+        elif self.color.lower() == "blue":
+            en_color = 1
+        else:
+            self.get_logger().error(f"NO COLOR")
+        while True:
+            self.send_raw("VMAX 0.4")
+            max = -2
+            can_valid = None
+            ind_valid = None
+            for ind, cans in self.position_cans.items():
+                if self.available_cans[ind]:
+                    temp = self.compute_penality(cans)
+                    self.get_logger().info(f"Reward for cans: {ind}, {temp}")
+                    if temp > max:
+                        max = temp
+                        ind_valid = ind
+                        can_valid = cans
+            if can_valid is not None:
+                if can_valid[2] % 2 == 0:
+                    # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
+                    self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * tol, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
+                    fpos = self.find_final_pos(ind_valid, en_color)
+                    self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
+                    self.take_cans(can_valid[2])
+                    self.get_logger().info(f"Drop")
+                    self.drop_cans(fpos, default_angle)
+                else: # CANS THAT ARE FRONT ON BOARD
+                    if self.robot_pos.y > can_valid[1] or can_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
+                        if self.robot_pos.y - can_valid[1] < tol:
+                            self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
+                            self.wait_for_motion()
+                        self.move_to(Position(can_valid[0], can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
+                        self.wait_for_motion()
+                        fpos = self.find_final_pos(ind_valid, en_color)
+                        self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
+                        self.take_cans(3)
+                        self.get_logger().info(f"Drop")
+                        self.drop_cans(fpos, default_angle)
+                    else:
+                        if can_valid[1] - self.robot_pos.y < tol:
+                            self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] - tol, np.pi / 2 + default_angle))
+                            self.wait_for_motion()
+                        self.move_to(Position(can_valid[0], can_valid[1] - tol, np.pi / 2 + default_angle))
+                        self.wait_for_motion()
+                        fpos = self.find_final_pos(ind_valid, en_color)
+                        self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
+                        self.take_cans(1)
+                        self.get_logger().info(f"Drop")
+                        self.drop_cans(fpos, default_angle)
+                self.available_cans[ind_valid] = False
+                self.available_end[self.dest_cans[ind_valid][en_color]] += 1 # If yellow 0, else blue
+                self.get_logger().info(f"Available cans now: {self.available_cans}")
+            else:
+                if en_color == 0: # color is yellow
+                    self.move_to(Position(0.5, 1.4, 0))
+                    self.wait_for_motion()
+                    self.move_to(Position(0.5, 1.7, 0))
+                    self.wait_for_motion()
+                    self.send_raw("BLOCK")
+                    break
+                else:
+                    self.move_to(Position(3 - 0.5, 1.4, 0))
+                    self.wait_for_motion()
+                    self.move_to(Position(3 - 0.5, 1.7, 0))
+                    self.wait_for_motion()
+                    self.send_raw("BLOCK")
+
+    def find_final_pos(self, index, en_color):
+        size_robot = 0.27
+        pos_out = self.end_poses[self.dest_cans[index][en_color]] #If yellow 0
+        incr = self.available_end[self.dest_cans[index][en_color]]
+        if pos_out[2] % 2 == 0:
+            return [pos_out[0] + (pos_out[2] - 1) * (0.05 + size_robot + 0.1 * incr), pos_out[1], pos_out[2]]
+        else:
+            return [pos_out[0], pos_out[1] + 0.05 + size_robot + 0.1 * incr, 3 * pos_out[2]]
+
+    def angular_distance(a1, a2):
+        diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
+        return abs(diff)
+
+    def compute_penality(self, pos):
+        angle_coeff = 0.05
+        coeff_center = -0.005
+        coeff_dst = -1
+        coeff_enn = 0.05
+        # coeef_end = -0.0001
+        val_center = (1.5 - pos[0]) ** 2 + (1 - pos[1]) ** 2
+        # val_center = (1.5 - pos[0]) ** 2 + (1 - pos[1]) ** 2
+        if pos[2] % 2 == 0:
+            angle = pos[2] * np.pi / 2
+        else:
+            if self.robot_pos.y > pos[1] and pos[1] > 0.5:
+                angle = 3 * np.pi / 2
+            else:
+                angle = np.pi / 2
+        val_dst = (self.robot_pos.x - pos[0]) ** 2 + (self.robot_pos.y - pos[1]) ** 2 + angle_coeff * (self.robot_pos.t - angle) ** 2
+        if self.x_enn is not None:
+            val_ennemi = (self.x_enn - pos[0]) ** 2 + (self.y_enn - pos[1]) ** 2
+        else:
+            val_ennemi = 0
+        return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
+
+    def take_cans(self, angle):
+        self.kalman(False)
+        self.pump(PUMP_struct(1, 1))
+        self.sleep(0.1)
+        push_dst = 0.14
+        if angle == 0:
+            self.relative_move_to(Position(push_dst, 0, 0))
+        elif angle == 1:
+            self.relative_move_to(Position(0, push_dst, 0))
+        elif angle == 2:
+            self.relative_move_to(Position(-push_dst, 0, 0))
+        elif angle == 3:
+            self.relative_move_to(Position(0, -push_dst, 0))
+        else:
+            self.relative_move_to(Position(0, 0, 0))
+            self.get_logger().error(f"Invalid angle for taking cans: {angle}")
+            pass
+        self.wait_for_motion()
+        self.kalman(True)
+        self.sleep(0.1)
+
+    def drop_cans(self, destination, default_angle):
+        push_dst = 0.12
+        self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
+        self.wait_for_motion()
+
+        self.pump(PUMP_struct(1, 0))
+        self.valve(VALVE_struct(2))
+        if destination[2] == 0:
+            self.relative_move_to(Position(push_dst, 0, 0))
+            self.wait_for_motion()
+            self.relative_move_to(Position(-push_dst, 0, 0))
+            self.wait_for_motion()
+        elif destination[2] == 2:
+            self.relative_move_to(Position(-push_dst, 0, 0))
+            self.wait_for_motion()
+            self.relative_move_to(Position(push_dst, 0, 0))
+            self.wait_for_motion()
+        elif destination[2] == 3:
+            self.relative_move_to(Position(0, -push_dst, 0))
+            self.wait_for_motion()
+            self.relative_move_to(Position(0, push_dst, 0))
+            self.wait_for_motion()
+        else:
+            self.get_logger().error(f"Invalid angle for dropping cans: "
+                                    f"{destination[2]}")
+
+
 def main(args=None):
     """Run main loop."""
     rclpy.init(args=args)

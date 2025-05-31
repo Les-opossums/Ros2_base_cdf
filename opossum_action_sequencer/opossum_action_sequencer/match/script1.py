@@ -13,14 +13,15 @@ import threading
 class Script():
     def run(self, node):
         node.write_log('Script 1 is running...')
+        node.end_zone = Position(1.5, 1, 0)
         # self.send_raw('SYNCHROLIDAR')
         # self.send_raw('SETX 0.6')
         # self.send_raw('SETY 0.6')
         # self.send_raw('SETT -1.2')
-        node.kalman(False)
+        # node.kalman(False)
         node.sleep(2)
         # self.move_to(self.pos_departure)
-        for _ in range(5):
+        for _ in range(20):
             node.add_score(1)
             node.move_to(Position(0.6, 0.6, -1.2))
             node.pump(PUMP_struct(1, 1))

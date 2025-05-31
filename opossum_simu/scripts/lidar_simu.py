@@ -13,7 +13,7 @@ from rclpy.executors import ExternalShutdownException
 from opossum_msgs.msg import PositionMap
 from obstacle_detector.msg import Obstacles, CircleObstacle
 from std_srvs.srv import Trigger
-from std_msgs.msg import Header
+from std_msgs.msg import Header, String
 from opossum_simu.math_simu import lidar_scan
 from sensor_msgs.msg import LaserScan
 
@@ -23,16 +23,6 @@ class LidarSimulation(Node):
 
     def __init__(self):
         super().__init__("lidar_simulation_node")
-        self.count = 0
-
-        self._init_parameters()
-        self._init_publishers()
-        self._init_subscribers()
-        self._init_services()
-        self.get_logger().info("Lidar simulation node initialized.")
-
-    def _init_parameters(self) -> None:
-        """Initialize parameters."""
         self.declare_parameters(
             namespace="",
             parameters=[
@@ -45,19 +35,42 @@ class LidarSimulation(Node):
                 ("default_color", rclpy.Parameter.Type.STRING),
                 ("available_colors", rclpy.Parameter.Type.STRING_ARRAY),
                 ("use_lidar_points", rclpy.Parameter.Type.BOOL),
+                ("enable_wait_color", rclpy.Parameter.Type.BOOL),
                 ("radius", rclpy.Parameter.Type.DOUBLE),
                 ("lidar_range", rclpy.Parameter.Type.DOUBLE),
                 ("angle_info", rclpy.Parameter.Type.DOUBLE_ARRAY),
             ],
         )
+        self._init_main_parameters()
+
+    def _init_main_parameters(self: Node) -> None:
         self.available_colors = (
             self.get_parameter("available_colors")
             .get_parameter_value()
             .string_array_value
         )
-        self.team_color = (
-            self.get_parameter("default_color").get_parameter_value().string_value
-        )
+        if self.get_parameter("enable_wait_color").get_parameter_value().bool_value:
+            self.color_topic = (
+                self.get_parameter("color_topic").get_parameter_value().string_value
+            )
+            _ = self.create_subscription(
+                String,
+                self.color_topic,
+                self._init_color_callback,
+                10,
+            )
+        else:
+            self.team_color = (
+                self.get_parameter("default_color").get_parameter_value().string_value
+            ).lower()
+            if self.team_color not in self.available_colors:
+                raise ValueError("Invalid team color")
+            self._init_parameters()
+            self._init_publishers()
+            self._init_subscribers()
+
+    
+    def _init_parameters(self) -> None:
         self.boundaries = (
             self.get_parameter("boundaries").get_parameter_value().double_array_value
         )
@@ -81,6 +94,7 @@ class LidarSimulation(Node):
             np.array([beacons[i], beacons[i + 1], 1]).reshape(3, 1)
             for i in range(0, len(beacons), 2)
         ]
+        self.get_logger().info("Lidar simulation node initialized.")
 
     def _init_services(self) -> None:
         """Initialize services."""

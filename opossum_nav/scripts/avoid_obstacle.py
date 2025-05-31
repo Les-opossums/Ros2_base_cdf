@@ -248,7 +248,7 @@ class ObstacleAvoider(Node):
             last_obs_detected = self.obstacle_detected
             self.obstacle_detected = self.detect_obstacle(lidar_range)
             if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
-                self._send_vmax(0.4)
+                self._send_vmax(0.6)
                 self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
                 return
             if self.obstacle_detected:
@@ -462,8 +462,8 @@ class ObstacleAvoider(Node):
 
     def _send_block(self) -> None:
         """Send block to motors."""
-        if self.last_command_sent == "BLOCK":
-            return
+        # if self.last_command_sent == "BLOCK":
+            # return
         cmd_msg = String()
         cmd_msg.data = "BLOCK"
         self.pub_command.publish(cmd_msg)
@@ -491,7 +491,7 @@ class ObstacleAvoider(Node):
         if self._obstacle_on_goal(closest_obstacle):
             self.get_logger().info("Obstacle difficult goal we re fucked")
             # self._send_block()
-            # return True
+            # return False
         v_rg = [
             self.goal_position.x - self.robot_position.x,
             self.goal_position.y - self.robot_position.y,
@@ -502,12 +502,13 @@ class ObstacleAvoider(Node):
         ]
         if not self._is_obstacle_blocking(v_rg, v_ro, closest_obstacle, self.thickness_default / 2):
             self.get_logger().info("Path is now clear, resuming to goal.")
+            self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
             return False
         cross_product = 1 if v_rg[0] * v_ro[1] - v_rg[1] * v_ro[0] > 0 else -1
         pos = self._check_ways(closest_obstacle, cross_product, v_rg, v_ro)
         if pos is not None:
             self.get_logger().info(f"FOUND PATH {pos[0]}, {pos[1]}, {self.robot_data.theta}")
-            self._send_vmax(0.4)
+            self._send_vmax(0.6)
             self._send_move(pos[0], pos[1], self.robot_data.theta)
             return True
         self._send_block()
