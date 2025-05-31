@@ -248,7 +248,7 @@ class ObstacleAvoider(Node):
             last_obs_detected = self.obstacle_detected
             self.obstacle_detected = self.detect_obstacle(lidar_range)
             if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
-                # self._send_vmax(0.4)
+                self._send_vmax(0.6)
                 self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
                 return
             if self.obstacle_detected:
@@ -508,7 +508,7 @@ class ObstacleAvoider(Node):
         pos = self._check_ways(closest_obstacle, cross_product, v_rg, v_ro)
         if pos is not None:
             self.get_logger().info(f"FOUND PATH {pos[0]}, {pos[1]}, {self.robot_data.theta}")
-            # self._send_vmax(0.4)
+            self._send_vmax(0.6)
             self._send_move(pos[0], pos[1], self.robot_data.theta)
             return True
         self._send_block()
