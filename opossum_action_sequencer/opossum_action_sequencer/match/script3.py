@@ -130,10 +130,20 @@ class Script:
         node.sleep(0.5)
 
         # Retour a la base
-        node.send_raw("VMAX 0.7")
-        node.move_to(Position(1., 1.1, 2.03))
+        node.send_raw("VMAX 0.8")
+        node.move_to(Position(2.3, 1.1, 0.0))
         node.wait_for_motion()
-        node.move_to(Position(0.35, 1.7, -0.95))
+        node.send_raw("VMAX 1.5")
+        node.move_to(Position(0.5, 1.1, 0.0))
+        node.wait_for_motion()
+        node.send_raw("VMAX 1.5")
+        node.move_to(Position(2.3, 1.1, 0.0))
+        node.wait_for_motion()
+        node.send_raw("VMAX 1.5")
+        node.move_to(Position(0.5, 1.1, 0.0))
+        node.wait_for_motion()
+        node.send_raw("VMAX 1.0")
+        node.move_to(Position(0.35, 1.7, 0.0))
         node.wait_for_motion()
         node.in_end_zone = True
         node.add_score(10)
