@@ -22,7 +22,8 @@ class Script:
 
     def run(self, node):
         node.write_log("Script 3 is running...")
-        node.end_zone = Position(2.7, 1.7, 2.03)
+        node.end_zone = Position(2.7, 1.7, 1.6)
+        node.middle = Position(2.3, 1.5, 1.6)
 
         node.send_raw("AMAX 0.7")
         node.sleep(0.1)

@@ -44,6 +44,7 @@ class ActionManager(Node):
         self.timer_move = None
         self.in_end_zone = False
         self.end_zone = None
+        self.middle_zone = None
 
         self.x_enn = None
         self.y_enn = None
@@ -352,10 +353,12 @@ class ActionManager(Node):
             self.stop_script()
 
     def timer_backstage_callback(self):
-        if self.end_zone is not None:
+        if self.end_zone is not None and self.middle_zone is not None:
             if not self.is_ended and not self.in_end_zone:
                 self.get_logger().warn("Abort, go back home")
                 self.send_raw("VMAX 0.5")
+                self.move_to(self.middle_zone)
+                self.wait_for_motion()
                 time.sleep(0.1)
                 self.move_to(self.end_zone)
 
