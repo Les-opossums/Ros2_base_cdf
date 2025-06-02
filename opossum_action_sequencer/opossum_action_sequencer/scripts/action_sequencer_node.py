@@ -124,6 +124,18 @@ class ActionManager(Node):
             self.timer_backstage_callback
         )
 
+    def _init_move_timer(self):
+        self.move_timer = self.create_timer(
+            2,
+            self.timer_move_callback
+        )
+
+    def _reset_move_timer(self):
+        """Reset the move timer."""
+        if self.move_timer is not None:
+            self.move_timer.cancel()
+            self.move_timer = None
+
     def _init_publishers(self):
         """Initialize the publishers of the node."""
         self.pub_command = self.create_publisher(
@@ -316,20 +328,6 @@ class ActionManager(Node):
             self.update_arrival_status()
             self.update_motion_status()
 
-            if not self.is_robot_moving and not self.motion_done:
-                if self.timer_move is None:
-                    self.timer_move = time.time()
-                delta_time = time.time() - self.timer_move
-                if delta_time > 2.0:
-                    self.get_logger().warn(
-                        "Motion timed out."
-                    )
-                    self.move_to(Position(self.pos_obj.x,
-                                          self.pos_obj.y,
-                                          self.pos_obj.t)
-                                 )
-                    self.timer_move = None
-
     def timer_match_callback(self):
         """Timer callback for match time."""
         if not self.is_ended:
@@ -346,6 +344,13 @@ class ActionManager(Node):
                 self.wait_for_motion()
                 time.sleep(0.1)
                 self.move_to(self.end_zone)
+
+    def timer_move_callback(self):
+        if not self.is_robot_moving and not self.motion_done:
+            self._reset_move_timer()
+            self.get_logger().warn("New Motion timed out.")
+            self.move_to(self.pos_obj)
+            self._init_move_timer()
 
     def run_script_init(self):
         """Run the script initialization."""
@@ -459,8 +464,8 @@ class ActionManager(Node):
 
     def update_arrival_status(self):
         if not self.stop:
+            time.sleep(0.1)
             # self.get_logger().info("Updating arrival status...")
-            time.sleep(0.2)
             delta_x = abs(self.pos_obj.x - self.robot_pos.x)
             delta_y = abs(self.pos_obj.y - self.robot_pos.y)
             delta_t = abs(self.pos_obj.t - self.robot_pos.t)
@@ -471,13 +476,14 @@ class ActionManager(Node):
 
     def update_motion_status(self):
         if not self.stop:
-            # self.get_logger().info("Updating motion status...")
-            time.sleep(0.2)
-            # self.get_logger().info(f"Robot speed: vlin={self.robot_speed.x}, vt={self.robot_speed.t}")
-            if self.robot_speed.x < 0.0001 and self.robot_speed.t < 0.0001:
-                # if self.is_robot_moving:
-                    # self.get_logger().info("Robot has stopped.")
-                self.is_robot_moving = False
+            time.sleep(0.1)
+            if not self.is_robot_moving and not self.motion_done:
+                # self.get_logger().info("Updating motion status...")
+                if abs(self.robot_speed.x) < 0.0001 and abs(self.robot_speed.t) < 0.0001:
+                    self.get_logger().info("Robot has stopped.")
+                    self.get_logger().info(f"Robot speed: vlin={self.robot_speed.x}, vt={self.robot_speed.t}")
+                    self.is_robot_moving = False
+                    self._init_move_timer()
 
     def wait_for_motion(self):
         """Compute the wait_for_motion action."""
