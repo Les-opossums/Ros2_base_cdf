@@ -19,23 +19,14 @@ def launch_setup(context, *args, **kwargs):
         [FindPackageShare("opossum_localisation"), "config", "localisation_params.yaml"]
     )
 
-    node_tf_broadcaster = Node(
-        package="opossum_localisation",
-        executable="tf_broadcaster.py",
-        name="tf_broadcaster_node",
-        parameters=[param_file, {"robot_names": robot_names_list}],
-    )
-    nodes.append(node_tf_broadcaster)
-
     for robot in robot_names_list:
-        if not simulation:
-            node_rplidar = Node(
-                package="rplidar_ros",
-                namespace=robot,
-                executable="rplidar_node",
-                parameters=[param_file],
-            )
-            nodes.append(node_rplidar)
+        node_tf_broadcaster = Node(
+            namespace=robot,
+            package="opossum_localisation",
+            executable="tf_broadcaster.py",
+            name="tf_broadcaster_node",
+            parameters=[param_file, {"robot_names": robot_names_list}],
+        )
         node_beacon_detector = Node(
             namespace=robot,
             package="opossum_localisation",
@@ -51,8 +42,18 @@ def launch_setup(context, *args, **kwargs):
             name="obstacle_extractor_node",
             parameters=[param_file],
         )
+
+        if not simulation:
+            node_rplidar = Node(
+                package="rplidar_ros",
+                namespace=robot,
+                executable="rplidar_node",
+                parameters=[param_file],
+            )
+            nodes.append(node_rplidar)
         nodes.append(node_obstacle_extractor)
         nodes.append(node_beacon_detector)
+        nodes.append(node_tf_broadcaster)
     return nodes
 
 

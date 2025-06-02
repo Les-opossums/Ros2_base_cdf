@@ -101,9 +101,9 @@ class ZynqSimulation(Node):
         name = parser[0]
         args_list = parser[1:]
         if name not in self.comm_yaml:
-            self.get_logger().info(
-                f"The name {name} does not exist in the YAML file com_msgs."
-            )
+            # self.get_logger().info(
+            #     f"The name {name} does not exist in the YAML file com_msgs."
+            # )
             return
         order = self.comm_yaml[name]
         msg_type = order["send"]
@@ -111,9 +111,10 @@ class ZynqSimulation(Node):
             self.process_action(name, {})
 
         elif msg_type not in self.msgs_yaml:
-            self.get_logger().info(
-                f"The message type {msg_type} does not exist in the YAML file format_msgs."
-            )
+            pass
+            # self.get_logger().info(
+            #     f"The message type {msg_type} does not exist in the YAML file format_msgs."
+            # )
 
         else:
             name_type = [

@@ -289,6 +289,13 @@ class MotorSimu(Node):
         ):
             pot_pos = self.position[:2, :] + np.random.uniform(-0.05, 0.05, (2, 1))
         self.position[:2, :] = pot_pos
+        self.pub_real_position.publish(
+            Point(
+                x=float(self.position[0].item()),
+                y=float(self.position[1].item()),
+                z=float(self.position[2].item()),
+            )
+        )
 
     def _ordered_moves(self):
         """Do straight moves when there is a request."""

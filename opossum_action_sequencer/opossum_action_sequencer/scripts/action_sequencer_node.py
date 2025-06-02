@@ -321,12 +321,26 @@ class ActionManager(Node):
         self.robot_pos = Position(x=msg.x, y=msg.y, t=msg.theta)
         self.robot_speed = Position(x=msg.vlin, y=msg.vdir, t=msg.vt)
 
-        if not self.motion_done:
+        if False: #not self.motion_done:
             # self.get_logger().info(f"Verifying motion status: "
             #                        f"{self.is_robot_moving} {self.motion_done}")
             # Update motion state
             self.update_arrival_status()
             self.update_motion_status()
+            self.get_logger().info(f"Robot is moving: {self.is_robot_moving}")
+            if not self.is_robot_moving and not self.motion_done:
+                if self.timer_move is None:
+                    self.timer_move = time.time()
+                delta_time = time.time() - self.timer_move
+                if delta_time > 2.0:
+                    self.get_logger().warn(
+                        "Motion timed out."
+                    )
+                    self.move_to(Position(self.pos_obj.x,
+                                          self.pos_obj.y,
+                                          self.pos_obj.t)
+                                 )
+                    self.timer_move = None
 
     def timer_match_callback(self):
         """Timer callback for match time."""
@@ -436,7 +450,7 @@ class ActionManager(Node):
                     time.sleep(0.1)
                 else:
                     self.send_raw("BLOCK")
-                    self.get_logger().info(f"Sending BLOCK")
+                    # self.get_logger().info(f"Sending BLOCK")
                     time.sleep(0.1)
 
                 # self.get_logger().info("Robot moving...")
@@ -502,7 +516,7 @@ class ActionManager(Node):
                                             )
                                      )
 
-            self.get_logger().info(f"SERVO : SERVO {servo.servo_id} {servo.angle}")
+            # self.get_logger().info(f"SERVO : SERVO {servo.servo_id} {servo.angle}")
             time.sleep(0.1)
 
     def pump(self, pump: PUMP_struct):
@@ -513,7 +527,7 @@ class ActionManager(Node):
                                             )
                                      )
 
-            self.get_logger().info(f"PUMP : PUMP {pump.pump_id} {pump.enable}")
+            # self.get_logger().info(f"PUMP : PUMP {pump.pump_id} {pump.enable}")
             time.sleep(0.1)
 
     def led(self, led: LED_struct):
@@ -528,7 +542,7 @@ class ActionManager(Node):
             self.pub_command.publish(
                 String(data=f"STEPPER1  {stepper.mode}")
             )
-            self.get_logger().info(f"STEPPER : STEPPER1 {stepper.mode}")
+            # self.get_logger().info(f"STEPPER : STEPPER1 {stepper.mode}")
             time.sleep(0.1)
 
     def valve(self, valve: VALVE_struct):
@@ -536,13 +550,14 @@ class ActionManager(Node):
         if not self.stop:
             self.pub_command.publish(String(data=f"VALVE {valve.valve_id} 1"))
 
-            self.get_logger().info(f"VALVE {valve.valve_id} 1")
+            # self.get_logger().info(f"VALVE {valve.valve_id} 1")
             time.sleep(0.1)
 
     def write_log(self, message):
         """Write logs."""
         if not self.stop:
-            self.get_logger().info(f"{message}")
+            # self.get_logger().info(f"{message}")
+            pass
 
     def sleep(self, duration):
         """Sleep for a given duration."""
@@ -553,7 +568,7 @@ class ActionManager(Node):
     def send_raw(self, raw_command):
         """Send raw commands."""
         if not self.stop:
-            self.get_logger().info(f"Sending raw command: {raw_command}")
+            # self.get_logger().info(f"Sending raw command: {raw_command}")
             self.pub_command.publish(String(data=raw_command))
             time.sleep(0.1)
 
@@ -562,10 +577,10 @@ class ActionManager(Node):
         if not self.stop:
             if kalman:
                 self.pub_command.publish(String(data="ENKALMAN 1"))
-                self.get_logger().info("KALMAN ON")
+                # self.get_logger().info("KALMAN ON")
             else:
                 self.pub_command.publish(String(data="ENKALMAN 0"))
-                self.get_logger().info("KALMAN OFF")
+                # self.get_logger().info("KALMAN OFF")
             time.sleep(0.1)
 
     def synchro_lidar(self):
@@ -577,7 +592,7 @@ class ActionManager(Node):
                 f"SYNCHROLIDAR {self.lidar_pos.x} "
                 f"{self.lidar_pos.y} {self.lidar_pos.t}"
             )
-            self.get_logger().info(f"Synchro : {command}")
+            # self.get_logger().info(f"Synchro : {command}")
             self.pub_command.publish(String(data=f"{command}"))
 
     def add_score(self, score):
@@ -592,6 +607,7 @@ class ActionManager(Node):
     def smart_moves(self):
         default_angle = -2.60
         tol = 0.3
+        vmax = 0.3
         if self.color.lower() == "yellow":
             en_color = 0
         elif self.color.lower() == "blue":
@@ -599,14 +615,15 @@ class ActionManager(Node):
         else:
             self.get_logger().error(f"NO COLOR")
         while True:
-            self.send_raw("VMAX 0.4")
-            max = -2
+            # self.get_logger().info("Sending new goal.")
+            self.send_raw(f"VMAX {vmax}")
+            max = -10
             can_valid = None
             ind_valid = None
             for ind, cans in self.position_cans.items():
                 if self.available_cans[ind]:
                     temp = self.compute_penality(cans)
-                    self.get_logger().info(f"Reward for cans: {ind}, {temp}")
+                    # self.get_logger().info(f"Reward for cans: {ind}, {temp}")
                     if temp > max:
                         max = temp
                         ind_valid = ind
@@ -615,10 +632,11 @@ class ActionManager(Node):
                 if can_valid[2] % 2 == 0:
                     # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
                     self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * tol, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
+                    self.wait_for_motion()
                     fpos = self.find_final_pos(ind_valid, en_color)
                     self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
                     self.take_cans(can_valid[2])
-                    self.get_logger().info(f"Drop")
+                    # self.get_logger().info(f"Drop")
                     self.drop_cans(fpos, default_angle)
                 else: # CANS THAT ARE FRONT ON BOARD
                     if self.robot_pos.y > can_valid[1] or can_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
@@ -630,7 +648,7 @@ class ActionManager(Node):
                         fpos = self.find_final_pos(ind_valid, en_color)
                         self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
                         self.take_cans(3)
-                        self.get_logger().info(f"Drop")
+                        # self.get_logger().info(f"Drop")
                         self.drop_cans(fpos, default_angle)
                     else:
                         if can_valid[1] - self.robot_pos.y < tol:
@@ -641,11 +659,11 @@ class ActionManager(Node):
                         fpos = self.find_final_pos(ind_valid, en_color)
                         self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
                         self.take_cans(1)
-                        self.get_logger().info(f"Drop")
+                        # self.get_logger().info(f"Drop")
                         self.drop_cans(fpos, default_angle)
                 self.available_cans[ind_valid] = False
                 self.available_end[self.dest_cans[ind_valid][en_color]] += 1 # If yellow 0, else blue
-                self.get_logger().info(f"Available cans now: {self.available_cans}")
+                # self.get_logger().info(f"Available cans now: {self.available_cans}")
             else:
                 if en_color == 0: # color is yellow
                     self.move_to(Position(0.5, 1.4, 0))
@@ -662,13 +680,14 @@ class ActionManager(Node):
                     self.send_raw("BLOCK")
 
     def find_final_pos(self, index, en_color):
+        size_cans = 0.1
         size_robot = 0.27
-        pos_out = self.end_poses[self.dest_cans[index][en_color]] #If yellow 0
+        pos_out = self.end_poses[self.dest_cans[index][en_color]] # If yellow 0
         incr = self.available_end[self.dest_cans[index][en_color]]
         if pos_out[2] % 2 == 0:
-            return [pos_out[0] + (pos_out[2] - 1) * (0.05 + size_robot + 0.1 * incr), pos_out[1], pos_out[2]]
+            return [pos_out[0] + (pos_out[2] - 1) * (size_cans / 2 + size_robot + size_cans * incr), pos_out[1], pos_out[2]]
         else:
-            return [pos_out[0], pos_out[1] + 0.05 + size_robot + 0.1 * incr, 3 * pos_out[2]]
+            return [pos_out[0], pos_out[1] + size_cans / 2 + size_robot + size_cans * incr, 3 * pos_out[2]]
 
     def angular_distance(a1, a2):
         diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
@@ -676,19 +695,17 @@ class ActionManager(Node):
 
     def compute_penality(self, pos):
         angle_coeff = 0.05
-        coeff_center = -0.005
+        coeff_center = 0 # -0.005
         coeff_dst = -1
-        coeff_enn = 0.05
+        coeff_enn = 0 # 0.05
         # coeef_end = -0.0001
         val_center = (1.5 - pos[0]) ** 2 + (1 - pos[1]) ** 2
-        # val_center = (1.5 - pos[0]) ** 2 + (1 - pos[1]) ** 2
         if pos[2] % 2 == 0:
             angle = pos[2] * np.pi / 2
+        elif self.robot_pos.y > pos[1] and pos[1] > 0.5:
+            angle = 3 * np.pi / 2
         else:
-            if self.robot_pos.y > pos[1] and pos[1] > 0.5:
-                angle = 3 * np.pi / 2
-            else:
-                angle = np.pi / 2
+            angle = np.pi / 2
         val_dst = (self.robot_pos.x - pos[0]) ** 2 + (self.robot_pos.y - pos[1]) ** 2 + angle_coeff * (self.robot_pos.t - angle) ** 2
         if self.x_enn is not None:
             val_ennemi = (self.x_enn - pos[0]) ** 2 + (self.y_enn - pos[1]) ** 2
@@ -700,7 +717,7 @@ class ActionManager(Node):
         self.kalman(False)
         self.pump(PUMP_struct(1, 1))
         self.sleep(0.1)
-        push_dst = 0.14
+        push_dst = 0.1
         if angle == 0:
             self.relative_move_to(Position(push_dst, 0, 0))
         elif angle == 1:
@@ -718,7 +735,7 @@ class ActionManager(Node):
         self.sleep(0.1)
 
     def drop_cans(self, destination, default_angle):
-        push_dst = 0.12
+        push_dst = 0.1
         self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
         self.wait_for_motion()
 

@@ -55,7 +55,7 @@ second_robot:
     ros__parameters:
       real_position_topic: real_position
       short_motor_srv: short_motor
-      random_moves: False
+      random_moves: true
       boundaries:  [0.0, 3.0, 0.0, 2.0]
       compute_period: 0.2
       angular_velocity: 0.4
@@ -78,5 +78,4 @@ second_robot:
       use_lidar_points: false
       lidar_range: 10.
       radius: 0.05
-      num_points: 600
       angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
