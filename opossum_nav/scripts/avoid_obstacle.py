@@ -97,25 +97,25 @@ class ObstacleAvoider(Node):
 
     def _init_publishers(self) -> None:
         """Initialize publishers."""
-        self.obstacle_detected_topic = (
+        obstacle_detected_topic = (
             self.get_parameter("obstacle_detected_topic")
             .get_parameter_value()
             .string_value
         )
-        self.command_topic = (
+        command_topic = (
             self.get_parameter("command_topic").get_parameter_value().string_value
         )
 
-        self.visualization_topic = (
+        visualization_topic = (
             self.get_parameter("visualization_topic").get_parameter_value().string_value
         )
 
         self.pub_obstacle_detected = self.create_publisher(
-            Bool, self.obstacle_detected_topic, 10
+            Bool, obstacle_detected_topic, 10
         )
-        self.pub_command = self.create_publisher(String, self.command_topic, 10)
+        self.pub_command = self.create_publisher(String, command_topic, 10)
 
-        self.pub_visualization = self.create_publisher(Marker, self.visualization_topic, 10)
+        self.pub_visualization = self.create_publisher(Marker, visualization_topic, 10)
 
     def _init_subscribers(self) -> None:
         """Initialize subscribers."""

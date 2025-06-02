@@ -135,13 +135,14 @@ class ActionManager(Node):
         self.declare_parameters(
             namespace="",
             parameters=[
-                ("pub_command", "command"),
-                ("feedback_topic", "/main_robot/feedback_command"),
-                ("pub_score", "/main_robot/score"),
-                ("pub_au", "/main_robot/au"),
-                ("pub_feedback", "/main_robot/feedback_command"),
-                ("pub_position", "/main_robot/position_out"),
-                ("pub_velocity", "/main_robot/asserv/vel"),
+                ("command_topic", "command"),
+                ("score_topic", "score"),
+                ("au_topic", "au"),
+                ("end_of_match_topic", "end_of_match"),
+                ("feedback_command_topic", "feedback_command"),
+                ("robot_data_topic", "robot_data"),
+                ("position_topic", "position_out"),
+                ("color_topic", "init_team_color"),
             ],
         )
 
@@ -170,32 +171,81 @@ class ActionManager(Node):
 
     def _init_publishers(self):
         """Initialize the publishers of the node."""
+        command_topic = (
+            self.get_parameter("command_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        score_topic = (
+            self.get_parameter("score_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        au_topic = (
+            self.get_parameter("au_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        end_of_match_topic = (
+            self.get_parameter("end_of_match_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
         self.pub_command = self.create_publisher(
             String,
-            "/main_robot/command",
+            command_topic,
             10
         )
 
         self.pub_score = self.create_publisher(
             Int32,
-            "/main_robot/score",
+            score_topic,
             10
         )
 
         self.pub_au = self.create_publisher(
             Bool,
-            "/main_robot/au",
+            au_topic,
             10
         )
 
         self.pub_end_of_match = self.create_publisher(
             Bool,
-            "/main_robot/end_of_match",
+            end_of_match_topic,
             10
         )
 
     def _init_subscribers(self):
         """Initialize the subscribers of the node."""
+
+        feedback_command_topic = (
+            self.get_parameter("feedback_command_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        robot_data_topic = (
+            self.get_parameter("robot_data_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        position_topic = (
+            self.get_parameter("position_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        color_topic = (
+            self.get_parameter("color_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
         self.subscription = self.create_subscription(
             ParameterEvent,
             "/parameter_events",
@@ -205,35 +255,28 @@ class ActionManager(Node):
 
         self.sub_feedback = self.create_subscription(
             String,
-            "/main_robot/feedback_command",
+            feedback_command_topic,
             self.feedback_callback,
             10
         )
 
         self.robot_data_sub = self.create_subscription(
             RobotData,
-            "/main_robot/robot_data",
+            robot_data_topic,
             self.robot_data_callback,
             10
         )
 
         self.lidar_loc_sub = self.create_subscription(
             LidarLoc,
-            "/main_robot/position_out",
+            position_topic,
             self.lidar_loc_callback,
             10
         )
 
         self.color_sub = self.create_subscription(
             String,
-            "init_team_color",
-            self.color_callback,
-            10
-        )
-
-        self.color_sub = self.create_subscription(
-            String,
-            "init_team_color",
+            color_topic,
             self.color_callback,
             10
         )
