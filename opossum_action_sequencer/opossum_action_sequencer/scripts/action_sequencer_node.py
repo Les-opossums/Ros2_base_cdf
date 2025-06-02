@@ -191,68 +191,50 @@ class ActionManager(Node):
         """Handle the parameters event."""
         # Parcours des paramètres modifiés
         # self.get_logger().info(f"Parameter event received: {event}")
+        script_map = {
+            0: ("opossum_action_sequencer.match.script1",
+                "Default Script"),
+            1: ("opossum_action_sequencer.match.script1",
+                "Script 1"),
+            2: ("opossum_action_sequencer.match.script2",
+                "Script 2"),
+            3: ("opossum_action_sequencer.match.script3",
+                "Script 3"),
+            4: ("opossum_action_sequencer.match.script4",
+                "Script 4"),
+            5: ("opossum_action_sequencer.match.script5",
+                "Script 5"),
+            6: ("opossum_action_sequencer.match.script6",
+                "Script 6"),
+            7: ("opossum_action_sequencer.match.script_homologation",
+                "Script Homologation"),
+            9: ("opossum_action_sequencer.match.follow_ennemi",
+                "Script Follow Ennemi"),
+            11: ("opossum_action_sequencer.match.smart_script",
+                 "Script Smart"),
+            12: ("opossum_action_sequencer.match.smart_script",
+                 "Script Smart"),
+            69: ("opossum_action_sequencer.match.script_init",
+                 "Script Init"),
+        }
+
         for changed in event.changed_parameters:
             if changed.name == "script_number":
-                # Affiche la nouvelle valeur du paramètre script_number
-                self.get_logger().info(
-                    f"Choix du script : {changed.value.integer_value}"
-                )
-                # Import script
-                if changed.value.integer_value == 0:
-                    pass
-                elif changed.value.integer_value == 1:
-                    from opossum_action_sequencer.match.script1 import Script
+                script_num = changed.value.integer_value
+                self.get_logger().info(f"Choix du script : {script_num}")
 
-                    self.get_logger().info("Script 1")
-                elif changed.value.integer_value == 2:
-                    from opossum_action_sequencer.match.script2 import Script
+                if script_num in script_map:
+                    module_path, log_msg = script_map[script_num]
+                    self.get_logger().info(log_msg)
 
-                    self.get_logger().info("Script 2")
-
-                elif changed.value.integer_value == 3:
-                    from opossum_action_sequencer.match.script3 import Script
-
-                    self.get_logger().info("Script 3")
-
-                elif changed.value.integer_value == 4:
-                    from opossum_action_sequencer.match.script4 import Script
-
-                    self.get_logger().info("Script 4")
-
-                elif changed.value.integer_value == 5:
-                    from opossum_action_sequencer.match.script5 import Script
-
-                    self.get_logger().info("Script 5")
-
-                elif changed.value.integer_value == 6:
-                    from opossum_action_sequencer.match.script6 import Script
-
-                    self.get_logger().info("Script 6")
-
-                elif changed.value.integer_value == 7:
-                    from opossum_action_sequencer.match.script_homologation import Script
-
-                    self.get_logger().info("Script Homologation")
-
-                elif changed.value.integer_value == 9:
-                    from opossum_action_sequencer.match.follow_ennemi import Script
-
-                    self.get_logger().info("Script Follow Ennemi")
-
-                elif changed.value.integer_value == 11:
-                    from opossum_action_sequencer.match.smart_script import Script
-
-                    self.get_logger().info("Script SMART")
-
-                elif changed.value.integer_value == 12:
-                    from opossum_action_sequencer.match.smart_script import Script
-
-                    self.get_logger().info("Script SMART")
+                    # Dynamically import the Script class
+                    module = __import__(module_path, fromlist=["Script"])
+                    Script = getattr(module, "Script")
 
                 else:
-                    from opossum_action_sequencer.match.script1 import Script
-
-                    self.get_logger().info("Default script")
+                    self.get_logger().error("Aucun script associé à la valeur "
+                                            f": {script_num}")
+                    raise ValueError("Invalid script number")
 
                 if changed.value.integer_value != 0:
                     self.ready = True
@@ -264,8 +246,11 @@ class ActionManager(Node):
                 # Affiche la nouvelle valeur du paramètre debug_mode
                 if changed.value.bool_value:
                     self.get_logger().info("Debug mode enabled")
-                    from opossum_action_sequencer.match.script_init import Script as ScriptInit
-                    self.script_init_class = ScriptInit
+                    module = __import__(
+                        "opossum_action_sequencer.match.script_init",
+                        fromlist=["Script"]
+                    )
+                    self.script_init_class = getattr(module, "Script")
                     self.run_script_init()
                 else:
                     self.get_logger().info("Debug mode disabled")
