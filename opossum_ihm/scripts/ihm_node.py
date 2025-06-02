@@ -29,7 +29,10 @@ class IhmNode(Node):
         self._init_publishers()
 
         # Initialisation de l'interface graphique
-        self.gui = GUI()
+        name = self.get_namespace()
+        self.name = name[1:] if name[0] == "/" else name 
+
+        self.gui = GUI(self.name)
 
         # Démarrage de la logique principale
         self.logic_thread = threading.Thread(target=self.main_logic,

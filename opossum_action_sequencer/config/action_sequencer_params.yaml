@@ -1,0 +1,9 @@
+main_robot:
+  action_sequencer_node:
+    ros__parameters:
+      parameters: none
+
+second_robot:
+  action_sequencer_node:
+    ros__parameters:
+      parameters: none

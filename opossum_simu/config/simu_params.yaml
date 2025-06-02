@@ -55,7 +55,7 @@ second_robot:
     ros__parameters:
       real_position_topic: real_position
       short_motor_srv: short_motor
-      random_moves: true
+      random_moves: false
       boundaries:  [0.0, 3.0, 0.0, 2.0]
       compute_period: 0.2
       angular_velocity: 0.4

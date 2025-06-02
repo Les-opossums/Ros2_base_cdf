@@ -28,15 +28,15 @@ main_robot:
 
   obstacle_extractor_node:
     ros__parameters:
-      active: True
-      use_scan: True
-      use_pcl: False
-      use_sim_time: True
+      active: true
+      use_scan: true
+      use_pcl: false
+      use_sim_time: false
 
-      use_split_and_merge: True
-      circles_from_visibles: True
-      discard_converted_segments: True
-      transform_coordinates: True
+      use_split_and_merge: true
+      circles_from_visibles: true
+      discard_converted_segments: true
+      transform_coordinates: true
 
       min_group_points: 2
 
@@ -102,15 +102,15 @@ second_robot:
 
   obstacle_extractor_node:
     ros__parameters:
-      active: True
-      use_scan: True
-      use_pcl: False
-      use_sim_time: True
+      active: true
+      use_scan: true
+      use_pcl: false
+      use_sim_time: false
 
-      use_split_and_merge: True
-      circles_from_visibles: True
-      discard_converted_segments: True
-      transform_coordinates: True
+      use_split_and_merge: true
+      circles_from_visibles: true
+      discard_converted_segments: true
+      transform_coordinates: true
 
       min_group_points: 2
 
