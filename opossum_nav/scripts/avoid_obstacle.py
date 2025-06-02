@@ -119,29 +119,29 @@ class ObstacleAvoider(Node):
 
     def _init_subscribers(self) -> None:
         """Initialize subscribers."""
-        self.robot_data_topic = (
+        robot_data_topic = (
             self.get_parameter("robot_data_topic").get_parameter_value().string_value
         )
-        self.position_topic = (
+        position_topic = (
             self.get_parameter("position_topic").get_parameter_value().string_value
         )
-        self.scan_topic = (
+        scan_topic = (
             self.get_parameter("scan_topic").get_parameter_value().string_value
         )
-        self.goal_position_topic = (
+        goal_position_topic = (
             self.get_parameter("goal_position_topic").get_parameter_value().string_value
         )
         self.sub_robot_data = self.create_subscription(
-            RobotData, self.robot_data_topic, self.robot_data_callback, 10
+            RobotData, robot_data_topic, self.robot_data_callback, 10
         )
         self.sub_scan = self.create_subscription(
-            LaserScan, self.scan_topic, self.scan_callback, 10
+            LaserScan, scan_topic, self.scan_callback, 10
         )
         self.sub_robot_position = self.create_subscription(
-            LidarLoc, self.position_topic, self.robot_position_callback, 10
+            LidarLoc, position_topic, self.robot_position_callback, 10
         )
         self.sub_goal_position = self.create_subscription(
-            GoalDetection, self.goal_position_topic, self.goal_position_callback, 10
+            GoalDetection, goal_position_topic, self.goal_position_callback, 10
         )
         self.sub_au = self.create_subscription(
             Bool, "au", self.reset_all_au, 10

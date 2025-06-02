@@ -1,7 +1,12 @@
 main_robot:
   ihm_node:
     ros__parameters:
-      parameters: none
+      color_topic: init_team_color
+      position_topic: position_out
+      score_topic: score
+      au_topic: au
+      enable_timer_topic: enable_timer
+      comm_state_topic: comm_state
 
   param_server_node:
     ros__parameters:
@@ -12,7 +17,12 @@ main_robot:
 seond_robot:
   ihm_node:
     ros__parameters:
-      parameters: none
+      color_topic: init_team_color
+      position_topic: position_out
+      score_topic: score
+      au_topic: au
+      enable_timer_topic: enable_timer
+      comm_state_topic: comm_state
 
   param_server_node:
     ros__parameters:
