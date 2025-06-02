@@ -57,13 +57,12 @@ private:
     // Topics
     std::string object_topic_;
     std::string robot_position_topic_;
-    std::string position_topic_;
     std::string debug_topic_;
     std::string display_topic_;
 
     // ROS 2 communication
     rclcpp::Publisher<opossum_msgs::msg::LidarLoc>::SharedPtr pub_location_;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_location_cmd_;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_cmd_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_debug_;
 
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_color_;
