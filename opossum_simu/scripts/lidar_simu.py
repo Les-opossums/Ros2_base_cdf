@@ -152,23 +152,57 @@ class LidarSimulation(Node):
         )
 
     def _update(self, msg) -> None:
-        """Update the position and beacons in robot frame."""
-        self.position = np.array([[msg.robot.x], [msg.robot.y], [1]])
-        self.angle = msg.robot.z
-        self.OtoR = np.array(
-            [
-                [np.cos(self.angle), -np.sin(self.angle), self.position[0, 0]],
-                [np.sin(self.angle), np.cos(self.angle), self.position[1, 0]],
-                [0, 0, 1],
-            ]
-        )
-        self.new_beacons = [
-            np.linalg.inv(self.OtoR) @ beacon for beacon in self.fixed_beacons
-        ]
+        """Update the position and transform fixed beacons and enemy positions to the robot frame."""
+        x, y, theta = msg.robot.x, msg.robot.y, msg.robot.z
+        self.position = np.array([[x], [y], [1]])
+        self.angle = theta
+
+        # Homogeneous transformation matrix: world → robot frame
+        cos_a = np.cos(theta)
+        sin_a = np.sin(theta)
+        self.OtoR = np.array([
+            [cos_a, -sin_a, x],
+            [sin_a,  cos_a, y],
+            [0, 0, 1]
+        ])
+
+        inv_OtoR = np.array([
+            [ cos_a,  sin_a, -x * cos_a - y * sin_a],
+            [-sin_a,  cos_a,  x * sin_a - y * cos_a],
+            [0, 0, 1]
+        ])
+
+        # Transform all beacons
+        self.new_beacons = [inv_OtoR @ b for b in self.fixed_beacons]
+
+        # Vectorized transformation of enemies
         self.new_ennemis = []
-        for e in msg.ennemis:
-            e_w = np.array([[e.x], [e.y], [1]])
-            self.new_ennemis.append(np.linalg.inv(self.OtoR) @ e_w)
+        if msg.ennemis:
+            ennemis_world = np.array([[e.x, e.y, 1.0] for e in msg.ennemis]).T  # Shape: (3, N)
+            ennemis_robot = inv_OtoR @ ennemis_world
+            self.new_ennemis = [ennemis_robot[:, i].reshape(3, 1) for i in range(ennemis_robot.shape[1])]
+
+    # def _update(self, msg) -> None:
+    #     """Update the position and beacons in robot frame."""
+    #     self.position = np.array([[msg.robot.x], [msg.robot.y], [1]])
+    #     self.angle = msg.robot.z
+    #     cos_a = np.cos(self.angle)
+    #     sin_a = np.sin(self.angle)
+    #     self.OtoR = np.array(
+    #         [
+    #             [cos_a, -sin_a, self.position[0, 0]],
+    #             [sin_a, cos_a, self.position[1, 0]],
+    #             [0, 0, 1],
+    #         ]
+    #     )
+    #     inv_OtoR = np.linalg.inv(self.OtoR)
+    #     self.new_beacons = [
+    #         inv_OtoR @ beacon for beacon in self.fixed_beacons
+    #     ]
+    #     self.new_ennemis = []
+    #     for e in msg.ennemis:
+    #         e_w = np.array([[e.x], [e.y], [1]])
+    #         self.new_ennemis.append(inv_OtoR @ e_w)
 
     def _publish_objects(self, msg) -> None:
         """Publish all the objects displayed."""

@@ -36,11 +36,11 @@ main_robot:
       boundaries:  [0.0, 3.0, 0.0, 2.0]
       enable_wait_color: true
       color_topic: init_team_color
-      use_lidar_points: false
+      use_lidar_points: true
       lidar_range: 10.
       radius: 0.05
-      angle_info: [-3.1276220678165654, 3.14159265358, 0.014828970674425364] # Angle min, angle max, angle increment
-      # angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
+      # angle_info: [-3.1276220678165654, 3.14159265358, 0.014828970674425364] # Angle min, angle max, angle increment
+      angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
 
 second_robot:
   zynq_simu_node:
@@ -73,8 +73,8 @@ second_robot:
       boundaries:  [0.0, 3.0, 0.0, 2.0]
       enable_wait_color: true
       color_topic: init_team_color
-      use_lidar_points: false
+      use_lidar_points: true
       lidar_range: 10.
       radius: 0.05
-      # angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
-      angle_info: [-3.1276220678165654, 3.14159265358, 0.014828970674425364] # Angle min, angle max, angle increment
+      angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
+      # angle_info: [-3.1276220678165654, 3.14159265358, 0.014828970674425364] # Angle min, angle max, angle increment
