@@ -17,6 +17,8 @@ include_directories(include)
 
 install(DIRECTORY
   images
+  config
+  launch
   DESTINATION share/${PROJECT_NAME}/
 )
 

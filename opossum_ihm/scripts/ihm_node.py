@@ -14,9 +14,28 @@ class IhmNode(Node):
     def __init__(self):
         super().__init__("ihm_node")
         self.get_logger().info("Initializing IHM Node")
-
-        # Initialisation des abonnements
+        self._init_parameters()
+        self._init_publishers()
         self._init_subscribers()
+
+        # Initialisation de l'interface graphique
+        self.gui = GUI(self.name)
+        self.logic_thread = threading.Thread(target=self.main_logic,
+                                             daemon=True)
+        self.logic_thread.start()
+
+    def _init_parameters(self):
+        self.declare_parameters(
+            namespace="",
+            parameters=[
+                ("color_topic", "init_team_color"),
+                ("position_topic", "position_out"),
+                ("score_topic", "score"),
+                ("au_topic", "au"),
+                ("enable_timer_topic", "enable_timer"),
+                ("comm_state_topic", "comm_state"),
+            ]
+        )
         self.current_score = 0
         self.clr = 'blue'
         self.scr = 0
@@ -26,18 +45,69 @@ class IhmNode(Node):
         self.au = False
         self.comm_state = True
         self.x, self.y, self.t = None, None, None
-        self._init_publishers()
-
-        # Initialisation de l'interface graphique
-        self.gui = GUI()
-
-        # Démarrage de la logique principale
-        self.logic_thread = threading.Thread(target=self.main_logic,
-                                             daemon=True)
-        self.logic_thread.start()
+        name = self.get_namespace()
+        self.name = name[1:] if name[0] == "/" else name 
 
     def _init_publishers(self):
-        self.pub_team_color = self.create_publisher(String, "init_team_color", 10)
+        color_topic = (
+            self.get_parameter("color_topic").get_parameter_value().string_value
+        )
+        self.pub_color_topic = self.create_publisher(String, color_topic, 10)
+
+    def _init_subscribers(self):
+        """Initialise les abonnements aux topics ROS 2."""
+        self.get_logger().info("Setting up subscribers...")
+        
+        score_topic = (
+            self.get_parameter("score_topic").get_parameter_value().string_value
+        )
+        
+        au_topic = (
+            self.get_parameter("au_topic").get_parameter_value().string_value
+        )
+
+        enable_timer_topic = (
+            self.get_parameter("enable_timer_topic").get_parameter_value().string_value
+        )
+
+        comm_state_topic = (
+            self.get_parameter("comm_state_topic").get_parameter_value().string_value
+        )
+
+        position_topic = (
+            self.get_parameter("position_topic").get_parameter_value().string_value
+        )
+
+        self.sub_score = self.create_subscription(
+            Int32,
+            score_topic,
+            self.score_callback,
+            10
+        )
+        self.sub_au = self.create_subscription(
+            Bool,
+            au_topic,
+            self.au_callback,
+            10
+        )
+        self.sub_enable_timer = self.create_subscription(
+            Bool,
+            enable_timer_topic,
+            self.enable_timer_callback,
+            10
+        )
+        self.sub_comm_state = self.create_subscription(
+            Bool,
+            comm_state_topic,
+            self.comm_state_callback,
+            10
+        )
+        self.lidar_loc_sub = self.create_subscription(
+            LidarLoc,
+            position_topic,
+            self.lidar_loc_callback,
+            1
+        )
 
     def main_logic(self):
         """Logique principale pour interagir avec l'utilisateur."""
@@ -50,7 +120,7 @@ class IhmNode(Node):
                 continue
 
             self.clr = self.gui.get_color()
-            self.pub_team_color.publish(String(data=self.clr))
+            self.pub_color_topic.publish(String(data=self.clr))
             self.get_logger().info(f"Color selected: {self.clr}")
 
             self.gui.run_script()
@@ -81,10 +151,6 @@ class IhmNode(Node):
         self.gui.score_app.root.mainloop()
 
     def update_values(self):
-        # self.get_logger().info("Updating values:")
-        # self.get_logger().info(f"Score: {self.score}")
-        # self.get_logger().info(f"AU: {self.au}")
-        # self.get_logger().info(f"Positon: {self.x} {self.y} {self.t}")
         self.gui.score_app.update_score(self.score)
         self.gui.score_app.update_au(self.au, self.comm_state)
         self.gui.score_app.update_position(self.x, self.y, self.t)
@@ -112,41 +178,6 @@ class IhmNode(Node):
             #                        f"{response}")
         except Exception as e:
             self.get_logger().error(f"Service call failed: {e}")
-
-    def _init_subscribers(self):
-        """Initialise les abonnements aux topics ROS 2."""
-        self.get_logger().info("Setting up subscribers...")
-
-        self.sub_score_topic = self.create_subscription(
-            Int32,
-            "/main_robot/score",
-            self.score_callback,
-            10
-        )
-        self.sub_au_topic = self.create_subscription(
-            Bool,
-            "au",
-            self.au_callback,
-            10
-        )
-        self.sub_enable_timer_topic = self.create_subscription(
-            Bool,
-            "enable_timer",
-            self.enable_timer_callback,
-            10
-        )
-        self.sub_comm_state_topic = self.create_subscription(
-            Bool,
-            "/main_robot/comm_state",
-            self.comm_state_callback,
-            10
-        )
-        self.lidar_loc_sub = self.create_subscription(
-            LidarLoc,
-            "/main_robot/position_out",
-            self.lidar_loc_callback,
-            1
-        )
 
     def score_callback(self, msg):
         """Callback pour le topic 'score'."""

@@ -23,6 +23,7 @@ void BeaconDetectorNode::init_main_parameters()
     this->declare_parameter("object_topic", "");
     this->declare_parameter("robot_position_topic", "");
     this->declare_parameter("position_topic", "");
+    this->declare_parameter("command_topic", "");
 
     // Get parameters
     enable_wait_color_ = this->get_parameter("enable_wait_color").as_bool();
@@ -116,9 +117,10 @@ void BeaconDetectorNode::init_parameters()
 
 void BeaconDetectorNode::init_publishers()
 {
-    position_topic_ = this->get_parameter("position_topic").as_string();
-    pub_location_ = this->create_publisher<opossum_msgs::msg::LidarLoc>(position_topic_, 10);
-    pub_location_cmd_ = this->create_publisher<std_msgs::msg::String>("command", 10);
+    std::string position_topic = this->get_parameter("position_topic").as_string();
+    std::string command_topic = this->get_parameter("command_topic").as_string();
+    pub_location_ = this->create_publisher<opossum_msgs::msg::LidarLoc>(position_topic, 10);
+    pub_cmd_ = this->create_publisher<std_msgs::msg::String>(command_topic, 10);
 }
 
 void BeaconDetectorNode::init_subscribers()
@@ -189,9 +191,7 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
             << position_found->z() << " "
             << ms_since_last;
             msg_cmd.data = ss.str();
-            pub_location_cmd_->publish(msg_cmd);
-            // RCLCPP_INFO(this->get_logger(), "Current time: %d ms", ms_since_begin);
-            // RCLCPP_INFO(this->get_logger(), "Last Time: %d ms", ms_since_last);
+            pub_cmd_->publish(msg_cmd);
         }
     }
 }

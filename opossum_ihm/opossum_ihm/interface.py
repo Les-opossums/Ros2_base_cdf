@@ -7,10 +7,11 @@ from ament_index_python.packages import get_package_share_directory
 
 
 class ColorChoiceApp:
-    def __init__(self, au_state):
+    def __init__(self, name, au_state):
+        self.name = name
         self.reload = False
         self.root = tk.Tk()
-        self.root.title("Choisir une couleur")
+        self.root.title(f"[{self.name}] Choose your color")
 
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -19,7 +20,7 @@ class ColorChoiceApp:
             self.root.attributes("-fullscreen", True)
         else:
             self.root.geometry("480x800")
-        self.label = tk.Label(self.root, text="Choisissez une couleur :")
+        self.label = tk.Label(self.root, text="Choose a color:")
         self.label.pack(pady=10)
 
         if au_state:
@@ -77,13 +78,14 @@ class ColorChoiceApp:
 
 
 class ImageApp:
-    def __init__(self, selected_color):
+    def __init__(self, name, selected_color):
+        self.name = name
         self.reload = False
         self.selected_script = 0
         self.selected_color = selected_color
 
         self.root = tk.Tk()
-        self.root.title("Choose your script")
+        self.root.title(f"[{self.name}] Choose your script")
         self.root.configure(bg=selected_color)
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -227,7 +229,8 @@ class ImageApp:
 
 
 class ValidationApp:
-    def __init__(self, color, script):
+    def __init__(self, name, color, script):
+        self.name = name
         self.color = color
         self.script = script
         self.reload = False
@@ -235,7 +238,7 @@ class ValidationApp:
 
         # Initialisation de la fenêtre principale
         self.root = tk.Tk()
-        self.root.title("Validation")
+        self.root.title(f"[{self.name}] Validation")
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         if screen_width == 480 and screen_height == 800:
@@ -255,7 +258,7 @@ class ValidationApp:
         # Titre
         title_label = tk.Label(
             self.root,
-            text="Détails de la Validation",
+            text="Validation details",
             font=("Arial", 16, "bold"),
             bg="white",
             fg="black",
@@ -265,7 +268,7 @@ class ValidationApp:
         # Affichage de la couleur
         color_label = tk.Label(
             self.root,
-            text=f"Couleur : {self.color}",
+            text=f"Color : {self.color}",
             font=("Arial", 14),
             bg=self.color,  # Utilisation de la couleur fournie
             fg="white" if self.color.lower() != "white" else "black",
@@ -316,7 +319,7 @@ class ValidationApp:
         reload_button.pack(pady=20)
 
     def on_validate(self):
-        print("Validation effectuée.")
+        print("Validation done.")
         self.root.destroy()
 
     def launch_init(self):
@@ -329,9 +332,10 @@ class ValidationApp:
 
 
 class ScoreApp:
-    def __init__(self, color):
+    def __init__(self, name, color):
+        self.name = name
         self.root = tk.Tk()
-        self.root.title("Score")
+        self.root.title(f"[{self.name}] Score")
         self.color = color
         self.score = 0
         self.is_match = False
@@ -471,13 +475,14 @@ class ImageLabel(tk.Label):
 
 
 class GUI:
-    def __init__(self):
+    def __init__(self, name):
+        self.name = name
         self.reload = False
         self.launched_init = False
         self.initialized = False
 
     def run_color(self, au_state):
-        self.color_app = ColorChoiceApp(au_state)
+        self.color_app = ColorChoiceApp(self.name, au_state)
         self.reload = self.color_app.reload
 
     def get_color(self):
@@ -485,7 +490,7 @@ class GUI:
 
     def run_script(self):
         assert self.color_app.selected_color is not None
-        self.img_app = ImageApp(self.color_app.selected_color)
+        self.img_app = ImageApp(self.name, self.color_app.selected_color)
         self.reload = self.img_app.reload
 
     def get_script(self):
@@ -495,6 +500,7 @@ class GUI:
         assert self.color_app.selected_color is not None
         assert self.img_app.selected_script is not None
         self.validation_app = ValidationApp(
+            self.name, 
             self.color_app.selected_color,
             self.img_app.selected_script
         )
@@ -502,4 +508,4 @@ class GUI:
         self.launched_init = self.validation_app.launched_init
 
     def run_score(self):
-        self.score_app = ScoreApp(self.color_app.selected_color)
+        self.score_app = ScoreApp(self.name, self.color_app.selected_color)

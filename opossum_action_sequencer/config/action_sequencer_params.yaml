@@ -1,0 +1,23 @@
+main_robot:
+  action_sequencer_node:
+    ros__parameters:
+      command_topic: command
+      score_topic: score
+      au_topic: au
+      end_of_match_topic: end_of_match
+      feedback_command_topic: feedback_command
+      robot_data_topic: robot_data
+      position_topic: position_out
+      color_topic: init_team_color
+
+second_robot:
+  action_sequencer_node:
+    ros__parameters:
+      command_topic: command
+      score_topic: score
+      au_topic: au
+      end_of_match_topic: end_of_match
+      feedback_command_topic: feedback_command
+      robot_data_topic: robot_data
+      position_topic: position_out
+      color_topic: init_team_color

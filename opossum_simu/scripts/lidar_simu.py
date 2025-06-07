@@ -32,6 +32,7 @@ class LidarSimulation(Node):
                 ("scan_topic", rclpy.Parameter.Type.STRING),
                 ("update_position_topic", rclpy.Parameter.Type.STRING),
                 ("color_service", rclpy.Parameter.Type.STRING),
+                ("color_topic", rclpy.Parameter.Type.STRING),
                 ("default_color", rclpy.Parameter.Type.STRING),
                 ("available_colors", rclpy.Parameter.Type.STRING_ARRAY),
                 ("use_lidar_points", rclpy.Parameter.Type.BOOL),
@@ -69,6 +70,21 @@ class LidarSimulation(Node):
             self._init_publishers()
             self._init_subscribers()
 
+    def _init_color_callback(self: Node, msg: String) -> None:
+        """
+        Wait for the reception of the color message and set all the parameters once the message has been received.
+
+        :param msg: The message containing the color of the team
+        :type msg: String
+        """
+        color = msg.data.lower()
+        if color not in self.available_colors:
+            raise ValueError("Invalid team color")
+        self.team_color = color
+        self._init_parameters()
+        self._init_publishers()
+        self._init_subscribers()
+
     
     def _init_parameters(self) -> None:
         self.boundaries = (
@@ -87,14 +103,14 @@ class LidarSimulation(Node):
         beacons = self.get_parameter("beacons").get_parameter_value().double_array_value
         if self.team_color not in self.available_colors:
             raise ValueError("Invalid team color")
-        if self.team_color == self.available_colors[1]:
-            for i in range(1, len(beacons), 2):
-                beacons[i] = self.boundaries[3] - beacons[i]
+        if self.team_color == "blue":
+            for i in range(0, len(beacons), 2):
+                beacons[i] = self.boundaries[1] - beacons[i]
         self.fixed_beacons = [
             np.array([beacons[i], beacons[i + 1], 1]).reshape(3, 1)
             for i in range(0, len(beacons), 2)
         ]
-        self.get_logger().info("Lidar simulation node initialized.")
+        self.get_logger().info(f"Lidar simulation node initialized with color {self.team_color}.")
 
     def _init_services(self) -> None:
         """Initialize services."""

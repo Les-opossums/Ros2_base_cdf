@@ -196,8 +196,10 @@ class MapScene(QtWidgets.QGraphicsView):
             index += 1
         # logger = get_logger("HEY")
         # logger.info(f"NUM robo: {len(self.ennemis_items)}")
-        if index < len(self.ennemis_items) - 1:
-            self.ennemis_items = self.ennemis_items[:index]
+        # Remove old enemy items from the scene if they are no longer in the new message
+        while len(self.ennemis_items) > index:
+            old_item = self.ennemis_items.pop()
+            self.scene.removeItem(old_item)
 
 
 class DraggablePixmapItem(QtWidgets.QGraphicsPixmapItem):
@@ -564,6 +566,8 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
 
         # ROS connection
         self.gui_node = NodeGUI(self)
+        self.leash_button = QtWidgets.QPushButton("Send all LEASH")
+        self.leash_button.clicked.connect(self.send_leashes)
 
         # GUI for each robot
         self.page_name_box = QtWidgets.QComboBox()
@@ -580,6 +584,7 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         central_widget = QtWidgets.QWidget()
         self.setCentralWidget(central_widget)
         self.layout = QtWidgets.QVBoxLayout(central_widget)
+        self.layout.addWidget(self.leash_button)
         self.layout.addWidget(self.page_name_box)
         self.layout.addWidget(self.stackedWidgets)
 
@@ -593,6 +598,10 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         """Send the command request to node ROS."""
         self.gui_node.publish_command(name, command_name, args)
 
+    def send_leashes(self):
+        for name in self.robot_pages.keys():
+            self.send_cmd(name, "LEASH", [])
+            
     def _connect_to_ros(self):
         """Connect ROS to interface."""
         self.timer = QtCore.QTimer(self)

@@ -34,14 +34,13 @@ main_robot:
       beacons: [-0.094, 0.05, -0.094, 1.95, 3.094, 1., 1.275, 2.13]
       # beacons: [-0.094, 0.072, -0.094, 1.928, 3.094, 1., 1.275, 2.12]
       boundaries:  [0.0, 3.0, 0.0, 2.0]
-      enable_wait_color: false
+      enable_wait_color: true
       color_topic: init_team_color
-
-
-      use_lidar_points: true
+      use_lidar_points: false
       lidar_range: 10.
       radius: 0.05
-      angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
+      angle_info: [-3.1276220678165654, 3.14159265358, 0.014828970674425364] # Angle min, angle max, angle increment
+      # angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
 
 second_robot:
   zynq_simu_node:
@@ -55,7 +54,7 @@ second_robot:
     ros__parameters:
       real_position_topic: real_position
       short_motor_srv: short_motor
-      random_moves: False
+      random_moves: false
       boundaries:  [0.0, 3.0, 0.0, 2.0]
       compute_period: 0.2
       angular_velocity: 0.4
@@ -72,11 +71,10 @@ second_robot:
       beacons: [-0.094, 0.05, -0.094, 1.95, 3.094, 1., 1.275, 2.13]
       # beacons: [-0.094, 0.072, -0.094, 1.928, 3.094, 1., 1.275, 2.12]
       boundaries:  [0.0, 3.0, 0.0, 2.0]
-      enable_wait_color: false
+      enable_wait_color: true
       color_topic: init_team_color
-
       use_lidar_points: false
       lidar_range: 10.
       radius: 0.05
-      num_points: 600
-      angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
+      # angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
+      angle_info: [-3.1276220678165654, 3.14159265358, 0.014828970674425364] # Angle min, angle max, angle increment

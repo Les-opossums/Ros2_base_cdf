@@ -97,51 +97,51 @@ class ObstacleAvoider(Node):
 
     def _init_publishers(self) -> None:
         """Initialize publishers."""
-        self.obstacle_detected_topic = (
+        obstacle_detected_topic = (
             self.get_parameter("obstacle_detected_topic")
             .get_parameter_value()
             .string_value
         )
-        self.command_topic = (
+        command_topic = (
             self.get_parameter("command_topic").get_parameter_value().string_value
         )
 
-        self.visualization_topic = (
+        visualization_topic = (
             self.get_parameter("visualization_topic").get_parameter_value().string_value
         )
 
         self.pub_obstacle_detected = self.create_publisher(
-            Bool, self.obstacle_detected_topic, 10
+            Bool, obstacle_detected_topic, 10
         )
-        self.pub_command = self.create_publisher(String, self.command_topic, 10)
+        self.pub_command = self.create_publisher(String, command_topic, 10)
 
-        self.pub_visualization = self.create_publisher(Marker, self.visualization_topic, 10)
+        self.pub_visualization = self.create_publisher(Marker, visualization_topic, 10)
 
     def _init_subscribers(self) -> None:
         """Initialize subscribers."""
-        self.robot_data_topic = (
+        robot_data_topic = (
             self.get_parameter("robot_data_topic").get_parameter_value().string_value
         )
-        self.position_topic = (
+        position_topic = (
             self.get_parameter("position_topic").get_parameter_value().string_value
         )
-        self.scan_topic = (
+        scan_topic = (
             self.get_parameter("scan_topic").get_parameter_value().string_value
         )
-        self.goal_position_topic = (
+        goal_position_topic = (
             self.get_parameter("goal_position_topic").get_parameter_value().string_value
         )
         self.sub_robot_data = self.create_subscription(
-            RobotData, self.robot_data_topic, self.robot_data_callback, 10
+            RobotData, robot_data_topic, self.robot_data_callback, 10
         )
         self.sub_scan = self.create_subscription(
-            LaserScan, self.scan_topic, self.scan_callback, 10
+            LaserScan, scan_topic, self.scan_callback, 10
         )
         self.sub_robot_position = self.create_subscription(
-            LidarLoc, self.position_topic, self.robot_position_callback, 10
+            LidarLoc, position_topic, self.robot_position_callback, 10
         )
         self.sub_goal_position = self.create_subscription(
-            GoalDetection, self.goal_position_topic, self.goal_position_callback, 10
+            GoalDetection, goal_position_topic, self.goal_position_callback, 10
         )
         self.sub_au = self.create_subscription(
             Bool, "au", self.reset_all_au, 10
@@ -248,7 +248,7 @@ class ObstacleAvoider(Node):
             last_obs_detected = self.obstacle_detected
             self.obstacle_detected = self.detect_obstacle(lidar_range)
             if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
-                self._send_vmax(0.6)
+                self._send_vmax(0.4)
                 self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
                 return
             if self.obstacle_detected:
@@ -508,7 +508,7 @@ class ObstacleAvoider(Node):
         pos = self._check_ways(closest_obstacle, cross_product, v_rg, v_ro)
         if pos is not None:
             self.get_logger().info(f"FOUND PATH {pos[0]}, {pos[1]}, {self.robot_data.theta}")
-            self._send_vmax(0.6)
+            self._send_vmax(0.4)
             self._send_move(pos[0], pos[1], self.robot_data.theta)
             return True
         self._send_block()

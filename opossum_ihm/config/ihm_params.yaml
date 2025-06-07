@@ -1,0 +1,31 @@
+main_robot:
+  ihm_node:
+    ros__parameters:
+      color_topic: init_team_color
+      position_topic: position_out
+      score_topic: score
+      au_topic: au
+      enable_timer_topic: enable_timer
+      comm_state_topic: comm_state
+
+  param_server_node:
+    ros__parameters:
+      team_color: blue
+      script_number: 1
+      debug_mode: false
+
+seond_robot:
+  ihm_node:
+    ros__parameters:
+      color_topic: init_team_color
+      position_topic: position_out
+      score_topic: score
+      au_topic: au
+      enable_timer_topic: enable_timer
+      comm_state_topic: comm_state
+
+  param_server_node:
+    ros__parameters:
+      team_color: blue
+      script_number: 1
+      debug_mode: false
