@@ -53,7 +53,6 @@ second_robot:
   motor_simu_node:
     ros__parameters:
       real_position_topic: real_position
-      short_motor_srv: short_motor
       random_moves: false
       boundaries:  [0.0, 3.0, 0.0, 2.0]
       compute_period: 0.2

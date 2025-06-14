@@ -97,38 +97,6 @@ class ActionManager(Node):
             9: [5, 3],
         }
 
-        self.end_poses = {
-            0: [0, 0.875, 2],
-            1: [0.225, 0, 1],
-            2: [1.775, 0, 1],
-            3: [2.225, 0, 1],
-        }
-        self.end_poses = self.end_poses | {key + 4: [3 - val[0], val [1], 2 - val[2]] for key, val in self.end_poses.items()}
-        self.available_end = {i: 0 for i in range(len(list(self.end_poses.keys())))}
-
-        self.position_cans = {
-            0: [0.075, 1.325, 2],
-            1: [0.075, 0.4, 2],
-            2: [0.825, 1.725, 1],
-            3: [1.1, 0.95, 1],
-            4: [0.775, 0.25, 1],
-        }
-        self.position_cans = self.position_cans | {key + 5: [3 - val[0], val[1], 2 - val[2]] for key, val in self.position_cans.items()}
-        self.available_cans = {i: True for i in range(len(list(self.position_cans.keys())))}
-
-        self.dest_cans = {
-            0: [6, 0],
-            1: [6, 0],
-            2: [6, 0],
-            3: [6, 0],
-            4: [7, 1],
-            5: [4, 2],
-            6: [4, 2],
-            7: [4, 2],
-            8: [4, 2],
-            9: [5, 3],
-        }
-
     def _init_parameters(self) -> None:
         """Initialize the parameters of the node."""
         self.declare_parameters(

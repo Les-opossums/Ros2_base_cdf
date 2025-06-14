@@ -8,6 +8,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from ament_index_python.packages import get_package_share_directory
 import os
 import yaml
+import functools
 from rclpy.action import ActionClient
 from opossum_msgs.srv import StringReq
 from opossum_msgs.action import StringAction
@@ -24,7 +25,6 @@ class ZynqSimulation(Node):
             parameters=[
                 ("rcv_comm_topic", rclpy.Parameter.Type.STRING),
                 ("send_comm_topic", rclpy.Parameter.Type.STRING),
-                ("short_motor_srv", rclpy.Parameter.Type.STRING),
                 ("robot_components", rclpy.Parameter.Type.STRING_ARRAY),
             ],
         )
@@ -85,14 +85,16 @@ class ZynqSimulation(Node):
     def _init_service_clients(self):
         """Initialize service clients of the node."""
         callback_group = ReentrantCallbackGroup()
-        short_motor_srv = (
-            self.get_parameter("short_motor_srv").get_parameter_value().string_value
-        )
-        self.short_motor_srv = self.create_client(
-            StringReq, short_motor_srv, callback_group=callback_group
-        )
+        self.robot_services_clients = {
+            component: self.create_client(
+                StringReq,
+                f"{component}/service_simu",
+                callback_group=callback_group,
+            )
+            for component in self.robot_components
+        }
         # Wait for the service asynchronously (or log warnings until it's available)
-        while not self.short_motor_srv.wait_for_service(timeout_sec=1.0):
+        while not self.robot_services_clients["motors"].wait_for_service(timeout_sec=1.0):
             self.get_logger().warn("No position service available, retrying...")
 
     def do_action_callback(self, msg: String):
@@ -136,54 +138,50 @@ class ZynqSimulation(Node):
             or name == "VMAX"
             or name == "VTMAX"
         ):
-            self.send_short_cmd_motor(name, args)
+            self.send_short_cmd("motors", name, args)
         elif name == "MOVE":
-            self.send_long_cmd_motor(name, args)
+            self.send_long_cmd("motors", name, args)
         elif name == "SETLIDAR":
             pass
-        # elif name == "LEASH" or name == "AU":
-        #     self.get_logger().info(f'Received {name}, {args[0]}')
-        #     self.pub_comm_topic.publish(String(data=name + " " + args[0]))
         elif name == "LEASH":
             self.pub_comm_topic.publish(String(data="LEASH\n"))
         elif name == "AU":
             self.pub_comm_topic.publish(String(data="AU 1\n"))
-        
         else:
             self.get_logger().warn(f"Action {name} is not implemented.")
 
     # Actions handler
-    def send_long_cmd_motor(self, name, args):
-        """Send goal for motors asynchronously."""
+    def send_long_cmd(self, component, name, args):
+        """Send goal for components asynchronously."""
         goal = StringAction.Goal()
         goal.data = name
         for arg in args.values():
             goal.data += "," + arg
-        client = self.robot_action_clients.get("motors")
+        client = self.robot_action_clients.get(component)
         if client is None:
-            self.get_logger().error("No action client found for motors!")
+            self.get_logger().error(f"No action client found for {component}!")
             return
         if not client.wait_for_server(timeout_sec=5.0):
-            self.get_logger().error("Motor action server not available!")
+            self.get_logger().error(f"{component} action server not available!")
             return
         future = client.send_goal_async(goal)
-        future.add_done_callback(self.handle_long_cmd_motor_result)
+        future.add_done_callback(functools.partial(self.handle_long_cmd_result, component=component))
 
-    def handle_long_cmd_motor_result(self, future):
-        """Handle the result from the motor action asynchronously."""
+    def handle_long_cmd_result(self, future, component):
+        """Handle the result from the component action asynchronously."""
         try:
             result_response = future.result()
             # Check if goal was accepted
             if not result_response.accepted:
-                self.get_logger().error("Motor action goal was rejected!")
+                self.get_logger().error(f"{component} action goal was rejected!")
                 return
             result_future = result_response.get_result_async()
-            result_future.add_done_callback(self.handle_long_motor_action_result)
+            result_future.add_done_callback(functools.partial(self.handle_long_action_result, component=component))
         except Exception as e:
-            self.get_logger().error(f"Motor action send failed: {e}")
+            self.get_logger().error(f"{component} action send failed: {e}")
 
-    def handle_long_motor_action_result(self, future):
-        """Process the final result of the motor action."""
+    def handle_long_action_result(self, future, component):
+        """Process the final result of the component action."""
         try:
             res = future.result().result.response
             if res == "":
@@ -194,19 +192,20 @@ class ZynqSimulation(Node):
             result_msg.data = res + "\n"
             self.pub_comm_topic.publish(result_msg)
         except Exception as e:
-            self.get_logger().error(f"Failed to get motor action result: {e}")
+            self.get_logger().error(f"Failed to get {component} action result: {e}")
 
     # Services handler
-    def send_short_cmd_motor(self, name, args):
+    def send_short_cmd(self, component, name, args):
         """Call a service to get the robot's position asynchronously."""
         req = StringReq.Request()
         req.data = name
         for arg in args.values():
             req.data += "," + arg
-        future = self.short_motor_srv.call_async(req)
-        future.add_done_callback(self.handle_short_cmd_motor_result)
+        client = self.robot_services_clients.get(component)
+        future = client.call_async(req)
+        future.add_done_callback(functools.partial(self.handle_short_cmd_result, component=component))
 
-    def handle_short_cmd_motor_result(self, future):
+    def handle_short_cmd_result(self, future, component):
         """Handle the result from the GETODOM service asynchronously."""
         try:
             res = future.result().response
@@ -215,7 +214,7 @@ class ZynqSimulation(Node):
             result_msg.data = res + "\n"
             self.pub_comm_topic.publish(result_msg)
         except Exception as e:
-            self.get_logger().error(f"Motor service call failed: {e}")
+            self.get_logger().error(f"{component} service call failed: {e}")
 
 
 def main(args=None):

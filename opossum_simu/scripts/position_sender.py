@@ -9,7 +9,7 @@ from rclpy.executors import ExternalShutdownException
 # Import des messages
 from opossum_msgs.srv import StringReq
 from geometry_msgs.msg import Point
-from opossum_msgs.msg import PositionMap
+from opossum_msgs.msg import PositionMap, RobotData, Objects, GlobalView
 import functools
 
 
@@ -43,7 +43,7 @@ class PositionSender(Node):
         self.update_period = (
             self.get_parameter("update_period").get_parameter_value().double_value
         )
-        self.current_pos = {name: None for name in self.robot_names}
+        self.current_pos = {name: Point() for name in self.robot_names}
 
     def _init_publishers(self) -> None:
         """Initialize publishers of the node."""
@@ -58,6 +58,9 @@ class PositionSender(Node):
             )
             for name in self.robot_names
         }
+        self.pub_global_view = self.create_publisher(
+            GlobalView, "global_view", 10
+        )
 
     def _init_subscribers(self):
         """Initialize subscribers of the node."""
@@ -66,41 +69,43 @@ class PositionSender(Node):
         )
 
         for name in self.robot_names:
-            sub_init = self.create_subscription(
+            self.create_subscription(
                 Point,
                 "/" + name + "/" + self.real_position_topic,
                 functools.partial(self._update_pos, name=name),
                 10,
             )
-            sub_init
-        self.create_timer(self.update_period, self._publish_position)
+        self.create_timer(self.update_period, self._publish_general_map)
 
     def _init_clients(self):
         """Initialize clients of the node."""
-        self.short_motor_srv = (
-            self.get_parameter("short_motor_srv").get_parameter_value().string_value
-        )
+        components = ["motors"]
         for name in self.robot_names:
-            cli_motor_srv = self.create_client(
-                StringReq, name + "/" + self.short_motor_srv
-            )
-            while not cli_motor_srv.wait_for_service(timeout_sec=1.0):
-                self.get_logger().warn(f"No position to update currently for {name}...")
-            req = StringReq.Request()
-            req.data = "GETODOM,1,30.0"
-            future = cli_motor_srv.call_async(req)
-            rclpy.spin_until_future_complete(self, future)
-            res = future.result().response.split(",")
-            self.current_pos[name] = Point(
-                x=float(res[1]), y=float(res[2]), z=float(res[3])
-            )
+            for component in components:
+                cli_motor_srv = self.create_client(
+                    StringReq, name + "/" + component + "/service_simu"
+                )
+                self.get_logger().error(f"{name + '/' + component + '/service_simu'}")
+                while not cli_motor_srv.wait_for_service(timeout_sec=1.0):
+                    self.get_logger().warn(f"No data to update currently for the {component} of {name}...")
+                    self.get_logger().error(f"{name + '/' + component + '/service_simu'}")
+                req = StringReq.Request()
+                if component == "motors":
+                    req.data = "GETODOM,1,30.0"
+                    future = cli_motor_srv.call_async(req)
+                    rclpy.spin_until_future_complete(self, future)
+                    res = future.result().response.split(",")
+                    self.current_pos[name] = Point(
+                        x=float(res[1]), y=float(res[2]), z=float(res[3])
+                    )
 
     def _update_pos(self, msg, name):
         """Update the position of the robot corresponding to the name."""
         self.current_pos[name] = msg
 
-    def _publish_position(self):
+    def _publish_general_map(self):
         """Publish the postion to every captor who needs information."""
+        objects = []
         for name in self.robot_names:
             if self.current_pos[name] is not None:
                 msg = PositionMap()
@@ -108,6 +113,21 @@ class PositionSender(Node):
                 for n in [na for na in self.robot_names if na != name]:
                     msg.ennemis.append(self.current_pos[n])
                 self.pub_update_position[name].publish(msg)
+        msg_global = GlobalView()
+        for name in self.robot_names:
+            robot = RobotData()
+            robot.name = name
+            robot.x = self.current_pos[name].x
+            robot.y = self.current_pos[name].y
+            robot.theta = self.current_pos[name].z
+            msg_global.robots.append(robot)
+        for obj in objects:
+            pass
+        self.pub_global_view.publish(msg_global)
+
+
+
+
 
 
 def main(args=None):

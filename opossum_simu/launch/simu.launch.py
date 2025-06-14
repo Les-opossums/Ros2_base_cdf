@@ -19,7 +19,7 @@ def launch_setup(context, *args, **kwargs):
 
     node_position_sender = Node(
         package="opossum_simu",
-        executable="position_sender",
+        executable="position_sender.py",
         name="position_sender_node",
         parameters=[param_file, {"robot_names": robot_names_list}],
     )

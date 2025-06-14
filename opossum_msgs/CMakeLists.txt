@@ -25,6 +25,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TCPmessage.msg"
   "msg/Trajectoire.msg"
   "msg/GoalDetection.msg"
+  "msg/GlobalView.msg"
+  "msg/Objects.msg"
   "msg/CamCommand.msg"
   "msg/Poses2D.msg"
   "msg/PositionMap.msg"

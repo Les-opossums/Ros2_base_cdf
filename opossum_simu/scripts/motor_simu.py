@@ -110,12 +110,9 @@ class MotorSimu(Node):
 
     def _init_services(self):
         """Init services of the node."""
-        short_motor_srv = (
-            self.get_parameter("short_motor_srv").get_parameter_value().string_value
-        )
         self.srv_short_motor = self.create_service(
             StringReq,
-            short_motor_srv,
+            "motors/service_simu",
             self.response_callback,
             callback_group=ReentrantCallbackGroup(),
         )
