@@ -11,8 +11,9 @@ from rclpy.node import Node
 from PyQt5 import QtWidgets, QtGui, QtCore
 from ament_index_python.packages import get_package_share_directory
 import os
-from opossum_msgs.msg import LidarLoc
+from opossum_msgs.msg import LidarLoc, GlobalView
 from std_msgs.msg import String
+from std_srvs.srv import Trigger
 import functools
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -27,7 +28,8 @@ class NodeGUI(Node):
         self.parent = parent
         self._init_parameters()
         self._init_publishers()
-        self._init_subscriber()
+        self._init_subscribers()
+        self._init_clients()
         self.get_logger().info("Orchestrator GUI node initialized.")
 
     def _init_parameters(self) -> None:
@@ -59,8 +61,14 @@ class NodeGUI(Node):
             for name in self.robot_names
         }
 
-    def _init_subscriber(self):
+    def _init_clients(self):
+        self.client_global_data = self.create_client(Trigger, 'send_global_data')
+        while not self.client_global_data.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('service not available, waiting again...')
+
+    def _init_subscribers(self):
         """Initialize subscribers of the node."""
+        self.create_subscription(GlobalView, 'global_view', self.global_view_callback, 10)
         position_topic = (
             self.get_parameter("position_topic").get_parameter_value().string_value
         )
@@ -89,6 +97,12 @@ class NodeGUI(Node):
                     10,
                 )
 
+    def call_send_global_data(self):
+        req = Trigger.Request()
+        future = self.client_global_data.call_async(req)
+        rclpy.spin_until_future_complete(self, future)
+        return future.result()
+
     def publish_command(self, name, command_name, args):
         """Publish the command for the robot."""
         command_msg = String()
@@ -97,6 +111,9 @@ class NodeGUI(Node):
             command += " " + str(arg)
         command_msg.data = command
         self.pub_command[name].publish(command_msg)
+
+    def global_view_callback(self, msg):
+        self.parent.update_global_view(msg)
 
     def position_callback(self, msg, name):
         """Receive the last known information and display it."""
@@ -205,13 +222,14 @@ class MapScene(QtWidgets.QGraphicsView):
 class DraggablePixmapItem(QtWidgets.QGraphicsPixmapItem):
     """Drag items on the Map."""
 
-    def __init__(self, pixmap, parent=None):
+    def __init__(self, pixmap, parent=None, is_movable=True):
         super().__init__(pixmap, parent)
         # Permettre à cet item d'être déplacé et sélectionné
-        self.setFlags(
-            QtWidgets.QGraphicsItem.ItemIsMovable
-            | QtWidgets.QGraphicsItem.ItemIsSelectable
-        )
+        if is_movable:
+            self.setFlags(
+                QtWidgets.QGraphicsItem.ItemIsMovable
+                | QtWidgets.QGraphicsItem.ItemIsSelectable
+            )
         self.setTransformOriginPoint(pixmap.width() / 2, pixmap.height() / 2)
 
 
@@ -553,6 +571,73 @@ class MainRobotPage(QtWidgets.QWidget):
         self.component_pages["Motors"].update_map_position(msg)
         self.component_pages["Motors"].update_text_position(msg)
 
+class GeneralViewPage(QtWidgets.QGraphicsView):
+    def __init__(self, robot_names, parent):
+        super().__init__()
+        self.parent = parent
+        self.robot_names = robot_names
+        self.image_path = os.path.join(
+            get_package_share_directory("opossum_dev_gui"), "images"
+        )
+        map = os.path.join(self.image_path, "plateau.png")
+        
+        # Création de la scène
+        self.scene = QtWidgets.QGraphicsScene(self)
+        self.setScene(self.scene)
+
+        # Chargement de l'image de la carte
+        self.map_pixmap = QtGui.QPixmap(map).scaled(800, 800, QtCore.Qt.KeepAspectRatio)
+        self.map_item = QtWidgets.QGraphicsPixmapItem(self.map_pixmap)
+        self.scene.addItem(self.map_item)
+
+        self.icons = {}
+        for name in self.robot_names:
+            icon_path = os.path.join(self.image_path, f"{name}.png")
+            icon_pixmap = QtGui.QPixmap(icon_path).scaled(50, 50, QtCore.Qt.KeepAspectRatio)
+            item = DraggablePixmapItem(icon_pixmap, is_movable=False)
+            icon_rect = item.boundingRect()
+            width = icon_rect.width()
+            height = icon_rect.height()
+            item.setPos(5, 5)  # Position initiale
+            self.icons[name] = {"item": item, "width": width, "height": height}
+            self.scene.addItem(self.icons[name]["item"])
+        self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
+
+    @QtCore.pyqtSlot(GlobalView)
+    def update_global_view(self, msg):
+        """Update the robots positions."""
+        map_rect = self.map_item.boundingRect()
+        width = map_rect.width()
+        height = map_rect.height()
+        for robot in msg.robots:
+            posx = width * robot.x / 3 - self.icons[robot.name]["width"] / 2
+            posy = height * (1 - robot.y / 2) - self.icons[robot.name]["height"] / 2
+            new_pos = QtCore.QPointF(posx, posy)
+            new_rotation = -robot.theta * 180 / pi
+            self.icons[robot.name]["item"].setPos(new_pos)
+            self.icons[robot.name]["item"].setRotation(new_rotation)
+        for elem in msg.objects:
+            if f"{elem.type}_{elem.id}" not in self.icons:
+                icon_path = os.path.join(self.image_path, f"{elem.type}.png")
+                icon_pixmap = QtGui.QPixmap(icon_path).scaled(10, 10, QtCore.Qt.KeepAspectRatio)
+                item = DraggablePixmapItem(icon_pixmap, is_movable=False)
+                icon_rect = item.boundingRect()
+                i_width = icon_rect.width()
+                i_height = icon_rect.height()
+                posx = i_width * elem.x / 3 - i_width / 2
+                posy = i_height * (1 - elem.y / 2) - i_height / 2
+                item.setPos(posx, posy)  # Position initiale
+                item.setRotation(-elem.theta * 90)
+                self.icons[f"{elem.type}_{elem.id}"] = {"item": item, "width": i_width, "height": i_height}
+                self.scene.addItem(self.icons[f"{elem.type}_{elem.id}"]["item"])
+            else:
+                posx = width * elem.x / 3 - self.icons[f"{elem.type}_{elem.id}"]["width"] / 2
+                posy = height * (1 - elem.y / 2) - self.icons[f"{elem.type}_{elem.id}"]["height"] / 2
+                self.icons[f"{elem.type}_{elem.id}"]["item"].setPos(posx, posy)  # Position initiale
+                self.icons[f"{elem.type}_{elem.id}"]["item"].setRotation(-elem.theta * 90)
+
+
+
 
 # Fenêtre Qt avec un label à mettre à jour
 class OrchestratorGUI(QtWidgets.QMainWindow):
@@ -571,14 +656,15 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
 
         # GUI for each robot
         self.page_name_box = QtWidgets.QComboBox()
-        self.page_name_box.addItems([name for name in self.gui_node.robot_names])
+        self.page_name_box.addItems([name for name in self.gui_node.robot_names] + ["General View"])
         self.robot_pages = {
             name: MainRobotPage(name, self) for name in self.gui_node.robot_names
         }
+        self.robot_pages['General View'] = GeneralViewPage(self.gui_node.robot_names, self)
         self.stackedWidgets = QtWidgets.QStackedWidget()
         for val in self.robot_pages.values():
             self.stackedWidgets.addWidget(val)
-
+        
         self.page_name_box.currentIndexChanged.connect(self.change_page)
 
         central_widget = QtWidgets.QWidget()
@@ -589,17 +675,24 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         self.layout.addWidget(self.stackedWidgets)
 
         self._connect_to_ros()
+        self.call_update_global()
 
     def update_robot_position(self, msg, name):
         """Update the position of the robot."""
         self.robot_pages[name].update_robot_position(msg)
+
+    def update_global_view(self, msg):
+        self.robot_pages['General View'].update_global_view(msg)
+
+    def call_update_global(self):
+        self.gui_node.call_send_global_data()
 
     def send_cmd(self, name, command_name, args):
         """Send the command request to node ROS."""
         self.gui_node.publish_command(name, command_name, args)
 
     def send_leashes(self):
-        for name in self.robot_pages.keys():
+        for name in self.gui_node.robot_names:
             self.send_cmd(name, "LEASH", [])
             
     def _connect_to_ros(self):

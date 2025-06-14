@@ -13,6 +13,7 @@ from ament_index_python.packages import get_package_share_directory
 # Import des messages
 from opossum_msgs.srv import StringReq
 from geometry_msgs.msg import Point
+from std_srvs.srv import Trigger
 from opossum_msgs.msg import PositionMap, RobotData, Objects, GlobalView
 import functools
 
@@ -26,6 +27,7 @@ class PositionSender(Node):
         self._init_publishers()
         self._init_subscribers()
         self._init_clients()
+        self._init_servers()
         self.get_logger().info("Position sender node initialized.")
 
     def _init_parameters(self) -> None:
@@ -72,7 +74,7 @@ class PositionSender(Node):
                 elem.type = element['type']
                 elem.x = x
                 elem.y = y
-                elem.t = t
+                elem.theta = t
                 self.objects[elem.id] = elem
                 self.modified_objects.append(elem.id)
                 nb_objects += 1
@@ -84,7 +86,7 @@ class PositionSender(Node):
                 f"  State  : {obj.state}\n"
                 f"  x      : {obj.x:.3f}\n"
                 f"  y      : {obj.y:.3f}\n"
-                f"  t (rad): {obj.t:.2f}\n"
+                f"  t (rad): {obj.theta:.2f}\n"
                 "-----------------------------"
             )
         self.current_pos = {name: Point() for name in self.robot_names}
@@ -120,6 +122,9 @@ class PositionSender(Node):
                 10,
             )
         self.create_timer(self.update_period, self._publish_general_map)
+
+    def _init_servers(self):
+        self.srv = self.create_service(Trigger, 'send_global_data', self._reset_global_objects)
 
     def _init_clients(self):
         """Initialize clients of the node."""
@@ -168,6 +173,12 @@ class PositionSender(Node):
         while len(self.modified_objects) > 0:
             msg_global.objects.append(self.objects[self.modified_objects.pop()])
         self.pub_global_view.publish(msg_global)
+
+    def _reset_global_objects(self, request, response):
+        for obj in self.objects.keys():
+            self.modified_objects.append(obj)
+        response.success = True
+        return response
 
 def main(args=None):
     """Run the main loop."""
