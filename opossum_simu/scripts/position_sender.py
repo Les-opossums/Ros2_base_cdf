@@ -3,8 +3,12 @@
 """Receive all the world information and send it to every captors (lidars at now)."""
 
 import rclpy
+import os
+import yaml
+import numpy as np
 from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
+from ament_index_python.packages import get_package_share_directory
 
 # Import des messages
 from opossum_msgs.srv import StringReq
@@ -43,6 +47,46 @@ class PositionSender(Node):
         self.update_period = (
             self.get_parameter("update_period").get_parameter_value().double_value
         )
+        objects_path = os.path.join(
+            get_package_share_directory("opossum_bringup"), "config", "objects.yaml"
+        )
+        self.modified_objects = []
+
+        data = yaml.safe_load(open(objects_path, "r"))
+
+        # Access first stack item
+        element_types = data['stacks']
+        self.objects = {}
+        nb_objects = 0
+        # Iterate over all map objects
+        for obj in data['map'].values():
+            cos_ = np.cos(obj['t'] * np.pi / 2)
+            sin_ = np.sin(obj['t'] * np.pi / 2)
+            for element in element_types[obj['type']].values():
+                x = obj['x'] + element['x'] * cos_ - element['y'] * sin_ 
+                y = obj['y'] + element['x'] * sin_ + element['y'] * cos_
+                t = (obj['t'] + element['t']) * np.pi / 2
+                elem = Objects()
+                elem.id = nb_objects
+                elem.state = "free"
+                elem.type = element['type']
+                elem.x = x
+                elem.y = y
+                elem.t = t
+                self.objects[elem.id] = elem
+                self.modified_objects.append(elem.id)
+                nb_objects += 1
+        
+        for obj in self.objects.values():
+            self.get_logger().info(
+                f"Object ID: {obj.id}\n"
+                f"  Type   : {obj.type}\n"
+                f"  State  : {obj.state}\n"
+                f"  x      : {obj.x:.3f}\n"
+                f"  y      : {obj.y:.3f}\n"
+                f"  t (rad): {obj.t:.2f}\n"
+                "-----------------------------"
+            )
         self.current_pos = {name: Point() for name in self.robot_names}
 
     def _init_publishers(self) -> None:
@@ -121,14 +165,9 @@ class PositionSender(Node):
             robot.y = self.current_pos[name].y
             robot.theta = self.current_pos[name].z
             msg_global.robots.append(robot)
-        for obj in objects:
-            pass
+        while len(self.modified_objects) > 0:
+            msg_global.objects.append(self.objects[self.modified_objects.pop()])
         self.pub_global_view.publish(msg_global)
-
-
-
-
-
 
 def main(args=None):
     """Run the main loop."""
