@@ -114,9 +114,9 @@ class ZynqSimulation(Node):
 
         elif msg_type not in self.msgs_yaml:
             pass
-            # self.get_logger().info(
-            #     f"The message type {msg_type} does not exist in the YAML file format_msgs."
-            # )
+            self.get_logger().info(
+                f"The message type {msg_type} does not exist in the YAML file format_msgs."
+            )
 
         else:
             name_type = [
@@ -139,6 +139,10 @@ class ZynqSimulation(Node):
             or name == "VTMAX"
         ):
             self.send_short_cmd("motors", name, args)
+        elif (
+            name == "PUMP"
+        ):
+            self.send_short_cmd("actuators", name, args)
         elif name == "MOVE":
             self.send_long_cmd("motors", name, args)
         elif name == "SETLIDAR":

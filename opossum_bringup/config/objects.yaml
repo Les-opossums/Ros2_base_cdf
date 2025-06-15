@@ -87,3 +87,9 @@ map:
     x: 2.225
     y: 0.25
     t: 1
+
+states:
+  0: pump0
+  1: pump1
+  2: pump2
+  3: pump3

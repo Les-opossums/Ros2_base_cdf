@@ -14,6 +14,7 @@ from ament_index_python.packages import get_package_share_directory
 from opossum_msgs.srv import StringReq
 from geometry_msgs.msg import Point
 from std_srvs.srv import Trigger
+from std_msgs.msg import Int16
 from opossum_msgs.msg import PositionMap, RobotData, Objects, GlobalView
 import functools
 
@@ -78,18 +79,8 @@ class PositionSender(Node):
                 self.objects[elem.id] = elem
                 self.modified_objects.append(elem.id)
                 nb_objects += 1
-        
-        for obj in self.objects.values():
-            self.get_logger().info(
-                f"Object ID: {obj.id}\n"
-                f"  Type   : {obj.type}\n"
-                f"  State  : {obj.state}\n"
-                f"  x      : {obj.x:.3f}\n"
-                f"  y      : {obj.y:.3f}\n"
-                f"  t (rad): {obj.theta:.2f}\n"
-                "-----------------------------"
-            )
         self.current_pos = {name: Point() for name in self.robot_names}
+        self.current_state = {name: [0, 1] for name in self.robot_names}
 
     def _init_publishers(self) -> None:
         """Initialize publishers of the node."""
@@ -121,7 +112,17 @@ class PositionSender(Node):
                 functools.partial(self._update_pos, name=name),
                 10,
             )
+            self.create_subscription(
+                Int16,
+                "/" + name + "/actuators_state",
+                functools.partial(self._update_state, name=name),
+                10,
+            )
         self.create_timer(self.update_period, self._publish_general_map)
+
+    def _update_state(self, msg, name):
+        self.current_state[name][0] = msg.data
+        self.current_state[name][1] = 1
 
     def _init_servers(self):
         self.srv = self.create_service(Trigger, 'send_global_data', self._reset_global_objects)
@@ -134,10 +135,8 @@ class PositionSender(Node):
                 cli_motor_srv = self.create_client(
                     StringReq, name + "/" + component + "/service_simu"
                 )
-                self.get_logger().error(f"{name + '/' + component + '/service_simu'}")
                 while not cli_motor_srv.wait_for_service(timeout_sec=1.0):
                     self.get_logger().warn(f"No data to update currently for the {component} of {name}...")
-                    self.get_logger().error(f"{name + '/' + component + '/service_simu'}")
                 req = StringReq.Request()
                 if component == "motors":
                     req.data = "GETODOM,1,30.0"
@@ -151,6 +150,28 @@ class PositionSender(Node):
     def _update_pos(self, msg, name):
         """Update the position of the robot corresponding to the name."""
         self.current_pos[name] = msg
+        for val in self.objects.values():
+            if _is_bit_set(self.current_state[name][0], 1):
+                if val.state == "free" and (msg.x - val.x) ** 2 + (msg.y - val.y) ** 2 < 0.4 ** 2:
+                    val.state = name
+                    val.x = msg.x
+                    val.y = msg.y
+                    val.theta = msg.z
+                    self.modified_objects.append(val.id)
+                elif val.state == name:
+                    val.x = msg.x
+                    val.y = msg.y
+                    val.theta = msg.z
+                    self.modified_objects.append(val.id)
+            elif not _is_bit_set(self.current_state[name][0], 1) and self.current_state[name][1] == 1 and val.state == name:
+                val.state = "free"
+                val.x = msg.x
+                val.y = msg.y
+                val.theta = msg.z
+                self.modified_objects.append(val.id)
+                self.get_logger().info(f"Freeing the {val.id}")
+        self.current_state[name][1] = 0
+        
 
     def _publish_general_map(self):
         """Publish the postion to every captor who needs information."""
@@ -179,6 +200,10 @@ class PositionSender(Node):
             self.modified_objects.append(obj)
         response.success = True
         return response
+    
+def _is_bit_set(value: int, index: int) -> bool:
+    """Return True if the bit at `index` is set in `value`."""
+    return (value >> index) & 1 == 1
 
 def main(args=None):
     """Run the main loop."""

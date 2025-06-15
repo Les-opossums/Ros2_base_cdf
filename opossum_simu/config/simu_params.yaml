@@ -3,7 +3,7 @@ position_sender_node:
     real_position_topic: real_position
     short_motor_srv: short_motor
     update_position_topic: update_position
-    update_period: 0.1
+    update_period: 0.2
 
 main_robot:
   zynq_simu_node:
@@ -11,7 +11,7 @@ main_robot:
       rcv_comm_topic: raspi_zync
       short_motor_srv: short_motor
       send_comm_topic: zync_raspi
-      robot_components: ["motors"]
+      robot_components: ["motors", "actuators"]
 
   motor_simu_node:
     ros__parameters:
@@ -19,7 +19,7 @@ main_robot:
       short_motor_srv: short_motor
       random_moves: False
       boundaries:  [0.0, 3.0, 0.0, 2.0]
-      compute_period: 0.05
+      compute_period: 0.2
       angular_velocity: 1.0
       linear_velocity: 1.0
 
@@ -48,7 +48,7 @@ second_robot:
       rcv_comm_topic: raspi_zync
       short_motor_srv: short_motor
       send_comm_topic: zync_raspi
-      robot_components: ["motors"]
+      robot_components: ["motors", "actuators"]
 
   motor_simu_node:
     ros__parameters:

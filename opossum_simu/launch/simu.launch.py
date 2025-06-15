@@ -49,9 +49,19 @@ def launch_setup(context, *args, **kwargs):
             name="lidar_simu_node",
             parameters=[param_file],
         )
+
+        node_actuators_simu = Node(
+            namespace=robot,
+            package="opossum_simu",
+            executable="actuators_simu.py",
+            name="actuators_simu_node",
+            parameters=[param_file],
+        )
+        
         nodes.append(node_motor_simu)
         nodes.append(node_zynq_simu)
         nodes.append(node_lidar_simu)
+        nodes.append(node_actuators_simu)
     return nodes
 
 

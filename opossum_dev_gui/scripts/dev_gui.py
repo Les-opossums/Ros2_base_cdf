@@ -545,7 +545,6 @@ class MainRobotPage(QtWidgets.QWidget):
 class GeneralViewPage(QtWidgets.QGraphicsView):
     def __init__(self, robot_names, parent):
         super().__init__()
-        self.count = 0
         self.parent = parent
         self.robot_names = robot_names
 
@@ -588,7 +587,6 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
 
     @QtCore.pyqtSlot(GlobalView)
     def update_global_view(self, msg):
-        self.count += 10
         map_w, map_h = self.elements["map"]
         map_rect = self.map_item.boundingRect()
         width = map_rect.width()
@@ -609,10 +607,15 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
                 self.icons[key] = {"item": item}
                 self.scene.addItem(item)
                 flag = True
-            posx = width * elem.x / map_w
-            posy = height * (1 - elem.y / map_h)
-            item.setPos(posx, posy)
-            item.setRotation(90 - elem.theta * 180 / pi)
+            item = self.icons[key]["item"]
+            should_be_visible = elem.state == "free"
+            if item.isVisible() != should_be_visible:
+                item.setVisible(should_be_visible)  # Update visibility only if it changes
+            if should_be_visible:
+                posx = width * elem.x / map_w
+                posy = height * (1 - elem.y / map_h)
+                item.setPos(posx, posy)
+                item.setRotation(90 - elem.theta * 180 / pi)
         if flag:
             self.compute_initial_scale()
 
