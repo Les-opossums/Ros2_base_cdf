@@ -496,36 +496,6 @@ class PlotCanvas(FigureCanvas):
         self.draw()
 
 
-# class ChartWidget(QtWidgets.QWidget):
-#     """Plot also but a Chart, moving and Dynamic (not well implemented)."""
-
-#     def __init__(self, name, parent):
-#         super().__init__()
-#         self.parent = parent
-#         self.name = name
-#         self.series = QLineSeries()
-#         self.chart = QChart()
-#         self.chart.addSeries(self.series)
-#         self.chart.createDefaultAxes()
-#         self.chart_view = QChartView(self.chart)
-
-#         # Create a button to add a new point.
-#         self.button = QtWidgets.QPushButton("Add Point")
-#         self.button.clicked.connect(self.add_point)
-
-#         layout = QtWidgets.QVBoxLayout(self)
-#         layout.addWidget(self.chart_view)
-#         layout.addWidget(self.button)
-#         self.counter = 0
-
-#     def add_point(self):
-#         """Add a point to the last serie."""
-#         self.counter += 1
-#         new_y = random.uniform(0, 10)
-#         self.series.append(QtCore.QPointF(self.counter, new_y))
-#         self.chart.axisX().setRange(0, self.counter + 1)
-
-
 class MainRobotPage(QtWidgets.QWidget):
     """Page for ecah robot."""
 
@@ -538,18 +508,18 @@ class MainRobotPage(QtWidgets.QWidget):
             [
                 "Global View",
                 "Motors",
-                "Servo",
-                "Create Script",
-                "Asserv",
-                "Asserv Dynamic",
+                # "Servo",
+                # "Create Script",
+                # "Asserv",
+                # "Asserv Dynamic",
             ]
         )
         self.component_pages = {
             "GlobalView": GlobalViewPage(name, self.parent),
             "Motors": MotorsPage(name, self.parent),
-            "Servo": MapScene(name, self.parent),
-            "Create Script": MapScene(name, self.parent),
-            "Asserv": AsservPage(name, self.parent),
+            # "Servo": MapScene(name, self.parent),
+            # "Create Script": MapScene(name, self.parent),
+            # "Asserv": AsservPage(name, self.parent),
             # "AsservDynamic": ChartWidget(name, self.parent),
         }
         self.stackedWidgets = QtWidgets.QStackedWidget()
@@ -616,14 +586,6 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
         self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
         self.compute_initial_scale()   
 
-
-    def _center_item(self, item):
-        """Center the transform and drawing origin of a pixmap item."""
-        pix = item.pixmap()
-        w, h = pix.width(), pix.height()
-        item.setOffset(-w / 2, -h / 2)
-        item.setTransformOriginPoint(w / 2, h / 2)
-
     @QtCore.pyqtSlot(GlobalView)
     def update_global_view(self, msg):
         self.count += 10
@@ -637,46 +599,37 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
             posy = height * (1 - robot.y / map_h)
             item = self.icons[robot.name]["item"]
             item.setPos(posx, posy)
-            item.setRotation(self.count)
-            # item.setRotation(-robot.theta * 180 / pi)
+            item.setRotation(-robot.theta * 180 / pi)
         
         flag = False
         for elem in msg.objects:
             key = f"{elem.type}-{elem.id}"
             if key not in self.icons:
                 item = QtWidgets.QGraphicsPixmapItem()
-                self._scale_and_center_item(item, elem.type, scale=1.0)  # default scale   
                 self.icons[key] = {"item": item}
                 self.scene.addItem(item)
                 flag = True
             posx = width * elem.x / map_w
             posy = height * (1 - elem.y / map_h)
-            item = self.icons[key]["item"]
             item.setPos(posx, posy)
-            item.setRotation(self.count)
-            # item.setRotation(90 - elem.theta * 180 / pi)
+            item.setRotation(90 - elem.theta * 180 / pi)
         if flag:
-            self.compute_initial_scale()   
+            self.compute_initial_scale()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.fitInView(self.map_item, QtCore.Qt.KeepAspectRatio)
         self.compute_initial_scale()
 
-    def update_item_scaling(self, scale):
-        for id, icon in self.icons.items():
-            self._scale_and_center_item(icon["item"], id.split("-")[0], scale)
-    
     def compute_initial_scale(self):
         map_w, map_h = self.elements["map"]
         item_rect = self.map_item.mapRectToScene(self.map_item.boundingRect())
         pixels_per_meter_x = item_rect.width() / map_w
         pixels_per_meter_y = item_rect.height() / map_h
         scale = min(pixels_per_meter_x, pixels_per_meter_y)
-
-        for id, icon in self.icons.items():
-            self._scale_and_center_item(icon["item"], id.split("-")[0] if "-" in id else id, scale)
-
+        for id in self.icons.keys():
+            self._scale_and_center_item(self.icons[id]["item"], id.split("-")[0] if "-" in id else id, scale)
+            
     def _scale_and_center_item(self, item, elem_type, scale):
         base_pixmap = self.pixmaps.get(elem_type)
         if base_pixmap and not base_pixmap.isNull():
@@ -694,7 +647,6 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
             w = scaled_pixmap.width()
             h = scaled_pixmap.height()
             item.setOffset(-w / 2, -h / 2)
-            item.setTransformOriginPoint(w / 2, h / 2)
 
 # Fenêtre Qt avec un label à mettre à jour
 class OrchestratorGUI(QtWidgets.QMainWindow):
