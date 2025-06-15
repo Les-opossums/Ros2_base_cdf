@@ -18,6 +18,7 @@ import functools
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from math import pi
+from rclpy.logging import get_logger
 
 
 class NodeGUI(Node):
@@ -134,7 +135,7 @@ class MapScene(QtWidgets.QGraphicsView):
         image_path = os.path.join(
             get_package_share_directory("opossum_dev_gui"), "images"
         )
-        map = os.path.join(image_path, "plateau.png")
+        map = os.path.join(image_path, "map.png")
         icon = os.path.join(image_path, "robot.png")
         self.mad_icon = os.path.join(image_path, "mad_robot.png")
         # Création de la scène
@@ -574,70 +575,126 @@ class MainRobotPage(QtWidgets.QWidget):
 class GeneralViewPage(QtWidgets.QGraphicsView):
     def __init__(self, robot_names, parent):
         super().__init__()
+        self.count = 0
         self.parent = parent
         self.robot_names = robot_names
+
         self.image_path = os.path.join(
             get_package_share_directory("opossum_dev_gui"), "images"
         )
-        map = os.path.join(self.image_path, "plateau.png")
-        
-        # Création de la scène
+
+        # Real sizes (meters)
+        self.elements = {
+            "map": (3.0, 2.0),
+            "can": (0.08, 0.08),
+            "w_board": (0.40, 0.10),
+        } | {name: (0.35, 0.35) for name in self.robot_names}
+
         self.scene = QtWidgets.QGraphicsScene(self)
         self.setScene(self.scene)
 
-        # Chargement de l'image de la carte
-        self.map_pixmap = QtGui.QPixmap(map).scaled(800, 800, QtCore.Qt.KeepAspectRatio)
-        self.map_item = QtWidgets.QGraphicsPixmapItem(self.map_pixmap)
-        self.scene.addItem(self.map_item)
+        # Load pixmaps
+        self.pixmaps = {
+            name: QtGui.QPixmap(os.path.join(self.image_path, f"{name}.png"))
+            for name in self.elements
+        }
 
+        # Add map
+        self.map_item = QtWidgets.QGraphicsPixmapItem(self.pixmaps["map"])
+        self.scene.addItem(self.map_item)
+        self.scene.setSceneRect(QtCore.QRectF(self.pixmaps["map"].rect()))
+
+        # Add robot items
         self.icons = {}
         for name in self.robot_names:
-            icon_path = os.path.join(self.image_path, f"{name}.png")
-            icon_pixmap = QtGui.QPixmap(icon_path).scaled(50, 50, QtCore.Qt.KeepAspectRatio)
-            item = DraggablePixmapItem(icon_pixmap, is_movable=False)
-            icon_rect = item.boundingRect()
-            width = icon_rect.width()
-            height = icon_rect.height()
-            item.setPos(5, 5)  # Position initiale
-            self.icons[name] = {"item": item, "width": width, "height": height}
-            self.scene.addItem(self.icons[name]["item"])
+            item = QtWidgets.QGraphicsPixmapItem()
+            self._scale_and_center_item(item, name, scale=1.0)  # default scale
+            item.setPos(5, 5)
+            self.icons[name] = {"item": item}
+            self.scene.addItem(item)
+
         self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
+        self.compute_initial_scale()   
+
+
+    def _center_item(self, item):
+        """Center the transform and drawing origin of a pixmap item."""
+        pix = item.pixmap()
+        w, h = pix.width(), pix.height()
+        item.setOffset(-w / 2, -h / 2)
+        item.setTransformOriginPoint(w / 2, h / 2)
 
     @QtCore.pyqtSlot(GlobalView)
     def update_global_view(self, msg):
-        """Update the robots positions."""
+        self.count += 10
+        map_w, map_h = self.elements["map"]
         map_rect = self.map_item.boundingRect()
         width = map_rect.width()
         height = map_rect.height()
+
         for robot in msg.robots:
-            posx = width * robot.x / 3 - self.icons[robot.name]["width"] / 2
-            posy = height * (1 - robot.y / 2) - self.icons[robot.name]["height"] / 2
-            new_pos = QtCore.QPointF(posx, posy)
-            new_rotation = -robot.theta * 180 / pi
-            self.icons[robot.name]["item"].setPos(new_pos)
-            self.icons[robot.name]["item"].setRotation(new_rotation)
+            posx = width * robot.x / map_w
+            posy = height * (1 - robot.y / map_h)
+            item = self.icons[robot.name]["item"]
+            item.setPos(posx, posy)
+            item.setRotation(self.count)
+            # item.setRotation(-robot.theta * 180 / pi)
+        
+        flag = False
         for elem in msg.objects:
-            if f"{elem.type}_{elem.id}" not in self.icons:
-                icon_path = os.path.join(self.image_path, f"{elem.type}.png")
-                icon_pixmap = QtGui.QPixmap(icon_path).scaled(10, 10, QtCore.Qt.KeepAspectRatio)
-                item = DraggablePixmapItem(icon_pixmap, is_movable=False)
-                icon_rect = item.boundingRect()
-                i_width = icon_rect.width()
-                i_height = icon_rect.height()
-                posx = i_width * elem.x / 3 - i_width / 2
-                posy = i_height * (1 - elem.y / 2) - i_height / 2
-                item.setPos(posx, posy)  # Position initiale
-                item.setRotation(-elem.theta * 90)
-                self.icons[f"{elem.type}_{elem.id}"] = {"item": item, "width": i_width, "height": i_height}
-                self.scene.addItem(self.icons[f"{elem.type}_{elem.id}"]["item"])
-            else:
-                posx = width * elem.x / 3 - self.icons[f"{elem.type}_{elem.id}"]["width"] / 2
-                posy = height * (1 - elem.y / 2) - self.icons[f"{elem.type}_{elem.id}"]["height"] / 2
-                self.icons[f"{elem.type}_{elem.id}"]["item"].setPos(posx, posy)  # Position initiale
-                self.icons[f"{elem.type}_{elem.id}"]["item"].setRotation(-elem.theta * 90)
+            key = f"{elem.type}-{elem.id}"
+            if key not in self.icons:
+                item = QtWidgets.QGraphicsPixmapItem()
+                self._scale_and_center_item(item, elem.type, scale=1.0)  # default scale   
+                self.icons[key] = {"item": item}
+                self.scene.addItem(item)
+                flag = True
+            posx = width * elem.x / map_w
+            posy = height * (1 - elem.y / map_h)
+            item = self.icons[key]["item"]
+            item.setPos(posx, posy)
+            item.setRotation(self.count)
+            # item.setRotation(90 - elem.theta * 180 / pi)
+        if flag:
+            self.compute_initial_scale()   
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.fitInView(self.map_item, QtCore.Qt.KeepAspectRatio)
+        self.compute_initial_scale()
 
+    def update_item_scaling(self, scale):
+        for id, icon in self.icons.items():
+            self._scale_and_center_item(icon["item"], id.split("-")[0], scale)
+    
+    def compute_initial_scale(self):
+        map_w, map_h = self.elements["map"]
+        item_rect = self.map_item.mapRectToScene(self.map_item.boundingRect())
+        pixels_per_meter_x = item_rect.width() / map_w
+        pixels_per_meter_y = item_rect.height() / map_h
+        scale = min(pixels_per_meter_x, pixels_per_meter_y)
 
+        for id, icon in self.icons.items():
+            self._scale_and_center_item(icon["item"], id.split("-")[0] if "-" in id else id, scale)
+
+    def _scale_and_center_item(self, item, elem_type, scale):
+        base_pixmap = self.pixmaps.get(elem_type)
+        if base_pixmap and not base_pixmap.isNull():
+            real_w, real_h = self.elements[elem_type]
+            width_px = int(scale * real_w)
+            height_px = int(scale * real_h)
+
+            scaled_pixmap = base_pixmap.scaled(
+                width_px, height_px,
+                QtCore.Qt.IgnoreAspectRatio,  # Real-world size
+                QtCore.Qt.SmoothTransformation
+            )
+            item.setPixmap(scaled_pixmap)
+
+            w = scaled_pixmap.width()
+            h = scaled_pixmap.height()
+            item.setOffset(-w / 2, -h / 2)
+            item.setTransformOriginPoint(w / 2, h / 2)
 
 # Fenêtre Qt avec un label à mettre à jour
 class OrchestratorGUI(QtWidgets.QMainWindow):
@@ -656,14 +713,14 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
 
         # GUI for each robot
         self.page_name_box = QtWidgets.QComboBox()
-        self.page_name_box.addItems([name for name in self.gui_node.robot_names] + ["General View"])
+        self.page_name_box.addItems(["General View"] + [name for name in self.gui_node.robot_names])
         self.robot_pages = {
             name: MainRobotPage(name, self) for name in self.gui_node.robot_names
         }
         self.robot_pages['General View'] = GeneralViewPage(self.gui_node.robot_names, self)
         self.stackedWidgets = QtWidgets.QStackedWidget()
-        for val in self.robot_pages.values():
-            self.stackedWidgets.addWidget(val)
+        for page_name in [self.page_name_box.itemText(i) for i in range(self.page_name_box.count())]:
+            self.stackedWidgets.addWidget(self.robot_pages[page_name])
         
         self.page_name_box.currentIndexChanged.connect(self.change_page)
 
