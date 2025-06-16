@@ -28,6 +28,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/GlobalView.msg"
   "msg/Objects.msg"
   "msg/CamCommand.msg"
+  "msg/Actuators.msg"
   "msg/Poses2D.msg"
   "msg/PositionMap.msg"
   "action/ActionSequencer.action"

@@ -608,10 +608,11 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
                 self.scene.addItem(item)
                 flag = True
             item = self.icons[key]["item"]
-            should_be_visible = elem.state == "free"
-            if item.isVisible() != should_be_visible:
-                item.setVisible(should_be_visible)  # Update visibility only if it changes
-            if should_be_visible:
+            # should_be_visible = elem.state == "free"
+            # if item.isVisible() != should_be_visible:
+            #     item.setVisible(should_be_visible)  # Update visibility only if it changes
+            # if should_be_visible:
+            if True:
                 posx = width * elem.x / map_w
                 posy = height * (1 - elem.y / map_h)
                 item.setPos(posx, posy)

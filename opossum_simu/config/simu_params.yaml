@@ -3,7 +3,7 @@ position_sender_node:
     real_position_topic: real_position
     short_motor_srv: short_motor
     update_position_topic: update_position
-    update_period: 0.2
+    update_period: 0.1
 
 main_robot:
   zynq_simu_node:
@@ -19,7 +19,7 @@ main_robot:
       short_motor_srv: short_motor
       random_moves: False
       boundaries:  [0.0, 3.0, 0.0, 2.0]
-      compute_period: 0.2
+      compute_period: 0.1
       angular_velocity: 1.0
       linear_velocity: 1.0
 
@@ -55,9 +55,9 @@ second_robot:
       real_position_topic: real_position
       random_moves: false
       boundaries:  [0.0, 3.0, 0.0, 2.0]
-      compute_period: 0.2
-      angular_velocity: 0.4
-      linear_velocity: 0.15
+      compute_period: 0.1
+      angular_velocity: 1.0
+      linear_velocity: 1.0
 
   lidar_simu_node:
     ros__parameters:

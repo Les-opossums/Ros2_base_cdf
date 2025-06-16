@@ -21,5 +21,6 @@ class Script:
         node.write_log("Script GNAAAAAAAAAAAAAais running...")
 
         # Banderole
-        node.send_raw("VMAX 0.4")
+        node.send_raw("VMAX 0.7")
+        node.send_raw("VTMAX 1.0")
         node.smart_moves()

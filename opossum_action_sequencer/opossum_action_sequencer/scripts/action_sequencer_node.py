@@ -658,7 +658,8 @@ class ActionManager(Node):
     def smart_moves(self):
         default_angle = -2.60
         tol = 0.3
-        vmax = 0.3
+        vmax = 0.5
+        vtmax = 1.0
         if self.color.lower() == "yellow":
             en_color = 0
         elif self.color.lower() == "blue":
@@ -668,6 +669,7 @@ class ActionManager(Node):
         while True:
             # self.get_logger().info("Sending new goal.")
             self.send_raw(f"VMAX {vmax}")
+            self.send_raw(f"VTMAX {vtmax}")
             max = -10
             can_valid = None
             ind_valid = None
@@ -714,6 +716,7 @@ class ActionManager(Node):
                         self.drop_cans(fpos, default_angle)
                 self.available_cans[ind_valid] = False
                 self.available_end[self.dest_cans[ind_valid][en_color]] += 1 # If yellow 0, else blue
+                self.add_score(4)
                 # self.get_logger().info(f"Available cans now: {self.available_cans}")
             else:
                 if en_color == 0: # color is yellow
@@ -766,9 +769,12 @@ class ActionManager(Node):
 
     def take_cans(self, angle):
         self.kalman(False)
+        self.pump(PUMP_struct(0, 1))
         self.pump(PUMP_struct(1, 1))
+        self.pump(PUMP_struct(2, 1))
+        self.pump(PUMP_struct(3, 1))
         self.sleep(0.1)
-        push_dst = 0.1
+        push_dst = 0.15
         if angle == 0:
             self.relative_move_to(Position(push_dst, 0, 0))
         elif angle == 1:
@@ -790,21 +796,32 @@ class ActionManager(Node):
         self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
         self.wait_for_motion()
 
-        self.pump(PUMP_struct(1, 0))
         self.valve(VALVE_struct(2))
         if destination[2] == 0:
             self.relative_move_to(Position(push_dst, 0, 0))
             self.wait_for_motion()
+            self.pump(PUMP_struct(0, 0))
+            self.pump(PUMP_struct(1, 0))
+            self.pump(PUMP_struct(2, 0))
+            self.pump(PUMP_struct(3, 0))
             self.relative_move_to(Position(-push_dst, 0, 0))
             self.wait_for_motion()
         elif destination[2] == 2:
             self.relative_move_to(Position(-push_dst, 0, 0))
             self.wait_for_motion()
+            self.pump(PUMP_struct(0, 0))
+            self.pump(PUMP_struct(1, 0))
+            self.pump(PUMP_struct(2, 0))
+            self.pump(PUMP_struct(3, 0))
             self.relative_move_to(Position(push_dst, 0, 0))
             self.wait_for_motion()
         elif destination[2] == 3:
             self.relative_move_to(Position(0, -push_dst, 0))
             self.wait_for_motion()
+            self.pump(PUMP_struct(0, 0))
+            self.pump(PUMP_struct(1, 0))
+            self.pump(PUMP_struct(2, 0))
+            self.pump(PUMP_struct(3, 0))
             self.relative_move_to(Position(0, push_dst, 0))
             self.wait_for_motion()
         else:

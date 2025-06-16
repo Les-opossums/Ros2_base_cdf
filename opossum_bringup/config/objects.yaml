@@ -20,11 +20,11 @@ stacks:
       x: 0
       y: -0.15
       t: 0
-    4:
-      type: w_board
-      x: 0
-      y: 0
-      t: 0
+    # 4:
+    #   type: w_board
+    #   x: 0
+    #   y: 0
+    #   t: 0
 
 objects:
   can:
@@ -88,8 +88,25 @@ map:
     y: 0.25
     t: 1
 
-states:
-  0: pump0
-  1: pump1
-  2: pump2
-  3: pump3
+# In the robot referential def angle -2.6
+actuators:
+  0: 
+    name: pump1
+    x: -0.15 # -15 * cos a - (-5) * sin a  
+    y: -0.15 # -15 * sin a -5 * cos a 
+    size: 0.05
+  1: 
+    name: pump2
+    x: -0.05 # -5 * cos a -(-15) * sin a 
+    y: -0.15 # -5 * sin a -15 * cos a 
+    size: 0.05
+  2: 
+    name: pump3
+    x: 0.05 # 5 * cos a -(-15) * sin a 
+    y: -0.15 # 5 * sin a -15 * cos a 
+    size: 0.05
+  3: 
+    name: pump4
+    x: 0.15 # 15 * cos a -(-5) * sin a
+    y: -0.15 # 15 * sin a -5 * cos a
+    size: 0.05

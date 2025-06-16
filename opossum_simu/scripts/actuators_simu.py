@@ -145,7 +145,7 @@ def encode_state(state) -> int:
             result |= (1 << i)
     return result
 
-def decode_state(self, value: int, length: int) -> list[bool]:
+def decode_state(value: int, length: int) -> list[bool]:
     """Decode an integer into a list of booleans of given length."""
     return [(value >> i) & 1 == 1 for i in range(length)]
 

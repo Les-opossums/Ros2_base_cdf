@@ -15,8 +15,9 @@ from opossum_msgs.srv import StringReq
 from geometry_msgs.msg import Point
 from std_srvs.srv import Trigger
 from std_msgs.msg import Int16
-from opossum_msgs.msg import PositionMap, RobotData, Objects, GlobalView
+from opossum_msgs.msg import PositionMap, RobotData, Objects, GlobalView, Actuators
 import functools
+from copy import deepcopy
 
 
 class PositionSender(Node):
@@ -56,6 +57,21 @@ class PositionSender(Node):
         self.modified_objects = []
 
         data = yaml.safe_load(open(objects_path, "r"))
+        act_angle = 4.17
+        # Get the poition of the pumps on the robot
+        actuators_types = data['actuators']
+        self.actuators = {name: {} for name in self.robot_names}
+        cos_a = np.cos(act_angle)
+        sin_a = np.sin(act_angle)
+        for k, v in actuators_types.items():
+            act = Actuators()
+            act.name = v['name']
+            act.x = cos_a * v['x'] - sin_a * v['y']
+            act.y = sin_a * v['x'] + cos_a * v['y']
+            act.size = v['size']
+            act.state = 'free'
+            for name in self.robot_names:
+                self.actuators[name][int(k)] = deepcopy(act)
 
         # Access first stack item
         element_types = data['stacks']
@@ -121,8 +137,16 @@ class PositionSender(Node):
         self.create_timer(self.update_period, self._publish_general_map)
 
     def _update_state(self, msg, name):
-        self.current_state[name][0] = msg.data
-        self.current_state[name][1] = 1
+        result = decode_state(msg.data, len(self.actuators[name]))
+        for k in self.actuators[name].keys():
+            act = self.actuators[name][k]
+            if not result[k] and act.state != 'free':
+                self.get_logger().info(f"I released {act.state}")
+                if act.state != 'running':
+                    self.objects[int(act.state)].state = 'free' # We free the object, considering that it has the pos from last time, so its is ok
+                act.state = 'free'
+            elif result[k] and act.state == 'free':
+                act.state = 'running'
 
     def _init_servers(self):
         self.srv = self.create_service(Trigger, 'send_global_data', self._reset_global_objects)
@@ -149,29 +173,32 @@ class PositionSender(Node):
 
     def _update_pos(self, msg, name):
         """Update the position of the robot corresponding to the name."""
+        old_theta = self.current_pos[name].z
         self.current_pos[name] = msg
-        for val in self.objects.values():
-            if _is_bit_set(self.current_state[name][0], 1):
-                if val.state == "free" and (msg.x - val.x) ** 2 + (msg.y - val.y) ** 2 < 0.4 ** 2:
-                    val.state = name
-                    val.x = msg.x
-                    val.y = msg.y
-                    val.theta = msg.z
-                    self.modified_objects.append(val.id)
-                elif val.state == name:
-                    val.x = msg.x
-                    val.y = msg.y
-                    val.theta = msg.z
-                    self.modified_objects.append(val.id)
-            elif not _is_bit_set(self.current_state[name][0], 1) and self.current_state[name][1] == 1 and val.state == name:
-                val.state = "free"
-                val.x = msg.x
-                val.y = msg.y
-                val.theta = msg.z
-                self.modified_objects.append(val.id)
-                self.get_logger().info(f"Freeing the {val.id}")
-        self.current_state[name][1] = 0
-        
+        cos_ = np.cos(msg.z)
+        sin_ = np.sin(msg.z)
+        for act in self.actuators[name].values():
+            if act.state == 'running':
+                x_ = act.x * cos_ - act.y * sin_ + msg.x
+                y_ = act.x * sin_ + act.y * cos_ + msg.y
+                for obj in self.objects.values():
+                    if obj.state == 'free' and obj.type == "can":
+                        if (obj.x - x_) ** 2 + (obj.y - y_) ** 2 < act.size ** 2:
+                            act.state = str(obj.id)
+                            obj.state = f"{name}-{act.name}"
+                            obj.x = x_
+                            obj.y = y_
+                            self.modified_objects.append(obj.id)
+
+                            break
+            elif act.state != 'free':
+                x_ = act.x * cos_ - act.y * sin_ + msg.x
+                y_ = act.x * sin_ + act.y * cos_ + msg.y
+                obj_taken = self.objects[int(act.state)]
+                obj_taken.x = x_
+                obj_taken.y = y_
+                obj_taken.theta += msg.z - old_theta
+                self.modified_objects.append(obj_taken.id)
 
     def _publish_general_map(self):
         """Publish the postion to every captor who needs information."""
@@ -204,6 +231,18 @@ class PositionSender(Node):
 def _is_bit_set(value: int, index: int) -> bool:
     """Return True if the bit at `index` is set in `value`."""
     return (value >> index) & 1 == 1
+
+def encode_state(state) -> int:
+    """Encode a list of booleans into an integer."""
+    result = 0
+    for i, bit in enumerate(state):
+        if bit:
+            result |= (1 << i)
+    return result
+
+def decode_state(value: int, length: int) -> list[bool]:
+    """Decode an integer into a list of booleans of given length."""
+    return [(value >> i) & 1 == 1 for i in range(length)]
 
 def main(args=None):
     """Run the main loop."""
