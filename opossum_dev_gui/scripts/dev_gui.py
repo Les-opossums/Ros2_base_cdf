@@ -11,12 +11,14 @@ from rclpy.node import Node
 from PyQt5 import QtWidgets, QtGui, QtCore
 from ament_index_python.packages import get_package_share_directory
 import os
-from opossum_msgs.msg import LidarLoc
+from opossum_msgs.msg import LidarLoc, GlobalView
 from std_msgs.msg import String
+from std_srvs.srv import Trigger
 import functools
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from math import pi
+from rclpy.logging import get_logger
 
 
 class NodeGUI(Node):
@@ -27,7 +29,8 @@ class NodeGUI(Node):
         self.parent = parent
         self._init_parameters()
         self._init_publishers()
-        self._init_subscriber()
+        self._init_subscribers()
+        self._init_clients()
         self.get_logger().info("Orchestrator GUI node initialized.")
 
     def _init_parameters(self) -> None:
@@ -59,8 +62,14 @@ class NodeGUI(Node):
             for name in self.robot_names
         }
 
-    def _init_subscriber(self):
+    def _init_clients(self):
+        self.client_global_data = self.create_client(Trigger, 'send_global_data')
+        while not self.client_global_data.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('service not available, waiting again...')
+
+    def _init_subscribers(self):
         """Initialize subscribers of the node."""
+        self.create_subscription(GlobalView, 'global_view', self.global_view_callback, 10)
         position_topic = (
             self.get_parameter("position_topic").get_parameter_value().string_value
         )
@@ -89,6 +98,12 @@ class NodeGUI(Node):
                     10,
                 )
 
+    def call_send_global_data(self):
+        req = Trigger.Request()
+        future = self.client_global_data.call_async(req)
+        rclpy.spin_until_future_complete(self, future)
+        return future.result()
+
     def publish_command(self, name, command_name, args):
         """Publish the command for the robot."""
         command_msg = String()
@@ -97,6 +112,9 @@ class NodeGUI(Node):
             command += " " + str(arg)
         command_msg.data = command
         self.pub_command[name].publish(command_msg)
+
+    def global_view_callback(self, msg):
+        self.parent.update_global_view(msg)
 
     def position_callback(self, msg, name):
         """Receive the last known information and display it."""
@@ -117,7 +135,7 @@ class MapScene(QtWidgets.QGraphicsView):
         image_path = os.path.join(
             get_package_share_directory("opossum_dev_gui"), "images"
         )
-        map = os.path.join(image_path, "plateau.png")
+        map = os.path.join(image_path, "map.png")
         icon = os.path.join(image_path, "robot.png")
         self.mad_icon = os.path.join(image_path, "mad_robot.png")
         # Création de la scène
@@ -205,13 +223,14 @@ class MapScene(QtWidgets.QGraphicsView):
 class DraggablePixmapItem(QtWidgets.QGraphicsPixmapItem):
     """Drag items on the Map."""
 
-    def __init__(self, pixmap, parent=None):
+    def __init__(self, pixmap, parent=None, is_movable=True):
         super().__init__(pixmap, parent)
         # Permettre à cet item d'être déplacé et sélectionné
-        self.setFlags(
-            QtWidgets.QGraphicsItem.ItemIsMovable
-            | QtWidgets.QGraphicsItem.ItemIsSelectable
-        )
+        if is_movable:
+            self.setFlags(
+                QtWidgets.QGraphicsItem.ItemIsMovable
+                | QtWidgets.QGraphicsItem.ItemIsSelectable
+            )
         self.setTransformOriginPoint(pixmap.width() / 2, pixmap.height() / 2)
 
 
@@ -477,36 +496,6 @@ class PlotCanvas(FigureCanvas):
         self.draw()
 
 
-# class ChartWidget(QtWidgets.QWidget):
-#     """Plot also but a Chart, moving and Dynamic (not well implemented)."""
-
-#     def __init__(self, name, parent):
-#         super().__init__()
-#         self.parent = parent
-#         self.name = name
-#         self.series = QLineSeries()
-#         self.chart = QChart()
-#         self.chart.addSeries(self.series)
-#         self.chart.createDefaultAxes()
-#         self.chart_view = QChartView(self.chart)
-
-#         # Create a button to add a new point.
-#         self.button = QtWidgets.QPushButton("Add Point")
-#         self.button.clicked.connect(self.add_point)
-
-#         layout = QtWidgets.QVBoxLayout(self)
-#         layout.addWidget(self.chart_view)
-#         layout.addWidget(self.button)
-#         self.counter = 0
-
-#     def add_point(self):
-#         """Add a point to the last serie."""
-#         self.counter += 1
-#         new_y = random.uniform(0, 10)
-#         self.series.append(QtCore.QPointF(self.counter, new_y))
-#         self.chart.axisX().setRange(0, self.counter + 1)
-
-
 class MainRobotPage(QtWidgets.QWidget):
     """Page for ecah robot."""
 
@@ -519,18 +508,18 @@ class MainRobotPage(QtWidgets.QWidget):
             [
                 "Global View",
                 "Motors",
-                "Servo",
-                "Create Script",
-                "Asserv",
-                "Asserv Dynamic",
+                # "Servo",
+                # "Create Script",
+                # "Asserv",
+                # "Asserv Dynamic",
             ]
         )
         self.component_pages = {
             "GlobalView": GlobalViewPage(name, self.parent),
             "Motors": MotorsPage(name, self.parent),
-            "Servo": MapScene(name, self.parent),
-            "Create Script": MapScene(name, self.parent),
-            "Asserv": AsservPage(name, self.parent),
+            # "Servo": MapScene(name, self.parent),
+            # "Create Script": MapScene(name, self.parent),
+            # "Asserv": AsservPage(name, self.parent),
             # "AsservDynamic": ChartWidget(name, self.parent),
         }
         self.stackedWidgets = QtWidgets.QStackedWidget()
@@ -553,6 +542,115 @@ class MainRobotPage(QtWidgets.QWidget):
         self.component_pages["Motors"].update_map_position(msg)
         self.component_pages["Motors"].update_text_position(msg)
 
+class GeneralViewPage(QtWidgets.QGraphicsView):
+    def __init__(self, robot_names, parent):
+        super().__init__()
+        self.parent = parent
+        self.robot_names = robot_names
+
+        self.image_path = os.path.join(
+            get_package_share_directory("opossum_dev_gui"), "images"
+        )
+
+        # Real sizes (meters)
+        self.elements = {
+            "map": (3.0, 2.0),
+            "can": (0.08, 0.08),
+            "w_board": (0.40, 0.10),
+        } | {name: (0.35, 0.35) for name in self.robot_names}
+
+        self.scene = QtWidgets.QGraphicsScene(self)
+        self.setScene(self.scene)
+
+        # Load pixmaps
+        self.pixmaps = {
+            name: QtGui.QPixmap(os.path.join(self.image_path, f"{name}.png"))
+            for name in self.elements
+        }
+
+        # Add map
+        self.map_item = QtWidgets.QGraphicsPixmapItem(self.pixmaps["map"])
+        self.scene.addItem(self.map_item)
+        self.scene.setSceneRect(QtCore.QRectF(self.pixmaps["map"].rect()))
+
+        # Add robot items
+        self.icons = {}
+        for name in self.robot_names:
+            item = QtWidgets.QGraphicsPixmapItem()
+            self._scale_and_center_item(item, name, scale=1.0)  # default scale
+            item.setPos(5, 5)
+            self.icons[name] = {"item": item}
+            self.scene.addItem(item)
+
+        self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
+        self.compute_initial_scale()   
+
+    @QtCore.pyqtSlot(GlobalView)
+    def update_global_view(self, msg):
+        map_w, map_h = self.elements["map"]
+        map_rect = self.map_item.boundingRect()
+        width = map_rect.width()
+        height = map_rect.height()
+
+        for robot in msg.robots:
+            posx = width * robot.x / map_w
+            posy = height * (1 - robot.y / map_h)
+            item = self.icons[robot.name]["item"]
+            item.setPos(posx, posy)
+            item.setRotation(-robot.theta * 180 / pi)
+        
+        flag = False
+        for elem in msg.objects:
+            key = f"{elem.type}-{elem.id}"
+            if key not in self.icons:
+                item = QtWidgets.QGraphicsPixmapItem()
+                self.icons[key] = {"item": item}
+                self.scene.addItem(item)
+                flag = True
+            item = self.icons[key]["item"]
+            # should_be_visible = elem.state == "free"
+            # if item.isVisible() != should_be_visible:
+            #     item.setVisible(should_be_visible)  # Update visibility only if it changes
+            # if should_be_visible:
+            if True:
+                posx = width * elem.x / map_w
+                posy = height * (1 - elem.y / map_h)
+                item.setPos(posx, posy)
+                item.setRotation(90 - elem.theta * 180 / pi)
+        if flag:
+            self.compute_initial_scale()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.fitInView(self.map_item, QtCore.Qt.KeepAspectRatio)
+        self.compute_initial_scale()
+
+    def compute_initial_scale(self):
+        map_w, map_h = self.elements["map"]
+        item_rect = self.map_item.mapRectToScene(self.map_item.boundingRect())
+        pixels_per_meter_x = item_rect.width() / map_w
+        pixels_per_meter_y = item_rect.height() / map_h
+        scale = min(pixels_per_meter_x, pixels_per_meter_y)
+        for id in self.icons.keys():
+            self._scale_and_center_item(self.icons[id]["item"], id.split("-")[0] if "-" in id else id, scale)
+            
+    def _scale_and_center_item(self, item, elem_type, scale):
+        base_pixmap = self.pixmaps.get(elem_type)
+        if base_pixmap and not base_pixmap.isNull():
+            real_w, real_h = self.elements[elem_type]
+            width_px = int(scale * real_w)
+            height_px = int(scale * real_h)
+
+            scaled_pixmap = base_pixmap.scaled(
+                width_px, height_px,
+                QtCore.Qt.IgnoreAspectRatio,  # Real-world size
+                QtCore.Qt.SmoothTransformation
+            )
+            item.setPixmap(scaled_pixmap)
+
+            w = scaled_pixmap.width()
+            h = scaled_pixmap.height()
+            item.setOffset(-w / 2, -h / 2)
 
 # Fenêtre Qt avec un label à mettre à jour
 class OrchestratorGUI(QtWidgets.QMainWindow):
@@ -571,14 +669,15 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
 
         # GUI for each robot
         self.page_name_box = QtWidgets.QComboBox()
-        self.page_name_box.addItems([name for name in self.gui_node.robot_names])
+        self.page_name_box.addItems(["General View"] + [name for name in self.gui_node.robot_names])
         self.robot_pages = {
             name: MainRobotPage(name, self) for name in self.gui_node.robot_names
         }
+        self.robot_pages['General View'] = GeneralViewPage(self.gui_node.robot_names, self)
         self.stackedWidgets = QtWidgets.QStackedWidget()
-        for val in self.robot_pages.values():
-            self.stackedWidgets.addWidget(val)
-
+        for page_name in [self.page_name_box.itemText(i) for i in range(self.page_name_box.count())]:
+            self.stackedWidgets.addWidget(self.robot_pages[page_name])
+        
         self.page_name_box.currentIndexChanged.connect(self.change_page)
 
         central_widget = QtWidgets.QWidget()
@@ -589,17 +688,24 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         self.layout.addWidget(self.stackedWidgets)
 
         self._connect_to_ros()
+        self.call_update_global()
 
     def update_robot_position(self, msg, name):
         """Update the position of the robot."""
         self.robot_pages[name].update_robot_position(msg)
+
+    def update_global_view(self, msg):
+        self.robot_pages['General View'].update_global_view(msg)
+
+    def call_update_global(self):
+        self.gui_node.call_send_global_data()
 
     def send_cmd(self, name, command_name, args):
         """Send the command request to node ROS."""
         self.gui_node.publish_command(name, command_name, args)
 
     def send_leashes(self):
-        for name in self.robot_pages.keys():
+        for name in self.gui_node.robot_names:
             self.send_cmd(name, "LEASH", [])
             
     def _connect_to_ros(self):

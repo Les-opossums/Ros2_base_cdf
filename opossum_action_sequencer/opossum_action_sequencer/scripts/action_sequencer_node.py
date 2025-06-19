@@ -97,38 +97,6 @@ class ActionManager(Node):
             9: [5, 3],
         }
 
-        self.end_poses = {
-            0: [0, 0.875, 2],
-            1: [0.225, 0, 1],
-            2: [1.775, 0, 1],
-            3: [2.225, 0, 1],
-        }
-        self.end_poses = self.end_poses | {key + 4: [3 - val[0], val [1], 2 - val[2]] for key, val in self.end_poses.items()}
-        self.available_end = {i: 0 for i in range(len(list(self.end_poses.keys())))}
-
-        self.position_cans = {
-            0: [0.075, 1.325, 2],
-            1: [0.075, 0.4, 2],
-            2: [0.825, 1.725, 1],
-            3: [1.1, 0.95, 1],
-            4: [0.775, 0.25, 1],
-        }
-        self.position_cans = self.position_cans | {key + 5: [3 - val[0], val[1], 2 - val[2]] for key, val in self.position_cans.items()}
-        self.available_cans = {i: True for i in range(len(list(self.position_cans.keys())))}
-
-        self.dest_cans = {
-            0: [6, 0],
-            1: [6, 0],
-            2: [6, 0],
-            3: [6, 0],
-            4: [7, 1],
-            5: [4, 2],
-            6: [4, 2],
-            7: [4, 2],
-            8: [4, 2],
-            9: [5, 3],
-        }
-
     def _init_parameters(self) -> None:
         """Initialize the parameters of the node."""
         self.declare_parameters(
@@ -607,7 +575,7 @@ class ActionManager(Node):
                                             )
                                      )
 
-            # self.get_logger().info(f"PUMP : PUMP {pump.pump_id} {pump.enable}")
+            self.get_logger().info(f"PUMP : PUMP {pump.pump_id} {pump.enable}")
             time.sleep(0.1)
 
     def led(self, led: LED_struct):
@@ -690,7 +658,8 @@ class ActionManager(Node):
     def smart_moves(self):
         default_angle = -2.60
         tol = 0.3
-        vmax = 0.3
+        vmax = 0.5
+        vtmax = 1.0
         if self.color.lower() == "yellow":
             en_color = 0
         elif self.color.lower() == "blue":
@@ -700,6 +669,7 @@ class ActionManager(Node):
         while True:
             # self.get_logger().info("Sending new goal.")
             self.send_raw(f"VMAX {vmax}")
+            self.send_raw(f"VTMAX {vtmax}")
             max = -10
             can_valid = None
             ind_valid = None
@@ -717,7 +687,7 @@ class ActionManager(Node):
                     self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * tol, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
                     self.wait_for_motion()
                     fpos = self.find_final_pos(ind_valid, en_color)
-                    self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
+                    # self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
                     self.take_cans(can_valid[2])
                     # self.get_logger().info(f"Drop")
                     self.drop_cans(fpos, default_angle)
@@ -729,7 +699,7 @@ class ActionManager(Node):
                         self.move_to(Position(can_valid[0], can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
                         self.wait_for_motion()
                         fpos = self.find_final_pos(ind_valid, en_color)
-                        self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
+                        # self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
                         self.take_cans(3)
                         # self.get_logger().info(f"Drop")
                         self.drop_cans(fpos, default_angle)
@@ -740,12 +710,13 @@ class ActionManager(Node):
                         self.move_to(Position(can_valid[0], can_valid[1] - tol, np.pi / 2 + default_angle))
                         self.wait_for_motion()
                         fpos = self.find_final_pos(ind_valid, en_color)
-                        self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
+                        # self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
                         self.take_cans(1)
                         # self.get_logger().info(f"Drop")
                         self.drop_cans(fpos, default_angle)
                 self.available_cans[ind_valid] = False
                 self.available_end[self.dest_cans[ind_valid][en_color]] += 1 # If yellow 0, else blue
+                self.add_score(4)
                 # self.get_logger().info(f"Available cans now: {self.available_cans}")
             else:
                 if en_color == 0: # color is yellow
@@ -798,9 +769,12 @@ class ActionManager(Node):
 
     def take_cans(self, angle):
         self.kalman(False)
+        self.pump(PUMP_struct(0, 1))
         self.pump(PUMP_struct(1, 1))
+        self.pump(PUMP_struct(2, 1))
+        self.pump(PUMP_struct(3, 1))
         self.sleep(0.1)
-        push_dst = 0.1
+        push_dst = 0.15
         if angle == 0:
             self.relative_move_to(Position(push_dst, 0, 0))
         elif angle == 1:
@@ -822,21 +796,32 @@ class ActionManager(Node):
         self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
         self.wait_for_motion()
 
-        self.pump(PUMP_struct(1, 0))
         self.valve(VALVE_struct(2))
         if destination[2] == 0:
             self.relative_move_to(Position(push_dst, 0, 0))
             self.wait_for_motion()
+            self.pump(PUMP_struct(0, 0))
+            self.pump(PUMP_struct(1, 0))
+            self.pump(PUMP_struct(2, 0))
+            self.pump(PUMP_struct(3, 0))
             self.relative_move_to(Position(-push_dst, 0, 0))
             self.wait_for_motion()
         elif destination[2] == 2:
             self.relative_move_to(Position(-push_dst, 0, 0))
             self.wait_for_motion()
+            self.pump(PUMP_struct(0, 0))
+            self.pump(PUMP_struct(1, 0))
+            self.pump(PUMP_struct(2, 0))
+            self.pump(PUMP_struct(3, 0))
             self.relative_move_to(Position(push_dst, 0, 0))
             self.wait_for_motion()
         elif destination[2] == 3:
             self.relative_move_to(Position(0, -push_dst, 0))
             self.wait_for_motion()
+            self.pump(PUMP_struct(0, 0))
+            self.pump(PUMP_struct(1, 0))
+            self.pump(PUMP_struct(2, 0))
+            self.pump(PUMP_struct(3, 0))
             self.relative_move_to(Position(0, push_dst, 0))
             self.wait_for_motion()
         else:
