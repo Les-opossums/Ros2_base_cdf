@@ -369,26 +369,31 @@ class ActionManager(Node):
         self.robot_pos = Position(x=msg.x, y=msg.y, t=msg.theta)
         self.robot_speed = Position(x=msg.vlin, y=msg.vdir, t=msg.vt)
 
-        if False: #not self.motion_done:
+        if not self.motion_done:
             # self.get_logger().info(f"Verifying motion status: "
             #                        f"{self.is_robot_moving} {self.motion_done}")
             # Update motion state
             self.update_arrival_status()
             self.update_motion_status()
-            self.get_logger().info(f"Robot is moving: {self.is_robot_moving}")
-            if not self.is_robot_moving and not self.motion_done:
-                if self.timer_move is None:
-                    self.timer_move = time.time()
-                delta_time = time.time() - self.timer_move
-                if delta_time > 2.0:
-                    self.get_logger().warn(
-                        "Motion timed out."
-                    )
-                    self.move_to(Position(self.pos_obj.x,
-                                          self.pos_obj.y,
-                                          self.pos_obj.t)
-                                 )
-                    self.timer_move = None
+
+            if self.is_robot_arrived and not self.is_robot_moving:
+                self.motion_done = True
+                self.motion_done_event.set()
+
+#             self.get_logger().info(f"Robot is moving: {self.is_robot_moving}")
+#             if not self.is_robot_moving and not self.motion_done:
+#                 if self.timer_move is None:
+#                     self.timer_move = time.time()
+#                 delta_time = time.time() - self.timer_move
+#                 if delta_time > 2.0:
+#                     self.get_logger().warn(
+#                         "Motion timed out."
+#                     )
+#                     self.move_to(Position(self.pos_obj.x,
+#                                           self.pos_obj.y,
+#                                           self.pos_obj.t)
+#                                  )
+#                     self.timer_move = None
 
     def timer_match_callback(self):
         """Timer callback for match time."""
@@ -501,8 +506,6 @@ class ActionManager(Node):
                     # self.get_logger().info(f"Sending BLOCK")
                     time.sleep(0.1)
 
-                # self.get_logger().info("Robot moving...")
-
     def relative_move_to(self, delta: Position, seuil=0.1):
         """Compute the relative move_to action."""
         if not self.stop:
@@ -539,13 +542,13 @@ class ActionManager(Node):
     def update_motion_status(self):
         if not self.stop:
             time.sleep(0.1)
-            if not self.is_robot_moving and not self.motion_done:
+            if self.is_robot_moving and not self.motion_done:
                 # self.get_logger().info("Updating motion status...")
                 if abs(self.robot_speed.x) < 0.0001 and abs(self.robot_speed.t) < 0.0001:
                     self.get_logger().info("Robot has stopped.")
-                    self.get_logger().info(f"Robot speed: vlin={self.robot_speed.x}, vt={self.robot_speed.t}")
+                    # self.get_logger().info(f"Robot speed: vlin={self.robot_speed.x}, vt={self.robot_speed.t}")
                     self.is_robot_moving = False
-                    self._init_move_timer()
+                    # self._init_move_timer()
 
     def wait_for_motion(self):
         """Compute the wait_for_motion action."""
