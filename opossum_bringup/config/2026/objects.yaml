@@ -1,0 +1,232 @@
+stacks:
+  full_haz_stack_crates:
+    0:
+      type: haz_crate
+      x: 0.075
+      y: 0
+      t: 1
+    1: 
+      type: haz_crate
+      x: 0.025
+      y: 0
+      t: 1
+    2:
+      type: haz_crate
+      x: -0.025
+      y: 0
+      t: 1
+    3: 
+      type: haz_crate
+      x: -0.075
+      y: 0
+      t: 1
+
+  half_haz_stack_crates:
+    0:
+      type: haz_crate
+      x: 0.025
+      y: 0
+      t: 1
+    1: 
+      type: haz_crate
+      x: -0.025
+      y: 0
+      t: 1
+  
+  cursor:
+    0: 
+      type: cursor
+      x: 0
+      y: 0
+      t: 1
+
+objects:
+  haz_crate:
+    type: rectangle
+    x_len: 0.05
+    y_len: 0.15
+
+  cursor: 
+    type: rectangle
+    x_len: 0.1
+    y_len: 0.045
+
+# t is not the real angle for that you need to multiply by pi / 2
+map:
+  0:
+    type: full_haz_stack_crates
+    x: 1.15
+    y: 0.8
+    t: 0
+    shape: clean
+  1:
+    type: full_haz_stack_crates
+    x: 1.85
+    y: 0.8
+    t: 0
+    shape: clean
+  2:
+    type: full_haz_stack_crates
+    x: 1.1
+    y: 0.125
+    t: 0
+    shape: clean
+  3:
+    type: full_haz_stack_crates
+    x: 1.9
+    y: 0.125
+    t: 0
+    shape: clean
+  4:
+    type: full_haz_stack_crates
+    x: 0.125
+    y: 0.4
+    t: -1
+    shape: clean
+  5:
+    type: full_haz_stack_crates
+    x: 0.125
+    y: 1.2
+    t: -1
+    shape: clean
+  6:
+    type: full_haz_stack_crates
+    x: 2.875
+    y: 0.4 
+    t: 1
+    shape: clean
+  7:
+    type: full_haz_stack_crates
+    x: 2.875
+    y: 1.2
+    t: 1
+    shape: clean
+  8:
+    type: half_haz_stack_crates
+    x: 1.1
+    y: 1.725
+    t: 0
+    shape: clean
+  9:
+    type: half_haz_stack_crates
+    x: 1.35
+    y: 1.775
+    t: 0
+    shape: clean
+  10:
+    type: half_haz_stack_crates
+    x: 1.65
+    y: 1.775
+    t: 0
+    shape: clean
+  11:
+    type: half_haz_stack_crates
+    x: 1.9
+    y: 1.725
+    t: 0
+    shape: clean
+  12:
+    type: half_haz_stack_crates
+    x: 0.8
+    y: 1.675
+    t: 0
+    shape: rot
+  13:
+    type: half_haz_stack_crates
+    x: 2.2
+    y: 1.675
+    t: 0
+    shape: rot
+  14:
+    type: cursor
+    x: 0.8
+    y: 0
+    t: 0
+  15:
+    type: cursor
+    x: 2.2
+    y: 0
+    t: 0
+
+# In the robot referential def angle -2.6
+actuators:
+  0: 
+    name: vaccum_gripper1
+    x: -0.125 # -15 * cos a - (-5) * sin a  
+    y: 0.075 # -15 * sin a -5 * cos a 
+    size: 0.05
+  1: 
+    name: vaccum_gripper2
+    x: -0.125 # -5 * cos a -(-15) * sin a 
+    y: 0.025 # -5 * sin a -15 * cos a 
+    size: 0.05
+  2: 
+    name: vaccum_gripper3
+    x: -0.125 # 5 * cos a -(-15) * sin a 
+    y: -0.025 # 5 * sin a -15 * cos a 
+    size: 0.05
+  3: 
+    name: vaccum_gripper4
+    x: -0.125 # 15 * cos a -(-5) * sin a
+    y: -0.075 # 15 * sin a -5 * cos a
+    size: 0.05
+  4: 
+    name: vaccum_gripper5
+    x: 0.125 # -15 * cos a - (-5) * sin a  
+    y: 0.075 # -15 * sin a -5 * cos a 
+    size: 0.05
+  5: 
+    name: vaccum_gripper6
+    x: 0.125 # -5 * cos a -(-15) * sin a 
+    y: 0.025 # -5 * sin a -15 * cos a 
+    size: 0.05
+  6: 
+    name: vaccum_gripper7
+    x: 0.125 # 5 * cos a -(-15) * sin a 
+    y: -0.025 # 5 * sin a -15 * cos a 
+    size: 0.05
+  7: 
+    name: vaccum_gripper8
+    x: 0.125 # 15 * cos a -(-5) * sin a
+    y: -0.075 # 15 * sin a -5 * cos a
+    size: 0.05
+  8:
+    name: vaccum_gripper9
+    x: 0.075 # -15 * cos a - (-5) * sin a  
+    y: -0.125 # -15 * sin a -5 * cos a 
+    size: 0.05
+  9: 
+    name: vaccum_gripper10
+    x: 0.025 # -5 * cos a -(-15) * sin a 
+    y: -0.125 # -5 * sin a -15 * cos a 
+    size: 0.05
+  10: 
+    name: vaccum_gripper11
+    x: -0.025 # 5 * cos a -(-15) * sin a 
+    y: -0.125 # 5 * sin a -15 * cos a 
+    size: 0.05
+  11: 
+    name: vaccum_gripper12
+    x: -0.075 # 15 * cos a -(-5) * sin a
+    y: -0.125 # 15 * sin a -5 * cos a
+    size: 0.05
+  12: 
+    name: vaccum_gripper13
+    x: 0.075 # -15 * cos a - (-5) * sin a  
+    y: 0.125 # -15 * sin a -5 * cos a 
+    size: 0.05
+  13: 
+    name: vaccum_gripper14
+    x: 0.025 # -5 * cos a -(-15) * sin a 
+    y: -0.125 # -5 * sin a -15 * cos a 
+    size: 0.05
+  14: 
+    name: vaccum_gripper15
+    x: -0.025 # 5 * cos a -(-15) * sin a 
+    y: -0.125 # 5 * sin a -15 * cos a 
+    size: 0.05
+  15: 
+    name: vaccum_gripper16
+    x: -0.075 # 15 * cos a -(-5) * sin a
+    y: -0.125 # 15 * sin a -5 * cos a
+    size: 0.05

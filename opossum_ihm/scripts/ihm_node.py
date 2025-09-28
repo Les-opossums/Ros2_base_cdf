@@ -121,14 +121,12 @@ class IhmNode(Node):
 
             self.clr = self.gui.get_color()
             self.pub_color_topic.publish(String(data=self.clr))
-            self.get_logger().info(f"Color selected: {self.clr}")
 
             self.gui.run_script()
             if self.gui.reload:
                 continue
 
             self.scr = self.gui.get_script()
-            self.get_logger().info(f"Script selected: {self.scr}")
 
             self.update_parameters()
 
@@ -174,35 +172,25 @@ class IhmNode(Node):
         """Gère la réponse du service asynchrone."""
         try:
             response = future.result()
-            # self.get_logger().info(f"Parameters updated successfully: "
-            #                        f"{response}")
         except Exception as e:
             self.get_logger().error(f"Service call failed: {e}")
 
     def score_callback(self, msg):
         """Callback pour le topic 'score'."""
-        self.get_logger().info(f"Score received: {msg.data}")
         self.score += msg.data
-        self.get_logger().info(
-            f"Score received: {msg.data}, "
-            f"current_score={self.score}"
-        )
 
     def au_callback(self, msg):
         """Callback pour le topic 'au'."""
         self.au = msg.data
-        # self.get_logger().info(f"AU received: {msg.data}")
 
     def enable_timer_callback(self, msg):
         """Callback pour le topic 'enable_timer'."""
         if self.gui.initialized:
             self.gui.score_app.is_match = msg.data
-            self.get_logger().info(f"Enable Timer received: {msg.data}")
 
     def comm_state_callback(self, msg):
         """Callback pour le topic 'comm_state'."""
         self.comm_state = msg.data
-        self.get_logger().info(f"Comm State received: {msg.data}")
 
     def lidar_loc_callback(self, msg: LidarLoc):
         """Receive Lidar location."""

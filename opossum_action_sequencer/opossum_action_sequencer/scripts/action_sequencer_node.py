@@ -14,6 +14,7 @@ import numpy as np
 from opossum_action_sequencer.utils import (
     Position,
     PUMP_struct,
+    VACCUMGRIPPER_struct,
     LED_struct,
     SERVO_struct,
     STEPPER_struct,
@@ -465,7 +466,6 @@ class ActionManager(Node):
         if not self.stop:
             self.timer = None
             self.seuil = seuil
-            # self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
             self.motion_done = False
             self.is_robot_moving = True
             self.is_robot_arrived = False
@@ -494,14 +494,11 @@ class ActionManager(Node):
                     pos_y = self.y_enn # + v1_y * 0.5
                     dir = np.arctan2(v1_y, v1_x)
                     self.move_to(Position(pos_x, pos_y, dir))
-                    # self.get_logger().info(f"Move to ennemi: {pos_x} {pos_y} {dir}")
                     time.sleep(0.1)
                 else:
                     self.send_raw("BLOCK")
-                    # self.get_logger().info(f"Sending BLOCK")
                     time.sleep(0.1)
 
-                # self.get_logger().info("Robot moving...")
 
     def relative_move_to(self, delta: Position, seuil=0.1):
         """Compute the relative move_to action."""
@@ -513,8 +510,6 @@ class ActionManager(Node):
                 y=self.robot_pos.y + delta.y,
                 t=self.robot_pos.t + delta.t
             )
-            # self.get_logger().info(f"Robot_data : {self.robot_pos.x} {self.robot_pos.y} {self.robot_pos.t}")
-            # self.get_logger().info(f"Moving to : {pos.x} {pos.y} {pos.t}")
             self.motion_done = False
             self.is_robot_moving = True
             self.is_robot_arrived = False
@@ -522,38 +517,29 @@ class ActionManager(Node):
             self.pub_command.publish(String(data=f"MOVE {pos.x} {pos.y} {pos.t}"))
             self.pos_obj = Position(x=pos.x, y=pos.y, t=pos.t)
             self.motion_done_event.clear()  # Block the wait
-            # self.get_logger().info("Robot moving...")
 
     def update_arrival_status(self):
         if not self.stop:
             time.sleep(0.1)
-            # self.get_logger().info("Updating arrival status...")
             delta_x = abs(self.pos_obj.x - self.robot_pos.x)
             delta_y = abs(self.pos_obj.y - self.robot_pos.y)
             delta_t = abs(self.pos_obj.t - self.robot_pos.t)
             if delta_x < 0.5 and delta_y < 0.5 and delta_t < 0.5:
-                # if not self.is_robot_arrived:
-                    # self.get_logger().info("Robot has arrived.")
                 self.is_robot_arrived = True
 
     def update_motion_status(self):
         if not self.stop:
             time.sleep(0.1)
             if not self.is_robot_moving and not self.motion_done:
-                # self.get_logger().info("Updating motion status...")
                 if abs(self.robot_speed.x) < 0.0001 and abs(self.robot_speed.t) < 0.0001:
-                    self.get_logger().info("Robot has stopped.")
-                    self.get_logger().info(f"Robot speed: vlin={self.robot_speed.x}, vt={self.robot_speed.t}")
                     self.is_robot_moving = False
                     self._init_move_timer()
 
     def wait_for_motion(self):
         """Compute the wait_for_motion action."""
         if not self.stop:
-            # self.get_logger().info("Waiting for robot to stop...")
             self.motion_done_event.wait()
             time.sleep(0.2)
-            # self.get_logger().info("Motion done from Ros")
             self.motion_done = True
 
     def servo(self, servo: SERVO_struct):
@@ -564,7 +550,6 @@ class ActionManager(Node):
                                             )
                                      )
 
-            # self.get_logger().info(f"SERVO : SERVO {servo.servo_id} {servo.angle}")
             time.sleep(0.1)
 
     def pump(self, pump: PUMP_struct):
@@ -574,8 +559,15 @@ class ActionManager(Node):
                                                  f"{pump.enable}"
                                             )
                                      )
+            time.sleep(0.1)
 
-            self.get_logger().info(f"PUMP : PUMP {pump.pump_id} {pump.enable}")
+    def vaccumgripper(self, vg: VACCUMGRIPPER_struct):
+        """Compute the pump action."""
+        if not self.stop:
+            self.pub_command.publish(String(data=f"VACCUMGRIPPER {vg.vg_id} "
+                                                 f"{vg.enable}"
+                                            )
+                                     )
             time.sleep(0.1)
 
     def led(self, led: LED_struct):
@@ -590,7 +582,6 @@ class ActionManager(Node):
             self.pub_command.publish(
                 String(data=f"STEPPER1  {stepper.mode}")
             )
-            # self.get_logger().info(f"STEPPER : STEPPER1 {stepper.mode}")
             time.sleep(0.1)
 
     def valve(self, valve: VALVE_struct):
@@ -598,25 +589,21 @@ class ActionManager(Node):
         if not self.stop:
             self.pub_command.publish(String(data=f"VALVE {valve.valve_id} 1"))
 
-            # self.get_logger().info(f"VALVE {valve.valve_id} 1")
             time.sleep(0.1)
 
     def write_log(self, message):
         """Write logs."""
         if not self.stop:
-            # self.get_logger().info(f"{message}")
             pass
 
     def sleep(self, duration):
         """Sleep for a given duration."""
         if not self.stop:
-            # self.get_logger().info(f"Sleeping for {duration} seconds")
             time.sleep(duration)
 
     def send_raw(self, raw_command):
         """Send raw commands."""
         if not self.stop:
-            # self.get_logger().info(f"Sending raw command: {raw_command}")
             self.pub_command.publish(String(data=raw_command))
             time.sleep(0.1)
 
@@ -625,10 +612,8 @@ class ActionManager(Node):
         if not self.stop:
             if kalman:
                 self.pub_command.publish(String(data="ENKALMAN 1"))
-                # self.get_logger().info("KALMAN ON")
             else:
                 self.pub_command.publish(String(data="ENKALMAN 0"))
-                # self.get_logger().info("KALMAN OFF")
             time.sleep(0.1)
 
     def synchro_lidar(self):
@@ -640,7 +625,6 @@ class ActionManager(Node):
                 f"SYNCHROLIDAR {self.lidar_pos.x} "
                 f"{self.lidar_pos.y} {self.lidar_pos.t}"
             )
-            # self.get_logger().info(f"Synchro : {command}")
             self.pub_command.publish(String(data=f"{command}"))
 
     def add_score(self, score):
@@ -667,7 +651,6 @@ class ActionManager(Node):
         else:
             self.get_logger().error(f"NO COLOR")
         while True:
-            # self.get_logger().info("Sending new goal.")
             self.send_raw(f"VMAX {vmax}")
             self.send_raw(f"VTMAX {vtmax}")
             max = -10
@@ -676,7 +659,6 @@ class ActionManager(Node):
             for ind, cans in self.position_cans.items():
                 if self.available_cans[ind]:
                     temp = self.compute_penality(cans)
-                    # self.get_logger().info(f"Reward for cans: {ind}, {temp}")
                     if temp > max:
                         max = temp
                         ind_valid = ind
@@ -687,10 +669,8 @@ class ActionManager(Node):
                     self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * tol, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
                     self.wait_for_motion()
                     fpos = self.find_final_pos(ind_valid, en_color)
-                    # self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
-                    self.take_cans(can_valid[2])
-                    # self.get_logger().info(f"Drop")
-                    self.drop_cans(fpos, default_angle)
+                    self.take_crates(can_valid[2])
+                    self.drop_crates(fpos, default_angle)
                 else: # CANS THAT ARE FRONT ON BOARD
                     if self.robot_pos.y > can_valid[1] or can_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
                         if self.robot_pos.y - can_valid[1] < tol:
@@ -699,10 +679,8 @@ class ActionManager(Node):
                         self.move_to(Position(can_valid[0], can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
                         self.wait_for_motion()
                         fpos = self.find_final_pos(ind_valid, en_color)
-                        # self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
-                        self.take_cans(3)
-                        # self.get_logger().info(f"Drop")
-                        self.drop_cans(fpos, default_angle)
+                        self.take_crates(3)
+                        self.drop_crates(fpos, default_angle)
                     else:
                         if can_valid[1] - self.robot_pos.y < tol:
                             self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] - tol, np.pi / 2 + default_angle))
@@ -710,14 +688,11 @@ class ActionManager(Node):
                         self.move_to(Position(can_valid[0], can_valid[1] - tol, np.pi / 2 + default_angle))
                         self.wait_for_motion()
                         fpos = self.find_final_pos(ind_valid, en_color)
-                        # self.get_logger().info(f"Take can id {ind_valid} at position {can_valid} with final position {fpos}")
-                        self.take_cans(1)
-                        # self.get_logger().info(f"Drop")
-                        self.drop_cans(fpos, default_angle)
+                        self.take_crates(1)
+                        self.drop_crates(fpos, default_angle)
                 self.available_cans[ind_valid] = False
                 self.available_end[self.dest_cans[ind_valid][en_color]] += 1 # If yellow 0, else blue
                 self.add_score(4)
-                # self.get_logger().info(f"Available cans now: {self.available_cans}")
             else:
                 if en_color == 0: # color is yellow
                     self.move_to(Position(0.5, 1.4, 0))
@@ -732,6 +707,76 @@ class ActionManager(Node):
                     self.move_to(Position(3 - 0.5, 1.7, 0))
                     self.wait_for_motion()
                     self.send_raw("BLOCK")
+
+    def smart_moves_2025(self):
+        default_angle = -2.60
+        tol = 0.3
+        vmax = 0.5
+        vtmax = 1.0
+        if self.color.lower() == "yellow":
+            en_color = 0
+        elif self.color.lower() == "blue":
+            en_color = 1
+        else:
+            self.get_logger().error(f"NO COLOR")
+        while True:
+            self.send_raw(f"VMAX {vmax}")
+            self.send_raw(f"VTMAX {vtmax}")
+            max = -10
+            can_valid = None
+            ind_valid = None
+            for ind, cans in self.position_cans.items():
+                if self.available_cans[ind]:
+                    temp = self.compute_penality(cans)
+                    if temp > max:
+                        max = temp
+                        ind_valid = ind
+                        can_valid = cans
+            if can_valid is not None:
+                if can_valid[2] % 2 == 0:
+                    # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
+                    self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * tol, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
+                    self.wait_for_motion()
+                    fpos = self.find_final_pos(ind_valid, en_color)
+                    self.take_cans(can_valid[2])
+                    self.drop_cans(fpos, default_angle)
+                else: # CANS THAT ARE FRONT ON BOARD
+                    if self.robot_pos.y > can_valid[1] or can_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
+                        if self.robot_pos.y - can_valid[1] < tol:
+                            self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
+                            self.wait_for_motion()
+                        self.move_to(Position(can_valid[0], can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
+                        self.wait_for_motion()
+                        fpos = self.find_final_pos(ind_valid, en_color)
+                        self.take_cans(3)
+                        self.drop_cans(fpos, default_angle)
+                    else:
+                        if can_valid[1] - self.robot_pos.y < tol:
+                            self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] - tol, np.pi / 2 + default_angle))
+                            self.wait_for_motion()
+                        self.move_to(Position(can_valid[0], can_valid[1] - tol, np.pi / 2 + default_angle))
+                        self.wait_for_motion()
+                        fpos = self.find_final_pos(ind_valid, en_color)
+                        self.take_cans(1)
+                        self.drop_cans(fpos, default_angle)
+                self.available_cans[ind_valid] = False
+                self.available_end[self.dest_cans[ind_valid][en_color]] += 1 # If yellow 0, else blue
+                self.add_score(4)
+            else:
+                if en_color == 0: # color is yellow
+                    self.move_to(Position(0.5, 1.4, 0))
+                    self.wait_for_motion()
+                    self.move_to(Position(0.5, 1.7, 0))
+                    self.wait_for_motion()
+                    self.send_raw("BLOCK")
+                    break
+                else:
+                    self.move_to(Position(3 - 0.5, 1.4, 0))
+                    self.wait_for_motion()
+                    self.move_to(Position(3 - 0.5, 1.7, 0))
+                    self.wait_for_motion()
+                    self.send_raw("BLOCK")
+
 
     def find_final_pos(self, index, en_color):
         size_cans = 0.1
@@ -766,6 +811,38 @@ class ActionManager(Node):
         else:
             val_ennemi = 0
         return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
+
+    def take_crates(self, angle):
+        self.kalman(False)
+        self.vaccumgripper(VACCUMGRIPPER_struct(0, 1))
+        self.vaccumgripper(VACCUMGRIPPER_struct(1, 1))
+        self.vaccumgripper(VACCUMGRIPPER_struct(2, 1))
+        self.vaccumgripper(VACCUMGRIPPER_struct(3, 1))
+        self.vaccumgripper(VACCUMGRIPPER_struct(4, 1))
+        self.vaccumgripper(VACCUMGRIPPER_struct(5, 1))
+        self.vaccumgripper(VACCUMGRIPPER_struct(6, 1))
+        self.vaccumgripper(VACCUMGRIPPER_struct(7, 1))
+        self.vaccumgripper(VACCUMGRIPPER_struct(8, 1))
+        self.vaccumgripper(VACCUMGRIPPER_struct(9, 1))
+        self.vaccumgripper(VACCUMGRIPPER_struct(10, 1))
+        self.vaccumgripper(VACCUMGRIPPER_struct(11, 1))
+        self.sleep(0.1)
+        push_dst = 0.15
+        if angle == 0:
+            self.relative_move_to(Position(push_dst, 0, 0))
+        elif angle == 1:
+            self.relative_move_to(Position(0, push_dst, 0))
+        elif angle == 2:
+            self.relative_move_to(Position(-push_dst, 0, 0))
+        elif angle == 3:
+            self.relative_move_to(Position(0, -push_dst, 0))
+        else:
+            self.relative_move_to(Position(0, 0, 0))
+            self.get_logger().error(f"Invalid angle for taking cans: {angle}")
+            pass
+        self.wait_for_motion()
+        self.kalman(True)
+        self.sleep(0.1)
 
     def take_cans(self, angle):
         self.kalman(False)
@@ -828,6 +905,66 @@ class ActionManager(Node):
             self.get_logger().error(f"Invalid angle for dropping cans: "
                                     f"{destination[2]}")
 
+    def drop_crates(self, destination, default_angle):    
+        push_dst = 0.1
+        self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
+        self.wait_for_motion()
+
+        self.valve(VALVE_struct(2))
+        if destination[2] == 0:
+            self.relative_move_to(Position(push_dst, 0, 0))
+            self.wait_for_motion()
+            self.vaccumgripper(VACCUMGRIPPER_struct(0, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(1, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(2, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(3, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(4, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(5, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(6, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(7, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(8, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(9, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(10, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(11, 0))
+            self.relative_move_to(Position(-push_dst, 0, 0))
+            self.wait_for_motion()
+        elif destination[2] == 2:
+            self.relative_move_to(Position(-push_dst, 0, 0))
+            self.wait_for_motion()
+            self.vaccumgripper(VACCUMGRIPPER_struct(0, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(1, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(2, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(3, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(4, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(5, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(6, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(7, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(8, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(9, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(10, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(11, 0))
+            self.relative_move_to(Position(push_dst, 0, 0))
+            self.wait_for_motion()
+        elif destination[2] == 3:
+            self.relative_move_to(Position(0, -push_dst, 0))
+            self.wait_for_motion()
+            self.vaccumgripper(VACCUMGRIPPER_struct(0, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(1, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(2, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(3, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(4, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(5, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(6, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(7, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(8, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(9, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(10, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(11, 0))
+            self.relative_move_to(Position(0, push_dst, 0))
+            self.wait_for_motion()
+        else:
+            self.get_logger().error(f"Invalid angle for dropping cans: "
+                                    f"{destination[2]}")
 
 def main(args=None):
     """Run main loop."""

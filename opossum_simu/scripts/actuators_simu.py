@@ -14,7 +14,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 # Import des messages
 from opossum_msgs.action import StringAction
 from opossum_msgs.srv import StringReq
-from std_msgs.msg import String, Int16
+from std_msgs.msg import String, Int64
 from geometry_msgs.msg import Point
 import threading
 import collections
@@ -54,7 +54,7 @@ class ActuatorsSimu(Node):
     def _init_publishers(self):
         """Init publishers of the node."""
         self.pub_change_state = self.create_publisher(
-            Int16, "actuators_state", 10
+            Int64, "actuators_state", 10
         )
         self.pub_zync_raspi = self.create_publisher(String, "zync_raspi", 10)
     
@@ -86,8 +86,11 @@ class ActuatorsSimu(Node):
         if request_split[0] == "PUMP":
             self.states[f"PUMP{request_split[1]}"] = bool(int(request_split[2]))
             response.response = request_split[0] + "," + request_split[1] + "," + request_split[2]
+        if request_split[0] == "VACCUMGRIPPER":
+            self.states[f"VACCUMGRIPPER{request_split[1]}"] = bool(int(request_split[2]))
+            response.response = request_split[0] + "," + request_split[1] + "," + request_split[2]
         state_vector = encode_state(list(self.states.values()))
-        self.pub_change_state.publish(Int16(data=state_vector))
+        self.pub_change_state.publish(Int64(data=state_vector))
         return response
 
     def _single_handle_accepted_callback(self, goal_handle):
@@ -129,8 +132,10 @@ class ActuatorsSimu(Node):
     def _init_states(self):
         """Create random positions for init."""
         self.states = {f"PUMP{i}": False for i in range(4)}
+        for i in range(16):
+            self.states["VACCUMGRIPPER"] = False
         state_vector = encode_state(list(self.states.values()))
-        self.pub_change_state.publish(Int16(data=state_vector))
+        self.pub_change_state.publish(Int64(data=state_vector))
 
     def destroy(self):
         """Destroy the node."""

@@ -6,3 +6,4 @@ from opossum_action_sequencer.action_manager import Version, Position, Speed
 from opossum_action_sequencer.action_manager import ODOM_struct, SERVO_struct
 from opossum_action_sequencer.action_manager import STEPPER_struct
 from opossum_action_sequencer.action_manager import VALVE_struct
+from opossum_action_sequencer.action_manager import VACCUMGRIPPER_struct

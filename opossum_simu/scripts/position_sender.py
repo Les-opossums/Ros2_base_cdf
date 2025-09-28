@@ -3,6 +3,7 @@
 """Receive all the world information and send it to every captors (lidars at now)."""
 
 import rclpy
+import random
 import os
 import yaml
 import numpy as np
@@ -14,7 +15,7 @@ from ament_index_python.packages import get_package_share_directory
 from opossum_msgs.srv import StringReq
 from geometry_msgs.msg import Point
 from std_srvs.srv import Trigger
-from std_msgs.msg import Int16
+from std_msgs.msg import Int64
 from opossum_msgs.msg import PositionMap, RobotData, Objects, GlobalView, Actuators
 import functools
 from copy import deepcopy
@@ -52,7 +53,7 @@ class PositionSender(Node):
             self.get_parameter("update_period").get_parameter_value().double_value
         )
         objects_path = os.path.join(
-            get_package_share_directory("opossum_bringup"), "config", "objects.yaml"
+            get_package_share_directory("opossum_bringup"), "config", "2026", "objects.yaml"
         )
         self.modified_objects = []
 
@@ -81,13 +82,24 @@ class PositionSender(Node):
         for obj in data['map'].values():
             cos_ = np.cos(obj['t'] * np.pi / 2)
             sin_ = np.sin(obj['t'] * np.pi / 2)
-            for element in element_types[obj['type']].values():
+            if obj['type'] == "full_haz_stack_crates" and obj['shape'] == "clean":
+                order = ["yellow", "yellow", "blue", "blue"]
+                random.shuffle(order)
+            elif obj['type'] == "half_haz_stack_crates" and obj['shape'] == "clean":
+                order = ["yellow", "blue"]
+                random.shuffle(order)
+            else:
+                order = ["rot", "rot", "rot", "rot"]
+            for ind, element in element_types[obj['type']].items():
+                
                 x = obj['x'] + element['x'] * cos_ - element['y'] * sin_ 
                 y = obj['y'] + element['x'] * sin_ + element['y'] * cos_
                 t = (obj['t'] + element['t']) * np.pi / 2
                 elem = Objects()
                 elem.id = nb_objects
                 elem.state = "free"
+                if obj['type'] in ("full_haz_stack_crates", "half_haz_stack_crates"):
+                    elem.state += "_" + order[ind]
                 elem.type = element['type']
                 elem.x = x
                 elem.y = y
@@ -129,7 +141,7 @@ class PositionSender(Node):
                 10,
             )
             self.create_subscription(
-                Int16,
+                Int64,
                 "/" + name + "/actuators_state",
                 functools.partial(self._update_state, name=name),
                 10,
@@ -141,9 +153,8 @@ class PositionSender(Node):
         for k in self.actuators[name].keys():
             act = self.actuators[name][k]
             if not result[k] and act.state != 'free':
-                self.get_logger().info(f"I released {act.state}")
                 if act.state != 'running':
-                    self.objects[int(act.state)].state = 'free' # We free the object, considering that it has the pos from last time, so its is ok
+                    self.objects[int(act.state)].state = 'free' + "_" + self.objects[int(act.state)].state.split("_")[1] # We free the object, considering that it has the pos from last time, so its is ok
                 act.state = 'free'
             elif result[k] and act.state == 'free':
                 act.state = 'running'
@@ -178,27 +189,50 @@ class PositionSender(Node):
         cos_ = np.cos(msg.z)
         sin_ = np.sin(msg.z)
         for act in self.actuators[name].values():
-            if act.state == 'running':
-                x_ = act.x * cos_ - act.y * sin_ + msg.x
-                y_ = act.x * sin_ + act.y * cos_ + msg.y
-                for obj in self.objects.values():
-                    if obj.state == 'free' and obj.type == "can":
-                        if (obj.x - x_) ** 2 + (obj.y - y_) ** 2 < act.size ** 2:
-                            act.state = str(obj.id)
-                            obj.state = f"{name}-{act.name}"
-                            obj.x = x_
-                            obj.y = y_
-                            self.modified_objects.append(obj.id)
+            if act.name.startswith("pump"):
+                if act.state == 'running':
+                    x_ = act.x * cos_ - act.y * sin_ + msg.x
+                    y_ = act.x * sin_ + act.y * cos_ + msg.y
+                    for obj in self.objects.values():
+                        if obj.state.split("_")[0] == 'free' and obj.type == "can":
+                            if (obj.x - x_) ** 2 + (obj.y - y_) ** 2 < act.size ** 2:
+                                act.state = str(obj.id)
+                                obj.state = f"{name}-{act.name}" + "_" + self.objects[int(act.state)].state.split("_")[1]
+                                obj.x = x_
+                                obj.y = y_
+                                self.modified_objects.append(obj.id)
 
-                            break
-            elif act.state != 'free':
-                x_ = act.x * cos_ - act.y * sin_ + msg.x
-                y_ = act.x * sin_ + act.y * cos_ + msg.y
-                obj_taken = self.objects[int(act.state)]
-                obj_taken.x = x_
-                obj_taken.y = y_
-                obj_taken.theta += msg.z - old_theta
-                self.modified_objects.append(obj_taken.id)
+                                break
+                elif act.state != 'free':
+                    x_ = act.x * cos_ - act.y * sin_ + msg.x
+                    y_ = act.x * sin_ + act.y * cos_ + msg.y
+                    obj_taken = self.objects[int(act.state)]
+                    obj_taken.x = x_
+                    obj_taken.y = y_
+                    obj_taken.theta += msg.z - old_theta
+                    self.modified_objects.append(obj_taken.id)
+            elif act.name.startswith("vaccum_gripper"):
+                if act.state == 'running':
+                    x_ = act.x * cos_ - act.y * sin_ + msg.x
+                    y_ = act.x * sin_ + act.y * cos_ + msg.y
+                    for obj in self.objects.values():
+                        if obj.state.split("_")[0] == 'free' and obj.type == "haz_crate":
+                            if (obj.x - x_) ** 2 + (obj.y - y_) ** 2 < act.size ** 2:
+                                act.state = str(obj.id)
+                                obj.state = f"{name}-{act.name}" + "_" + self.objects[int(act.state)].state.split("_")[1]
+                                obj.x = x_
+                                obj.y = y_
+                                self.modified_objects.append(obj.id)
+
+                                break
+                elif act.state != 'free':
+                    x_ = act.x * cos_ - act.y * sin_ + msg.x
+                    y_ = act.x * sin_ + act.y * cos_ + msg.y
+                    obj_taken = self.objects[int(act.state)]
+                    obj_taken.x = x_
+                    obj_taken.y = y_
+                    obj_taken.theta += msg.z - old_theta
+                    self.modified_objects.append(obj_taken.id)
 
     def _publish_general_map(self):
         """Publish the postion to every captor who needs information."""

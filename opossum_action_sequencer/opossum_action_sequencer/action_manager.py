@@ -26,6 +26,11 @@ class PUMP_struct:
         self.pump_id = pump_id
         self.enable = enable
 
+class VACCUMGRIPPER_struct:
+    def __init__(self, vg_id, enable):
+        self.vg_id = vg_id
+        self.enable = enable
+
 
 class LED_struct:
     def __init__(self, red, green, blue):

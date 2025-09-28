@@ -103,9 +103,6 @@ class ZynqSimulation(Node):
         name = parser[0]
         args_list = parser[1:]
         if name not in self.comm_yaml:
-            # self.get_logger().info(
-            #     f"The name {name} does not exist in the YAML file com_msgs."
-            # )
             return
         order = self.comm_yaml[name]
         msg_type = order["send"]
@@ -131,16 +128,11 @@ class ZynqSimulation(Node):
     def process_action(self, name, args):
         """Execute the requested action asynchronously."""
         if (
-            name == "GETODOM"
-            or name == "SPEED"
-            or name == "MAPASSERV"
-            or name == "BLOCK"
-            or name == "VMAX"
-            or name == "VTMAX"
+            name in ("GETODOM", "SPEED", "MAPASSERV", "BLOCK", "VMAX", "VTMAX")
         ):
             self.send_short_cmd("motors", name, args)
         elif (
-            name == "PUMP"
+            name in ("PUMP", "VACCUMGRIPPER")
         ):
             self.send_short_cmd("actuators", name, args)
         elif name == "MOVE":

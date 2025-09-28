@@ -133,7 +133,7 @@ class MapScene(QtWidgets.QGraphicsView):
         self.parent = parent
         self.name = name
         image_path = os.path.join(
-            get_package_share_directory("opossum_dev_gui"), "images"
+            get_package_share_directory("opossum_dev_gui"), "images", "2026"
         )
         map = os.path.join(image_path, "map.png")
         icon = os.path.join(image_path, "robot.png")
@@ -212,9 +212,6 @@ class MapScene(QtWidgets.QGraphicsView):
                 self.ennemis_items[index].setPos(e_pos)
                 self.scene.addItem(self.ennemis_items[index])
             index += 1
-        # logger = get_logger("HEY")
-        # logger.info(f"NUM robo: {len(self.ennemis_items)}")
-        # Remove old enemy items from the scene if they are no longer in the new message
         while len(self.ennemis_items) > index:
             old_item = self.ennemis_items.pop()
             self.scene.removeItem(old_item)
@@ -549,14 +546,16 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
         self.robot_names = robot_names
 
         self.image_path = os.path.join(
-            get_package_share_directory("opossum_dev_gui"), "images"
+            get_package_share_directory("opossum_dev_gui"), "images", "2026"
         )
 
         # Real sizes (meters)
         self.elements = {
             "map": (3.0, 2.0),
-            "can": (0.08, 0.08),
-            "w_board": (0.40, 0.10),
+            "haz_crate_blue": (0.05, 0.15),
+            "haz_crate_yellow": (0.05, 0.15),
+            "haz_crate_rot": (0.05, 0.15),
+            "cursor": (0.1, 0.045),
         } | {name: (0.35, 0.35) for name in self.robot_names}
 
         self.scene = QtWidgets.QGraphicsScene(self)
@@ -577,9 +576,9 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
         self.icons = {}
         for name in self.robot_names:
             item = QtWidgets.QGraphicsPixmapItem()
-            self._scale_and_center_item(item, name, scale=1.0)  # default scale
+            self._scale_and_center_item(item, name, 1.0, "free")  # default scale
             item.setPos(5, 5)
-            self.icons[name] = {"item": item}
+            self.icons[name] = {"item": item, "state": "free", "type": name}
             self.scene.addItem(item)
 
         self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
@@ -599,14 +598,17 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
             item.setPos(posx, posy)
             item.setRotation(-robot.theta * 180 / pi)
         
-        flag = False
+        to_update = []
         for elem in msg.objects:
             key = f"{elem.type}-{elem.id}"
             if key not in self.icons:
                 item = QtWidgets.QGraphicsPixmapItem()
-                self.icons[key] = {"item": item}
+                self.icons[key] = {"item": item, "state": elem.state, "type": elem.type}
                 self.scene.addItem(item)
-                flag = True
+                to_update.append(key)
+            if elem.state != self.icons[key]["state"]:
+                self.icons[key]["state"] = elem.state
+                to_update.append(key)
             item = self.icons[key]["item"]
             # should_be_visible = elem.state == "free"
             # if item.isVisible() != should_be_visible:
@@ -617,27 +619,31 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
                 posy = height * (1 - elem.y / map_h)
                 item.setPos(posx, posy)
                 item.setRotation(90 - elem.theta * 180 / pi)
-        if flag:
-            self.compute_initial_scale()
+        if to_update != []:
+            self.compute_initial_scale(to_update)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.fitInView(self.map_item, QtCore.Qt.KeepAspectRatio)
-        self.compute_initial_scale()
+        self.compute_initial_scale(self.icons.keys())
 
-    def compute_initial_scale(self):
+    def compute_initial_scale(self, to_update = []):
         map_w, map_h = self.elements["map"]
         item_rect = self.map_item.mapRectToScene(self.map_item.boundingRect())
         pixels_per_meter_x = item_rect.width() / map_w
         pixels_per_meter_y = item_rect.height() / map_h
         scale = min(pixels_per_meter_x, pixels_per_meter_y)
-        for id in self.icons.keys():
-            self._scale_and_center_item(self.icons[id]["item"], id.split("-")[0] if "-" in id else id, scale)
+        for id in to_update:
+            self._scale_and_center_item(self.icons[id]["item"], self.icons[id]["type"], scale, self.icons[id]["state"])
             
-    def _scale_and_center_item(self, item, elem_type, scale):
-        base_pixmap = self.pixmaps.get(elem_type)
+    def _scale_and_center_item(self, item, elem_type, scale, state):
+        if elem_type == "haz_crate":
+            mod_elem_type = elem_type + "_" + state.split("_")[1]
+        else:
+            mod_elem_type = elem_type
+        base_pixmap = self.pixmaps.get(mod_elem_type)
         if base_pixmap and not base_pixmap.isNull():
-            real_w, real_h = self.elements[elem_type]
+            real_w, real_h = self.elements[mod_elem_type]
             width_px = int(scale * real_w)
             height_px = int(scale * real_h)
 
