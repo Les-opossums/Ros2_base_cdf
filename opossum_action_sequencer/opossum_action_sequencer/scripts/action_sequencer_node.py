@@ -380,20 +380,22 @@ class ActionManager(Node):
                 self.motion_done = True
                 self.motion_done_event.set()
 
-#             self.get_logger().info(f"Robot is moving: {self.is_robot_moving}")
-#             if not self.is_robot_moving and not self.motion_done:
-#                 if self.timer_move is None:
-#                     self.timer_move = time.time()
-#                 delta_time = time.time() - self.timer_move
-#                 if delta_time > 2.0:
-#                     self.get_logger().warn(
-#                         "Motion timed out."
-#                     )
-#                     self.move_to(Position(self.pos_obj.x,
-#                                           self.pos_obj.y,
-#                                           self.pos_obj.t)
-#                                  )
-#                     self.timer_move = None
+            elif not self.is_robot_arrived and not self.is_robot_moving:
+                if self.timer_move is None:
+                    self.timer_move = time.time()
+                delta_time = time.time() - self.timer_move
+                if delta_time > 2.0:
+                    self.get_logger().warn(
+                        "Motion timed out."
+                    )
+                    self.move_to(Position(self.pos_obj.x,
+                                          self.pos_obj.y,
+                                          self.pos_obj.t)
+                                 )
+                    self.timer_move = None
+            
+            else :
+                pass 
 
     def timer_match_callback(self):
         """Timer callback for match time."""
