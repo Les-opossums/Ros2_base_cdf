@@ -151,82 +151,106 @@ map:
 # In the robot referential def angle -2.6
 actuators:
   0: 
+    type: vaccum_gripper
     name: vaccum_gripper1
     x: -0.125 # -15 * cos a - (-5) * sin a  
     y: 0.075 # -15 * sin a -5 * cos a 
     size: 0.05
   1: 
+    type: vaccum_gripper
     name: vaccum_gripper2
     x: -0.125 # -5 * cos a -(-15) * sin a 
     y: 0.025 # -5 * sin a -15 * cos a 
     size: 0.05
   2: 
+    type: vaccum_gripper
     name: vaccum_gripper3
     x: -0.125 # 5 * cos a -(-15) * sin a 
     y: -0.025 # 5 * sin a -15 * cos a 
     size: 0.05
   3: 
+    type: vaccum_gripper
     name: vaccum_gripper4
     x: -0.125 # 15 * cos a -(-5) * sin a
     y: -0.075 # 15 * sin a -5 * cos a
     size: 0.05
   4: 
+    type: vaccum_gripper
     name: vaccum_gripper5
     x: 0.125 # -15 * cos a - (-5) * sin a  
     y: 0.075 # -15 * sin a -5 * cos a 
     size: 0.05
   5: 
+    type: vaccum_gripper
     name: vaccum_gripper6
     x: 0.125 # -5 * cos a -(-15) * sin a 
     y: 0.025 # -5 * sin a -15 * cos a 
     size: 0.05
   6: 
+    type: vaccum_gripper
     name: vaccum_gripper7
     x: 0.125 # 5 * cos a -(-15) * sin a 
     y: -0.025 # 5 * sin a -15 * cos a 
     size: 0.05
   7: 
+    type: vaccum_gripper
     name: vaccum_gripper8
     x: 0.125 # 15 * cos a -(-5) * sin a
     y: -0.075 # 15 * sin a -5 * cos a
     size: 0.05
   8:
+    type: vaccum_gripper
     name: vaccum_gripper9
     x: 0.075 # -15 * cos a - (-5) * sin a  
     y: -0.125 # -15 * sin a -5 * cos a 
     size: 0.05
   9: 
+    type: vaccum_gripper
     name: vaccum_gripper10
     x: 0.025 # -5 * cos a -(-15) * sin a 
     y: -0.125 # -5 * sin a -15 * cos a 
     size: 0.05
   10: 
+    type: vaccum_gripper
     name: vaccum_gripper11
     x: -0.025 # 5 * cos a -(-15) * sin a 
     y: -0.125 # 5 * sin a -15 * cos a 
     size: 0.05
   11: 
+    type: vaccum_gripper
     name: vaccum_gripper12
     x: -0.075 # 15 * cos a -(-5) * sin a
     y: -0.125 # 15 * sin a -5 * cos a
     size: 0.05
   12: 
+    type: vaccum_gripper
     name: vaccum_gripper13
     x: 0.075 # -15 * cos a - (-5) * sin a  
     y: 0.125 # -15 * sin a -5 * cos a 
     size: 0.05
   13: 
+    type: vaccum_gripper
     name: vaccum_gripper14
     x: 0.025 # -5 * cos a -(-15) * sin a 
     y: -0.125 # -5 * sin a -15 * cos a 
     size: 0.05
   14: 
+    type: vaccum_gripper
     name: vaccum_gripper15
     x: -0.025 # 5 * cos a -(-15) * sin a 
     y: -0.125 # 5 * sin a -15 * cos a 
     size: 0.05
   15: 
+    type: vaccum_gripper
     name: vaccum_gripper16
     x: -0.075 # 15 * cos a -(-5) * sin a
     y: -0.125 # 15 * sin a -5 * cos a
     size: 0.05
+
+actuators_type:
+  vaccum_gripper:
+    take: 
+      - haz_crate
+  pump:
+    take:
+      - can

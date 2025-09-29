@@ -61,12 +61,15 @@ class PositionSender(Node):
         act_angle = 4.17
         # Get the poition of the pumps on the robot
         actuators_types = data['actuators']
+        self.actuators_actions = data['actuators_type']
+        # self.actuators_actions = {name: actions for name, actions in actuators_actions_type.items()}
         self.actuators = {name: {} for name in self.robot_names}
         cos_a = np.cos(act_angle)
         sin_a = np.sin(act_angle)
         for k, v in actuators_types.items():
             act = Actuators()
             act.name = v['name']
+            act.type = v['type']
             act.x = cos_a * v['x'] - sin_a * v['y']
             act.y = sin_a * v['x'] + cos_a * v['y']
             act.size = v['size']
@@ -189,54 +192,42 @@ class PositionSender(Node):
         cos_ = np.cos(msg.z)
         sin_ = np.sin(msg.z)
         for act in self.actuators[name].values():
-            if act.name.startswith("pump"):
-                if act.state == 'running':
-                    x_ = act.x * cos_ - act.y * sin_ + msg.x
-                    y_ = act.x * sin_ + act.y * cos_ + msg.y
-                    for obj in self.objects.values():
-                        if obj.state.split("_")[0] == 'free' and obj.type == "can":
-                            if (obj.x - x_) ** 2 + (obj.y - y_) ** 2 < act.size ** 2:
-                                act.state = str(obj.id)
-                                obj.state = f"{name}-{act.name}" + "_" + self.objects[int(act.state)].state.split("_")[1]
-                                obj.x = x_
-                                obj.y = y_
-                                self.modified_objects.append(obj.id)
+            if act.type == "pump":
+                self._action_pump(name, act, msg, cos_, sin_, old_theta)
+            elif act.type == "vaccum_gripper":
+                self._action_vaccum_cleaner(name, act, msg, cos_, sin_, old_theta)
+                
 
-                                break
-                elif act.state != 'free':
-                    x_ = act.x * cos_ - act.y * sin_ + msg.x
-                    y_ = act.x * sin_ + act.y * cos_ + msg.y
-                    obj_taken = self.objects[int(act.state)]
-                    obj_taken.x = x_
-                    obj_taken.y = y_
-                    obj_taken.theta += msg.z - old_theta
-                    self.modified_objects.append(obj_taken.id)
-            elif act.name.startswith("vaccum_gripper"):
-                if act.state == 'running':
-                    x_ = act.x * cos_ - act.y * sin_ + msg.x
-                    y_ = act.x * sin_ + act.y * cos_ + msg.y
-                    for obj in self.objects.values():
-                        if obj.state.split("_")[0] == 'free' and obj.type == "haz_crate":
-                            if (obj.x - x_) ** 2 + (obj.y - y_) ** 2 < act.size ** 2:
-                                act.state = str(obj.id)
-                                obj.state = f"{name}-{act.name}" + "_" + self.objects[int(act.state)].state.split("_")[1]
-                                obj.x = x_
-                                obj.y = y_
-                                self.modified_objects.append(obj.id)
+    def _action_vaccum_cleaner(self, name, act, msg, cos, sin, old_theta):
+        self._action_take(name, act, msg, cos, sin, old_theta)
 
-                                break
-                elif act.state != 'free':
-                    x_ = act.x * cos_ - act.y * sin_ + msg.x
-                    y_ = act.x * sin_ + act.y * cos_ + msg.y
-                    obj_taken = self.objects[int(act.state)]
-                    obj_taken.x = x_
-                    obj_taken.y = y_
-                    obj_taken.theta += msg.z - old_theta
-                    self.modified_objects.append(obj_taken.id)
+    def _action_pump(self, name, act, msg, cos, sin, old_theta):
+        self._action_take(name, act, msg, cos, sin, old_theta)
+
+    def _action_take(self, name, act, msg, cos, sin, old_theta):
+        if act.state == 'free':
+            return
+        x_ = act.x * cos - act.y * sin + msg.x
+        y_ = act.x * sin + act.y * cos + msg.y
+        if act.state == 'running':
+            for obj in self.objects.values():
+                if obj.state.split("_")[0] == 'free' and obj.type in self.actuators_actions[act.type]["take"]:
+                    if (obj.x - x_) ** 2 + (obj.y - y_) ** 2 < act.size ** 2:
+                        act.state = str(obj.id)
+                        obj.state = f"{name}-{act.name}" + "_" + self.objects[obj.id].state.split("_")[1]
+                        obj.x = x_
+                        obj.y = y_
+                        self.modified_objects.append(obj.id)
+                        break
+        else:
+            obj_taken = self.objects[int(act.state)]
+            obj_taken.x = x_
+            obj_taken.y = y_
+            obj_taken.theta += msg.z - old_theta
+            self.modified_objects.append(obj_taken.id)       
 
     def _publish_general_map(self):
         """Publish the postion to every captor who needs information."""
-        objects = []
         for name in self.robot_names:
             if self.current_pos[name] is not None:
                 msg = PositionMap()
