@@ -1,0 +1,10 @@
+main_robot:
+  action_sequencer_node:
+    ros__parameters:
+      robot_data_topic: robot_data
+
+second_robot:
+  action_sequencer_node:
+    ros__parameters:
+      robot_data_topic: robot_data
+
