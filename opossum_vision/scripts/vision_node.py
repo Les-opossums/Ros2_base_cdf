@@ -2,47 +2,55 @@
 
 import rclpy
 from rclpy.node import Node
-
-from std_msgs.msg import String, Bool, Int32
-from opossum_msgs.msg import RobotData, LidarLoc
+from geometry_msgs.msg import Point
+# Assurez-vous que l'import fonctionne selon votre structure
+try:
+    from opossum_msgs.msg import RobotData
+except ImportError:
+    class RobotData: pass
 
 class VisionNode(Node):
     def __init__(self):
         super().__init__('vision_node')
-        self._init_parameters()
-        self._init_subscribers()
-        self._init_publishers()
+        
+        # 1. Chargement des paramètres
+        # Le topic est relatif (pas de '/' au début), donc il deviendra /nom_robot/robot_data
+        self.declare_parameter("robot_data_topic", "robot_data")
+        self.data_topic = self.get_parameter("robot_data_topic").get_parameter_value().string_value
 
-    def _init_parameters(self):
-        """Initialize the parameters of the node."""
-        self.declare_parameters(
-            namespace="",
-            parameters=[
-                ("robot_data_topic", rclpy.Parameter.Type.STRING),
-                ("robot_names", rclpy.Parameter.Type.STRING_ARRAY),
-            ],
+        # 2. Création des Pub/Sub
+        # On publie sur un topic relatif à notre namespace (ex: /main_robot/objet_loc)
+        self.loc_pub = self.create_publisher(Point, "objet_loc", 10)
+
+        # On écoute le topic configuré
+        self.data_sub = self.create_subscription(
+            RobotData,
+            self.data_topic,
+            self.robot_data_callback,
+            10
         )
 
-        self.robot_names = (
-            self.get_parameter("robot_names").get_parameter_value().string_array_value
-        )
+        self.get_logger().info(f"VisionNode démarré dans le namespace '{self.get_namespace()}'")
+        self.get_logger().info(f"Écoute sur : {self.get_namespace()}/{self.data_topic}")
 
-    def _init_subscribers(self):
-        """Initialize the subscribers of the node."""
-        robot_data_topic = (
-            self.get_parameter("robot_data_topic")
-            .get_parameter_value()
-            .string_value
-        )
+    def robot_data_callback(self, msg):
+        self.get_logger().info(f"Reçu des données sur {self.get_namespace()}")
+        
+        # Exemple de traitement : on renvoie un point fictif
+        # p = Point()
+        # p.x = 10.0
+        # self.loc_pub.publish(p)
 
-        for name in self.robot_names:
-            self.robot_data_sub = self.create_subscription(
-                RobotData,
-                name + "/" + robot_data_topic,
-                self.robot_data_callback,
-                10
-            )
-
-    def _init_publishers(self):
+def main(args=None):
+    rclpy.init(args=args)
+    node = VisionNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
         pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
+if __name__ == '__main__':
+    main()
