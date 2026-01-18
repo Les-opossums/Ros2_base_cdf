@@ -23,7 +23,6 @@ void BeaconDetectorNode::init_main_parameters()
     this->declare_parameter("object_topic", "");
     this->declare_parameter("robot_position_topic", "");
     this->declare_parameter("position_topic", "");
-    this->declare_parameter("command_topic", "");
 
     // Get parameters
     enable_wait_color_ = this->get_parameter("enable_wait_color").as_bool();
@@ -117,10 +116,9 @@ void BeaconDetectorNode::init_parameters()
 
 void BeaconDetectorNode::init_publishers()
 {
-    std::string position_topic = this->get_parameter("position_topic").as_string();
-    std::string command_topic = this->get_parameter("command_topic").as_string();
-    pub_location_ = this->create_publisher<opossum_msgs::msg::LidarLoc>(position_topic, 10);
-    pub_cmd_ = this->create_publisher<std_msgs::msg::String>(command_topic, 10);
+    position_topic_ = this->get_parameter("position_topic").as_string();
+    pub_location_ = this->create_publisher<opossum_msgs::msg::LidarLoc>(position_topic_, 10);
+    pub_location_cmd_ = this->create_publisher<std_msgs::msg::String>("command", 10);
 }
 
 void BeaconDetectorNode::init_subscribers()
@@ -140,7 +138,6 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
 {
     // rclcpp::Time begin = this->now();
     // int64_t ns_begin = begin.nanoseconds();
-    RCLCPP_INFO(this->get_logger(), "NAME: %s", this->get_namespace());
 
     if ((!enable_robot_position_reception_ || !position_finder_->previous_robot.has_value()))
     {
@@ -165,20 +162,16 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
             new_objects_detected.push_back({msg->circles[i].center.x, msg->circles[i].center.y});
         }
     }
-    RCLCPP_INFO(this->get_logger(), "NAME: %s 1", this->get_namespace());
-
     std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> beacons_result;
     beacons_result = beacon_sorter_->find_possible_beacons(previous_beacons, new_objects_detected);
+    // RCLCPP_INFO(this->get_logger(), "Updating robot position... %d possible beacons found.", beacons_result.first);
     if (beacons_result.first > 1)
     {
-        RCLCPP_INFO(this->get_logger(), "NAME: %s 2", this->get_namespace());
-
         std::pair<std::array<std::optional<Eigen::Vector2d>, 4>, std::optional<Eigen::Vector3d>> output = position_finder_->search_pos(beacons_result.first, beacons_result.second, new_objects_detected);
         std::array<std::optional<Eigen::Vector2d>, 4> beacons = output.first;
         std::optional<Eigen::Vector3d> position_found = output.second;
         if (position_found.has_value())
         {
-            RCLCPP_INFO(this->get_logger(), "NAME: %s 3", this->get_namespace());
             std::vector<Eigen::Vector2d> others;
             others = position_finder_->find_robots_on_plateau(new_objects_detected);
             opossum_msgs::msg::LidarLoc msg_loc = publish_pose_from_lidar(position_found.value(), others);
@@ -197,8 +190,7 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
             << position_found->z() << " "
             << ms_since_last;
             msg_cmd.data = ss.str();
-            RCLCPP_INFO(this->get_logger(), "NAME: %s 4", this->get_namespace());
-            pub_cmd_->publish(msg_cmd);
+            pub_location_cmd_->publish(msg_cmd);
             // RCLCPP_INFO(this->get_logger(), "Current time: %d ms", ms_since_begin);
             // RCLCPP_INFO(this->get_logger(), "Last Time: %d ms", ms_since_last);
         }
