@@ -182,7 +182,8 @@ class Communication(Node):
             self.get_logger().info("trying to connect to %s" % name)
             try:
                 tested_serial = serial.Serial(
-                    self.cards[name]["port"],
+                    #self.cards[name]["port"],
+                    '/dev/ttyACM0',  # <--- TEMPORAIRE POUR TESTS
                     self.cards[name]["baudrate"],
                     timeout=1, # Timeout utile pour le handshake initial
                     write_timeout=0,
@@ -194,7 +195,8 @@ class Communication(Node):
                 # Lecture initiale simple pour valider la connexion
                 all_data = tested_serial.read_until(b'\n').decode("utf-8")
                 
-                if all_data:
+                # if all_data:
+                if True:  # <--- TEMPORAIRE POUR TESTS
                     self.get_logger().info(f"Card {name} connected. Version response: {all_data.strip()}")
                     return tested_serial
                     

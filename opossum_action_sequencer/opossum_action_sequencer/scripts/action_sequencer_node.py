@@ -176,44 +176,8 @@ class ActionManager(Node):
             self.move_timer.cancel()
             self.move_timer = None
 
-    def _init_move_timer(self):
-        self.move_timer = self.create_timer(
-            2,
-            self.timer_move_callback
-        )
-
-    def _reset_move_timer(self):
-        """Reset the move timer."""
-        if self.move_timer is not None:
-            self.move_timer.cancel()
-            self.move_timer = None
-
     def _init_publishers(self):
         """Initialize the publishers of the node."""
-        command_topic = (
-            self.get_parameter("command_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
-        score_topic = (
-            self.get_parameter("score_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
-        au_topic = (
-            self.get_parameter("au_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
-        end_of_match_topic = (
-            self.get_parameter("end_of_match_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
         command_topic = (
             self.get_parameter("command_topic")
             .get_parameter_value()
@@ -241,13 +205,11 @@ class ActionManager(Node):
         self.pub_command = self.create_publisher(
             String,
             command_topic,
-            command_topic,
             10
         )
 
         self.pub_score = self.create_publisher(
             Int32,
-            score_topic,
             score_topic,
             10
         )
@@ -255,44 +217,17 @@ class ActionManager(Node):
         self.pub_au = self.create_publisher(
             Bool,
             au_topic,
-            au_topic,
             10
         )
 
         self.pub_end_of_match = self.create_publisher(
             Bool,
             end_of_match_topic,
-            end_of_match_topic,
             10
         )
 
     def _init_subscribers(self):
         """Initialize the subscribers of the node."""
-
-        feedback_command_topic = (
-            self.get_parameter("feedback_command_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
-        robot_data_topic = (
-            self.get_parameter("robot_data_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
-        position_topic = (
-            self.get_parameter("position_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
-        color_topic = (
-            self.get_parameter("color_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
 
         feedback_command_topic = (
             self.get_parameter("feedback_command_topic")
@@ -328,22 +263,12 @@ class ActionManager(Node):
         self.sub_feedback = self.create_subscription(
             String,
             feedback_command_topic,
-            feedback_command_topic,
             self.feedback_callback,
-            10
-        )
-
-        self.robot_data_sub = self.create_subscription(
-            RobotData,
-            robot_data_topic,
-            robot_data_topic,
-            self.robot_data_callback,
             10
         )
 
         self.lidar_loc_sub = self.create_subscription(
             LidarLoc,
-            position_topic,
             position_topic,
             self.lidar_loc_callback,
             10
@@ -351,7 +276,6 @@ class ActionManager(Node):
 
         self.color_sub = self.create_subscription(
             String,
-            color_topic,
             color_topic,
             self.color_callback,
             10
@@ -399,21 +323,8 @@ class ActionManager(Node):
                     # Dynamically import the Script class
                     module = __import__(module_path, fromlist=["Script"])
                     Script = getattr(module, "Script")
-                script_num = changed.value.integer_value
-                self.get_logger().info(f"Choix du script : {script_num}")
-
-                if script_num in script_map:
-                    module_path, log_msg = script_map[script_num]
-                    self.get_logger().info(log_msg)
-
-                    # Dynamically import the Script class
-                    module = __import__(module_path, fromlist=["Script"])
-                    Script = getattr(module, "Script")
 
                 else:
-                    self.get_logger().error("Aucun script associé à la valeur "
-                                            f": {script_num}")
-                    raise ValueError("Invalid script number")
                     self.get_logger().error("Aucun script associé à la valeur "
                                             f": {script_num}")
                     raise ValueError("Invalid script number")
@@ -428,11 +339,6 @@ class ActionManager(Node):
                 # Affiche la nouvelle valeur du paramètre debug_mode
                 if changed.value.bool_value:
                     self.get_logger().info("Debug mode enabled")
-                    module = __import__(
-                        "opossum_action_sequencer.match.script_init",
-                        fromlist=["Script"]
-                    )
-                    self.script_init_class = getattr(module, "Script")
                     module = __import__(
                         "opossum_action_sequencer.match.script_init",
                         fromlist=["Script"]
@@ -531,13 +437,6 @@ class ActionManager(Node):
                 self.wait_for_motion()
                 time.sleep(0.1)
                 self.move_to(self.end_zone)
-
-    def timer_move_callback(self):
-        if not self.is_robot_moving and not self.motion_done:
-            self._reset_move_timer()
-            self.get_logger().warn("New Motion timed out.")
-            self.move_to(self.pos_obj)
-            self._init_move_timer()
 
     def timer_move_callback(self):
         if not self.is_robot_moving and not self.motion_done:
