@@ -24,7 +24,6 @@ void BeaconDetectorNode::init_main_parameters()
     this->declare_parameter("robot_position_topic", "");
     this->declare_parameter("position_topic", "");
     this->declare_parameter("command_topic", "");
-    this->declare_parameter("command_topic", "");
 
     // Get parameters
     enable_wait_color_ = this->get_parameter("enable_wait_color").as_bool();
