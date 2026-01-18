@@ -122,10 +122,6 @@ void BeaconDetectorNode::init_publishers()
     std::string command_topic = this->get_parameter("command_topic").as_string();
     pub_location_ = this->create_publisher<opossum_msgs::msg::LidarLoc>(position_topic, 10);
     pub_cmd_ = this->create_publisher<std_msgs::msg::String>(command_topic, 10);
-    std::string position_topic = this->get_parameter("position_topic").as_string();
-    std::string command_topic = this->get_parameter("command_topic").as_string();
-    pub_location_ = this->create_publisher<opossum_msgs::msg::LidarLoc>(position_topic, 10);
-    pub_cmd_ = this->create_publisher<std_msgs::msg::String>(command_topic, 10);
 }
 
 void BeaconDetectorNode::init_subscribers()

@@ -863,10 +863,6 @@ class ActionManager(Node):
             angle = 3 * np.pi / 2
         else:
             angle = np.pi / 2
-        elif self.robot_pos.y > pos[1] and pos[1] > 0.5:
-            angle = 3 * np.pi / 2
-        else:
-            angle = np.pi / 2
         val_dst = (self.robot_pos.x - pos[0]) ** 2 + (self.robot_pos.y - pos[1]) ** 2 + angle_coeff * (self.robot_pos.t - angle) ** 2
         if self.x_enn is not None:
             val_ennemi = (self.x_enn - pos[0]) ** 2 + (self.y_enn - pos[1]) ** 2
