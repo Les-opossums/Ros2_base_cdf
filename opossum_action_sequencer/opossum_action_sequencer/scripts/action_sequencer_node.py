@@ -97,11 +97,51 @@ class ActionManager(Node):
             9: [5, 3],
         }
 
+        self.end_poses = {
+            0: [0, 0.875, 2],
+            1: [0.225, 0, 1],
+            2: [1.775, 0, 1],
+            3: [2.225, 0, 1],
+        }
+        self.end_poses = self.end_poses | {key + 4: [3 - val[0], val [1], 2 - val[2]] for key, val in self.end_poses.items()}
+        self.available_end = {i: 0 for i in range(len(list(self.end_poses.keys())))}
+
+        self.position_cans = {
+            0: [0.075, 1.325, 2],
+            1: [0.075, 0.4, 2],
+            2: [0.825, 1.725, 1],
+            3: [1.1, 0.95, 1],
+            4: [0.775, 0.25, 1],
+        }
+        self.position_cans = self.position_cans | {key + 5: [3 - val[0], val[1], 2 - val[2]] for key, val in self.position_cans.items()}
+        self.available_cans = {i: True for i in range(len(list(self.position_cans.keys())))}
+
+        self.dest_cans = {
+            0: [6, 0],
+            1: [6, 0],
+            2: [6, 0],
+            3: [6, 0],
+            4: [7, 1],
+            5: [4, 2],
+            6: [4, 2],
+            7: [4, 2],
+            8: [4, 2],
+            9: [5, 3],
+        }
+
     def _init_parameters(self) -> None:
         """Initialize the parameters of the node."""
         self.declare_parameters(
             namespace="",
             parameters=[
+                ("command_topic", "command"),
+                ("score_topic", "score"),
+                ("au_topic", "au"),
+                ("end_of_match_topic", "end_of_match"),
+                ("feedback_command_topic", "feedback_command"),
+                ("robot_data_topic", "robot_data"),
+                ("position_topic", "position_out"),
+                ("color_topic", "init_team_color"),
                 ("command_topic", "command"),
                 ("score_topic", "score"),
                 ("au_topic", "au"),
@@ -123,6 +163,18 @@ class ActionManager(Node):
             92,
             self.timer_backstage_callback
         )
+
+    def _init_move_timer(self):
+        self.move_timer = self.create_timer(
+            2,
+            self.timer_move_callback
+        )
+
+    def _reset_move_timer(self):
+        """Reset the move timer."""
+        if self.move_timer is not None:
+            self.move_timer.cancel()
+            self.move_timer = None
 
     def _init_move_timer(self):
         self.move_timer = self.create_timer(
@@ -162,8 +214,33 @@ class ActionManager(Node):
             .string_value
         )
 
+        command_topic = (
+            self.get_parameter("command_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        score_topic = (
+            self.get_parameter("score_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        au_topic = (
+            self.get_parameter("au_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        end_of_match_topic = (
+            self.get_parameter("end_of_match_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
         self.pub_command = self.create_publisher(
             String,
+            command_topic,
             command_topic,
             10
         )
@@ -171,11 +248,13 @@ class ActionManager(Node):
         self.pub_score = self.create_publisher(
             Int32,
             score_topic,
+            score_topic,
             10
         )
 
         self.pub_au = self.create_publisher(
             Bool,
+            au_topic,
             au_topic,
             10
         )
@@ -183,11 +262,37 @@ class ActionManager(Node):
         self.pub_end_of_match = self.create_publisher(
             Bool,
             end_of_match_topic,
+            end_of_match_topic,
             10
         )
 
     def _init_subscribers(self):
         """Initialize the subscribers of the node."""
+
+        feedback_command_topic = (
+            self.get_parameter("feedback_command_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        robot_data_topic = (
+            self.get_parameter("robot_data_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        position_topic = (
+            self.get_parameter("position_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        color_topic = (
+            self.get_parameter("color_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
 
         feedback_command_topic = (
             self.get_parameter("feedback_command_topic")
@@ -223,12 +328,14 @@ class ActionManager(Node):
         self.sub_feedback = self.create_subscription(
             String,
             feedback_command_topic,
+            feedback_command_topic,
             self.feedback_callback,
             10
         )
 
         self.robot_data_sub = self.create_subscription(
             RobotData,
+            robot_data_topic,
             robot_data_topic,
             self.robot_data_callback,
             10
@@ -237,12 +344,14 @@ class ActionManager(Node):
         self.lidar_loc_sub = self.create_subscription(
             LidarLoc,
             position_topic,
+            position_topic,
             self.lidar_loc_callback,
             10
         )
 
         self.color_sub = self.create_subscription(
             String,
+            color_topic,
             color_topic,
             self.color_callback,
             10
@@ -290,8 +399,21 @@ class ActionManager(Node):
                     # Dynamically import the Script class
                     module = __import__(module_path, fromlist=["Script"])
                     Script = getattr(module, "Script")
+                script_num = changed.value.integer_value
+                self.get_logger().info(f"Choix du script : {script_num}")
+
+                if script_num in script_map:
+                    module_path, log_msg = script_map[script_num]
+                    self.get_logger().info(log_msg)
+
+                    # Dynamically import the Script class
+                    module = __import__(module_path, fromlist=["Script"])
+                    Script = getattr(module, "Script")
 
                 else:
+                    self.get_logger().error("Aucun script associé à la valeur "
+                                            f": {script_num}")
+                    raise ValueError("Invalid script number")
                     self.get_logger().error("Aucun script associé à la valeur "
                                             f": {script_num}")
                     raise ValueError("Invalid script number")
@@ -306,6 +428,11 @@ class ActionManager(Node):
                 # Affiche la nouvelle valeur du paramètre debug_mode
                 if changed.value.bool_value:
                     self.get_logger().info("Debug mode enabled")
+                    module = __import__(
+                        "opossum_action_sequencer.match.script_init",
+                        fromlist=["Script"]
+                    )
+                    self.script_init_class = getattr(module, "Script")
                     module = __import__(
                         "opossum_action_sequencer.match.script_init",
                         fromlist=["Script"]
@@ -404,6 +531,13 @@ class ActionManager(Node):
                 self.wait_for_motion()
                 time.sleep(0.1)
                 self.move_to(self.end_zone)
+
+    def timer_move_callback(self):
+        if not self.is_robot_moving and not self.motion_done:
+            self._reset_move_timer()
+            self.get_logger().warn("New Motion timed out.")
+            self.move_to(self.pos_obj)
+            self._init_move_timer()
 
     def timer_move_callback(self):
         if not self.is_robot_moving and not self.motion_done:
@@ -623,6 +757,9 @@ class ActionManager(Node):
     def sign(self, val):
         return -1 if val < 0 else 1
 
+    def sign(self, val):
+        return -1 if val < 0 else 1
+
     def smart_moves(self):
         default_angle = -2.60
         tol = 0.3
@@ -651,6 +788,7 @@ class ActionManager(Node):
                 if can_valid[2] % 2 == 0:
                     # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
                     self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * tol, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
+                    self.wait_for_motion()
                     self.wait_for_motion()
                     fpos = self.find_final_pos(ind_valid, en_color)
                     self.take_cans(can_valid[2])
@@ -694,12 +832,16 @@ class ActionManager(Node):
 
     def find_final_pos(self, index, en_color):
         size_cans = 0.1
+        size_cans = 0.1
         size_robot = 0.27
+        pos_out = self.end_poses[self.dest_cans[index][en_color]] # If yellow 0
         pos_out = self.end_poses[self.dest_cans[index][en_color]] # If yellow 0
         incr = self.available_end[self.dest_cans[index][en_color]]
         if pos_out[2] % 2 == 0:
             return [pos_out[0] + (pos_out[2] - 1) * (size_cans / 2 + size_robot + size_cans * incr), pos_out[1], pos_out[2]]
+            return [pos_out[0] + (pos_out[2] - 1) * (size_cans / 2 + size_robot + size_cans * incr), pos_out[1], pos_out[2]]
         else:
+            return [pos_out[0], pos_out[1] + size_cans / 2 + size_robot + size_cans * incr, 3 * pos_out[2]]
             return [pos_out[0], pos_out[1] + size_cans / 2 + size_robot + size_cans * incr, 3 * pos_out[2]]
 
     def angular_distance(a1, a2):
@@ -709,12 +851,18 @@ class ActionManager(Node):
     def compute_penality(self, pos):
         angle_coeff = 0.05
         coeff_center = 0 # -0.005
+        coeff_center = 0 # -0.005
         coeff_dst = -1
+        coeff_enn = 0 # 0.05
         coeff_enn = 0 # 0.05
         # coeef_end = -0.0001
         val_center = (1.5 - pos[0]) ** 2 + (1 - pos[1]) ** 2
         if pos[2] % 2 == 0:
             angle = pos[2] * np.pi / 2
+        elif self.robot_pos.y > pos[1] and pos[1] > 0.5:
+            angle = 3 * np.pi / 2
+        else:
+            angle = np.pi / 2
         elif self.robot_pos.y > pos[1] and pos[1] > 0.5:
             angle = 3 * np.pi / 2
         else:
@@ -750,6 +898,7 @@ class ActionManager(Node):
         self.sleep(0.1)
 
     def drop_cans(self, destination, default_angle):
+        push_dst = 0.1
         push_dst = 0.1
         self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
         self.wait_for_motion()
