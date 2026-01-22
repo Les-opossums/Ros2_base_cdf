@@ -38,16 +38,16 @@ def launch_setup(context, *args, **kwargs):
     # 4. Lancement de l'Émulateur (Unique, global)
     # L'émulateur n'est pas lié à un robot spécifique dans cet exemple,
     # il simule le hardware connecté au PC.
-    for robot in robot_names_list:
-        node_emulator = Node(
-            package="opossum_vision",
-            executable="vision_emulator_node.py",
-            name="vision_emulator_node",
-            namespace=robot,
-            output="screen",
-            parameters=[param_file] # Il ira chercher les params globaux (/**)
-        )
-        nodes.append(node_emulator)
+    # for robot in robot_names_list:
+    #     node_emulator = Node(
+    #         package="opossum_vision",
+    #         executable="vision_emulator_node.py",
+    #         name="vision_emulator_node",
+    #         namespace=robot,
+    #         output="screen",
+    #         parameters=[param_file] # Il ira chercher les params globaux (/**)
+    #     )
+    #     nodes.append(node_emulator)
 
     return nodes
 
