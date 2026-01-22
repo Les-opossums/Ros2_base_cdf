@@ -97,11 +97,51 @@ class ActionManager(Node):
             9: [5, 3],
         }
 
+        self.end_poses = {
+            0: [0, 0.875, 2],
+            1: [0.225, 0, 1],
+            2: [1.775, 0, 1],
+            3: [2.225, 0, 1],
+        }
+        self.end_poses = self.end_poses | {key + 4: [3 - val[0], val [1], 2 - val[2]] for key, val in self.end_poses.items()}
+        self.available_end = {i: 0 for i in range(len(list(self.end_poses.keys())))}
+
+        self.position_cans = {
+            0: [0.075, 1.325, 2],
+            1: [0.075, 0.4, 2],
+            2: [0.825, 1.725, 1],
+            3: [1.1, 0.95, 1],
+            4: [0.775, 0.25, 1],
+        }
+        self.position_cans = self.position_cans | {key + 5: [3 - val[0], val[1], 2 - val[2]] for key, val in self.position_cans.items()}
+        self.available_cans = {i: True for i in range(len(list(self.position_cans.keys())))}
+
+        self.dest_cans = {
+            0: [6, 0],
+            1: [6, 0],
+            2: [6, 0],
+            3: [6, 0],
+            4: [7, 1],
+            5: [4, 2],
+            6: [4, 2],
+            7: [4, 2],
+            8: [4, 2],
+            9: [5, 3],
+        }
+
     def _init_parameters(self) -> None:
         """Initialize the parameters of the node."""
         self.declare_parameters(
             namespace="",
             parameters=[
+                ("command_topic", "command"),
+                ("score_topic", "score"),
+                ("au_topic", "au"),
+                ("end_of_match_topic", "end_of_match"),
+                ("feedback_command_topic", "feedback_command"),
+                ("robot_data_topic", "robot_data"),
+                ("position_topic", "position_out"),
+                ("color_topic", "init_team_color"),
                 ("command_topic", "command"),
                 ("score_topic", "score"),
                 ("au_topic", "au"),
@@ -224,13 +264,6 @@ class ActionManager(Node):
             String,
             feedback_command_topic,
             self.feedback_callback,
-            10
-        )
-
-        self.robot_data_sub = self.create_subscription(
-            RobotData,
-            robot_data_topic,
-            self.robot_data_callback,
             10
         )
 
@@ -623,6 +656,9 @@ class ActionManager(Node):
     def sign(self, val):
         return -1 if val < 0 else 1
 
+    def sign(self, val):
+        return -1 if val < 0 else 1
+
     def smart_moves(self):
         default_angle = -2.60
         tol = 0.3
@@ -651,6 +687,7 @@ class ActionManager(Node):
                 if can_valid[2] % 2 == 0:
                     # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
                     self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * tol, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
+                    self.wait_for_motion()
                     self.wait_for_motion()
                     fpos = self.find_final_pos(ind_valid, en_color)
                     self.take_cans(can_valid[2])
@@ -694,12 +731,16 @@ class ActionManager(Node):
 
     def find_final_pos(self, index, en_color):
         size_cans = 0.1
+        size_cans = 0.1
         size_robot = 0.27
+        pos_out = self.end_poses[self.dest_cans[index][en_color]] # If yellow 0
         pos_out = self.end_poses[self.dest_cans[index][en_color]] # If yellow 0
         incr = self.available_end[self.dest_cans[index][en_color]]
         if pos_out[2] % 2 == 0:
             return [pos_out[0] + (pos_out[2] - 1) * (size_cans / 2 + size_robot + size_cans * incr), pos_out[1], pos_out[2]]
+            return [pos_out[0] + (pos_out[2] - 1) * (size_cans / 2 + size_robot + size_cans * incr), pos_out[1], pos_out[2]]
         else:
+            return [pos_out[0], pos_out[1] + size_cans / 2 + size_robot + size_cans * incr, 3 * pos_out[2]]
             return [pos_out[0], pos_out[1] + size_cans / 2 + size_robot + size_cans * incr, 3 * pos_out[2]]
 
     def angular_distance(a1, a2):
@@ -709,7 +750,9 @@ class ActionManager(Node):
     def compute_penality(self, pos):
         angle_coeff = 0.05
         coeff_center = 0 # -0.005
+        coeff_center = 0 # -0.005
         coeff_dst = -1
+        coeff_enn = 0 # 0.05
         coeff_enn = 0 # 0.05
         # coeef_end = -0.0001
         val_center = (1.5 - pos[0]) ** 2 + (1 - pos[1]) ** 2
@@ -750,6 +793,7 @@ class ActionManager(Node):
         self.sleep(0.1)
 
     def drop_cans(self, destination, default_angle):
+        push_dst = 0.1
         push_dst = 0.1
         self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
         self.wait_for_motion()

@@ -12,6 +12,7 @@ import os
 import serial
 import yaml
 import functools
+import threading  # <--- AJOUTÉ : Pour les threads dédiés
 
 # Msgs import
 from std_msgs.msg import String, Bool
@@ -41,6 +42,11 @@ class Communication(Node):
         self._init_parameters()
         self._init_publishers()
         self._init_subscribers()
+        
+        # Démarrage des threads de lecture si nous ne sommes pas en simulation
+        if not self.simulation:
+            self._start_reading_threads()
+
         self.get_logger().info(f"Simu: {self.simulation}")
         self.get_logger().info("Communication node initialized.")
 
@@ -75,6 +81,8 @@ class Communication(Node):
                 .string_array_value
             )
             self.cards = {}
+            self.serial_threads = [] # Liste pour garder une référence des threads
+            
             for name in cards_name:
                 self.declare_parameter(
                     f"cards.{name}.port", rclpy.Parameter.Type.STRING
@@ -94,6 +102,7 @@ class Communication(Node):
                     .integer_value
                 )
                 self.cards[name] = {"port": port, "baudrate": baudrate}
+                # Initialisation bloquante de la carte (handshake)
                 self.cards[name]["serial"] = self._init_card(name)
 
     def _init_subscribers(self: Node) -> None:
@@ -119,9 +128,7 @@ class Communication(Node):
                 String, command_topic, self.send_card_simu, 10
             )
         else:
-            self.read_timer = self.create_timer(
-                1 / self.frequency, self.read_card, callback_group=self.mutex_clb
-            )
+            # Note: Le timer de lecture est supprimé ici car remplacé par des threads
             self.sub_command = {
                 name: self.create_subscription(
                     String,
@@ -130,7 +137,7 @@ class Communication(Node):
                     10,
                 )
                 for name in list(self.cards.keys())
-            }  # Here, if more than one card, we will have to add /card/command especially
+            }
 
     def _init_publishers(self: Node) -> None:
         """Initialize publishers of the node."""
@@ -167,20 +174,32 @@ class Communication(Node):
         )
 
     def _init_card(self, name):
+        """Initialize serial connection with handshake."""
+        # Note: timeout défini à 1s pour le handshake initial, 
+        # il sera potentiellement ajusté dans le thread si besoin, 
+        # mais read_until gère son propre blocage.
         while True:
             self.get_logger().info("trying to connect to %s" % name)
             try:
                 tested_serial = serial.Serial(
-                    self.cards[name]["port"],
+                    #self.cards[name]["port"],
+                    '/dev/ttyACM1',  # <--- TEMPORAIRE POUR TESTS
                     self.cards[name]["baudrate"],
-                    timeout=0,
+                    timeout=1, # Timeout utile pour le handshake initial
                     write_timeout=0,
                 )
                 tested_serial.write("VERSION\n".encode("utf-8"))
+                # On attend un peu pour la réponse
                 rclpy.spin_once(self, timeout_sec=0.2, executor=self.default_exec)
-                all_data = tested_serial.read(tested_serial.in_waiting).decode("utf-8")
-                if all_data.split("\n") is not None:
+                
+                # Lecture initiale simple pour valider la connexion
+                all_data = tested_serial.read_until(b'\n').decode("utf-8")
+                
+                # if all_data:
+                if True:  # <--- TEMPORAIRE POUR TESTS
+                    self.get_logger().info(f"Card {name} connected. Version response: {all_data.strip()}")
                     return tested_serial
+                    
             except serial.SerialException as e:
                 self.get_logger().error(
                     "Scanned serial port is already opened nor existing !"
@@ -188,48 +207,78 @@ class Communication(Node):
                 print(e)
             except ValueError:
                 self.get_logger().info("Unknown card found")
-                tested_serial.close()
+                if 'tested_serial' in locals():
+                    tested_serial.close()
+            
             self.get_logger().warn("Retrying to connect the '%s' card in 1s" % name)
             rclpy.spin_once(self, timeout_sec=1, executor=self.default_exec)
+
+    def _start_reading_threads(self):
+        """Start a dedicated thread for each serial card."""
+        for name in self.cards.keys():
+            # Création d'un thread par carte pour éviter qu'une carte bloque les autres
+            thread = threading.Thread(target=self._serial_read_worker, args=(name,), daemon=True)
+            thread.start()
+            self.serial_threads.append(thread)
+            self.get_logger().info(f"Started reading thread for card: {name}")
+
+    def _serial_read_worker(self, name):
+        """Worker function running in a separate thread to read serial data."""
+        serial_card = self.cards[name]["serial"]
+        
+        # Configuration du timeout pour read_until :
+        # None = bloquant indéfiniment jusqu'à réception
+        # X = bloquant X secondes max
+        serial_card.timeout = 1.0 
+
+        self.get_logger().info(f"Thread listening on {name} started.")
+
+        while rclpy.ok():
+            try:
+                # Lecture bloquante jusqu'au caractère de fin de ligne (\n)
+                # C'est beaucoup plus efficace que de poller in_waiting
+                raw_line = serial_card.read_until(b'\n')
+                
+                if raw_line:
+                    try:
+                        line = raw_line.decode('utf-8').strip()
+                        if line: # Si la ligne n'est pas vide
+                             # Traitement direct (thread-safe pour les publishers ROS2 en Python)
+                             self._handle_received_line(line)
+                    except UnicodeDecodeError:
+                         self.get_logger().warn(f"Decoding error on card {name}")
+                
+            except serial.SerialException as e:
+                self.get_logger().error(f"Serial exception on {name}: {e}")
+                break # On sort de la boucle si le port crash
+            except Exception as e:
+                self.get_logger().error(f"Unexpected error in thread {name}: {e}")
+
+    def _handle_received_line(self, data):
+        """Process a single line of received data."""
+        if data and data[0].isalpha():
+            if not data.startswith(self.custom_handled_commands):
+                self.pub_feedback_command.publish(String(data=data))
+            self.process_data_rcv(data)
 
     def send_card(self, msg, name):
         """Send the received message frome ActionSequencer to real card."""
         if not self.enable_send:
             return
         out = self.process_data_send(msg.data)
-        self.cards[name]["serial"].write((out + "\n").encode("utf-8"))
-
-    def read_card(self):
-        """Read the messages that could have been sent by the Zynq."""
         try:
-            for name in self.cards.keys():
-                serial_card = self.cards[name]["serial"]
-                char_available = serial_card.in_waiting
-                if char_available != 0:
-                    received_data = str(serial_card.read(char_available).decode("UTF8"))
-                    try:
-                        data_seq = received_data.split("\n")
-                    except Exception as e:
-                        self.get_logger().warn(f"Error While Decoding Data: {e}")
-                        data_seq = []
-                    for data in data_seq:
-                        if data and data[0].isalpha():
-                            if not data.startswith(self.custom_handled_commands):
-                                self.pub_feedback_command.publish(String(data=data))
-                            self.process_data_rcv(data)
+            self.cards[name]["serial"].write((out + "\n").encode("utf-8"))
+        except serial.SerialException as e:
+            self.get_logger().error(f"Failed to write to card {name}: {e}")
 
-        except Exception as e:
-            self.get_logger().error(f"Unhandled Exception: {e}")
+    # --- SIMULATION METHODS (Unchanged logic, just cleanup) ---
 
     def read_card_simu(self):
         """Look at the result of the command send in simulation."""
         data_seq = self.buffer_simu_rcv.split("\n")
         self.buffer_simu_rcv = ""
         for data in data_seq:
-            if data and data[0].isalpha():
-                if not data.startswith(self.custom_handled_commands):
-                    self.pub_feedback_command.publish(String(data=data))
-                self.process_data_rcv(data)
+            self._handle_received_line(data)
 
     def save_in_buffer(self, msg):
         """Simulate the Zynq sending data."""
@@ -242,21 +291,23 @@ class Communication(Node):
         out = self.process_data_send(msg.data)
         self.pub_comm.publish(String(data=out))
 
+    # --- PROCESSING METHODS ---
+
     def process_data_send(self, data):
         """Process data to send."""
         splitted_data = data.split()
         if len(splitted_data) == 0:
-            return
+            return "" # Return empty string instead of None for safety
         if (
             splitted_data[0] == "MOVE" and len(splitted_data) == 4
-        ):  # >4 but for thest # Move will need more options to enable the avoid node
+        ):
             try:
                 goal_pos = GoalDetection()
                 goal_pos.goal_position.x = float(splitted_data[1])
                 goal_pos.goal_position.y = float(splitted_data[2])
                 goal_pos.goal_position.z = float(splitted_data[3])
-                goal_pos.detection_mode = -1  # int(splitted_data[4])
-                goal_pos.obstacle_detection_distance = 0.5  # float(splitted_data[5])
+                goal_pos.detection_mode = -1
+                goal_pos.obstacle_detection_distance = 0.5
                 self.pub_goal_position.publish(goal_pos)
                 data = " ".join(splitted_data[:4])
             except ValueError as e:
@@ -268,6 +319,7 @@ class Communication(Node):
             self.get_logger().info(f"In avoid: sending {' '.join(splitted_data[:4])}")
             return " ".join(splitted_data[:4])
         return data
+
     def process_data_rcv(self, data):
         """Publish the asserv data if necessary."""
         if len(data) == 0:

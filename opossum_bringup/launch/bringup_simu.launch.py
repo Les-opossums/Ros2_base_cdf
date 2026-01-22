@@ -16,9 +16,8 @@ def generate_launch_description():
     simulation = LaunchConfiguration("simulation")
     robot_names_arg = DeclareLaunchArgument(
         "robot_names",
+        # default_value="main_robot,second_robot",
         default_value="main_robot,second_robot",
-        # default_value="second_robot",
-        # default_value="main_robot",
         description="Set list of robots",
     )
     robot_names = LaunchConfiguration("robot_names")
@@ -111,6 +110,26 @@ def generate_launch_description():
             ]
         ),
         launch_arguments={"robot_names": robot_names}.items()
+    ihm_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                PathJoinSubstitution(
+                    [FindPackageShare("opossum_ihm"), "launch", "ihm.launch.py"]
+                )
+            ]
+        ),
+        launch_arguments={"robot_names": robot_names}.items()
+    )
+
+    action_sequencer_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                PathJoinSubstitution(
+                    [FindPackageShare("opossum_action_sequencer"), "launch", "action_sequencer.launch.py"]
+                )
+            ]
+        ),
+        launch_arguments={"robot_names": robot_names}.items()
     )
 
     return LaunchDescription(
@@ -122,6 +141,8 @@ def generate_launch_description():
             localisation_launch,
             simu_launch,
             dev_gui_launch,
+            ihm_launch,
+            action_sequencer_launch,
             ihm_launch,
             action_sequencer_launch,
         ]
