@@ -1,18 +1,42 @@
-# Paramètres pour l'émulateur (global ou hors namespace robot)
-# /**:
-#   ros__parameters:
-#     serial_port: "/dev/ttyV0"
-#     baudrate: 115200
-
-# Paramètres pour le Robot 1
 main_robot:
   vision_node:
     ros__parameters:
-      robot_data_topic: "robot_data"
-      # Autres paramètres spécifiques à ce robot si besoin
+      rcv_comm_topic: zync_raspi
+      send_comm_topic: raspi_zync
+      comm_state_topic: comm_state
+      simulation: false
 
-# Paramètres pour le Robot 2
-# second_robot:
-#   vision_node:
-#     ros__parameters:
-#       robot_data_topic: "robot_data"
+      asserv_topic: asserv
+      robot_data_topic: robot_data
+      goal_position_topic: goal_position
+
+      cards_name: ["cam"]
+      command_topic: command
+      feedback_command_topic: feedback_command
+      frequency: 20.
+      cards:
+        cam:
+          port: '/dev/ttyACM0'
+          baudrate: 115200
+
+second_robot:
+  vision_node:
+    ros__parameters:
+      rcv_comm_topic: zync_raspi
+      send_comm_topic: raspi_zync
+      comm_state_topic: comm_state
+      simulation: false
+
+      asserv_topic: asserv
+      robot_data_topic: robot_data
+      goal_position_topic: goal_position
+
+      cards_name: ["cam"]
+      command_topic: command
+      feedback_command_topic: feedback_command
+      frequency: 20.
+      cards:
+        cam:
+          port: '/dev/ttyACM0'
+          baudrate: 115200
+

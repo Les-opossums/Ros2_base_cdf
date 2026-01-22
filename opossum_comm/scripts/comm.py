@@ -183,7 +183,7 @@ class Communication(Node):
             try:
                 tested_serial = serial.Serial(
                     #self.cards[name]["port"],
-                    '/dev/ttyACM1',  # <--- TEMPORAIRE POUR TESTS
+                    '/dev/ttyZynq',  # <--- TEMPORAIRE POUR TESTS
                     self.cards[name]["baudrate"],
                     timeout=1, # Timeout utile pour le handshake initial
                     write_timeout=0,
