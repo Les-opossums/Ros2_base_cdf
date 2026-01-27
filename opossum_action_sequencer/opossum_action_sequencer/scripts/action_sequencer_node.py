@@ -8,6 +8,7 @@ from rclpy.node import Node
 from rcl_interfaces.msg import ParameterEvent
 
 from std_msgs.msg import String, Bool, Int32
+from geometry_msgs.msg import Point
 from opossum_msgs.msg import RobotData, LidarLoc
 
 import numpy as np
@@ -47,6 +48,9 @@ class ActionManager(Node):
 
         self.x_enn = None
         self.y_enn = None
+
+        self.x_tag = None
+        self.y_tag = None
 
         # Action Done
         self.is_robot_moving = False
@@ -281,6 +285,13 @@ class ActionManager(Node):
             10
         )
 
+        self.aruco_sub = self.create_subscription(
+            Point,
+            "aruco_loc",
+            self.aruco_callback,
+            10
+        )
+
     def parameter_event_callback(self, event):
         """Handle the parameters event."""
         # Parcours des paramètres modifiés
@@ -367,7 +378,7 @@ class ActionManager(Node):
 
         elif msg.data.startswith("AU"):
             if msg.data[-1] == "1":
-                self.get_logger().info("AU activated")
+                # self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
                 if self.is_started and self.script_thread is not None:
                     self.get_logger().warn("Stop script from AU")
@@ -375,7 +386,7 @@ class ActionManager(Node):
             elif msg.data[-1] == "2":
                 self.pub_au.publish(Bool(data=True))
             else:
-                self.get_logger().info("AU deactivated")
+                # self.get_logger().info("AU deactivated")
                 self.pub_au.publish(Bool(data=False))
 
         elif msg.data.startswith("YELLOWSWITCH"):
@@ -524,6 +535,33 @@ class ActionManager(Node):
                     pos_y = self.y_enn # + v1_y * 0.5
                     dir = np.arctan2(v1_y, v1_x)
                     self.move_to(Position(pos_x, pos_y, dir))
+                    time.sleep(0.1)
+                else:
+                    self.send_raw("BLOCK")
+                    time.sleep(0.1)
+
+    def aruco_callback(self, msg: Point):
+        self.x_tag = msg.x
+        self.y_tag = msg.y
+        self.z_tag = msg.z 
+
+    def follow_tag_aruco(self):
+        if not self.stop:
+            x_middle = 0.5
+            y_middle = 1.0
+            while True:
+                if self.lidar_pos is not None and self.x_tag is not None:
+                    self.send_raw("VMAX 0.5")
+                    v1_x = x_middle - self.x_tag
+                    v1_y = y_middle - self.y_tag
+                    v1_norm = np.sqrt(v1_x ** 2 + v1_y ** 2)
+                    v1_x /= v1_norm
+                    v1_y /= v1_norm
+                    pos_x = self.x_tag + self.lidar_pos.x # + v1_x * 0.5
+                    pos_y = self.y_tag + self.lidar_pos.y # + v1_y * 0.5
+                    dir = np.arctan2(v1_y, v1_x)
+                    self.move_to(Position(pos_x, pos_y, dir))
+                    self.get_logger().info(f"Move to {pos_x}, {pos_y}, {dir}")
                     time.sleep(0.1)
                 else:
                     self.send_raw("BLOCK")

@@ -237,7 +237,8 @@ class VisionNode(Node):
         self.aruco_pub = self.create_publisher(Point, 'aruco_loc', 10)
 
     def robot_data_callback(self, msg):
-        self.get_logger().info(f"Reçu des données sur {self.get_namespace()}")
+        # self.get_logger().info(f"Reçu des données sur {self.get_namespace()}")
+        pass
         
         # Exemple de traitement : on renvoie un point fictif
         # p = Point()

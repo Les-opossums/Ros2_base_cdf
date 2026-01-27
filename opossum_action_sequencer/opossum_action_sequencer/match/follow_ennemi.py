@@ -24,4 +24,5 @@ class Script:
         node.write_log("Script AHAHHAHAHA is running...")
 
         # Banderole
-        node.follow_ennemi()
+        # node.follow_ennemi()
+        node.follow_tag_aruco()
