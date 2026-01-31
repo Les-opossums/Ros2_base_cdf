@@ -244,6 +244,7 @@ class Communication(Node):
                         line = raw_line.decode('utf-8').strip()
                         if line: # Si la ligne n'est pas vide
                              # Traitement direct (thread-safe pour les publishers ROS2 en Python)
+                             # self.get_logger().info(f"Recu : {line}")
                              self._handle_received_line(line)
                     except UnicodeDecodeError:
                          self.get_logger().warn(f"Decoding error on card {name}")

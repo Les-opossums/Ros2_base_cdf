@@ -52,6 +52,8 @@ class ActionManager(Node):
         self.x_tag = None
         self.y_tag = None
 
+        self.new_pos = 0
+
         # Action Done
         self.is_robot_moving = False
         self.is_robot_arrived = False
@@ -143,15 +145,7 @@ class ActionManager(Node):
                 ("au_topic", "au"),
                 ("end_of_match_topic", "end_of_match"),
                 ("feedback_command_topic", "feedback_command"),
-                ("robot_data_topic", "robot_data"),
-                ("position_topic", "position_out"),
-                ("color_topic", "init_team_color"),
-                ("command_topic", "command"),
-                ("score_topic", "score"),
-                ("au_topic", "au"),
-                ("end_of_match_topic", "end_of_match"),
-                ("feedback_command_topic", "feedback_command"),
-                ("robot_data_topic", "robot_data"),
+                ("robot_data_topic", "/main_robot/robot_data"),
                 ("position_topic", "position_out"),
                 ("color_topic", "init_team_color"),
             ],
@@ -289,6 +283,13 @@ class ActionManager(Node):
             Point,
             "aruco_loc",
             self.aruco_callback,
+            10
+        )
+
+        self.robot_data_sub = self.create_subscription(
+            RobotData,
+            robot_data_topic,
+            self.robot_data_callback,
             10
         )
 
@@ -541,27 +542,61 @@ class ActionManager(Node):
                     time.sleep(0.1)
 
     def aruco_callback(self, msg: Point):
-        self.x_tag = msg.x
-        self.y_tag = msg.y
-        self.z_tag = msg.z 
+        if self.new_pos == 1 or self.new_pos > 10:
+            self.x_tag = msg.x
+            self.y_tag = msg.y
+            self.z_tag = msg.z 
+            self.new_pos += 1
+        else:
+            self.new_pos += 1
+
+#    def follow_tag_aruco(self):
+#        if not self.stop:
+#            while True:
+#                if self.robot_pos is not None and self.x_tag is not None: 
+#                    if self.new_pos > 30:
+#                        self.new_pos = 1
+#                        self.send_raw("VMAX 0.5")
+#                        self.get_logger().info(f"{self.x_tag}, {self.robot_pos.t}, {self.y_tag}, {self.robot_pos.t}, {self.robot_pos.x}")
+#                        pos_x = self.x_tag * np.cos(self.robot_pos.t) - self.y_tag * np.sin(self.robot_pos.t) + self.robot_pos.x
+#                        pos_y = self.x_tag * np.sin(self.robot_pos.t) + self.y_tag * np.cos(self.robot_pos.t) + self.robot_pos.y
+#                        self.move_to(Position(pos_x, pos_y, self.robot_pos.t + np.arctan2(self.y_tag, self.x_tag)))
+#                        self.get_logger().info(f"Move to {pos_x}, {pos_y}, {self.robot_pos.t + np.arctan2(self.y_tag, self.x_tag)}")
+#                        time.sleep(0.1)
+#                else:
+#                    self.send_raw("BLOCK")
+#                    time.sleep(0.1)
 
     def follow_tag_aruco(self):
         if not self.stop:
-            x_middle = 0.5
-            y_middle = 1.0
             while True:
-                if self.lidar_pos is not None and self.x_tag is not None:
-                    self.send_raw("VMAX 0.5")
-                    v1_x = x_middle - self.x_tag
-                    v1_y = y_middle - self.y_tag
-                    v1_norm = np.sqrt(v1_x ** 2 + v1_y ** 2)
-                    v1_x /= v1_norm
-                    v1_y /= v1_norm
-                    pos_x = self.x_tag + self.lidar_pos.x # + v1_x * 0.5
-                    pos_y = self.y_tag + self.lidar_pos.y # + v1_y * 0.5
-                    dir = np.arctan2(v1_y, v1_x)
-                    self.move_to(Position(pos_x, pos_y, dir))
-                    self.get_logger().info(f"Move to {pos_x}, {pos_y}, {dir}")
+                if self.robot_pos is not None and self.x_tag is not None:
+                    # 1. Calcul de la distance réelle actuelle au tag
+                    current_dist = np.sqrt(self.x_tag**2 + self.y_tag**2)
+
+                    # 2. Sécurité : on ne bouge que si le tag est à plus de 10cm
+                    if current_dist > 0.10:
+                        offset = 0.30  # 10 cm
+                        # Ratio pour trouver le point à 10cm en amont sur le même vecteur
+                        ratio = (current_dist - offset) / current_dist
+
+                        x_target_local = self.x_tag * ratio
+                        y_target_local = self.y_tag * ratio
+
+                        # 3. Transformation vers le repère global (votre formule actuelle)
+                        pos_x = x_target_local * np.cos(self.robot_pos.t) - y_target_local * np.sin(self.robot_pos.t) + self.robot_pos.x
+                        pos_y = x_target_local * np.sin(self.robot_pos.t) + y_target_local * np.cos(self.robot_pos.t) + self.robot_pos.y
+
+                        # Orientation : on garde l'angle pour faire face au tag
+                        target_angle = (self.robot_pos.t + np.arctan2(self.y_tag, self.x_tag))
+
+                        if self.new_pos > 5: # Votre condition de rafraîchissement
+                            self.new_pos = 1
+                            self.send_raw("VMAX 0.5")
+                            self.move_to(Position(pos_x, pos_y, target_angle))
+
+                            self.get_logger().info(f"Cible : {pos_x:.2f}, {pos_y:.2f} (10cm avant tag)")
+
                     time.sleep(0.1)
                 else:
                     self.send_raw("BLOCK")
