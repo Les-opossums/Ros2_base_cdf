@@ -576,7 +576,7 @@ class ActionManager(Node):
 
                     # 2. Sécurité : on ne bouge que si le tag est à plus de 10cm
                     if current_dist > 0.10:
-                        offset = 0.30  # 10 cm
+                        offset = 0.15  # 10 cm
                         # Ratio pour trouver le point à 10cm en amont sur le même vecteur
                         ratio = (current_dist - offset) / current_dist
 
