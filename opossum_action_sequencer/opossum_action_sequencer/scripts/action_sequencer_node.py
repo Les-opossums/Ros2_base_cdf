@@ -72,57 +72,51 @@ class ActionManager(Node):
         self.stop = False
 
         self.end_poses = {
-            0: [0, 0.875, 2],
-            1: [0.225, 0, 1],
-            2: [1.775, 0, 1],
-            3: [2.225, 0, 1],
+            0: [0.3, 1.8, 0],
+            1: [2.7, 1.8, 0],
         }
         self.end_poses = self.end_poses | {key + 4: [3 - val[0], val [1], 2 - val[2]] for key, val in self.end_poses.items()}
         self.available_end = {i: 0 for i in range(len(list(self.end_poses.keys())))}
 
-        self.position_cans = {
-            0: [0.075, 1.325, 2],
-            1: [0.075, 0.4, 2],
-            2: [0.825, 1.725, 1],
-            3: [1.1, 0.95, 1],
-            4: [0.775, 0.25, 1],
+        # ID_object: ID_stack, X, Y, Theta, Time
+        self.position_crates = {
+            0: [0, 0.1, 0.325, 1.57, 0.],
+            1: [0, 0.1, 0.375, 1.57, 0.],
+            2: [0, 0.1, 0.425, 1.57, 0.],
+            3: [0, 0.1, 0.475, 1.57, 0.],
+            4: [1, 0.1, 1.125, 1.57, 0.],
+            5: [1, 0.1, 1.175, 1.57, 0.],
+            6: [1, 0.1, 1.225, 1.57, 0.],
+            7: [1, 0.1, 1.275, 1.57, 0.],
+            8: [2, 1.025, 0.1, 0.0, 0.],
+            9: [2, 1.075, 0.1, 0.0, 0.],
+            10: [2, 1.125, 0.1, 0.0, 0.],
+            11: [2, 1.175, 0.1, 0.0, 0.],
+            12: [3, 1.825, 0.1, 0.0, 0.],
+            13: [3, 1.875, 0.1, 0.0, 0.],
+            14: [3, 1.925, 0.1, 0.0, 0.],
+            15: [3, 1.975, 0.1, 0.0, 0.],
+            16: [4, 1.075, 0.8, 0.0, 0.],
+            17: [4, 1.125, 0.8, 0.0, 0.],
+            18: [4, 1.175, 0.8, 0.0, 0.],
+            19: [4, 1.225, 0.8, 0.0, 0.],
+            20: [5, 1.775, 0.8, 0.0, 0.],
+            21: [5, 1.825, 0.8, 0.0, 0.],
+            22: [5, 1.875, 0.8, 0.0, 0.],
+            23: [5, 1.925, 0.8, 0.0, 0.],
+            24: [6, 2.9, 0.325, 1.57, 0.],
+            25: [6, 2.9, 0.375, 1.57, 0.],
+            26: [6, 2.9, 0.425, 1.57, 0.],
+            27: [6, 2.9, 0.475, 1.57, 0.],
+            28: [7, 2.9, 1.125, 1.57, 0.],
+            29: [7, 2.9, 1.175, 1.57, 0.],
+            30: [7, 2.9, 1.225, 1.57, 0.],
+            31: [7, 2.9, 1.275, 1.57, 0.],
         }
-        self.position_cans = self.position_cans | {key + 5: [3 - val[0], val[1], 2 - val[2]] for key, val in self.position_cans.items()}
-        self.available_cans = {i: True for i in range(len(list(self.position_cans.keys())))}
+        self.position_crates = self.position_crates | {key + 5: [3 - val[0], val[1], 2 - val[2]] for key, val in self.position_crates.items()}
+        self.available_crates = {i: True for i in range(len(list(self.position_crates.keys())))}
 
-        self.dest_cans = {
-            0: [6, 0],
-            1: [6, 0],
-            2: [6, 0],
-            3: [6, 0],
-            4: [7, 1],
-            5: [4, 2],
-            6: [4, 2],
-            7: [4, 2],
-            8: [4, 2],
-            9: [5, 3],
-        }
-
-        self.end_poses = {
-            0: [0, 0.875, 2],
-            1: [0.225, 0, 1],
-            2: [1.775, 0, 1],
-            3: [2.225, 0, 1],
-        }
-        self.end_poses = self.end_poses | {key + 4: [3 - val[0], val [1], 2 - val[2]] for key, val in self.end_poses.items()}
-        self.available_end = {i: 0 for i in range(len(list(self.end_poses.keys())))}
-
-        self.position_cans = {
-            0: [0.075, 1.325, 2],
-            1: [0.075, 0.4, 2],
-            2: [0.825, 1.725, 1],
-            3: [1.1, 0.95, 1],
-            4: [0.775, 0.25, 1],
-        }
-        self.position_cans = self.position_cans | {key + 5: [3 - val[0], val[1], 2 - val[2]] for key, val in self.position_cans.items()}
-        self.available_cans = {i: True for i in range(len(list(self.position_cans.keys())))}
-
-        self.dest_cans = {
+        self.dest_crates = {
             0: [6, 0],
             1: [6, 0],
             2: [6, 0],
@@ -433,6 +427,46 @@ class ActionManager(Node):
             else :
                 pass 
 
+    def aruco_callback(self, msg: VisionData):
+        if self.robot_pos is not None:
+            x_tag = msg.x
+            y_tag = msg.y
+            self.x_tag = x_tag * np.cos(self.robot_pos.t) - y_tag * np.sin(self.robot_pos.t) + self.robot_pos.x
+            self.y_tag = x_tag * np.sin(self.robot_pos.t) + y_tag * np.cos(self.robot_pos.t) + self.robot_pos.y
+
+            best_match_id = None
+            min_distance = float('inf')
+
+            for crate_id, crate_info in self.position_crates.items():
+                crate_x = crate_info[1]
+                crate_y = crate_info[2]
+                distance = np.sqrt((self.x_tag - crate_x) ** 2 + (self.y_tag - crate_y) ** 2)
+                if distance < min_distance:
+                    min_distance = distance
+                    best_match_id = crate_id
+
+            if best_match_id is not None and min_distance < 0.002:  # Threshold for matching
+                self.position_crates[best_match_id][1] = self.x_tag  # Update X with tag detection
+                self.position_crates[best_match_id][2] = self.y_tag  # Update Y with tag detection
+                self.position_crates[best_match_id][3] = msg.theta  # Update Theta with tag detection
+                self.position_crates[best_match_id][4] = time.time() - self.match_time  # Update the time of detection from timer_match
+
+            else: # Replace the crate who hasn't been detected for the longest time
+                oldest_time = float('inf')
+                oldest_crate_id = None
+
+                for crate_id, crate_info in self.position_crates.items():
+                    if crate_info[0] == 0:  # Only consider crates that are not already matched
+                        if crate_info[4] < oldest_time:
+                            oldest_time = crate_info[4]
+                            oldest_crate_id = crate_id
+
+                if oldest_crate_id is not None:
+                    self.position_crates[oldest_crate_id][1] = self.x_tag  # Update X with tag detection
+                    self.position_crates[oldest_crate_id][2] = self.y_tag  # Update Y with tag detection
+                    self.position_crates[oldest_crate_id][3] = msg.theta  # Update Theta with tag detection
+                    self.position_crates[oldest_crate_id][4] = time.time() - self.match_time  # Update the time of detection from timer_match 
+
     def timer_match_callback(self):
         """Timer callback for match time."""
         if not self.is_ended:
@@ -541,52 +575,40 @@ class ActionManager(Node):
                     self.send_raw("BLOCK")
                     time.sleep(0.1)
 
-    def aruco_callback(self, msg: VisionData):
-        if self.new_pos == 1 or self.new_pos > 10:
-            self.id_tag = msg.id
-            self.x_tag = msg.x
-            self.y_tag = msg.y
-            self.z_tag = msg.z
-            self.theta_tag = msg.theta
-            self.in_stack = msg.in_stack 
-            self.new_pos += 1
-        else:
-            self.new_pos += 1
-
-    def follow_tag_aruco(self):
-        if not self.stop:
-            while True:
-                if self.robot_pos is not None and self.x_tag is not None:
-                    # 1. Calcul de la distance réelle actuelle au tag
-                    current_dist = np.sqrt(self.x_tag**2 + self.y_tag**2)
-
-                    # 2. Sécurité : on ne bouge que si le tag est à plus de 10cm
-                    if current_dist > 0.10 and self.id_tag == 36:
-                        offset = 0.15  # 10 cm
-                        # Ratio pour trouver le point à 10cm en amont sur le même vecteur
-                        ratio = (current_dist - offset) / current_dist
-
-                        x_target_local = self.x_tag * ratio
-                        y_target_local = self.y_tag * ratio
-
-                        # 3. Transformation vers le repère global (votre formule actuelle)
-                        pos_x = x_target_local * np.cos(self.robot_pos.t) - y_target_local * np.sin(self.robot_pos.t) + self.robot_pos.x
-                        pos_y = x_target_local * np.sin(self.robot_pos.t) + y_target_local * np.cos(self.robot_pos.t) + self.robot_pos.y
-
-                        # Orientation : on garde l'angle pour faire face au tag
-                        target_angle = (self.robot_pos.t + np.arctan2(self.y_tag, self.x_tag))
-
-                        if self.new_pos > 5: # Votre condition de rafraîchissement
-                            self.new_pos = 1
-                            self.send_raw("VMAX 0.5")
-                            self.move_to(Position(pos_x, pos_y, target_angle))
-
-                            self.get_logger().info(f"Cible : {pos_x:.2f}, {pos_y:.2f} (10cm avant tag)")
-
-                    time.sleep(0.1)
-                else:
-                    self.send_raw("BLOCK")
-                    time.sleep(0.1)
+    # def follow_tag_aruco(self):
+    #     if not self.stop:
+    #         while True:
+    #             if self.robot_pos is not None and self.x_tag is not None:
+    #                 # 1. Calcul de la distance réelle actuelle au tag
+    #                 current_dist = np.sqrt(self.x_tag**2 + self.y_tag**2)
+# 
+    #                 # 2. Sécurité : on ne bouge que si le tag est à plus de 10cm
+    #                 if current_dist > 0.10 and self.id_tag == 36:
+    #                     offset = 0.15  # 10 cm
+    #                     # Ratio pour trouver le point à 10cm en amont sur le même vecteur
+    #                     ratio = (current_dist - offset) / current_dist
+# 
+    #                     x_target_local = self.x_tag * ratio
+    #                     y_target_local = self.y_tag * ratio
+# 
+    #                     # 3. Transformation vers le repère global (votre formule actuelle)
+    #                     pos_x = x_target_local * np.cos(self.robot_pos.t) - y_target_local * np.sin(self.robot_pos.t) + self.robot_pos.x
+    #                     pos_y = x_target_local * np.sin(self.robot_pos.t) + y_target_local * np.cos(self.robot_pos.t) + self.robot_pos.y
+# 
+    #                     # Orientation : on garde l'angle pour faire face au tag
+    #                     target_angle = (self.robot_pos.t + np.arctan2(self.y_tag, self.x_tag))
+# 
+    #                     if self.new_pos > 5: # Votre condition de rafraîchissement
+    #                         self.new_pos = 1
+    #                         self.send_raw("VMAX 0.5")
+    #                         self.move_to(Position(pos_x, pos_y, target_angle))
+# 
+    #                         self.get_logger().info(f"Cible : {pos_x:.2f}, {pos_y:.2f} (10cm avant tag)")
+# 
+    #                 time.sleep(0.1)
+    #             else:
+    #                 self.send_raw("BLOCK")
+    #                 time.sleep(0.1)
 
     def relative_move_to(self, delta: Position, seuil=0.1):
         """Compute the relative move_to action."""
@@ -712,12 +734,6 @@ class ActionManager(Node):
     def sign(self, val):
         return -1 if val < 0 else 1
 
-    def sign(self, val):
-        return -1 if val < 0 else 1
-
-    def sign(self, val):
-        return -1 if val < 0 else 1
-
     def smart_moves(self):
         default_angle = -2.60
         tol = 0.3
@@ -733,44 +749,44 @@ class ActionManager(Node):
             self.send_raw(f"VMAX {vmax}")
             self.send_raw(f"VTMAX {vtmax}")
             max = -10
-            can_valid = None
+            crate_valid = None
             ind_valid = None
-            for ind, cans in self.position_cans.items():
-                if self.available_cans[ind]:
-                    temp = self.compute_penality(cans)
+            for ind, crates in self.position_crates.items():
+                if self.available_crates[ind]:
+                    temp = self.compute_penality(crates)
                     if temp > max:
                         max = temp
                         ind_valid = ind
-                        can_valid = cans
-            if can_valid is not None:
-                if can_valid[2] % 2 == 0:
-                    # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
-                    self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * tol, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
+                        crate_valid = crates
+            if crate_valid is not None:
+                if crate_valid[2] % 2 == 0:
+                    # HERE GO IN FRONT OF crates THAT ARE BORDERLINE
+                    self.move_to(Position(crate_valid[0] + (crate_valid[2] - 1) * tol, crate_valid[1], crate_valid[2] * np.pi / 2 + default_angle))
                     self.wait_for_motion()
                     fpos = self.find_final_pos(ind_valid, en_color)
-                    self.take_cans(can_valid[2])
-                    self.drop_cans(fpos, default_angle)
-                else: # CANS THAT ARE FRONT ON BOARD
-                    if self.robot_pos.y > can_valid[1] or can_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
-                        if self.robot_pos.y - can_valid[1] < tol:
-                            self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
+                    self.take_crates(crate_valid[2])
+                    self.drop_crates(fpos, default_angle)
+                else: # crates THAT ARE FRONT ON BOARD
+                    if self.robot_pos.y > crate_valid[1] or crate_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE crates OR crates CLOSE TO BOUNDARIES
+                        if self.robot_pos.y - crate_valid[1] < tol:
+                            self.move_to(Position(crate_valid[0] + self.sign(self.robot_pos.x - crate_valid[0]) * tol, crate_valid[1] + tol, 3 * np.pi / 2 + default_angle))
                             self.wait_for_motion()
-                        self.move_to(Position(can_valid[0], can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
+                        self.move_to(Position(crate_valid[0], crate_valid[1] + tol, 3 * np.pi / 2 + default_angle))
                         self.wait_for_motion()
                         fpos = self.find_final_pos(ind_valid, en_color)
-                        self.take_cans(3)
-                        self.drop_cans(fpos, default_angle)
+                        self.take_crates(3)
+                        self.drop_crates(fpos, default_angle)
                     else:
-                        if can_valid[1] - self.robot_pos.y < tol:
-                            self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] - tol, np.pi / 2 + default_angle))
+                        if crate_valid[1] - self.robot_pos.y < tol:
+                            self.move_to(Position(crate_valid[0] + self.sign(self.robot_pos.x - crate_valid[0]) * tol, crate_valid[1] - tol, np.pi / 2 + default_angle))
                             self.wait_for_motion()
-                        self.move_to(Position(can_valid[0], can_valid[1] - tol, np.pi / 2 + default_angle))
+                        self.move_to(Position(crate_valid[0], crate_valid[1] - tol, np.pi / 2 + default_angle))
                         self.wait_for_motion()
                         fpos = self.find_final_pos(ind_valid, en_color)
-                        self.take_cans(1)
-                        self.drop_cans(fpos, default_angle)
-                self.available_cans[ind_valid] = False
-                self.available_end[self.dest_cans[ind_valid][en_color]] += 1 # If yellow 0, else blue
+                        self.take_crates(1)
+                        self.drop_crates(fpos, default_angle)
+                self.available_crates[ind_valid] = False
+                self.available_end[self.dest_crates[ind_valid][en_color]] += 1 # If yellow 0, else blue
                 self.add_score(4)
             else:
                 if en_color == 0: # color is yellow
@@ -788,14 +804,14 @@ class ActionManager(Node):
                     self.send_raw("BLOCK")
 
     def find_final_pos(self, index, en_color):
-        size_cans = 0.1
+        size_crates = 0.1
         size_robot = 0.27
-        pos_out = self.end_poses[self.dest_cans[index][en_color]] # If yellow 0
-        incr = self.available_end[self.dest_cans[index][en_color]]
+        pos_out = self.end_poses[self.dest_crates[index][en_color]] # If yellow 0
+        incr = self.available_end[self.dest_crates[index][en_color]]
         if pos_out[2] % 2 == 0:
-            return [pos_out[0] + (pos_out[2] - 1) * (size_cans / 2 + size_robot + size_cans * incr), pos_out[1], pos_out[2]]
+            return [pos_out[0] + (pos_out[2] - 1) * (size_crates / 2 + size_robot + size_crates * incr), pos_out[1], pos_out[2]]
         else:
-            return [pos_out[0], pos_out[1] + size_cans / 2 + size_robot + size_cans * incr, 3 * pos_out[2]]
+            return [pos_out[0], pos_out[1] + size_crates / 2 + size_robot + size_crates * incr, 3 * pos_out[2]]
 
     def angular_distance(a1, a2):
         diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
@@ -821,7 +837,7 @@ class ActionManager(Node):
             val_ennemi = 0
         return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
 
-    def take_cans(self, angle):
+    def take_crates(self, angle):
         self.kalman(False)
         self.pump(PUMP_struct(0, 1))
         self.pump(PUMP_struct(1, 1))
@@ -844,7 +860,7 @@ class ActionManager(Node):
         self.kalman(True)
         self.sleep(0.1)
 
-    def drop_cans(self, destination, default_angle):
+    def drop_crates(self, destination, default_angle):
         push_dst = 0.1
         self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
         self.wait_for_motion()
