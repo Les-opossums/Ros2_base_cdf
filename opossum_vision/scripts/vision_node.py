@@ -4,7 +4,6 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor, ExternalShutdownException
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
-from geometry_msgs.msg import Point
 import serial
 import threading
 import os
@@ -115,12 +114,6 @@ class VisionNode(Node):
         self.aruco_pub = self.create_publisher(
             VisionData, 
             'aruco_loc', 
-            10
-        )
-        
-        self.loc_pub = self.create_publisher(
-            Point, 
-            "objet_loc", 
             10
         )
 

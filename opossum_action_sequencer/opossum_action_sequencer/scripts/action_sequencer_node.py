@@ -280,7 +280,7 @@ class ActionManager(Node):
         )
 
         self.aruco_sub = self.create_subscription(
-            Point,
+            VisionData,
             "aruco_loc",
             self.aruco_callback,
             10
@@ -561,7 +561,7 @@ class ActionManager(Node):
                     current_dist = np.sqrt(self.x_tag**2 + self.y_tag**2)
 
                     # 2. Sécurité : on ne bouge que si le tag est à plus de 10cm
-                    if current_dist > 0.10:
+                    if current_dist > 0.10 and self.id_tag == 36:
                         offset = 0.15  # 10 cm
                         # Ratio pour trouver le point à 10cm en amont sur le même vecteur
                         ratio = (current_dist - offset) / current_dist
