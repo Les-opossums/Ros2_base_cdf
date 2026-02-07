@@ -12,7 +12,7 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 # Assurez-vous que l'import fonctionne selon votre structure
 try:
-    from opossum_msgs.msg import RobotData
+    from opossum_msgs.msg import RobotData, VisionData
 except ImportError:
     class RobotData: pass
 
@@ -20,8 +20,6 @@ class VisionNode(Node):
     def __init__(self):
         super().__init__('vision_node')
 
-        # 1. Chargement des paramètres
-        # Le topic est relatif (pas de '/' au début), donc il deviendra /nom_robot/robot_data
         self.declare_parameters(
             namespace="",
             parameters=[
@@ -39,22 +37,10 @@ class VisionNode(Node):
         )
         self._init_parameters()
         self._init_publishers()
+        self._init_subscribers()
         self._start_reading_threads()
 
-        # 2. Création des Pub/Sub
-        # On publie sur un topic relatif à notre namespace (ex: /main_robot/objet_loc)
-        self.loc_pub = self.create_publisher(Point, "objet_loc", 10)
-
-        # On écoute le topic configuré
-        self.data_sub = self.create_subscription(
-            RobotData,
-            self.data_topic,
-            self.robot_data_callback,
-            10
-        )
-
         self.get_logger().info(f"VisionNode démarré dans le namespace '{self.get_namespace()}'")
-        self.get_logger().info(f"Écoute sur : {self.get_namespace()}/{self.data_topic}")
 
     def _init_parameters(self: Node) -> None:
         """Initialise parameters of the node."""
@@ -121,6 +107,33 @@ class VisionNode(Node):
                 self.cards[name] = {"port": port, "baudrate": baudrate}
                 # Initialisation bloquante de la carte (handshake)
                 self.cards[name]["serial"] = self._init_cam(name)
+
+    def _init_publishers(self):
+        '''
+        Initialize publishers for detected objects.
+        '''
+        self.aruco_pub = self.create_publisher(
+            VisionData, 
+            'aruco_loc', 
+            10
+        )
+        
+        self.loc_pub = self.create_publisher(
+            Point, 
+            "objet_loc", 
+            10
+        )
+
+    def _init_subscribers(self):
+        '''
+        Initialize subscribers for robot data.
+        '''
+        self.data_sub = self.create_subscription(
+            RobotData,
+            self.data_topic,
+            self.robot_data_callback,
+            10
+        )
 
     def _init_cam(self, name):
         """Initialize serial connection with handshake."""
@@ -215,35 +228,26 @@ class VisionNode(Node):
             return
         if (
             splitted_data[0] == "ARUCO" and len(splitted_data) == 6
-        ):  # ARUCO x, y, z, ...
+        ):  # ARUCO id, x, y, z, theta, in_stack
             try:
-                if splitted_data[1] == "36":
-                    p = Point()
-                    p.x = float(splitted_data[2])/1000
-                    p.y = float(splitted_data[3])/1000
-                    p.z = float(splitted_data[5])  # On peut utiliser z pour l'angle si besoin 5 pour récupérer theta
-                    self.aruco_pub.publish(p)
+                p = VisionData()
+                p.id = int(splitted_data[1])
+                p.x = float(splitted_data[2])/1000
+                p.y = float(splitted_data[3])/1000
+                p.z = float(splitted_data[4]) 
+                p.theta = float(splitted_data[5])*3.14159/180  # Conversion en radians
+                p.in_stack = False
+                self.aruco_pub.publish(p)
             except Exception as e:
                 self.get_logger().warn(
                     f"The splitted data was {splitted_data} and got: {e}"
                 )
         elif splitted_data[0] == "ERROR":
             self.get_logger().error(f"Error: {data}")
-    
-    def _init_publishers(self):
-        '''
-        Initialize publishers for detected objects.
-        '''
-        self.aruco_pub = self.create_publisher(Point, 'aruco_loc', 10)
 
     def robot_data_callback(self, msg):
         # self.get_logger().info(f"Reçu des données sur {self.get_namespace()}")
         pass
-        
-        # Exemple de traitement : on renvoie un point fictif
-        # p = Point()
-        # p.x = 10.0
-        # self.loc_pub.publish(p)
 
 def main(args=None):
     rclpy.init(args=args)

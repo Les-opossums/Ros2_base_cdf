@@ -31,6 +31,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Actuators.msg"
   "msg/Poses2D.msg"
   "msg/PositionMap.msg"
+  "msg/VisionData.msg"
   "action/ActionSequencer.action"
   "action/MoveTo.action"
   "srv/Init.srv"

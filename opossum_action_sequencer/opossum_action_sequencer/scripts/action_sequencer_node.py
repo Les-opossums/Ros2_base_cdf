@@ -9,7 +9,7 @@ from rcl_interfaces.msg import ParameterEvent
 
 from std_msgs.msg import String, Bool, Int32
 from geometry_msgs.msg import Point
-from opossum_msgs.msg import RobotData, LidarLoc
+from opossum_msgs.msg import RobotData, LidarLoc, VisionData
 
 import numpy as np
 from opossum_action_sequencer.utils import (
@@ -541,31 +541,17 @@ class ActionManager(Node):
                     self.send_raw("BLOCK")
                     time.sleep(0.1)
 
-    def aruco_callback(self, msg: Point):
+    def aruco_callback(self, msg: VisionData):
         if self.new_pos == 1 or self.new_pos > 10:
+            self.id_tag = msg.id
             self.x_tag = msg.x
             self.y_tag = msg.y
-            self.z_tag = msg.z 
+            self.z_tag = msg.z
+            self.theta_tag = msg.theta
+            self.in_stack = msg.in_stack 
             self.new_pos += 1
         else:
             self.new_pos += 1
-
-#    def follow_tag_aruco(self):
-#        if not self.stop:
-#            while True:
-#                if self.robot_pos is not None and self.x_tag is not None: 
-#                    if self.new_pos > 30:
-#                        self.new_pos = 1
-#                        self.send_raw("VMAX 0.5")
-#                        self.get_logger().info(f"{self.x_tag}, {self.robot_pos.t}, {self.y_tag}, {self.robot_pos.t}, {self.robot_pos.x}")
-#                        pos_x = self.x_tag * np.cos(self.robot_pos.t) - self.y_tag * np.sin(self.robot_pos.t) + self.robot_pos.x
-#                        pos_y = self.x_tag * np.sin(self.robot_pos.t) + self.y_tag * np.cos(self.robot_pos.t) + self.robot_pos.y
-#                        self.move_to(Position(pos_x, pos_y, self.robot_pos.t + np.arctan2(self.y_tag, self.x_tag)))
-#                        self.get_logger().info(f"Move to {pos_x}, {pos_y}, {self.robot_pos.t + np.arctan2(self.y_tag, self.x_tag)}")
-#                        time.sleep(0.1)
-#                else:
-#                    self.send_raw("BLOCK")
-#                    time.sleep(0.1)
 
     def follow_tag_aruco(self):
         if not self.stop:
@@ -761,7 +747,6 @@ class ActionManager(Node):
                     # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
                     self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * tol, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
                     self.wait_for_motion()
-                    self.wait_for_motion()
                     fpos = self.find_final_pos(ind_valid, en_color)
                     self.take_cans(can_valid[2])
                     self.drop_cans(fpos, default_angle)
@@ -804,16 +789,12 @@ class ActionManager(Node):
 
     def find_final_pos(self, index, en_color):
         size_cans = 0.1
-        size_cans = 0.1
         size_robot = 0.27
-        pos_out = self.end_poses[self.dest_cans[index][en_color]] # If yellow 0
         pos_out = self.end_poses[self.dest_cans[index][en_color]] # If yellow 0
         incr = self.available_end[self.dest_cans[index][en_color]]
         if pos_out[2] % 2 == 0:
             return [pos_out[0] + (pos_out[2] - 1) * (size_cans / 2 + size_robot + size_cans * incr), pos_out[1], pos_out[2]]
-            return [pos_out[0] + (pos_out[2] - 1) * (size_cans / 2 + size_robot + size_cans * incr), pos_out[1], pos_out[2]]
         else:
-            return [pos_out[0], pos_out[1] + size_cans / 2 + size_robot + size_cans * incr, 3 * pos_out[2]]
             return [pos_out[0], pos_out[1] + size_cans / 2 + size_robot + size_cans * incr, 3 * pos_out[2]]
 
     def angular_distance(a1, a2):
@@ -823,9 +804,7 @@ class ActionManager(Node):
     def compute_penality(self, pos):
         angle_coeff = 0.05
         coeff_center = 0 # -0.005
-        coeff_center = 0 # -0.005
         coeff_dst = -1
-        coeff_enn = 0 # 0.05
         coeff_enn = 0 # 0.05
         # coeef_end = -0.0001
         val_center = (1.5 - pos[0]) ** 2 + (1 - pos[1]) ** 2
@@ -866,7 +845,6 @@ class ActionManager(Node):
         self.sleep(0.1)
 
     def drop_cans(self, destination, default_angle):
-        push_dst = 0.1
         push_dst = 0.1
         self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
         self.wait_for_motion()

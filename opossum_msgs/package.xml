@@ -6,10 +6,8 @@
   <description>TODO: Package description</description>
   <license>TODO: License declaration</license>
 
-  <maintainer email="7robot@bde.enseeiht.fr">7Robot</maintainer>
-  <author>Thomas Bonnefille</author>
+  <maintainer email="scrat.opossum@gmail.com">Scrat</maintainer>
   <author>Alexis Delgorgue</author>
-  <author>Clément Ramirez</author>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
