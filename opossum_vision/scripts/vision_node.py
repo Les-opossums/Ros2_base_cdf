@@ -10,6 +10,7 @@ import os
 import yaml
 from ament_index_python.packages import get_package_share_directory
 # Assurez-vous que l'import fonctionne selon votre structure
+from std_msgs.msg import String
 try:
     from opossum_msgs.msg import RobotData, VisionData, CameraLoc
 except ImportError:
@@ -113,6 +114,12 @@ class VisionNode(Node):
         '''
         Initialize publishers for detected objects.
         '''
+        command_topic = (
+            self.get_parameter("command_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
         self.aruco_pub = self.create_publisher(
             VisionData, 
             'aruco_loc', 
@@ -122,6 +129,12 @@ class VisionNode(Node):
         self.camera_log_pub = self.create_publisher(
             CameraLoc,
             'camera_loc',
+            10
+        )
+
+        self.pub_command = self.create_publisher(
+            String,
+            command_topic,
             10
         )
 
@@ -256,6 +269,20 @@ class VisionNode(Node):
                 loc_msg.robot_position.z = float(splitted_data[3]) 
                 loc_msg.camera_id = int(splitted_data[4])
                 self.camera_log_pub.publish(loc_msg)
+            except Exception as e:
+                self.get_logger().warn(
+                    f"The splitted data was {splitted_data} and got: {e}"
+                )
+
+        elif (
+            splitted_data[0] == "ROBOTPOS"
+        ):
+            try:
+                # Publish data in command
+                command_msg = String()
+                command_msg.data = data
+                self.pub_command.publish(command_msg)
+
             except Exception as e:
                 self.get_logger().warn(
                     f"The splitted data was {splitted_data} and got: {e}"
