@@ -315,7 +315,7 @@ class VisionNode(Node):
             if color in ["blue", "yellow"]:
                 for name, card in self.cards.items():
                     try:
-                        card["serial"].write((color + "\n").encode('utf-8'))
+                        card["serial"].write(("COLOR " +color + "\n").encode('utf-8'))
                     except Exception as e:
                         self.get_logger().error(f"Failed to send color to card '{name}': {e}")
             else:
