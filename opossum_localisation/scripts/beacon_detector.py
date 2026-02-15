@@ -46,7 +46,6 @@ class BeaconDetectorNode(Node):
             ],
         )
         self._init_main_parameters()
-        self.get_logger().info("Beacon detector node initialized.")
 
     def _init_main_parameters(self: Node) -> None:
         """

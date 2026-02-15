@@ -110,7 +110,6 @@ class LidarSimulation(Node):
             np.array([beacons[i], beacons[i + 1], 1]).reshape(3, 1)
             for i in range(0, len(beacons), 2)
         ]
-        self.get_logger().info(f"Lidar simulation node initialized with color {self.team_color}.")
 
     def _init_services(self) -> None:
         """Initialize services."""

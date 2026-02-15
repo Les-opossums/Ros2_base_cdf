@@ -41,8 +41,6 @@ class Communication(Node):
         self._init_parameters()
         self._init_publishers()
         self._init_subscribers()
-        self.get_logger().info(f"Simu: {self.simulation}")
-        self.get_logger().info("Communication node initialized.")
 
     def _init_parameters(self: Node) -> None:
         """Initialise parameters of the node."""
@@ -265,7 +263,6 @@ class Communication(Node):
         elif (
             splitted_data[0] == "MOVE" and len(splitted_data) == 5
         ):
-            self.get_logger().info(f"In avoid: sending {' '.join(splitted_data[:4])}")
             return " ".join(splitted_data[:4])
         return data
     def process_data_rcv(self, data):

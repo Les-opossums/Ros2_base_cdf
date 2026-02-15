@@ -31,7 +31,6 @@ class NodeGUI(Node):
         self._init_publishers()
         self._init_subscribers()
         self._init_clients()
-        self.get_logger().info("Orchestrator GUI node initialized.")
 
     def _init_parameters(self) -> None:
         """Initialize parameters of the node."""

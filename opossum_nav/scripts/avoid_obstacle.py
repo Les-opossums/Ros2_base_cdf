@@ -21,7 +21,6 @@ class ObstacleAvoider(Node):
         self._init_parameters()
         self._init_publishers()
         self._init_subscribers()
-        self.get_logger().info("Avoid obstacle node initialized.")
 
     def _init_parameters(self) -> None:
         """Initialize parameters."""
@@ -489,7 +488,8 @@ class ObstacleAvoider(Node):
             self._send_block()
             return False
         if self._obstacle_on_goal(closest_obstacle):
-            self.get_logger().info("Obstacle difficult goal we re fucked")
+            pass
+            # self.get_logger().info("Obstacle difficult goal we re fucked")
             # self._send_block()
             # return False
         v_rg = [

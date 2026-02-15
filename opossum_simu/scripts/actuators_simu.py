@@ -30,7 +30,6 @@ class ActuatorsSimu(Node):
         self._init_action_server()
         self._init_services()
         self._init_states()
-        self.get_logger().info("Actuator simulation node initialized.")
 
     def _init_parameters(self) -> None:
         """Init parameters of the node."""

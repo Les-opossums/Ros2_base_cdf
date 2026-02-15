@@ -97,9 +97,7 @@ class TfBroadcaster(Node):
         if self.team_color == "blue":
             for i in range(0, len(self.beacons), 2):
                 self.beacons[i] = self.boundaries[1] - self.beacons[i]
-        self.get_logger().info("TfBroadcaster node initialized.")
         
-
     def _init_subscribers(self):
         """Initialize subscribers."""
         update_position_topic = (

@@ -32,7 +32,6 @@ class ActionManager(Node):
 
     def __init__(self):
         super().__init__("action_sequencer_node")
-        self.get_logger().info("Action Manager Node started")
         self._init_parameters()
         self._init_publishers()
         self._init_subscribers()
@@ -252,7 +251,6 @@ class ActionManager(Node):
     def parameter_event_callback(self, event):
         """Handle the parameters event."""
         # Parcours des paramètres modifiés
-        # self.get_logger().info(f"Parameter event received: {event}")
         script_map = {
             0: ("opossum_action_sequencer.match.script1",
                 "Default Script"),
@@ -283,11 +281,10 @@ class ActionManager(Node):
         for changed in event.changed_parameters:
             if changed.name == "script_number":
                 script_num = changed.value.integer_value
-                self.get_logger().info(f"Choix du script : {script_num}")
 
                 if script_num in script_map:
                     module_path, log_msg = script_map[script_num]
-                    self.get_logger().info(log_msg)
+                    # self.get_logger().info(log_msg)
 
                     # Dynamically import the Script class
                     module = __import__(module_path, fromlist=["Script"])
@@ -307,15 +304,12 @@ class ActionManager(Node):
             elif changed.name == "debug_mode":
                 # Affiche la nouvelle valeur du paramètre debug_mode
                 if changed.value.bool_value:
-                    self.get_logger().info("Debug mode enabled")
                     module = __import__(
                         "opossum_action_sequencer.match.script_init",
                         fromlist=["Script"]
                     )
                     self.script_init_class = getattr(module, "Script")
                     self.run_script_init()
-                else:
-                    self.get_logger().info("Debug mode disabled")
 
     def color_callback(self, msg):
         self.color = msg.data
@@ -328,7 +322,6 @@ class ActionManager(Node):
             self._init_timers()
             self.is_started = True
             self.match_time = time.time()
-            self.get_logger().info("Leash activated")
             self.script_instance = self.script_class()
             self.script_thread = threading.Thread(
                 target=self.script_instance.run, args=(self,)
@@ -336,15 +329,12 @@ class ActionManager(Node):
             self.script_thread.start()
 
         elif msg.data.startswith("AU"):
-            # self.get_logger().info(f"AU_test : {msg.data[-1]}")
             if msg.data[-1] == "1":
-                self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
                 if self.is_started and self.script_thread is not None:
                     self.get_logger().warn("Stop script from AU")
                     self.stop_script()
             elif msg.data[-1] == "2":
-                # self.get_logger().info("AU activated")
                 self.pub_au.publish(Bool(data=True))
             else:
                 self.get_logger().info("AU deactivated")

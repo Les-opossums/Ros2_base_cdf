@@ -107,7 +107,6 @@ void ObstacleExtractor::updateParamsUtil(){
   if (p_active_ != prev_active) {
     if (p_active_) {
       if (p_use_scan_){
-        RCLCPP_INFO_STREAM_ONCE(nh_->get_logger(), "Using LaserScan topic");
         scan_sub_ = nh_->create_subscription<sensor_msgs::msg::LaserScan>(
             "scan", 1, std::bind(&ObstacleExtractor::scanCallback, this, std::placeholders::_1));
       }else if (p_use_pcl_){
@@ -147,7 +146,6 @@ void ObstacleExtractor::scanCallback(const sensor_msgs::msg::LaserScan& scan_msg
   // int64_t ns_begin = begin.nanoseconds();
   base_frame_id_ = scan_msg.header.frame_id;
   stamp_ = scan_msg.header.stamp;
-  // RCLCPP_INFO(nh_->get_logger(), "Using LaserScan topic");
 
   double phi = scan_msg.angle_min;
 

@@ -13,7 +13,6 @@ import time
 class IhmNode(Node):
     def __init__(self):
         super().__init__("ihm_node")
-        self.get_logger().info("Initializing IHM Node")
         self._init_parameters()
         self._init_publishers()
         self._init_subscribers()
@@ -56,7 +55,6 @@ class IhmNode(Node):
 
     def _init_subscribers(self):
         """Initialise les abonnements aux topics ROS 2."""
-        self.get_logger().info("Setting up subscribers...")
         
         score_topic = (
             self.get_parameter("score_topic").get_parameter_value().string_value

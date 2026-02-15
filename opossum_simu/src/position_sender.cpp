@@ -11,7 +11,6 @@ PositionSender::PositionSender() : Node("position_sender_node")
   init_publishers();
   init_subscribers();
   init_clients();
-  RCLCPP_INFO(this->get_logger(), "Position sender node initialized.");
 }
 
 void PositionSender::init_parameters()

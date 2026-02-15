@@ -27,7 +27,6 @@ class KeyboardController(Node):
                         target=self.wait_for_touch, # args=(self,)
                     )
         self.thread.start()
-        self.get_logger().info("Controller keyboard for the robot initialized.")
 
     def _init_parameters(self) -> None:
         """Initialize parameters."""

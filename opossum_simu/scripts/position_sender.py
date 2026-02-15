@@ -31,7 +31,6 @@ class PositionSender(Node):
         self._init_subscribers()
         self._init_clients()
         self._init_servers()
-        self.get_logger().info("Position sender node initialized.")
 
     def _init_parameters(self) -> None:
         """Initialize parameters of the node."""

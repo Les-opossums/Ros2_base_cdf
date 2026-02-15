@@ -34,14 +34,8 @@ class ParametersServer(Node):
             "set_parameters",
             self.set_parameters_callback
         )
-        self.get_logger().info("Parameters service is ready.")
 
     def set_parameters_callback(self, request, response):
-        # self.get_logger().info(
-        #     f"Received request: team_color={request.team_color}, "
-        #     f"script_number={request.script_number}, "
-        #     f"debug_mode={request.debug_mode}"
-        # )
 
         # Validation des valeurs
         if request.team_color not in ["blue", "yellow"]:
@@ -78,11 +72,6 @@ class ParametersServer(Node):
                 self.current_score
             ),
         ])
-
-        self.get_logger().info(
-            f"Updated parameters: team_color={self.team_color}, "
-            f"script_number={self.script_number}, debug_mode={self.debug_mode}"
-        )
 
         return response
 

@@ -30,7 +30,6 @@ class MotorSimu(Node):
         self._init_publishers()
         self._init_action_server()
         self._init_services()
-        self.get_logger().info("Nav simulation node initialized.")
 
     def _init_parameters(self) -> None:
         """Init parameters of the node."""

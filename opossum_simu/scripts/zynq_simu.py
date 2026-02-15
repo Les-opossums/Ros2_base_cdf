@@ -33,7 +33,6 @@ class ZynqSimulation(Node):
         self._init_publishers()
         self._init_action_clients()
         self._init_service_clients()
-        self.get_logger().info("ZYNQ simulation node initialized.")
 
     def _init_parameters(self):
         """Initialise parameters of the node."""
