@@ -110,6 +110,8 @@ def generate_launch_description():
             ]
         ),
         launch_arguments={"robot_names": robot_names}.items()
+    )
+
     ihm_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -141,8 +143,6 @@ def generate_launch_description():
             localisation_launch,
             simu_launch,
             dev_gui_launch,
-            ihm_launch,
-            action_sequencer_launch,
             ihm_launch,
             action_sequencer_launch,
         ]

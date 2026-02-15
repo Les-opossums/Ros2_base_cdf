@@ -73,9 +73,8 @@ class ActionManager(Node):
 
         self.end_poses = {
             0: [0.3, 1.8, 0],
-            1: [2.7, 1.8, 0],
         }
-        self.end_poses = self.end_poses | {key + 4: [3 - val[0], val [1], 2 - val[2]] for key, val in self.end_poses.items()}
+        self.end_poses = self.end_poses | {key + 1: [3 - val[0], val [1], 2 - val[2]] for key, val in self.end_poses.items()}
         self.available_end = {i: 0 for i in range(len(list(self.end_poses.keys())))}
 
         # ID_object: ID_stack, X, Y, Theta, Time
@@ -114,19 +113,7 @@ class ActionManager(Node):
             31: [7, 2.9, 1.275, 1.57, 0.],
         }
         self.available_crates = {i: True for i in range(len(list(self.position_crates.keys())))}
-
-        self.dest_crates = {
-            0: [6, 0],
-            1: [6, 0],
-            2: [6, 0],
-            3: [6, 0],
-            4: [7, 1],
-            5: [4, 2],
-            6: [4, 2],
-            7: [4, 2],
-            8: [4, 2],
-            9: [5, 3],
-        }
+        self.dest_crates = {i : [1, 0] for i in range(len(self.position_crates.keys()))}
 
     def _init_parameters(self) -> None:
         """Initialize the parameters of the node."""
@@ -767,9 +754,9 @@ class ActionManager(Node):
             max = -10
             crate_valid = None
             ind_valid = None
-            for ind, cans in self.position_cans.items():
-                if self.available_cans[ind]:
-                    temp = self.compute_penality(cans)
+            for ind, crates in self.position_crates.items():
+                if self.available_crates[ind]:
+                    temp = self.compute_penality(crates)
                     if temp > max:
                         max = temp
                         ind_valid = ind
@@ -780,29 +767,29 @@ class ActionManager(Node):
                     self.move_to(Position(crate_valid[0] + (crate_valid[2] - 1) * tol, crate_valid[1], crate_valid[2] * np.pi / 2 + default_angle))
                     self.wait_for_motion()
                     fpos = self.find_final_pos(ind_valid, en_color)
-                    self.take_crates(can_valid[2])
+                    self.take_crates(crate_valid[2])
                     self.drop_crates(fpos, default_angle)
                 else: # CANS THAT ARE FRONT ON BOARD
-                    if self.robot_pos.y > can_valid[1] or can_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
-                        if self.robot_pos.y - can_valid[1] < tol:
-                            self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
+                    if self.robot_pos.y > crate_valid[1] or crate_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
+                        if self.robot_pos.y - crate_valid[1] < tol:
+                            self.move_to(Position(crate_valid[0] + self.sign(self.robot_pos.x - crate_valid[0]) * tol, crate_valid[1] + tol, 3 * np.pi / 2 + default_angle))
                             self.wait_for_motion()
-                        self.move_to(Position(can_valid[0], can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
+                        self.move_to(Position(crate_valid[0], crate_valid[1] + tol, 3 * np.pi / 2 + default_angle))
                         self.wait_for_motion()
                         fpos = self.find_final_pos(ind_valid, en_color)
                         self.take_crates(3)
                         self.drop_crates(fpos, default_angle)
                     else:
-                        if can_valid[1] - self.robot_pos.y < tol:
-                            self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] - tol, np.pi / 2 + default_angle))
+                        if crate_valid[1] - self.robot_pos.y < tol:
+                            self.move_to(Position(crate_valid[0] + self.sign(self.robot_pos.x - crate_valid[0]) * tol, crate_valid[1] - tol, np.pi / 2 + default_angle))
                             self.wait_for_motion()
-                        self.move_to(Position(can_valid[0], can_valid[1] - tol, np.pi / 2 + default_angle))
+                        self.move_to(Position(crate_valid[0], crate_valid[1] - tol, np.pi / 2 + default_angle))
                         self.wait_for_motion()
                         fpos = self.find_final_pos(ind_valid, en_color)
                         self.take_crates(1)
                         self.drop_crates(fpos, default_angle)
-                self.available_cans[ind_valid] = False
-                self.available_end[self.dest_cans[ind_valid][en_color]] += 1 # If yellow 0, else blue
+                self.available_crates[ind_valid] = False
+                self.available_end[self.dest_crates[ind_valid][en_color]] += 1 # If yellow 0, else blue
                 self.add_score(4)
             else:
                 if en_color == 0: # color is yellow
@@ -834,27 +821,27 @@ class ActionManager(Node):
             self.send_raw(f"VMAX {vmax}")
             self.send_raw(f"VTMAX {vtmax}")
             max = -10
-            can_valid = None
+            crate_valid = None
             ind_valid = None
-            for ind, cans in self.position_cans.items():
-                if self.available_cans[ind]:
+            for ind, cans in self.position_crates.items():
+                if self.available_crates[ind]:
                     temp = self.compute_penality(cans)
                     if temp > max:
                         max = temp
                         ind_valid = ind
-                        can_valid = cans
-            if can_valid is not None:
-                if can_valid[2] % 2 == 0:
+                        crate_valid = cans
+            if crate_valid is not None:
+                if crate_valid[2] % 2 == 0:
                     # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
-                    self.move_to(Position(can_valid[0] + (can_valid[2] - 1) * tol, can_valid[1], can_valid[2] * np.pi / 2 + default_angle))
+                    self.move_to(Position(crate_valid[0] + (crate_valid[2] - 1) * tol, crate_valid[1], crate_valid[2] * np.pi / 2 + default_angle))
                     self.wait_for_motion()
                     fpos = self.find_final_pos(ind_valid, en_color)
-                    self.take_cans(can_valid[2])
+                    self.take_cans(crate_valid[2])
                     self.drop_cans(fpos, default_angle)
                 else: # CANS THAT ARE FRONT ON BOARD
-                    if self.robot_pos.y > can_valid[1] or can_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
-                        if self.robot_pos.y - can_valid[1] < tol:
-                            self.move_to(Position(can_valid[0] + self.sign(self.robot_pos.x - can_valid[0]) * tol, can_valid[1] + tol, 3 * np.pi / 2 + default_angle))
+                    if self.robot_pos.y > crate_valid[1] or crate_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
+                        if self.robot_pos.y - crate_valid[1] < tol:
+                            self.move_to(Position(crate_valid[0] + self.sign(self.robot_pos.x - crate_valid[0]) * tol, crate_valid[1] + tol, 3 * np.pi / 2 + default_angle))
                             self.wait_for_motion()
                         self.move_to(Position(crate_valid[0], crate_valid[1] + tol, 3 * np.pi / 2 + default_angle))
                         self.wait_for_motion()
@@ -892,6 +879,11 @@ class ActionManager(Node):
     def find_final_pos(self, index, en_color):
         size_crates = 0.1
         size_robot = 0.27
+        self.get_logger().info(f"End poses: {self.end_poses}")
+        self.get_logger().info(f"Dest crates: {self.dest_crates}")
+        self.get_logger().info(f"Index: {index}")
+        self.get_logger().info(f"En color: {en_color}")
+
         pos_out = self.end_poses[self.dest_crates[index][en_color]] # If yellow 0
         incr = self.available_end[self.dest_crates[index][en_color]]
         if pos_out[2] % 2 == 0:
@@ -954,66 +946,6 @@ class ActionManager(Node):
         self.wait_for_motion()
         self.kalman(True)
         self.sleep(0.1)
-
-    def take_cans(self, angle):
-    def take_crates(self, angle):
-        self.kalman(False)
-        self.pump(PUMP_struct(0, 1))
-        self.pump(PUMP_struct(1, 1))
-        self.pump(PUMP_struct(2, 1))
-        self.pump(PUMP_struct(3, 1))
-        self.sleep(0.1)
-        push_dst = 0.15
-        if angle == 0:
-            self.relative_move_to(Position(push_dst, 0, 0))
-        elif angle == 1:
-            self.relative_move_to(Position(0, push_dst, 0))
-        elif angle == 2:
-            self.relative_move_to(Position(-push_dst, 0, 0))
-        elif angle == 3:
-            self.relative_move_to(Position(0, -push_dst, 0))
-        else:
-            self.relative_move_to(Position(0, 0, 0))
-            pass
-        self.wait_for_motion()
-        self.kalman(True)
-        self.sleep(0.1)
-
-    def drop_crates(self, destination, default_angle):
-        push_dst = 0.1
-        self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
-        self.wait_for_motion()
-
-        self.valve(VALVE_struct(2))
-        if destination[2] == 0:
-            self.relative_move_to(Position(push_dst, 0, 0))
-            self.wait_for_motion()
-            self.pump(PUMP_struct(0, 0))
-            self.pump(PUMP_struct(1, 0))
-            self.pump(PUMP_struct(2, 0))
-            self.pump(PUMP_struct(3, 0))
-            self.relative_move_to(Position(-push_dst, 0, 0))
-            self.wait_for_motion()
-        elif destination[2] == 2:
-            self.relative_move_to(Position(-push_dst, 0, 0))
-            self.wait_for_motion()
-            self.pump(PUMP_struct(0, 0))
-            self.pump(PUMP_struct(1, 0))
-            self.pump(PUMP_struct(2, 0))
-            self.pump(PUMP_struct(3, 0))
-            self.relative_move_to(Position(push_dst, 0, 0))
-            self.wait_for_motion()
-        elif destination[2] == 3:
-            self.relative_move_to(Position(0, -push_dst, 0))
-            self.wait_for_motion()
-            self.pump(PUMP_struct(0, 0))
-            self.pump(PUMP_struct(1, 0))
-            self.pump(PUMP_struct(2, 0))
-            self.pump(PUMP_struct(3, 0))
-            self.relative_move_to(Position(0, push_dst, 0))
-            self.wait_for_motion()
-        else:
-            pass
 
     def drop_crates(self, destination, default_angle):
         push_dst = 0.1
