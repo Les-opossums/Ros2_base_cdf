@@ -11,9 +11,11 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 # Assurez-vous que l'import fonctionne selon votre structure
 try:
-    from opossum_msgs.msg import RobotData, VisionData
+    from opossum_msgs.msg import RobotData, VisionData, CameraLoc
 except ImportError:
     class RobotData: pass
+    class VisionData: pass
+    class CameraLoc: pass
 
 class VisionNode(Node):
     def __init__(self):
@@ -78,7 +80,7 @@ class VisionNode(Node):
         if True:
             cards_name = (
                 self.get_parameter("cards_name")
-                .get_parameter_value()
+                .get_parameter_value()  
                 .string_array_value
             )
             self.cards = {}
@@ -114,6 +116,12 @@ class VisionNode(Node):
         self.aruco_pub = self.create_publisher(
             VisionData, 
             'aruco_loc', 
+            10
+        )
+
+        self.camera_log_pub = self.create_publisher(
+            CameraLoc,
+            'camera_loc',
             10
         )
 
@@ -229,12 +237,30 @@ class VisionNode(Node):
                 p.y = float(splitted_data[3])/1000
                 p.z = float(splitted_data[4]) 
                 p.theta = float(splitted_data[5])*3.14159/180  # Conversion en radians
-                p.in_stack = False
+                p.in_stack = 1 # int(splitted_data[6])
+                p.stack_id = 1 # int(splitted_data[7])
+                p.in_center = 0. # float(splitted_data[8])
                 self.aruco_pub.publish(p)
             except Exception as e:
                 self.get_logger().warn(
                     f"The splitted data was {splitted_data} and got: {e}"
                 )
+
+        elif (
+            splitted_data[0] == "LOC" and len(splitted_data) == 5
+        ): # LOC x, y, z, camera_id
+            try:
+                loc_msg = CameraLoc()
+                loc_msg.robot_position.x = float(splitted_data[1])/1000
+                loc_msg.robot_position.y = float(splitted_data[2])/1000
+                loc_msg.robot_position.z = float(splitted_data[3]) 
+                loc_msg.camera_id = int(splitted_data[4])
+                self.camera_log_pub.publish(loc_msg)
+            except Exception as e:
+                self.get_logger().warn(
+                    f"The splitted data was {splitted_data} and got: {e}"
+                )
+
         elif splitted_data[0] == "ERROR":
             self.get_logger().error(f"Error: {data}")
 

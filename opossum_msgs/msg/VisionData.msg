@@ -4,5 +4,6 @@ float32 x
 float32 y
 float32 z
 float32 theta
-bool in_stack
-
+int32 in_stack
+int32 stack_id
+float32 in_center

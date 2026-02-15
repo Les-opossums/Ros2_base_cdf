@@ -25,7 +25,7 @@ import threading
 from threading import Event
 import time
 import os
-
+import json
 
 class ActionManager(Node):
     """Action Manager Node."""
@@ -392,6 +392,7 @@ class ActionManager(Node):
             os.system('systemctl --user restart launch.service')
 
         elif msg.data.strip() == "Pos,done":
+            self.get_logger().info("Motion done received from Zynq")
             self.motion_done = True
             self.motion_done_event.set()
 
@@ -445,7 +446,7 @@ class ActionManager(Node):
                     min_distance = distance
                     best_match_id = crate_id
 
-            if best_match_id is not None and min_distance < 0.002:  # Threshold for matching
+            if best_match_id is not None and min_distance < 0.002:  # Threshold for matching                
                 self.position_crates[best_match_id][1] = self.x_tag  # Update X with tag detection
                 self.position_crates[best_match_id][2] = self.y_tag  # Update Y with tag detection
                 self.position_crates[best_match_id][3] = msg.theta  # Update Theta with tag detection
@@ -465,7 +466,18 @@ class ActionManager(Node):
                     self.position_crates[oldest_crate_id][1] = self.x_tag  # Update X with tag detection
                     self.position_crates[oldest_crate_id][2] = self.y_tag  # Update Y with tag detection
                     self.position_crates[oldest_crate_id][3] = msg.theta  # Update Theta with tag detection
-                    self.position_crates[oldest_crate_id][4] = time.time() - self.match_time  # Update the time of detection from timer_match 
+                    self.position_crates[oldest_crate_id][4] = time.time() - self.match_time  # Update the time of detection from timer_match    
+            
+            # --- Section Logging ---
+            home_dir = os.path.expanduser('~')
+            log_filename = os.path.join(home_dir, "position_crates_log.json")
+            try:
+                with open(log_filename, 'w') as f:
+                    # indent=4 rend le fichier facile à lire pour un humain
+                    json.dump(self.position_crates, f, indent=4)
+
+            except Exception as e:
+                self.get_logger().error(f"Erreur lors de l'écriture du log : {e}")
 
     def timer_match_callback(self):
         """Timer callback for match time."""
