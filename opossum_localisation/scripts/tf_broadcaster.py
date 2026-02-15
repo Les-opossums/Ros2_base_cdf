@@ -32,6 +32,7 @@ class TfBroadcaster(Node):
                 ("init_visu_srv", rclpy.Parameter.Type.STRING),
                 ("boundaries", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("beacons", rclpy.Parameter.Type.DOUBLE_ARRAY),
+                ("robot_names", rclpy.Parameter.Type.STRING_ARRAY),
                 ("enable_wait_color", rclpy.Parameter.Type.BOOL),
                 ("color_topic", rclpy.Parameter.Type.STRING),
             ],
@@ -39,6 +40,9 @@ class TfBroadcaster(Node):
         self._init_main_parameters()
 
     def _init_main_parameters(self: Node) -> None:
+        self.robot_names = (
+            self.get_parameter("robot_names").get_parameter_value().string_array_value
+        )
         self.available_colors = (
             self.get_parameter("available_colors")
             .get_parameter_value()
@@ -50,7 +54,7 @@ class TfBroadcaster(Node):
             )
             _ = self.create_subscription(
                 String,
-                self.color_topic,
+                '/' + self.robot_names[0] + '/' + self.color_topic,
                 self._init_color_callback,
                 10,
             )
@@ -110,18 +114,19 @@ class TfBroadcaster(Node):
             .get_parameter_value()
             .string_value
         )
-        self.sub_update_position = self.create_subscription(
-            PositionMap,
-            update_position_topic,
-            self.broadcast_tf_from_update,
-            10,
-        )
-        self.sub_robot_data = self.create_subscription(
-            RobotData,
-            robot_data_topic,
-            self.broadcast_tf_from_robot_data,
-            10,
-        )
+        for name in self.robot_names:
+            self.sub_update_position = self.create_subscription(
+                PositionMap,
+                name + "/" + update_position_topic,
+                functools.partial(self.broadcast_tf_from_update, name=name),
+                10,
+            )
+            self.sub_robot_data = self.create_subscription(
+                RobotData,
+                name + "/" + robot_data_topic,
+                functools.partial(self.broadcast_tf_from_robot_data, name=name),
+                10,
+            )
 
     def _init_publishers(self):
         """Initialize publishers."""
@@ -196,7 +201,7 @@ class TfBroadcaster(Node):
 
             self.pub_visualization.publish(marker)
 
-    def broadcast_tf_from_update(self, msg):
+    def broadcast_tf_from_update(self, msg, name):
         """Link a frame to another."""
         if self.robot_data_rcv:
             return
@@ -205,7 +210,7 @@ class TfBroadcaster(Node):
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = "map"
-        t.child_frame_id = self.get_namespace() + "/laser_frame"
+        t.child_frame_id = name + "/laser_frame"
         t.transform.translation.x = msg.robot.x
         t.transform.translation.y = msg.robot.y
         t.transform.translation.z = 0.0
@@ -216,14 +221,14 @@ class TfBroadcaster(Node):
         t.transform.rotation.w = q[3]
         self.br.sendTransform(t)
 
-    def broadcast_tf_from_robot_data(self, msg):
+    def broadcast_tf_from_robot_data(self, msg, name):
         """Link a frame to another."""
         t = TransformStamped()
         if self.display_all:
             self._init_display()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = "map"
-        t.child_frame_id = self.get_namespace() + "/laser_frame"
+        t.child_frame_id = name + "/laser_frame"
         t.transform.translation.x = msg.x
         t.transform.translation.y = msg.y
         t.transform.translation.z = 0.0

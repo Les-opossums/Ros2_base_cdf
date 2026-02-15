@@ -1,0 +1,2 @@
+geometry_msgs/Point robot_position
+int32 camera_id

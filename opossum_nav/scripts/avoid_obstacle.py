@@ -151,9 +151,9 @@ class ObstacleAvoider(Node):
         )
 
     def reset_all_au(self, msg):
-        self.get_logger().info(f"I received a stop from AU")
+        # self.get_logger().info(f"I received a stop from AU")
         if msg.data:
-            self.get_logger().info(f"I received a stop from AU")
+            # self.get_logger().info(f"I received a stop from AU")
             self.enable_detection = False
             self.robot_data = None
             self.robot_position = None
