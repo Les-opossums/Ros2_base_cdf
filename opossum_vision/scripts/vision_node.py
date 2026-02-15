@@ -149,6 +149,19 @@ class VisionNode(Node):
             10
         )
 
+        color_topic = (
+            self.get_parameter("color_topic")
+            .get_parameter_value()
+            .string_value
+        )
+
+        self.color_sub = self.create_subscription(
+            String,
+            color_topic,
+            self.color_callback,
+            10
+        )
+
     def _init_cam(self, name):
         """Initialize serial connection with handshake."""
         # Note: timeout défini à 1s pour le handshake initial, 
@@ -294,6 +307,21 @@ class VisionNode(Node):
     def robot_data_callback(self, msg):
         # self.get_logger().info(f"Reçu des données sur {self.get_namespace()}")
         pass
+
+    def color_callback(self, msg):
+        # Write on serial the color received from the IHM
+        try:
+            color = msg.data
+            if color in ["blue", "yellow"]:
+                for name, card in self.cards.items():
+                    try:
+                        card["serial"].write((color + "\n").encode('utf-8'))
+                    except Exception as e:
+                        self.get_logger().error(f"Failed to send color to card '{name}': {e}")
+            else:
+                self.get_logger().warn(f"Received invalid color: {color}")
+        except Exception as e:
+            self.get_logger().error(f"Error in color_callback: {e}")
 
 def main(args=None):
     rclpy.init(args=args)

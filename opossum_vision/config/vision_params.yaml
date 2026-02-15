@@ -13,6 +13,7 @@ main_robot:
       cards_name: ["cam"]
       command_topic: command
       feedback_command_topic: feedback_command
+      color_topic: init_team_color
       frequency: 20.
       cards:
         cam:
@@ -34,6 +35,7 @@ second_robot:
       cards_name: ["cam"]
       command_topic: command
       feedback_command_topic: feedback_command
+      color_topic: init_team_color
       frequency: 20.
       cards:
         cam:
