@@ -113,7 +113,6 @@ class ActionManager(Node):
             30: [7, 2.9, 1.225, 1.57, 0.],
             31: [7, 2.9, 1.275, 1.57, 0.],
         }
-        self.position_crates = self.position_crates | {key + 5: [3 - val[0], val[1], 2 - val[2]] for key, val in self.position_crates.items()}
         self.available_crates = {i: True for i in range(len(list(self.position_crates.keys())))}
 
         self.dest_crates = {
@@ -456,11 +455,11 @@ class ActionManager(Node):
                 oldest_time = float('inf')
                 oldest_crate_id = None
 
-                for crate_id, crate_info in self.position_crates.items():
-                    if crate_info[0] == 0:  # Only consider crates that are not already matched
-                        if crate_info[4] < oldest_time:
-                            oldest_time = crate_info[4]
-                            oldest_crate_id = crate_id
+                # for crate_id, crate_info in self.position_crates.items():
+                #     if crate_info[0] == 0:  # Only consider crates that are not already matched
+                #         if crate_info[4] < oldest_time:
+                #             oldest_time = crate_info[4]
+                #             oldest_crate_id = crate_id
 
                 if oldest_crate_id is not None:
                     self.position_crates[oldest_crate_id][1] = self.x_tag  # Update X with tag detection

@@ -228,7 +228,7 @@ class VisionNode(Node):
         if len(splitted_data) < 1:
             return
         if (
-            splitted_data[0] == "ARUCO" and len(splitted_data) == 6
+            splitted_data[0] == "ARUCO" and len(splitted_data) == 9
         ):  # ARUCO id, x, y, z, theta, in_stack
             try:
                 p = VisionData()

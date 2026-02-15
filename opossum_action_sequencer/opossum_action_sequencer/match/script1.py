@@ -24,7 +24,7 @@ class Script():
         for _ in range(20):
             node.add_score(1)
             node.send_raw("VMAX 1.0")
-            node.move_to(Position(0.5, 1.75, 1.6))
+            node.move_to(Position(0.5, 1.5, 1.6))
             # node.pump(PUMP_struct(1, 1))
             # node.pump(PUMP_struct(2, 1))
             node.add_score(10)
@@ -32,7 +32,7 @@ class Script():
             node.sleep(2)
 
             node.send_raw("VMAX 1.0")
-            node.move_to(Position(0.5, 0.25, 1.6))
+            node.move_to(Position(0.5, 0.5, 1.6))
             # node.pump(PUMP_struct(1, 0))
             # node.pump(PUMP_struct(2, 1))
             node.add_score(10)
