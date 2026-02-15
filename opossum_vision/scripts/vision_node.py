@@ -316,6 +316,7 @@ class VisionNode(Node):
                 for name, card in self.cards.items():
                     try:
                         card["serial"].write(("COLOR " +color + "\n").encode('utf-8'))
+                        self.get_logger().info(f"Sent color '{color}' to card '{name}'")
                     except Exception as e:
                         self.get_logger().error(f"Failed to send color to card '{name}': {e}")
             else:
