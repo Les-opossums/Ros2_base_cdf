@@ -72,7 +72,7 @@ class ActionManager(Node):
         self.stop = False
 
         self.end_poses = {
-            0: [0.3, 1.8, 0],
+            0: [0.3, 1.8, 2],
         }
         self.end_poses = self.end_poses | {key + 1: [3 - val[0], val [1], 2 - val[2]] for key, val in self.end_poses.items()}
         self.available_end = {i: 0 for i in range(len(list(self.end_poses.keys())))}
