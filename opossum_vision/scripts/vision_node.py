@@ -293,7 +293,14 @@ class VisionNode(Node):
             try:
                 # Publish data in command
                 command_msg = String()
-                command_msg.data = data
+                cam_x = float(splitted_data[1])
+                cam_y = float(splitted_data[2])
+                cam_theta = float(splitted_data[3])
+                cam_delay = float(splitted_data[4])
+                cam_bruit_x = float(splitted_data[5])
+                cam_bruit_y = float(splitted_data[6])
+                cam_bruit_theta = float(splitted_data[7])
+                command_msg.data = f"SETCAMERA1 {cam_x} {cam_y} {cam_theta} {cam_delay} {cam_bruit_x} {cam_bruit_y} {cam_bruit_theta}"
                 self.pub_command.publish(command_msg)
 
             except Exception as e:
