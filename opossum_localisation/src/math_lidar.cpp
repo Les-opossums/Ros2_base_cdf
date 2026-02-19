@@ -146,11 +146,13 @@ Eigen::Vector3d _find_position_opti(
     }
 
     // Résolution des équations normales : (AᵀA)X = AᵀB
-    Eigen::MatrixXd AtA = A.transpose() * A;
-    if (std::abs(AtA.determinant()) < 1e-6) {
+    // Résolution directe par décomposition QR avec pivotage colonnaire
+    Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(A);
+    if (qr.rank() < 4) {
         return -Eigen::Vector3d::Ones();
     }
-    Eigen::Vector4d X = AtA.ldlt().solve(A.transpose() * B);
+    // Résolution de AX = B de manière numériquement stable
+    Eigen::Vector4d X = qr.solve(B);
 
     // Calcul de theta1 selon la logique du code Python
     double theta1 = 0.0;

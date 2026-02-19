@@ -23,7 +23,7 @@ main_robot:
       inverted: false
       angle_compensate: true
       scan_mode: Sensitivity
-      angle_correction: 0.
+      angle_correction: 0.08
       max_distance_soft: 3.8
 
   obstacle_extractor_node:
