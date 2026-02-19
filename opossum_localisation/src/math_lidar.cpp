@@ -244,36 +244,32 @@ double find_angle(
     const std::array<std::optional<Eigen::Vector2d>, 4>& beacons,
     const std::array<Eigen::Vector2d, 4>& fixed_beacons)
 {
-    std::vector<double> angle_tot;
-    std::vector<double> min_lists;
+    double sum_sin = 0.0;
+    double sum_cos = 0.0;
+    int count = 0;
 
-    // Parcours des 4 beacons
     for (size_t i = 0; i < 4; ++i) {
         if (beacons[i].has_value()) {
-            // v1 correspond aux coordonnées du beacon mesuré (déjà en 2D)
-            Eigen::Vector2d v1 = beacons[i].value();
-            // v2 est le vecteur allant du point pos aux coordonnées fixes du beacon
-            Eigen::Vector2d v2 = fixed_beacons[i] - pos;
+            Eigen::Vector2d v_mesure = beacons[i].value(); // Mesure Lidar (repère robot)
+            Eigen::Vector2d v_monde = fixed_beacons[i] - pos; // Vecteur cible (repère monde)
+            
+            // L'angle du robot est la différence entre l'angle absolu (monde) et l'angle relatif (lidar)
+            double angle_mesure = std::atan2(v_mesure.y(), v_mesure.x());
+            double angle_monde = std::atan2(v_monde.y(), v_monde.x());
+            double theta = angle_monde - angle_mesure;
 
-            // Appel à angle_between qui renvoie {angle, min_test}
-            auto [angle_temp_1, min_test] = angle_between(v1, v2);
-            angle_tot.push_back(angle_temp_1);
-            min_lists.push_back(min_test);
+            // Somme vectorielle pour la moyenne circulaire
+            sum_sin += std::sin(theta);
+            sum_cos += std::cos(theta);
+            count++;
         }
     }
-
-    // On sélectionne l'indice du beacon dont la valeur min_test est la plus petite
-    size_t best_index = 0;
-    double best_min = min_lists[0];
-    for (size_t i = 1; i < min_lists.size(); ++i) {
-        if (min_lists[i] < best_min) {
-            best_index = i;
-            best_min = min_lists[i];
-        }
-    }
-
-    return angle_tot[best_index];
+    if (count == 0) return 0.0;
+    
+    // std::atan2 gère parfaitement la normalisation et les quadrants
+    return std::atan2(sum_sin / count, sum_cos / count); 
 }
+
 
 std::vector<std::pair<Eigen::Vector3d, double>> find_position(
     const std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>& beacons_list,
