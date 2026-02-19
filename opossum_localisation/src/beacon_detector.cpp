@@ -157,9 +157,12 @@ void BeaconDetectorNode::object_callback(const obstacle_detector::msg::Obstacles
     std::vector<Eigen::Vector2d> new_objects_detected;
     for (std::size_t i = 0; i < msg->circles.size(); i++)
     {
-        if (pow(msg->circles[i].center.x, 2) + pow(msg->circles[i].center.y, 2) < 13.5)
+        double cx = msg->circles[i].center.x;
+        double cy = msg->circles[i].center.y;
+        
+        if ((cx * cx + cy * cy) < 13.5)
         {
-            new_objects_detected.push_back({msg->circles[i].center.x, msg->circles[i].center.y});
+            new_objects_detected.push_back({cx, cy});
         }
     }
     std::pair<int, std::vector<std::array<std::optional<Eigen::Vector2d>, 4>>> beacons_result;

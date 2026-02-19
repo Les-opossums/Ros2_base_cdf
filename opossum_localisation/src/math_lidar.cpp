@@ -53,27 +53,30 @@ bool angle_in_range(double alpha, double low, double up) {
 }
 
 Eigen::Vector3d convert_world_to_robot(const Eigen::Vector2d& pt, const Eigen::Vector3d& robot_frame) {
+    // Translation
+    double dx = pt.x() - robot_frame.x();
+    double dy = pt.y() - robot_frame.y();
+    
+    // Rotation inverse
     double cos_angle = std::cos(robot_frame.z());
     double sin_angle = std::sin(robot_frame.z());
 
-    Eigen::Matrix3d OtoR;
-    OtoR << cos_angle, -sin_angle, robot_frame.x(),
-            sin_angle, cos_angle, robot_frame.y(),
-            0, 0, 1;
-
-    return OtoR.inverse() * Eigen::Vector3d(pt.x(), pt.y(), 1);
+    return Eigen::Vector3d(
+        dx * cos_angle + dy * sin_angle,
+        -dx * sin_angle + dy * cos_angle,
+        1.0
+    );
 }
 
 Eigen::Vector3d convert_robot_to_world(const Eigen::Vector2d& pt, const Eigen::Vector3d& robot_frame) {
     double cos_angle = std::cos(robot_frame.z());
     double sin_angle = std::sin(robot_frame.z());
 
-    Eigen::Matrix3d OtoR;
-    OtoR << cos_angle, -sin_angle, robot_frame.x(),
-            sin_angle, cos_angle, robot_frame.y(),
-            0, 0, 1;
-
-    return OtoR * Eigen::Vector3d(pt.x(), pt.y(), 1);
+    return Eigen::Vector3d(
+        pt.x() * cos_angle - pt.y() * sin_angle + robot_frame.x(),
+        pt.x() * sin_angle + pt.y() * cos_angle + robot_frame.y(),
+        1.0
+    );
 }
 
 double _compute_error(const std::array<std::optional<Eigen::Vector2d>, 4>& beacons,
@@ -251,8 +254,13 @@ double find_angle(
     }
     if (count == 0) return 0.0;
     
-    // std::atan2 gère parfaitement la normalisation et les quadrants
-    return std::atan2(sum_sin / count, sum_cos / count); 
+    // atan2 extrait l'angle moyen proprement, sans saut à 360/0°
+    double final_angle = std::atan2(sum_sin / count, sum_cos / count);
+    
+    // Remise à l'échelle si tu travailles en [0, 2π)
+    if (final_angle < 0) final_angle += 2 * M_PI;
+    
+    return final_angle;
 }
 
 
