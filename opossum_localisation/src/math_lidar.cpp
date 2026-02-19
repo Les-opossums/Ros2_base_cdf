@@ -154,30 +154,13 @@ Eigen::Vector3d _find_position_opti(
     // Résolution de AX = B de manière numériquement stable
     Eigen::Vector4d X = qr.solve(B);
 
-    // Calcul de theta1 selon la logique du code Python
-    double theta1 = 0.0;
-    if (std::abs(X(2)) < 1) {
-        if (X(3) > 0)
-            theta1 = std::acos(X(2));
-        else
-            theta1 = -std::acos(X(2));
-    }
-    else if (std::abs(X(3)) < 1) {
-        if (X(2) < 0)
-            theta1 = M_PI - std::asin(X(3));
-        else
-            theta1 = std::asin(X(3));
-    }
-    else {
-        if (X(2) < -1)
-            theta1 = M_PI - std::atan(X(3) / X(2));
-        else
-            theta1 = std::atan(X(3) / X(2));
-    }
+    // Calcul de theta1 de manière robuste (atan2 gère les signes et les quadrants)
+    double theta1 = std::atan2(X(3), X(2));
+    
     // Mise à l'échelle de theta1 dans l'intervalle [0, 2π)
-    theta1 = std::fmod(theta1, 2 * M_PI);
-    if (theta1 < 0)
+    if (theta1 < 0) {
         theta1 += 2 * M_PI;
+    }
 
     return Eigen::Vector3d(X(0), X(1), theta1);
 }
