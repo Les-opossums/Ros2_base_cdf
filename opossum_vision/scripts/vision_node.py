@@ -35,6 +35,7 @@ class VisionNode(Node):
                 ("robot_data_topic", rclpy.Parameter.Type.STRING),
                 ("goal_position_topic", rclpy.Parameter.Type.STRING),
                 ("frequency", rclpy.Parameter.Type.DOUBLE),
+                ("color_topic", rclpy.Parameter.Type.STRING),
             ],
         )
         self._init_parameters()
