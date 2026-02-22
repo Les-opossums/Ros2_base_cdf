@@ -57,7 +57,8 @@ class PositionSender(Node):
         self.modified_objects = []
 
         data = yaml.safe_load(open(objects_path, "r"))
-        act_angle = 4.17
+        # act_angle = 4.17
+        act_angle = 0.0
         # Get the poition of the pumps on the robot
         actuators_types = data['actuators']
         self.actuators_actions = data['actuators_type']
@@ -65,6 +66,7 @@ class PositionSender(Node):
         self.actuators = {name: {} for name in self.robot_names}
         cos_a = np.cos(act_angle)
         sin_a = np.sin(act_angle)
+        nb_objects = 0
         for k, v in actuators_types.items():
             act = Actuators()
             act.name = v['name']
@@ -74,13 +76,15 @@ class PositionSender(Node):
             act.size = v['size']
             act.theta = v['t'] + act_angle
             act.state = 'free'
+            act.state_int = 0
             for name in self.robot_names:
+                act.id = nb_objects
                 self.actuators[name][int(k)] = deepcopy(act)
+                nb_objects += 1
 
         # Access first stack item
         element_types = data['stacks']
         self.objects = {}
-        nb_objects = 0
         # Iterate over all map objects
         for obj in data['map'].values():
             cos_ = np.cos(obj['t'])
@@ -113,6 +117,7 @@ class PositionSender(Node):
         self.current_pos = {name: Point() for name in self.robot_names}
         self.current_state = {name: [0, 1] for name in self.robot_names}
         self.inv_colors = {"blue": "yellow", "yellow": "blue", "rot": "rot"}
+
     def _init_publishers(self) -> None:
         """Initialize publishers of the node."""
         self.update_position_topic = (
@@ -155,6 +160,7 @@ class PositionSender(Node):
         result = decode_state(msg.data, len(self.actuators[name]))
         for k in self.actuators[name].keys():
             act = self.actuators[name][k]
+            act.state_int = result[k]
             # 0: free, 1: picking, 2: dropping, 3: reverting
             if result[k] in (0, 2, 3) and act.state != 'free':
                 if act.state != 'running':
@@ -215,11 +221,11 @@ class PositionSender(Node):
         x_ = act.x * cos - act.y * sin + msg.x
         y_ = act.x * sin + act.y * cos + msg.y
         theta_ = act.theta + msg.z
-        tol = 0.1
+        tol = 0.4
         if act.state == 'running':
             for obj in self.objects.values():
                 in_tol = abs((obj.theta - theta_) % np.pi) < tol
-                if obj.state.split("*")[0] == 'free' and obj.type in self.actuators_actions[act.type]["take"]: # and in_tol:
+                if obj.state.split("*")[0] == 'free' and obj.type in self.actuators_actions[act.type]["take"] and in_tol:
                     if (obj.x - x_) ** 2 + (obj.y - y_) ** 2 < act.size ** 2:
                         act.state = str(obj.id)
                         obj.state = f"{name}-{act.name}" + "*" + self.objects[obj.id].state.split("*")[-1]
@@ -232,7 +238,8 @@ class PositionSender(Node):
             obj_taken.x = x_
             obj_taken.y = y_
             obj_taken.theta += msg.z - old_theta
-            self.modified_objects.append(obj_taken.id)       
+            self.modified_objects.append(obj_taken.id)    
+               
 
     def _publish_general_map(self):
         """Publish the postion to every captor who needs information."""
@@ -253,6 +260,23 @@ class PositionSender(Node):
             msg_global.robots.append(robot)
         while len(self.modified_objects) > 0:
             msg_global.objects.append(self.objects[self.modified_objects.pop()])
+        mapping_st = {0: "free", 1: "pick", 2: "drop", 3: "revdrop"}
+        for name in self.robot_names:
+            cpos = self.current_pos[name]
+            cos_ = np.cos(cpos.z)
+            sin_ = np.sin(cpos.z)
+            for val in self.actuators[name].values():
+                x_ = val.x * cos_ - val.y * sin_ + cpos.x
+                y_ = val.x * sin_ + val.y * cos_ + cpos.y
+                theta_ = val.theta + cpos.z
+                obj = Objects()
+                obj.id = val.id
+                obj.state = "a*" + mapping_st[val.state_int]
+                obj.x = x_
+                obj.y = y_
+                obj.theta = theta_
+                obj.type = val.type
+                msg_global.objects.append(obj)
         self.pub_global_view.publish(msg_global)
 
     def _reset_global_objects(self, request, response):

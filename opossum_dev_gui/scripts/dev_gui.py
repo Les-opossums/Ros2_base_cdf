@@ -555,6 +555,11 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
             "haz_crate*yellow": (0.05, 0.15),
             "haz_crate*rot": (0.05, 0.15),
             "cursor": (0.1, 0.045),
+            "vaccum_gripper*free": (0.03, 0.01),
+            "vaccum_gripper*pick": (0.03, 0.01),
+            "vaccum_gripper*drop": (0.03, 0.01),
+            "vaccum_gripper*revdrop": (0.03, 0.01),
+            
         } | {name: (0.35, 0.35) for name in self.robot_names}
 
         self.scene = QtWidgets.QGraphicsScene(self)
@@ -600,6 +605,7 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
         to_update = []
         for elem in msg.objects:
             log = get_logger("LOGPIX")
+            # log.info(f"elem: {elem}")
             key = f"{elem.type}-{elem.id}"
             if key not in self.icons:
                 item = QtWidgets.QGraphicsPixmapItem()
@@ -638,7 +644,7 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
             self._scale_and_center_item(self.icons[id]["item"], self.icons[id]["type"], scale, self.icons[id]["state"])
             
     def _scale_and_center_item(self, item, elem_type, scale, state):
-        if elem_type == "haz_crate":
+        if elem_type in ("haz_crate", "vaccum_gripper"):
             mod_elem_type = elem_type + "*" + state.split("*")[-1]
         else:
             mod_elem_type = elem_type
