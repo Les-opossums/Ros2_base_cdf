@@ -115,11 +115,10 @@ class ZynqSimulation(Node):
             self.process_action(name, {})
 
         elif msg_type not in self.msgs_yaml:
-            pass
             # self.get_logger().info(
-            #     f"The message type {msg_type} does not exist in the YAML file format_msgs."
+            #     f"WARNING The message type {msg_type} does not exist in the YAML file format_msgs."
             # )
-
+            pass
         else:
             name_type = [
                 nt for nt in self.type_names if nt in self.msgs_yaml[msg_type].keys()

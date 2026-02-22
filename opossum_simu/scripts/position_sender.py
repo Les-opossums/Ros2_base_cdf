@@ -102,7 +102,7 @@ class PositionSender(Node):
                 elem.id = nb_objects
                 elem.state = "free"
                 if obj['type'] in ("full_haz_stack_crates", "half_haz_stack_crates"):
-                    elem.state += "_" + order[ind]
+                    elem.state += "*" + order[ind]
                 elem.type = element['type']
                 elem.x = x
                 elem.y = y
@@ -153,18 +153,17 @@ class PositionSender(Node):
 
     def _update_state(self, msg, name):
         result = decode_state(msg.data, len(self.actuators[name]))
-        print(result)
         for k in self.actuators[name].keys():
             act = self.actuators[name][k]
             # 0: free, 1: picking, 2: dropping, 3: reverting
             if result[k] in (0, 2, 3) and act.state != 'free':
-                print(f"Updating state of {name} actuator {act.name} from {act.state} to free, with result {result[k]}")
                 if act.state != 'running':
                     # The state of an object is "free_color" or "free_rot" (rot is eq to a spcific color, black, because rotten objects are not grabbable), we want to keep the color information when the object is released
                     if result[k] == 2: # dropping, so we need to update the color of the object to the one of the robot
-                        self.objects[int(act.state)].state = 'free' + "_" + self.objects[int(act.state)].state.split("_")[1]
+                        self.objects[int(act.state)].state = 'free' + "*" + self.objects[int(act.state)].state.split("*")[-1]
                     elif result[k] == 3: # picking, so we need to update the color of the object to the inverse of the one of the robot
-                        self.objects[int(act.state)].state = 'free' + "_" + self.inv_colors[self.objects[int(act.state)].state.split("_")[1]]
+                        self.objects[int(act.state)].state = 'free' + "*" + self.inv_colors[self.objects[int(act.state)].state.split("*")[-1]]
+                    self.modified_objects.append(int(act.state))
                 act.state = 'free'
             elif result[k] == 1 and act.state == 'free':
                 act.state = 'running'
@@ -220,10 +219,10 @@ class PositionSender(Node):
         if act.state == 'running':
             for obj in self.objects.values():
                 in_tol = abs((obj.theta - theta_) % np.pi) < tol
-                if obj.state.split("_")[0] == 'free' and obj.type in self.actuators_actions[act.type]["take"]: # and in_tol:
+                if obj.state.split("*")[0] == 'free' and obj.type in self.actuators_actions[act.type]["take"]: # and in_tol:
                     if (obj.x - x_) ** 2 + (obj.y - y_) ** 2 < act.size ** 2:
                         act.state = str(obj.id)
-                        obj.state = f"{name}-{act.name}" + "_" + self.objects[obj.id].state.split("_")[1]
+                        obj.state = f"{name}-{act.name}" + "*" + self.objects[obj.id].state.split("*")[-1]
                         # obj.x = x_
                         # obj.y = y_
                         self.modified_objects.append(obj.id)
