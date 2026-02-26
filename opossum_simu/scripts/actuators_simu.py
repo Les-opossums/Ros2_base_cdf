@@ -92,7 +92,6 @@ class ActuatorsSimu(Node):
             if side == 2:
                 self.states[f"VACCUMGRIPPER{id * 2}"] = mode
                 self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = mode
-                self.get_logger().info(f' STATE {self.states[f"VACCUMGRIPPER{id * 2}"]}')
             else:
                 self.states[f"VACCUMGRIPPER{id * 2 + side}"] = mode
             response.response = request_split[0] + "," + request_split[1] + "," + request_split[2]

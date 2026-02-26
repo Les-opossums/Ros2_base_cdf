@@ -971,7 +971,6 @@ class ActionManager(Node):
         self.sleep(0.1)
 
     def drop_crates(self, destination, default_angle):
-        self.get_logger().info(f"Dropping crates: {destination[2]}")
         push_dst = 0.1
         self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
         self.wait_for_motion()

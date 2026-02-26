@@ -604,8 +604,6 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
         
         to_update = []
         for elem in msg.objects:
-            log = get_logger("LOGPIX")
-            # log.info(f"elem: {elem}")
             key = f"{elem.type}-{elem.id}"
             if key not in self.icons:
                 item = QtWidgets.QGraphicsPixmapItem()
@@ -613,14 +611,9 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
                 self.scene.addItem(item)
                 to_update.append(key)
             if elem.state != self.icons[key]["state"]:
-                log.info(f"new: {elem.state}, old: {self.icons[key]['state']}")
                 self.icons[key]["state"] = elem.state
                 to_update.append(key)
             item = self.icons[key]["item"]
-            # should_be_visible = elem.state == "free"
-            # if item.isVisible() != should_be_visible:
-            #     item.setVisible(should_be_visible)  # Update visibility only if it changes
-            # if should_be_visible:
             if True:
                 posx = width * elem.x / map_w
                 posy = height * (1 - elem.y / map_h)
