@@ -455,6 +455,7 @@ class ActionManager(Node):
 
     def center_front_stack(self):
         if self.barycentre is not None:
+            self.try_center = 0
             self.get_logger().info(f"Barycentre: {self.barycentre}")
             self.relative_move_to(Position(self.barycentre[0], self.barycentre[1], 3.14159 - self.robot_pos.t))
             self.wait_for_motion()
@@ -463,15 +464,12 @@ class ActionManager(Node):
             self.begin_centering()
             time.sleep(1.0)
             if self.barycentre is not None:
-                if abs(self.barycentre[0]- 0.22) < 0.005 and abs(self.barycentre[1]) < 0.005:
-                    self.is_center = True
-                else:
+                while abs(self.barycentre[0]- 0.22) > 0.005 or abs(self.barycentre[1]) > 0.005 and self.try_center < 4:
                     self.get_logger().info(f"Barycentre: {self.barycentre}")
                     self.relative_move_to(Position(self.barycentre[0], self.barycentre[1], 3.14159 - self.robot_pos.t))
                     self.wait_for_motion()
-                    self.centering = False
-                    self.list_objects = []
-                    self.barycentre = None
+                    self.try_center += 1
+                    time.sleep(0.25)
 
     def timer_match_callback(self):
         """Timer callback for match time."""
