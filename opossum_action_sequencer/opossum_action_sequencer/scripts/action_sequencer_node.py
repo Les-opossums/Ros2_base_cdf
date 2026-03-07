@@ -53,6 +53,7 @@ class ActionManager(Node):
         self.y_tag = None
 
         self.new_pos = 0
+        self.pos_obj = None
 
         # Action Done
         self.is_robot_moving = False
@@ -64,8 +65,6 @@ class ActionManager(Node):
         self.color = None
 
         # Process
-        self.pos_obj = None
-
         self.motion_done_event = Event()
         self.motion_done_event.set()
 
@@ -114,43 +113,15 @@ class ActionManager(Node):
             30: [2.9, 1.225, 0],
             31: [2.9, 1.275, 0],
         }
-
-        # self.position_crates = {
-        #     0: [0, 0.1, 0.325, 1.57, 0.],
-        #     1: [0, 0.1, 0.375, 1.57, 0.],
-        #     2: [0, 0.1, 0.425, 1.57, 0.],
-        #     3: [0, 0.1, 0.475, 1.57, 0.],
-        #     4: [1, 0.1, 1.125, 1.57, 0.],
-        #     5: [1, 0.1, 1.175, 1.57, 0.],
-        #     6: [1, 0.1, 1.225, 1.57, 0.],
-        #     7: [1, 0.1, 1.275, 1.57, 0.],
-        #     8: [2, 1.025, 0.1, 0.0, 0.],
-        #     9: [2, 1.075, 0.1, 0.0, 0.],
-        #     10: [2, 1.125, 0.1, 0.0, 0.],
-        #     11: [2, 1.175, 0.1, 0.0, 0.],
-        #     12: [3, 1.825, 0.1, 0.0, 0.],
-        #     13: [3, 1.875, 0.1, 0.0, 0.],
-        #     14: [3, 1.925, 0.1, 0.0, 0.],
-        #     15: [3, 1.975, 0.1, 0.0, 0.],
-        #     16: [4, 1.075, 0.8, 0.0, 0.],
-        #     17: [4, 1.125, 0.8, 0.0, 0.],
-        #     18: [4, 1.175, 0.8, 0.0, 0.],
-        #     19: [4, 1.225, 0.8, 0.0, 0.],
-        #     20: [5, 1.775, 0.8, 0.0, 0.],
-        #     21: [5, 1.825, 0.8, 0.0, 0.],
-        #     22: [5, 1.875, 0.8, 0.0, 0.],
-        #     23: [5, 1.925, 0.8, 0.0, 0.],
-        #     24: [6, 2.9, 0.325, 1.57, 0.],
-        #     25: [6, 2.9, 0.375, 1.57, 0.],
-        #     26: [6, 2.9, 0.425, 1.57, 0.],
-        #     27: [6, 2.9, 0.475, 1.57, 0.],
-        #     28: [7, 2.9, 1.125, 1.57, 0.],
-        #     29: [7, 2.9, 1.175, 1.57, 0.],
-        #     30: [7, 2.9, 1.225, 1.57, 0.],
-        #     31: [7, 2.9, 1.275, 1.57, 0.],
-        # }
         self.available_crates = {i: True for i in range(len(list(self.position_crates.keys())))}
         self.dest_crates = {i : [0, 1] for i in range(len(self.position_crates.keys()))}
+
+        # Process objects with cam
+        self.barycentre = None
+        self.centering = False
+        self.list_objects = []
+        self.is_center = False
+        self.try_center = 0
 
     def _init_parameters(self) -> None:
         """Initialize the parameters of the node."""
@@ -466,18 +437,41 @@ class ActionManager(Node):
                     self.position_crates[oldest_crate_id][1] = self.x_tag  # Update X with tag detection
                     self.position_crates[oldest_crate_id][2] = self.y_tag  # Update Y with tag detection
                     self.position_crates[oldest_crate_id][3] = msg.theta  # Update Theta with tag detection
-                    self.position_crates[oldest_crate_id][4] = time.time() - self.match_time  # Update the time of detection from timer_match    
-            
-            # --- Section Logging ---
-            home_dir = os.path.expanduser('~')
-            log_filename = os.path.join(home_dir, "position_crates_log.json")
-            try:
-                with open(log_filename, 'w') as f:
-                    # indent=4 rend le fichier facile à lire pour un humain
-                    json.dump(self.position_crates, f, indent=4)
+                    self.position_crates[oldest_crate_id][4] = time.time() - self.match_time  # Update the time of detection from timer_match
 
-            except Exception as e:
-                self.get_logger().error(f"Erreur lors de l'écriture du log : {e}")
+        if self.centering == True:
+            object_x = msg.x
+            object_y = msg.y
+            # verify that the object is not in the list and add it if not
+            if not any(np.sqrt((obj[0] - object_x) ** 2 + (obj[1] - object_y) ** 2) < 0.025 for obj in self.list_objects):
+                self.list_objects.append((object_x, object_y))
+            if len(self.list_objects) == 4: # If we have detected 4 objects, we can compute the barycenter
+                self.barycentre = (sum(obj[0] for obj in self.list_objects) / 4, sum(obj[1] for obj in self.list_objects) / 4)
+
+    def begin_centering(self):
+        self.centering = True
+        self.list_objects = []
+        self.barycentre = None
+
+    def center_front_stack(self):
+        if self.barycentre is not None:
+            self.get_logger().info(f"Barycentre: {self.barycentre}")
+            self.relative_move_to(Position(self.barycentre[0], self.barycentre[1], 3.14159 - self.robot_pos.t))
+            self.wait_for_motion()
+
+            time.sleep(0.25)
+            self.begin_centering()
+            time.sleep(1.0)
+            if self.barycentre is not None:
+                if abs(self.barycentre[0]- 0.22) < 0.005 and abs(self.barycentre[1]) < 0.005:
+                    self.is_center = True
+                else:
+                    self.get_logger().info(f"Barycentre: {self.barycentre}")
+                    self.relative_move_to(Position(self.barycentre[0], self.barycentre[1], 3.14159 - self.robot_pos.t))
+                    self.wait_for_motion()
+                    self.centering = False
+                    self.list_objects = []
+                    self.barycentre = None
 
     def timer_match_callback(self):
         """Timer callback for match time."""
@@ -623,22 +617,39 @@ class ActionManager(Node):
     #                 time.sleep(0.1)
 
     def relative_move_to(self, delta: Position, seuil=0.1):
-        """Compute the relative move_to action."""
+        """Compute the relative move_to action with frame transformation (Robot -> Board)."""
         if not self.stop:
             self.timer = None
             self.seuil = seuil
+            
+            # 1. Récupération de l'angle actuel du robot (en radians)
+            theta = self.robot_pos.t
+            
+            # 2. Rotation du vecteur delta (repère robot) vers le repère plateau
+            # On projette le déplacement relatif selon l'orientation actuelle
+            delta_x_plateau = (delta.x - 0.22) * np.cos(theta) - delta.y * np.sin(theta)
+            delta_y_plateau = (delta.x - 0.22) * np.sin(theta) + delta.y * np.cos(theta)
+            
+            # 3. Calcul de la position cible finale dans le repère plateau
             pos = Position(
-                x=self.robot_pos.x + delta.x,
-                y=self.robot_pos.y + delta.y,
-                t=self.robot_pos.t + delta.t
+                x = self.robot_pos.x + delta_x_plateau,
+                y = self.robot_pos.y + delta_y_plateau,
+                t = self.robot_pos.t + delta.t  # L'angle reste une simple addition
             )
+            
             self.motion_done = False
             self.is_robot_moving = True
             self.is_robot_arrived = False
+            
+            # Petit temps de pause pour laisser le système respirer si nécessaire
             time.sleep(0.1)
+            
+            # Envoi de la commande
             self.pub_command.publish(String(data=f"MOVE {pos.x} {pos.y} {pos.t}"))
-            self.pos_obj = Position(x=pos.x, y=pos.y, t=pos.t)
-            self.motion_done_event.clear()  # Block the wait
+            
+            # Mise à jour de l'objectif
+            self.pos_obj = pos
+            self.motion_done_event.clear()
 
     def update_arrival_status(self):
         if not self.stop and self.pos_obj is not None:
