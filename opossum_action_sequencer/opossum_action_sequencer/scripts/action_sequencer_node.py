@@ -699,7 +699,7 @@ class ActionManager(Node):
     def vaccumgripper(self, vg: VACCUMGRIPPER_struct):
         """Compute the pump action."""
         if not self.stop:
-            self.pub_command.publish(String(data=f"VACCUMGRIPPER {vg.id} {vg.mode} {vg.side}"))
+            self.pub_command.publish(String(data=f"PINCE {vg.id} {vg.mode} {vg.side}"))
             time.sleep(0.1)
 
     def led(self, led: LED_struct):

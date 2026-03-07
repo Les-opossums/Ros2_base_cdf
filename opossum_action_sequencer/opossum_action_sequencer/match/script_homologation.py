@@ -17,28 +17,29 @@ class Script:
 
     def run(self, node):
         node.write_log("Script PD is running...")
-        node.end_zone = Position(1., 1.0, 0.0)
+        node.end_zone = Position(0.5, 1.0, 0.0)
 
-        node.send_raw("VMAX 0.5")
-        node.move_to(Position(1., 1., 3.14))
+        node.send_raw("VMAX 0.3")
+        node.move_to(Position(0.5, 1., 3.14))
         node.wait_for_motion()
         node.sleep(0.5)
 
-        node.move_to(Position(0.9, 1., 3.14))
+        node.move_to(Position(0.42, 1., 3.14))
         node.wait_for_motion()
         node.sleep(0.5)
 
         node.vaccumgripper(VACCUMGRIPPER_struct(0, 1, 2))
+        node.sleep(5)
         node.vaccumgripper(VACCUMGRIPPER_struct(1, 1, 2))
-        node.sleep(2)
+        node.sleep(5)
 
         node.move_to(Position(0.5, 0.5, 0.))
         node.wait_for_motion()
         node.sleep(0.5)
 
         node.vaccumgripper(VACCUMGRIPPER_struct(0, 2, 2))
+        node.sleep(0.5)
         node.vaccumgripper(VACCUMGRIPPER_struct(1, 3, 2))
-        node.sleep(2)
 
 
 
