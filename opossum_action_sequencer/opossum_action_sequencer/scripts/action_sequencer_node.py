@@ -64,6 +64,8 @@ class ActionManager(Node):
         self.color = None
 
         # Process
+        self.pos_obj = None
+
         self.motion_done_event = Event()
         self.motion_done_event.set()
 
@@ -418,29 +420,13 @@ class ActionManager(Node):
         if not self.motion_done:
             # Update motion state
             self.update_arrival_status()
-            self.update_motion_status()
+            is_stopped = abs(self.robot_speed.x) < 0.02 and abs(self.robot_speed.t) < 0.02
 
-            if self.is_robot_arrived and not self.is_robot_moving:
+            # Si on est proche de la cible ET à l'arrêt, on débloque le script.
+            if self.is_robot_arrived and is_stopped:
+                self.get_logger().info("Arrivée confirmée par calcul (Timeout logiciel)")
                 self.motion_done = True
-                # self.motion_done_event.set()
-
-            elif not self.is_robot_arrived and not self.is_robot_moving:
-                if self.timer_move is None:
-                    self.timer_move = time.time()
-
-                delta_time = time.time() - self.timer_move
-                if delta_time > 2.0:
-                    self.get_logger().warn(
-                        "Motion timed out."
-                    )
-                    self.move_to(Position(self.pos_obj.x,
-                                          self.pos_obj.y,
-                                          self.pos_obj.t)
-                                 )
-                    self.timer_move = None
-            
-            else :
-                pass 
+                self.motion_done_event.set() # C'est ça qui débloque wait_for_motion
 
     def aruco_callback(self, msg: VisionData):
         if self.robot_pos is not None:
@@ -655,46 +641,22 @@ class ActionManager(Node):
             self.motion_done_event.clear()  # Block the wait
 
     def update_arrival_status(self):
-        if not self.stop:
-            time.sleep(0.1)
-            delta_x = abs(self.pos_obj.x - self.robot_pos.x)
-            delta_y = abs(self.pos_obj.y - self.robot_pos.y)
-            delta_t = abs(self.pos_obj.t - self.robot_pos.t)
-            if delta_x < 0.5 and delta_y < 0.5 and delta_t < 0.5:
+        if not self.stop and self.pos_obj is not None:
+            dist = np.sqrt((self.pos_obj.x - self.robot_pos.x)**2 + 
+                           (self.pos_obj.y - self.robot_pos.y)**2)
+
+            # Seuil de 2cm (0.02) et environ 3 degrés (0.05 rad)
+            if dist < 0.02 and abs(self.pos_obj.t - self.robot_pos.t) < 0.05:
                 self.is_robot_arrived = True
+            else:
+                self.is_robot_arrived = False
 
-    def update_motion_status(self):
-        if not self.stop:
-            time.sleep(0.1)
-            if not self.is_robot_moving and not self.motion_done:
-                if abs(self.robot_speed.x) < 0.0001 and abs(self.robot_speed.t) < 0.0001:
-                    self.is_robot_moving = False
-
-    def wait_for_motion(self):
+    def wait_for_motion(self, timeout=10):
         """Compute the wait_for_motion action."""
         if not self.stop:
-            self.motion_done_event.wait()
-            time.sleep(0.2)
+            self.motion_done_event.wait(timeout=timeout) 
+            time.sleep(0.1)
             self.motion_done = True
-
-    def servo(self, servo: SERVO_struct):
-        """Compute the servo action."""
-        if not self.stop:
-            self.pub_command.publish(String(data=f"SERVO {servo.servo_id} "
-                                                 f"{servo.angle}"
-                                            )
-                                     )
-
-            time.sleep(0.1)
-
-    def pump(self, pump: PUMP_struct):
-        """Compute the pump action."""
-        if not self.stop:
-            self.pub_command.publish(String(data=f"PUMP {pump.pump_id} "
-                                                 f"{pump.enable}"
-                                            )
-                                     )
-            time.sleep(0.1)
 
     def vaccumgripper(self, vg: VACCUMGRIPPER_struct):
         """Compute the pump action."""
@@ -707,21 +669,6 @@ class ActionManager(Node):
         self.pub_command.publish(String(data=f"LED {led.red} "
                                              f"{led.green} {led.blue}")
                                  )
-
-    def stepper(self, stepper: STEPPER_struct):
-        """Compute the stepper action."""
-        if not self.stop:
-            self.pub_command.publish(
-                String(data=f"STEPPER1  {stepper.mode}")
-            )
-            time.sleep(0.1)
-
-    def valve(self, valve: VALVE_struct):
-        """Compute the valve action."""
-        if not self.stop:
-            self.pub_command.publish(String(data=f"VALVE {valve.valve_id} 1"))
-
-            time.sleep(0.1)
 
     def write_log(self, message):
         """Write logs."""
