@@ -83,10 +83,17 @@ class ActuatorsSimu(Node):
         """Answer to the request."""
         request_split = request.data.split(",")
         if request_split[0] == "PUMP":
-            self.states[f"PUMP{request_split[1]}"] = bool(int(request_split[2]))
+            self.states[f"PUMP{request_split[1]}"] = int(request_split[2])
             response.response = request_split[0] + "," + request_split[1] + "," + request_split[2]
         if request_split[0] == "VACCUMGRIPPER":
-            self.states[f"VACCUMGRIPPER{request_split[1]}"] = bool(int(request_split[2]))
+            id = int(request_split[1])
+            mode = int(request_split[2])
+            side = int(request_split[3])
+            if side == 2:
+                self.states[f"VACCUMGRIPPER{id * 2}"] = mode
+                self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = mode
+            else:
+                self.states[f"VACCUMGRIPPER{id * 2 + side}"] = mode
             response.response = request_split[0] + "," + request_split[1] + "," + request_split[2]
         state_vector = encode_state(list(self.states.values()))
         self.pub_change_state.publish(Int64(data=state_vector))
@@ -130,9 +137,7 @@ class ActuatorsSimu(Node):
 
     def _init_states(self):
         """Create random positions for init."""
-        self.states = {f"PUMP{i}": False for i in range(4)}
-        for i in range(16):
-            self.states["VACCUMGRIPPER"] = False
+        self.states = {f"VACCUMGRIPPER{i}": 0 for i in range(16)}
         state_vector = encode_state(list(self.states.values()))
         self.pub_change_state.publish(Int64(data=state_vector))
 
@@ -144,14 +149,14 @@ class ActuatorsSimu(Node):
 def encode_state(state) -> int:
     """Encode a list of booleans into an integer."""
     result = 0
-    for i, bit in enumerate(state):
-        if bit:
-            result |= (1 << i)
+    for i, value in enumerate(state):
+        result |= (int(value) << (i * 2))
     return result
 
-def decode_state(value: int, length: int) -> list[bool]:
+def decode_state(value: int, length: int) -> list[int]:
     """Decode an integer into a list of booleans of given length."""
-    return [(value >> i) & 1 == 1 for i in range(length)]
+    # Now, i will have not only true of false, but 0: free, 1: picking, 2: dropping, 3: revert_dropping, so need to review the archi, now need 2 bits for each.
+    return [(value >> (i * 2)) & 0b11 for i in range(length)]
 
 
 def main(args=None):

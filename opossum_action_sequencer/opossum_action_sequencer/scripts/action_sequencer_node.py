@@ -699,10 +699,7 @@ class ActionManager(Node):
     def vaccumgripper(self, vg: VACCUMGRIPPER_struct):
         """Compute the pump action."""
         if not self.stop:
-            self.pub_command.publish(String(data=f"VACCUMGRIPPER {vg.vg_id} "
-                                                 f"{vg.enable}"
-                                            )
-                                     )
+            self.pub_command.publish(String(data=f"VACCUMGRIPPER {vg.id} {vg.mode} {vg.side}"))
             time.sleep(0.1)
 
     def led(self, led: LED_struct):
@@ -773,6 +770,7 @@ class ActionManager(Node):
 
     def smart_moves(self):
         default_angle = -2.60
+        default_angle = 0.0
         tol = 0.3
         vmax = 0.5
         vtmax = 1.0
@@ -946,18 +944,14 @@ class ActionManager(Node):
 
     def take_crates(self, angle):
         self.kalman(False)
-        self.vaccumgripper(VACCUMGRIPPER_struct(0, 1))
-        self.vaccumgripper(VACCUMGRIPPER_struct(1, 1))
-        self.vaccumgripper(VACCUMGRIPPER_struct(2, 1))
-        self.vaccumgripper(VACCUMGRIPPER_struct(3, 1))
-        self.vaccumgripper(VACCUMGRIPPER_struct(4, 1))
-        self.vaccumgripper(VACCUMGRIPPER_struct(5, 1))
-        self.vaccumgripper(VACCUMGRIPPER_struct(6, 1))
-        self.vaccumgripper(VACCUMGRIPPER_struct(7, 1))
-        self.vaccumgripper(VACCUMGRIPPER_struct(8, 1))
-        self.vaccumgripper(VACCUMGRIPPER_struct(9, 1))
-        self.vaccumgripper(VACCUMGRIPPER_struct(10, 1))
-        self.vaccumgripper(VACCUMGRIPPER_struct(11, 1))
+        self.vaccumgripper(VACCUMGRIPPER_struct(0, 1, 2))
+        self.vaccumgripper(VACCUMGRIPPER_struct(1, 1, 2))
+        self.vaccumgripper(VACCUMGRIPPER_struct(2, 1, 2))
+        self.vaccumgripper(VACCUMGRIPPER_struct(3, 1, 2))
+        self.vaccumgripper(VACCUMGRIPPER_struct(4, 1, 2))
+        self.vaccumgripper(VACCUMGRIPPER_struct(5, 1, 2))
+        self.vaccumgripper(VACCUMGRIPPER_struct(6, 1, 2))
+        self.vaccumgripper(VACCUMGRIPPER_struct(7, 1, 2))
         self.sleep(0.1)
         push_dst = 0.15
         if angle == 0:
@@ -981,56 +975,44 @@ class ActionManager(Node):
         self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
         self.wait_for_motion()
 
-        self.valve(VALVE_struct(2))
+        # self.valve(VALVE_struct(2))
         if destination[2] == 0:
             self.relative_move_to(Position(push_dst, 0, 0))
             self.wait_for_motion()
-            self.vaccumgripper(VACCUMGRIPPER_struct(0, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(1, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(2, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(3, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(4, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(5, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(6, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(7, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(8, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(9, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(10, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(11, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(0, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(1, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(2, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(3, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(4, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(5, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(6, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(7, 3, 2))
             self.relative_move_to(Position(-push_dst, 0, 0))
             self.wait_for_motion()
         elif destination[2] == 2:
             self.relative_move_to(Position(-push_dst, 0, 0))
             self.wait_for_motion()
-            self.vaccumgripper(VACCUMGRIPPER_struct(0, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(1, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(2, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(3, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(4, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(5, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(6, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(7, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(8, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(9, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(10, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(11, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(0, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(1, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(2, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(3, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(4, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(5, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(6, 3, 2))
+            self.vaccumgripper(VACCUMGRIPPER_struct(7, 3, 2))
             self.relative_move_to(Position(push_dst, 0, 0))
             self.wait_for_motion()
         elif destination[2] == 3:
             self.relative_move_to(Position(0, -push_dst, 0))
             self.wait_for_motion()
-            self.vaccumgripper(VACCUMGRIPPER_struct(0, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(1, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(2, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(3, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(4, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(5, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(6, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(7, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(8, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(9, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(10, 0))
-            self.vaccumgripper(VACCUMGRIPPER_struct(11, 0))
+            self.vaccumgripper(VACCUMGRIPPER_struct(0, 3, 2))
+            # self.vaccumgripper(VACCUMGRIPPER_struct(1, 3, 2))
+            # self.vaccumgripper(VACCUMGRIPPER_struct(2, 3, 2))
+            # self.vaccumgripper(VACCUMGRIPPER_struct(3, 3, 2))
+            # self.vaccumgripper(VACCUMGRIPPER_struct(4, 3, 2))
+            # self.vaccumgripper(VACCUMGRIPPER_struct(5, 3, 2))
+            # self.vaccumgripper(VACCUMGRIPPER_struct(6, 3, 2))
+            # self.vaccumgripper(VACCUMGRIPPER_struct(7, 3, 2))
             self.relative_move_to(Position(0, push_dst, 0))
             self.wait_for_motion()
         else:

@@ -4,41 +4,41 @@ stacks:
       type: haz_crate
       x: 0.075
       y: 0
-      t: 1
+      t: 1.57079632679
     1: 
       type: haz_crate
       x: 0.025
       y: 0
-      t: 1
+      t: 1.57079632679
     2:
       type: haz_crate
       x: -0.025
       y: 0
-      t: 1
+      t: 1.57079632679
     3: 
       type: haz_crate
       x: -0.075
       y: 0
-      t: 1
+      t: 1.57079632679
 
   half_haz_stack_crates:
     0:
       type: haz_crate
       x: 0.025
       y: 0
-      t: 1
+      t: 1.57079632679
     1: 
       type: haz_crate
       x: -0.025
       y: 0
-      t: 1
-  
+      t: 1.57079632679
+
   cursor:
     0: 
       type: cursor
       x: 0
       y: 0
-      t: 1
+      t: 1.57079632679
 
 objects:
   haz_crate:
@@ -57,194 +57,217 @@ map:
     type: full_haz_stack_crates
     x: 1.15
     y: 0.8
-    t: 0
+    t: 0.0
     shape: clean
   1:
     type: full_haz_stack_crates
     x: 1.85
     y: 0.8
-    t: 0
+    t: 0.0
     shape: clean
   2:
     type: full_haz_stack_crates
     x: 1.1
     y: 0.125
-    t: 0
+    t: 0.0
     shape: clean
   3:
     type: full_haz_stack_crates
     x: 1.9
     y: 0.125
-    t: 0
+    t: 0.0
     shape: clean
   4:
     type: full_haz_stack_crates
     x: 0.125
     y: 0.4
-    t: -1
+    t: -1.57079632679
     shape: clean
   5:
     type: full_haz_stack_crates
     x: 0.125
     y: 1.2
-    t: -1
+    t: -1.57079632679
     shape: clean
   6:
     type: full_haz_stack_crates
     x: 2.875
-    y: 0.4 
-    t: 1
+    y: 0.4
+    t: 1.57079632679
     shape: clean
   7:
     type: full_haz_stack_crates
     x: 2.875
     y: 1.2
-    t: 1
+    t: 1.57079632679
     shape: clean
   8:
     type: half_haz_stack_crates
     x: 1.1
     y: 1.725
-    t: 0
+    t: 0.0
     shape: clean
   9:
     type: half_haz_stack_crates
     x: 1.35
     y: 1.775
-    t: 0
+    t: 0.0
     shape: clean
   10:
     type: half_haz_stack_crates
     x: 1.65
     y: 1.775
-    t: 0
+    t: 0.0
     shape: clean
   11:
     type: half_haz_stack_crates
     x: 1.9
     y: 1.725
-    t: 0
+    t: 0.0
     shape: clean
   12:
     type: half_haz_stack_crates
     x: 0.8
     y: 1.675
-    t: 0
+    t: 0.0
     shape: rot
   13:
     type: half_haz_stack_crates
     x: 2.2
     y: 1.675
-    t: 0
+    t: 0.0
     shape: rot
   14:
     type: cursor
     x: 0.8
     y: 0
-    t: 0
+    t: 0.0
   15:
     type: cursor
     x: 2.2
     y: 0
-    t: 0
+    t: 0.0
 
 # In the robot referential def angle -2.6
 actuators:
-  0: 
+  # LEFT SIDE (0 rad)
+  0:
     type: vaccum_gripper
     name: vaccum_gripper1
-    x: -0.125 # -15 * cos a - (-5) * sin a  
-    y: 0.075 # -15 * sin a -5 * cos a 
+    x: -0.125
+    y: 0.075
+    t: 0.0
     size: 0.05
-  1: 
+  1:
     type: vaccum_gripper
     name: vaccum_gripper2
-    x: -0.125 # -5 * cos a -(-15) * sin a 
-    y: 0.025 # -5 * sin a -15 * cos a 
+    x: -0.125
+    y: 0.025
+    t: 0.0
     size: 0.05
-  2: 
+  2:
     type: vaccum_gripper
     name: vaccum_gripper3
-    x: -0.125 # 5 * cos a -(-15) * sin a 
-    y: -0.025 # 5 * sin a -15 * cos a 
+    x: -0.125
+    y: -0.025
+    t: 0.0
     size: 0.05
-  3: 
+  3:
     type: vaccum_gripper
     name: vaccum_gripper4
-    x: -0.125 # 15 * cos a -(-5) * sin a
-    y: -0.075 # 15 * sin a -5 * cos a
+    x: -0.125
+    y: -0.075
+    t: 0.0
     size: 0.05
-  4: 
+
+  # BOTTOM SIDE (π/2)
+  4:
     type: vaccum_gripper
     name: vaccum_gripper5
-    x: 0.125 # -15 * cos a - (-5) * sin a  
-    y: 0.075 # -15 * sin a -5 * cos a 
+    x: 0.075
+    y: -0.125
+    t: 1.57
     size: 0.05
-  5: 
+  5:
     type: vaccum_gripper
     name: vaccum_gripper6
-    x: 0.125 # -5 * cos a -(-15) * sin a 
-    y: 0.025 # -5 * sin a -15 * cos a 
+    x: 0.025
+    y: -0.125
+    t: 1.57
     size: 0.05
-  6: 
+  6:
     type: vaccum_gripper
     name: vaccum_gripper7
-    x: 0.125 # 5 * cos a -(-15) * sin a 
-    y: -0.025 # 5 * sin a -15 * cos a 
+    x: -0.025
+    y: -0.125
+    t: 1.57
     size: 0.05
-  7: 
+  7:
     type: vaccum_gripper
     name: vaccum_gripper8
-    x: 0.125 # 15 * cos a -(-5) * sin a
-    y: -0.075 # 15 * sin a -5 * cos a
+    x: -0.075
+    y: -0.125
+    t: 1.57
     size: 0.05
+
+  # RIGHT SIDE (π)
   8:
     type: vaccum_gripper
     name: vaccum_gripper9
-    x: 0.075 # -15 * cos a - (-5) * sin a  
-    y: -0.125 # -15 * sin a -5 * cos a 
+    x: 0.125
+    y: -0.075
+    t: 3.14
     size: 0.05
-  9: 
+  9:
     type: vaccum_gripper
     name: vaccum_gripper10
-    x: 0.025 # -5 * cos a -(-15) * sin a 
-    y: -0.125 # -5 * sin a -15 * cos a 
+    x: 0.125
+    y: -0.025
+    t: 3.14
     size: 0.05
-  10: 
+  10:
     type: vaccum_gripper
     name: vaccum_gripper11
-    x: -0.025 # 5 * cos a -(-15) * sin a 
-    y: -0.125 # 5 * sin a -15 * cos a 
+    x: 0.125
+    y: 0.025
+    t: 3.14
     size: 0.05
-  11: 
+  11:
     type: vaccum_gripper
     name: vaccum_gripper12
-    x: -0.075 # 15 * cos a -(-5) * sin a
-    y: -0.125 # 15 * sin a -5 * cos a
+    x: 0.125
+    y: 0.075
+    t: 3.14
     size: 0.05
-  12: 
+
+  # TOP SIDE (3π/2)
+  12:
     type: vaccum_gripper
     name: vaccum_gripper13
-    x: 0.075 # -15 * cos a - (-5) * sin a  
-    y: 0.125 # -15 * sin a -5 * cos a 
+    x: -0.075
+    y: 0.125
+    t: 4.71
     size: 0.05
-  13: 
+  13:
     type: vaccum_gripper
     name: vaccum_gripper14
-    x: 0.025 # -5 * cos a -(-15) * sin a 
-    y: -0.125 # -5 * sin a -15 * cos a 
+    x: -0.025
+    y: 0.125
+    t: 4.71
     size: 0.05
-  14: 
+  14:
     type: vaccum_gripper
     name: vaccum_gripper15
-    x: -0.025 # 5 * cos a -(-15) * sin a 
-    y: -0.125 # 5 * sin a -15 * cos a 
+    x: 0.025
+    y: 0.125
+    t: 4.71
     size: 0.05
-  15: 
+  15:
     type: vaccum_gripper
     name: vaccum_gripper16
-    x: -0.075 # 15 * cos a -(-5) * sin a
-    y: -0.125 # 15 * sin a -5 * cos a
+    x: 0.075
+    y: 0.125
+    t: 4.71
     size: 0.05
 
 actuators_type:

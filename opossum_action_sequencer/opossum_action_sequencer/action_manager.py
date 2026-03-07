@@ -27,10 +27,10 @@ class PUMP_struct:
         self.enable = enable
 
 class VACCUMGRIPPER_struct:
-    def __init__(self, vg_id, enable):
-        self.vg_id = vg_id
-        self.enable = enable
-
+    def __init__(self, id, mode, side):
+        self.id = id
+        self.mode = mode # 0: free, 1: picking, 2: dropping, 3: revert_dropping
+        self.side = side # 0 left, 1 right, 2 both
 
 class LED_struct:
     def __init__(self, red, green, blue):

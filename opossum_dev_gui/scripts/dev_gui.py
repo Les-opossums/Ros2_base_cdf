@@ -551,10 +551,15 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
         # Real sizes (meters)
         self.elements = {
             "map": (3.0, 2.0),
-            "haz_crate_blue": (0.05, 0.15),
-            "haz_crate_yellow": (0.05, 0.15),
-            "haz_crate_rot": (0.05, 0.15),
+            "haz_crate*blue": (0.05, 0.15),
+            "haz_crate*yellow": (0.05, 0.15),
+            "haz_crate*rot": (0.05, 0.15),
             "cursor": (0.1, 0.045),
+            "vaccum_gripper*free": (0.03, 0.01),
+            "vaccum_gripper*pick": (0.03, 0.01),
+            "vaccum_gripper*drop": (0.03, 0.01),
+            "vaccum_gripper*revdrop": (0.03, 0.01),
+            
         } | {name: (0.35, 0.35) for name in self.robot_names}
 
         self.scene = QtWidgets.QGraphicsScene(self)
@@ -562,7 +567,7 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
 
         # Load pixmaps
         self.pixmaps = {
-            name: QtGui.QPixmap(os.path.join(self.image_path, f"{name}.png"))
+            name: QtGui.QPixmap(os.path.join(self.image_path, f"{name.replace('*', '_')}.png"))
             for name in self.elements
         }
 
@@ -609,10 +614,6 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
                 self.icons[key]["state"] = elem.state
                 to_update.append(key)
             item = self.icons[key]["item"]
-            # should_be_visible = elem.state == "free"
-            # if item.isVisible() != should_be_visible:
-            #     item.setVisible(should_be_visible)  # Update visibility only if it changes
-            # if should_be_visible:
             if True:
                 posx = width * elem.x / map_w
                 posy = height * (1 - elem.y / map_h)
@@ -636,8 +637,8 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
             self._scale_and_center_item(self.icons[id]["item"], self.icons[id]["type"], scale, self.icons[id]["state"])
             
     def _scale_and_center_item(self, item, elem_type, scale, state):
-        if elem_type == "haz_crate":
-            mod_elem_type = elem_type + "_" + state.split("_")[1]
+        if elem_type in ("haz_crate", "vaccum_gripper"):
+            mod_elem_type = elem_type + "*" + state.split("*")[-1]
         else:
             mod_elem_type = elem_type
         base_pixmap = self.pixmaps.get(mod_elem_type)
