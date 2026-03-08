@@ -2,24 +2,24 @@
 # -*- coding: utf-8 -*-
 """Action Sequencer Node."""
 
-
+### IDEA SMART SCRPIT: 
+# Use stacks and also save solo crates so we can choose the strategy. 
+# Use the Actuators ID, so we can manage them 1 by one.
+# Actions for pliers
+# 0: free, 1: picking, 2: dropping, 3: reverting
 import rclpy
 from rclpy.node import Node
 from rcl_interfaces.msg import ParameterEvent
 
 from std_msgs.msg import String, Bool, Int32
-from geometry_msgs.msg import Point
 from opossum_msgs.msg import RobotData, LidarLoc, VisionData
 
+import yaml
 import numpy as np
 from opossum_action_sequencer.utils import (
     Position,
-    PUMP_struct,
     VACCUMGRIPPER_struct,
     LED_struct,
-    SERVO_struct,
-    STEPPER_struct,
-    VALVE_struct,
 )
 
 import threading
@@ -27,6 +27,62 @@ from threading import Event
 import time
 import os
 import json
+from dataclasses import dataclass
+from ament_index_python.packages import get_package_share_directory
+
+@dataclass
+class Plier:
+    """Pliers Class."""
+
+    id: int
+    x: float
+    y: float
+    theta: float
+    state: int # -1 nothing, 100 + x, doing action, x have id.
+    side_robot: int
+
+    def __init__(self, id, data):
+        self.id = id
+        self.x = data['x']
+        self.y = data['y']
+        self.theta = data['t']
+        self.state = -1
+        self.side_id = id % 4
+        self.side_robot = (id // 4) * np.pi / 2
+
+@dataclass
+class HazCrate:
+    """HazCrate Class."""
+
+    id: int
+    x: float
+    y: float
+    theta: float
+    state: int
+    color: int
+    last_seen: float
+
+    def __init__(self, id, x, y, t, rot = False):
+        self.id = id
+        self.x = x
+        self.y = y
+        self.theta = t
+        self.state = -1
+        self.color = 2 if rot else -1 # -1 don't know, 0 yellow, 1 blue, 2 rot + 100 in zone
+        self.last_seen = None
+
+@dataclass
+class ZoneRelease:
+    id: int
+    x: float
+    y: float
+    state: int
+
+    def __init__(self, id, x, y):
+        self.id = id
+        self.x = x
+        self.y = y
+        self.state = []
 
 class ActionManager(Node):
     """Action Manager Node."""
@@ -63,58 +119,61 @@ class ActionManager(Node):
         self.robot_pos = None
         self.motion_done = True
         self.color = None
-
+        self._init_mapping(2026)
         # Process
         self.motion_done_event = Event()
         self.motion_done_event.set()
+
+        self.pliers_event = Event()
+        self.pliers_event.set()
 
         self.end_match_event = Event()
         self.end_match_event.set()
         self.stop = False
 
-        self.end_poses = {
-            0: [0.3, 1.8, 2],
-        }
-        self.end_poses = self.end_poses | {key + 1: [3 - val[0], val [1], 2 - val[2]] for key, val in self.end_poses.items()}
-        self.available_end = {i: 0 for i in range(len(list(self.end_poses.keys())))}
+    def _init_mapping(self, year):
+        objects_path = os.path.join(
+            get_package_share_directory("opossum_bringup"), "config", str(year), "objects.yaml"
+        )
 
-        # ID_object: ID_stack, X, Y, Theta, Time
-        self.position_crates = {
-            0: [0.1, 0.325, 2],
-            1: [0.1, 0.375, 2],
-            2: [0.1, 0.425, 2],
-            3: [0.1, 0.475, 2],
-            4: [0.1, 1.125, 2],
-            5: [0.1, 1.175, 2],
-            6: [0.1, 1.225, 2],
-            7: [0.1, 1.275, 2],
-            8: [1.025, 0.1, 1],
-            9: [1.075, 0.1, 1],
-            10: [1.125, 0.1, 1],
-            11: [1.175, 0.1, 1],
-            12: [1.825, 0.1, 1],
-            13: [1.875, 0.1, 1],
-            14: [1.925, 0.1, 1],
-            15: [1.975, 0.1, 1],
-            16: [1.075, 0.8, 1],
-            17: [1.125, 0.8, 1],
-            18: [1.175, 0.8, 1],
-            19: [1.225, 0.8, 1],
-            20: [1.775, 0.8, 1],
-            21: [1.825, 0.8, 1],
-            22: [1.875, 0.8, 1],
-            23: [1.925, 0.8, 1],
-            24: [2.9, 0.325, 0],
-            25: [2.9, 0.375, 0],
-            26: [2.9, 0.425, 0],
-            27: [2.9, 0.475, 0],
-            28: [2.9, 1.125, 0],
-            29: [2.9, 1.175, 0],
-            30: [2.9, 1.225, 0],
-            31: [2.9, 1.275, 0],
-        }
-        self.available_crates = {i: True for i in range(len(list(self.position_crates.keys())))}
-        self.dest_crates = {i : [0, 1] for i in range(len(self.position_crates.keys()))}
+        data = yaml.safe_load(open(objects_path, "r"))
+        self.pliers = {}
+        self.stacks = {}
+        self.haz_crates = {}
+        self.zones = {}
+
+        for id, act in data['actuators'].items():
+            if act['type'] != "vaccum_gripper":
+                continue
+            plier = Plier(id, act)
+            self.pliers[id] = plier
+
+        crates_count = 0
+        # Access first stack item
+        stacks = data['stacks']
+        # Iterate over all map objects
+        for id, obj in data['map'].items():
+            type_obj = obj['type']
+            cos_ = np.cos(obj['t'])
+            sin_ = np.sin(obj['t'])
+            if "crates" not in type_obj:
+                continue
+                
+            self.stacks[id] = []
+            rot = obj['shape'] == 'rot'
+
+            for element in stacks[type_obj].values():
+                x = obj['x'] + element['x'] * cos_ - element['y'] * sin_
+                y = obj['y'] + element['x'] * sin_ + element['y'] * cos_
+                t = obj['t'] + element['t']
+                self.haz_crates[crates_count] = HazCrate(crates_count, x, y, t, rot)
+                self.stacks[id].append(crates_count)
+                crates_count += 1
+
+        for id, zone in data['zones'].items():
+            self.zones[id] = ZoneRelease(id, zone['x'], zone['y'])
+        
+        self.final_zone = data['final_zone']
 
         # Process objects with cam
         self.barycentre = None
@@ -133,7 +192,7 @@ class ActionManager(Node):
                 ("au_topic", "au"),
                 ("end_of_match_topic", "end_of_match"),
                 ("feedback_command_topic", "feedback_command"),
-                ("robot_data_topic", "/main_robot/robot_data"),
+                ("robot_data_topic", "robot_data"),
                 ("position_topic", "position_out"),
                 ("color_topic", "init_team_color"),
             ],
@@ -142,11 +201,11 @@ class ActionManager(Node):
     def _init_timers(self):
         """Initialize the timers of the node."""
         self.timer_match = self.create_timer(
-            96,
+            200,
             self.timer_match_callback
         )
         self.timer_backstage = self.create_timer(
-            92,
+            200,
             self.timer_backstage_callback
         )
 
@@ -281,51 +340,84 @@ class ActionManager(Node):
             10
         )
 
+    def aruco_callback(self, msg: VisionData):
+        if self.centering:
+            object_x = msg.x
+            object_y = msg.y
+            # verify that the object is not in the list and add it if not
+            if not any(np.sqrt((obj[0] - object_x) ** 2 + (obj[1] - object_y) ** 2) < 0.025 for obj in self.list_objects):
+                self.list_objects.append((object_x, object_y))
+            if len(self.list_objects) == 4: # If we have detected 4 objects, we can compute the barycenter
+                self.barycentre = (sum(obj[0] for obj in self.list_objects) / 4, sum(obj[1] for obj in self.list_objects) / 4)
+
+    def begin_centering(self):
+        self.centering = True
+        self.list_objects = []
+        self.barycentre = None
+
+    def center_front_stack(self):
+        if self.barycentre is not None:
+            self.try_center = 0
+            self.get_logger().info(f"Barycentre: {self.barycentre}")
+            self.relative_move_to(Position(self.barycentre[0], self.barycentre[1], 3.14159 - self.robot_pos.t))
+            self.wait_for_motion()
+
+            time.sleep(0.25)
+            self.begin_centering()
+            time.sleep(1.0)
+            if self.barycentre is not None:
+                while abs(self.barycentre[0]- 0.22) > 0.005 or abs(self.barycentre[1]) > 0.005 and self.try_center < 4:
+                    self.get_logger().info(f"Barycentre: {self.barycentre}")
+                    self.relative_move_to(Position(self.barycentre[0], self.barycentre[1], 3.14159 - self.robot_pos.t))
+                    self.wait_for_motion()
+                    self.try_center += 1
+                    time.sleep(0.25)
+
     def parameter_event_callback(self, event):
         """Handle the parameters event."""
+        
+        # 1. On récupère le nom absolu du noeud qui a émis l'événement
+        sender_node = event.node
+        
+        # 2. On récupère le namespace actuel de CE noeud (ex: '/main_robot')
+        my_namespace = self.get_namespace()
+        
+        # 3. GUARD CLAUSE : Si l'événement ne vient pas de notre namespace, on l'ignore.
+        # On vérifie aussi que notre namespace n'est pas le root '/' pour éviter les bugs.
+        if my_namespace != '/' and not sender_node.startswith(my_namespace):
+            return
+
         # Parcours des paramètres modifiés
         script_map = {
-            0: ("opossum_action_sequencer.match.script1",
-                "Default Script"),
-            1: ("opossum_action_sequencer.match.script1",
-                "Script 1"),
-            2: ("opossum_action_sequencer.match.script2",
-                "Script 2"),
-            3: ("opossum_action_sequencer.match.script3",
-                "Script 3"),
-            4: ("opossum_action_sequencer.match.script4",
-                "Script 4"),
-            5: ("opossum_action_sequencer.match.script5",
-                "Script 5"),
-            6: ("opossum_action_sequencer.match.script6",
-                "Script 6"),
-            7: ("opossum_action_sequencer.match.script_homologation",
-                "Script Homologation"),
-            9: ("opossum_action_sequencer.match.follow_ennemi",
-                "Script Follow Ennemi"),
-            11: ("opossum_action_sequencer.match.smart_script",
-                 "Script Smart"),
-            12: ("opossum_action_sequencer.match.smart_script",
-                 "Script Smart"),
-            69: ("opossum_action_sequencer.match.script_init",
-                 "Script Init"),
+            0: ("opossum_action_sequencer.match.script1", "Default Script"),
+            1: ("opossum_action_sequencer.match.script1", "Script 1"),
+            2: ("opossum_action_sequencer.match.script2", "Script 2"),
+            3: ("opossum_action_sequencer.match.script3", "Script 3"),
+            4: ("opossum_action_sequencer.match.script4", "Script 4"),
+            5: ("opossum_action_sequencer.match.script5", "Script 5"),
+            6: ("opossum_action_sequencer.match.script6", "Script 6"),
+            7: ("opossum_action_sequencer.match.script_homologation", "Script Homologation"),
+            9: ("opossum_action_sequencer.match.follow_ennemi", "Script Follow Ennemi"),
+            11: ("opossum_action_sequencer.match.smart_script", "Script Smart"),
+            12: ("opossum_action_sequencer.match.smart_script", "Script Smart"),
+            69: ("opossum_action_sequencer.match.script_init", "Script Init"),
         }
 
+        # La suite de ton code reste identique
         for changed in event.changed_parameters:
             if changed.name == "script_number":
                 script_num = changed.value.integer_value
 
                 if script_num in script_map:
                     module_path, log_msg = script_map[script_num]
-                    # self.get_logger().info(log_msg)
+                    # self.get_logger().info(f"[{my_namespace}] {log_msg}")
 
                     # Dynamically import the Script class
                     module = __import__(module_path, fromlist=["Script"])
                     Script = getattr(module, "Script")
 
                 else:
-                    self.get_logger().error("Aucun script associé à la valeur "
-                                            f": {script_num}")
+                    self.get_logger().error(f"[{my_namespace}] Aucun script associé à la valeur : {script_num}")
                     raise ValueError("Invalid script number")
 
                 if changed.value.integer_value != 0:
@@ -345,7 +437,8 @@ class ActionManager(Node):
                     self.run_script_init()
 
     def color_callback(self, msg):
-        self.color = msg.data
+        self.color = 0 if msg.data.lower() == "yellow" else 1
+        self.final_zone = self.final_zone[self.color]
 
     def feedback_callback(self, msg):
         """Receive the data from Zynq."""
@@ -383,6 +476,32 @@ class ActionManager(Node):
             self.motion_done = True
             self.motion_done_event.set()
 
+        elif msg.data.startswith("PINCEFEEDBACK"):
+            data = msg.data.split()[1:]
+            id = int(data[0])
+            # action = int(data[1])
+            s0 = int(data[2])
+            s1 = int(data[3])
+            plier0 = self.pliers[id  * 2]
+            plier1 = self.pliers[id  * 2 + 1]
+            # for pl in self.pliers.values():
+            #     self.get_logger().info(f"Before state: {pl.state}")
+            if plier0.state >= 99:
+                if s0 == 1:
+                    plier0.state -= 100
+                else:
+                    plier0.state = -2
+            
+            if plier1.state >= 99:
+                if s1 == 1:
+                    plier1.state -= 100
+                else:
+                    plier1.state = -2
+            # for pl in self.pliers.values():
+            #     self.get_logger().info(f"state: {pl.state}")
+            if all(pl.state < 99 for pl in self.pliers.values()):
+                self.pliers_event.set()
+
     def robot_data_callback(self, msg: RobotData):
         """Receive the Robot Data from Zynq."""
         self.robot_pos = Position(x=msg.x, y=msg.y, t=msg.theta)
@@ -398,78 +517,6 @@ class ActionManager(Node):
                 self.get_logger().info("Arrivée confirmée par calcul (Timeout logiciel)")
                 self.motion_done = True
                 self.motion_done_event.set() # C'est ça qui débloque wait_for_motion
-
-    def aruco_callback(self, msg: VisionData):
-        if self.robot_pos is not None:
-            x_tag = msg.x
-            y_tag = msg.y
-            self.x_tag = x_tag * np.cos(self.robot_pos.t) - y_tag * np.sin(self.robot_pos.t) + self.robot_pos.x
-            self.y_tag = x_tag * np.sin(self.robot_pos.t) + y_tag * np.cos(self.robot_pos.t) + self.robot_pos.y
-
-            best_match_id = None
-            min_distance = float('inf')
-
-            for crate_id, crate_info in self.position_crates.items():
-                crate_x = crate_info[1]
-                crate_y = crate_info[2]
-                distance = np.sqrt((self.x_tag - crate_x) ** 2 + (self.y_tag - crate_y) ** 2)
-                if distance < min_distance:
-                    min_distance = distance
-                    best_match_id = crate_id
-
-            if best_match_id is not None and min_distance < 0.002:  # Threshold for matching                
-                self.position_crates[best_match_id][1] = self.x_tag  # Update X with tag detection
-                self.position_crates[best_match_id][2] = self.y_tag  # Update Y with tag detection
-                self.position_crates[best_match_id][3] = msg.theta  # Update Theta with tag detection
-                self.position_crates[best_match_id][4] = time.time() - self.match_time  # Update the time of detection from timer_match
-
-            else: # Replace the crate who hasn't been detected for the longest time
-                oldest_time = float('inf')
-                oldest_crate_id = None
-
-                # for crate_id, crate_info in self.position_crates.items():
-                #     if crate_info[0] == 0:  # Only consider crates that are not already matched
-                #         if crate_info[4] < oldest_time:
-                #             oldest_time = crate_info[4]
-                #             oldest_crate_id = crate_id
-
-                if oldest_crate_id is not None:
-                    self.position_crates[oldest_crate_id][1] = self.x_tag  # Update X with tag detection
-                    self.position_crates[oldest_crate_id][2] = self.y_tag  # Update Y with tag detection
-                    self.position_crates[oldest_crate_id][3] = msg.theta  # Update Theta with tag detection
-                    self.position_crates[oldest_crate_id][4] = time.time() - self.match_time  # Update the time of detection from timer_match
-
-        if self.centering == True:
-            object_x = msg.x
-            object_y = msg.y
-            # verify that the object is not in the list and add it if not
-            if not any(np.sqrt((obj[0] - object_x) ** 2 + (obj[1] - object_y) ** 2) < 0.025 for obj in self.list_objects):
-                self.list_objects.append((object_x, object_y))
-            if len(self.list_objects) == 4: # If we have detected 4 objects, we can compute the barycenter
-                self.barycentre = (sum(obj[0] for obj in self.list_objects) / 4, sum(obj[1] for obj in self.list_objects) / 4)
-
-    def begin_centering(self):
-        self.centering = True
-        self.list_objects = []
-        self.barycentre = None
-
-    def center_front_stack(self):
-        if self.barycentre is not None:
-            self.try_center = 0
-            self.get_logger().info(f"Barycentre: {self.barycentre}")
-            self.relative_move_to(Position(self.barycentre[0], self.barycentre[1], 3.14159 - self.robot_pos.t))
-            self.wait_for_motion()
-
-            time.sleep(0.25)
-            self.begin_centering()
-            time.sleep(1.0)
-            if self.barycentre is not None:
-                while abs(self.barycentre[0]- 0.22) > 0.005 or abs(self.barycentre[1]) > 0.005 and self.try_center < 4:
-                    self.get_logger().info(f"Barycentre: {self.barycentre}")
-                    self.relative_move_to(Position(self.barycentre[0], self.barycentre[1], 3.14159 - self.robot_pos.t))
-                    self.wait_for_motion()
-                    self.try_center += 1
-                    time.sleep(0.25)
 
     def timer_match_callback(self):
         """Timer callback for match time."""
@@ -579,41 +626,6 @@ class ActionManager(Node):
                     self.send_raw("BLOCK")
                     time.sleep(0.1)
 
-    # def follow_tag_aruco(self):
-    #     if not self.stop:
-    #         while True:
-    #             if self.robot_pos is not None and self.x_tag is not None:
-    #                 # 1. Calcul de la distance réelle actuelle au tag
-    #                 current_dist = np.sqrt(self.x_tag**2 + self.y_tag**2)
-# 
-    #                 # 2. Sécurité : on ne bouge que si le tag est à plus de 10cm
-    #                 if current_dist > 0.10 and self.id_tag == 36:
-    #                     offset = 0.15  # 10 cm
-    #                     # Ratio pour trouver le point à 10cm en amont sur le même vecteur
-    #                     ratio = (current_dist - offset) / current_dist
-# 
-    #                     x_target_local = self.x_tag * ratio
-    #                     y_target_local = self.y_tag * ratio
-# 
-    #                     # 3. Transformation vers le repère global (votre formule actuelle)
-    #                     pos_x = x_target_local * np.cos(self.robot_pos.t) - y_target_local * np.sin(self.robot_pos.t) + self.robot_pos.x
-    #                     pos_y = x_target_local * np.sin(self.robot_pos.t) + y_target_local * np.cos(self.robot_pos.t) + self.robot_pos.y
-# 
-    #                     # Orientation : on garde l'angle pour faire face au tag
-    #                     target_angle = (self.robot_pos.t + np.arctan2(self.y_tag, self.x_tag))
-# 
-    #                     if self.new_pos > 5: # Votre condition de rafraîchissement
-    #                         self.new_pos = 1
-    #                         self.send_raw("VMAX 0.5")
-    #                         self.move_to(Position(pos_x, pos_y, target_angle))
-# 
-    #                         self.get_logger().info(f"Cible : {pos_x:.2f}, {pos_y:.2f} (10cm avant tag)")
-# 
-    #                 time.sleep(0.1)
-    #             else:
-    #                 self.send_raw("BLOCK")
-    #                 time.sleep(0.1)
-
     def relative_move_to(self, delta: Position, seuil=0.1):
         """Compute the relative move_to action with frame transformation (Robot -> Board)."""
         if not self.stop:
@@ -664,8 +676,44 @@ class ActionManager(Node):
         """Compute the wait_for_motion action."""
         if not self.stop:
             self.motion_done_event.wait(timeout=timeout) 
-            time.sleep(0.1)
             self.motion_done = True
+
+    def wait_for_plier(self):
+        """Compute the wait_for_motion action."""
+        if not self.stop:
+            self.pliers_event.wait()
+
+    def send_plier_cmd(self, ids, mode):
+        """Compute and send the vacuum gripper command with pair optimization."""
+        if self.stop or not ids:
+            return
+
+        self.pliers_event.clear()
+        # 1. Trier et éliminer les doublons pour faciliter le groupement
+        sorted_ids = sorted(list(set(ids)))
+        processed_ids = set()
+
+        for i in range(len(sorted_ids)):
+            current_id = sorted_ids[i]
+            
+            if current_id in processed_ids:
+                continue
+
+            # Vérifier si c'est un ID pair (ex: 0, 2, 4) et si son voisin direct (n+1) est aussi dans la liste
+            pair_neighbor = current_id + 1
+            
+            if current_id % 2 == 0 and pair_neighbor in sorted_ids:
+                # On a une paire complète (ex: 0 et 1). On envoie l'argument '2'
+                cmd_id = current_id // 2
+                self.pub_command.publish(String(data=f"VACCUMGRIPPER {cmd_id} {mode} 2"))
+                processed_ids.add(current_id)
+                processed_ids.add(pair_neighbor)
+            else:
+                # ID seul ou voisin manquant. On envoie séparément avec 0 ou 1
+                cmd_id = current_id // 2
+                side = current_id % 2
+                self.pub_command.publish(String(data=f"VACCUMGRIPPER {cmd_id} {mode} {side}"))
+                processed_ids.add(current_id)
 
     def vaccumgripper(self, vg: VACCUMGRIPPER_struct):
         """Compute the pump action."""
@@ -725,256 +773,371 @@ class ActionManager(Node):
         return -1 if val < 0 else 1
 
     def smart_moves(self):
-        default_angle = -2.60
-        default_angle = 0.0
-        tol = 0.3
-        vmax = 0.5
-        vtmax = 1.0
-        if self.color.lower() == "yellow":
-            en_color = 0
-        elif self.color.lower() == "blue":
-            en_color = 1
-        else:
-            self.get_logger().error(f"NO COLOR")
+        self.send_raw(f"VMAX 0.8")
+        self.send_raw(f"VTMAX 1.5")
+        release = False
         while True:
-            self.send_raw(f"VMAX {vmax}")
-            self.send_raw(f"VTMAX {vtmax}")
-            max = -10
-            crate_valid = None
-            ind_valid = None
-            for ind, crates in self.position_crates.items():
-                if self.available_crates[ind]:
-                    temp = self.compute_penality(crates)
-                    if temp > max:
-                        max = temp
-                        ind_valid = ind
-                        crate_valid = crates
-            if crate_valid is not None:
-                if crate_valid[2] % 2 == 0:
-                    # HERE GO IN FRONT OF crates THAT ARE BORDERLINE
-                    self.move_to(Position(crate_valid[0] + (crate_valid[2] - 1) * tol, crate_valid[1], crate_valid[2] * np.pi / 2 + default_angle))
-                    self.wait_for_motion()
-                    fpos = self.find_final_pos(ind_valid, en_color)
-                    self.take_crates(crate_valid[2])
-                    self.drop_crates(fpos, default_angle)
-                else: # CANS THAT ARE FRONT ON BOARD
-                    if self.robot_pos.y > crate_valid[1] or crate_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
-                        if self.robot_pos.y - crate_valid[1] < tol:
-                            self.move_to(Position(crate_valid[0] + self.sign(self.robot_pos.x - crate_valid[0]) * tol, crate_valid[1] + tol, 3 * np.pi / 2 + default_angle))
-                            self.wait_for_motion()
-                        self.move_to(Position(crate_valid[0], crate_valid[1] + tol, 3 * np.pi / 2 + default_angle))
-                        self.wait_for_motion()
-                        fpos = self.find_final_pos(ind_valid, en_color)
-                        self.take_crates(3)
-                        self.drop_crates(fpos, default_angle)
+
+            best_ind, stack_id, is_inv = self.compute_pick_rewards()
+            if release:
+                best_zone_ind = self.compute_release_rewards()
+                if best_zone_ind is not None:
+                    best_zone = self.zones[best_zone_ind]
+                    dx = self.robot_pos.x - best_zone.x
+                    dy = self.robot_pos.y - best_zone.y
+                    distance = 0.15
+                    if dx > dy:
+                        if dx > 0:
+                            fpos = Position(best_zone.x + distance, best_zone.y, 0.0)
+                            angle = 3.14
+                        else:
+                            fpos = Position(best_zone.x - distance, best_zone.y, 0.0)
+                            angle = 0
                     else:
-                        if crate_valid[1] - self.robot_pos.y < tol:
-                            self.move_to(Position(crate_valid[0] + self.sign(self.robot_pos.x - crate_valid[0]) * tol, crate_valid[1] - tol, np.pi / 2 + default_angle))
-                            self.wait_for_motion()
-                        self.move_to(Position(crate_valid[0], crate_valid[1] - tol, np.pi / 2 + default_angle))
+                        if dy > 0:
+                            fpos = Position(best_zone.x, best_zone.y + distance, 0.0)
+                            angle = 4.71
+                        else:
+                            fpos = Position(best_zone.x, best_zone.y - distance, 0.0)
+                            angle = 1.57
+                    id_side = self.get_best_side_pliers_release(angle)
+                    if id_side is not None:
+                        fpos.t = angle - self.pliers[id_side * 4].theta
+                        self.move_to(fpos)
                         self.wait_for_motion()
-                        fpos = self.find_final_pos(ind_valid, en_color)
-                        self.take_crates(1)
-                        self.drop_crates(fpos, default_angle)
-                self.available_crates[ind_valid] = False
-                self.available_end[self.dest_crates[ind_valid][en_color]] += 1 # If yellow 0, else blue
-                self.add_score(4)
-            else:
-                if en_color == 0: # color is yellow
-                    self.move_to(Position(0.5, 1.4, 0))
+
+                        id_active_pliers = [id for id in self.pliers.keys() if (self.pliers[id].state >= 0 and id // 4 == id_side)]
+                        for id in id_active_pliers:
+                            pstate = self.pliers[id].state
+                            self.get_logger().info(f"STATE PL: {pstate}")
+                            if pstate >= 0:
+                                self.get_logger().info("GOIGNGINGIGN")
+                                self.haz_crates[pstate].state = 100
+                                self.zones[best_zone_ind].state.append(pstate)
+                        self.get_logger().info(f"Zone: {self.zones[best_zone_ind].state}")
+                        self.get_logger().info(f"All Zones: {self.zones}")
+
+                        self.send_plier_cmd(id_active_pliers, 3)
+                        self.wait_for_plier()
+
+                        # Set state of actuators
+                        for pl_id in id_active_pliers:
+                            self.pliers[pl_id].state = -1
+                    else: 
+                        self.get_logger().info("Issue cannot find anymore plier taken")
+                        release = False
+                else: 
+                    self.get_logger().info("Issue cannot find")
+                    self.move_to(Position(self.final_zone["x"], self.final_zone["y"], 0.0))
                     self.wait_for_motion()
-                    self.move_to(Position(0.5, 1.7, 0))
-                    self.wait_for_motion()
-                    self.send_raw("BLOCK")
                     break
-                else:
-                    self.move_to(Position(3 - 0.5, 1.4, 0))
-                    self.wait_for_motion()
-                    self.move_to(Position(3 - 0.5, 1.7, 0))
-                    self.wait_for_motion()
-                    self.send_raw("BLOCK")
+            # Get the best crate to take, according to the color / positions... 
+            elif best_ind is not None:
+                # Depending on the stack len (or alone) we check available pliers
+                # A. Déterminer le groupe d'objets (Stack ou Single)
+                target_ids = self.stacks[stack_id] if stack_id is not None else [best_ind]
 
-    def smart_moves_2025(self):
-        default_angle = -2.60
-        tol = 0.3
-        vmax = 0.5
-        vtmax = 1.0
-        if self.color.lower() == "yellow":
-            en_color = 0
-        elif self.color.lower() == "blue":
-            en_color = 1
-        else:
-            self.get_logger().error(f"NO COLOR")
-        while True:
-            self.send_raw(f"VMAX {vmax}")
-            self.send_raw(f"VTMAX {vtmax}")
-            max = -10
-            crate_valid = None
-            ind_valid = None
-            for ind, cans in self.position_crates.items():
-                if self.available_crates[ind]:
-                    temp = self.compute_penality(cans)
-                    if temp > max:
-                        max = temp
-                        ind_valid = ind
-                        crate_valid = cans
-            if crate_valid is not None:
-                if crate_valid[2] % 2 == 0:
-                    # HERE GO IN FRONT OF CANS THAT ARE BORDERLINE
-                    self.move_to(Position(crate_valid[0] + (crate_valid[2] - 1) * tol, crate_valid[1], crate_valid[2] * np.pi / 2 + default_angle))
-                    self.wait_for_motion()
-                    fpos = self.find_final_pos(ind_valid, en_color)
-                    self.take_cans(crate_valid[2])
-                    self.drop_cans(fpos, default_angle)
-                else: # CANS THAT ARE FRONT ON BOARD
-                    if self.robot_pos.y > crate_valid[1] or crate_valid[1] < 0.5: # CHECK IF ROBOT ABOVE THE CANS OR CANS CLOSE TO BOUNDARIES
-                        if self.robot_pos.y - crate_valid[1] < tol:
-                            self.move_to(Position(crate_valid[0] + self.sign(self.robot_pos.x - crate_valid[0]) * tol, crate_valid[1] + tol, 3 * np.pi / 2 + default_angle))
-                            self.wait_for_motion()
-                        self.move_to(Position(crate_valid[0], crate_valid[1] + tol, 3 * np.pi / 2 + default_angle))
-                        self.wait_for_motion()
-                        fpos = self.find_final_pos(ind_valid, en_color)
-                        self.take_crates(3)
-                        self.drop_crates(fpos, default_angle)
-                    else:
-                        if crate_valid[1] - self.robot_pos.y < tol:
-                            self.move_to(Position(crate_valid[0] + self.sign(self.robot_pos.x - crate_valid[0]) * tol, crate_valid[1] - tol, np.pi / 2 + default_angle))
-                            self.wait_for_motion()
-                        self.move_to(Position(crate_valid[0], crate_valid[1] - tol, np.pi / 2 + default_angle))
-                        self.wait_for_motion()
-                        fpos = self.find_final_pos(ind_valid, en_color)
-                        self.take_crates(1)
-                        self.drop_crates(fpos, default_angle)
-                self.available_crates[ind_valid] = False
-                self.available_end[self.dest_crates[ind_valid][en_color]] += 1 # If yellow 0, else blue
-                self.add_score(4)
+                # B. Trouver les pinces disponibles
+                pliers_config = self.get_best_side_pliers(len(target_ids))
+                if not pliers_config:
+                    self.get_logger().warn("Cible trouvée mais aucune pince disponible. Passage en mode Release.")
+                    release = True
+                    continue
+                
+                selected_pliers_ids = pliers_config[0]
+    
+                # C. Calculer les centres de masse (Crates et Pliers)
+                target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in target_ids])
+                pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in selected_pliers_ids])
+
+                # D. Étape 1 : Navigation vers le point d'entrée
+                # On s'aligne face à la caisse. On ajoute pi car le robot "recule" ou "fait face" ?
+                # Si le robot doit faire face, l'angle est target_pos.theta
+                
+
+                # E. Étape 2 : Alignement final (Calcul de l'offset)
+                # L'angle final du robot doit être tel que les pinces soient alignées avec la caisse
+                # target_angle = Angle_Caisse - Angle_Pince_dans_Robot
+                # Si is_inv est True, on attaque par l'autre côté (+ pi)
+                target_angle = target_pos.t
+                if is_inv:
+                    target_angle += np.pi
+                final_robot_theta = target_angle - pliers_pos.t
+
+                # Transformer la position de la pince du repère Robot vers Map
+                x_offset, y_offset = self.rotate_point(pliers_pos.x, pliers_pos.y, final_robot_theta)
+                
+                distance = 0.15
+                entry_pos = Position(
+                    target_pos.x - x_offset - distance * np.cos(target_angle),
+                    target_pos.y - y_offset - distance * np.sin(target_angle),
+                    final_robot_theta
+                )
+                # Position finale du robot = Position Caisse - Offset Pince
+                final_pos = Position(
+                    target_pos.x - x_offset,
+                    target_pos.y - y_offset,
+                    final_robot_theta
+                )
+
+                self.move_to(entry_pos)
+                self.wait_for_motion()
+
+                self.move_to(final_pos)
+                self.wait_for_motion()
+
+                # F. Activation des pinces
+                robot_x, robot_y, robot_t = final_pos.x, final_pos.y, final_pos.t
+
+                # 2. Projeter chaque pince sélectionnée dans la Map
+                pliers_in_map = {}
+                for pl_id in selected_pliers_ids:
+                    p_local = self.pliers[pl_id]
+                    # Rotation de la position de la pince (Robot -> Map)
+                    rx, ry = self.rotate_point(p_local.x, p_local.y, robot_t)
+                    # Translation (Ajout de la position du robot)
+                    px_map = robot_x + rx
+                    py_map = robot_y + ry
+                    pliers_in_map[pl_id] = (px_map, py_map)
+
+                # 3. Associer chaque pince à l'objet le plus proche (Nearest Neighbor)
+                remaining_targets = list(target_ids) # Copie des IDs d'objets dans la pile
+
+                for pl_id, (px, py) in pliers_in_map.items():
+                    if not remaining_targets:
+                        break
+                        
+                    # Trouver l'objet le plus proche de CETTE pince spécifique
+                    best_obj_id = min(
+                        remaining_targets, 
+                        key=lambda obj_id: (self.haz_crates[obj_id].x - px)**2 + (self.haz_crates[obj_id].y - py)**2
+                    )
+                    
+                    # Retirer l'objet de la liste pour ne pas l'assigner deux fois
+                    remaining_targets.remove(best_obj_id)
+                    
+                    # 4. Appliquer le State 100 + ID
+                    new_state = 100 + best_obj_id
+                    self.pliers[pl_id].state = new_state
+                    self.haz_crates[best_obj_id].state = 1
+                    
+                # 5. Envoyer la commande
+                self.send_plier_cmd(selected_pliers_ids, mode=1)
+                # Set state of objects
+                if stack_id is not None:
+                    for haz_id in self.stacks[stack_id]:
+                        self.haz_crates[haz_id].state = 1
+                else:
+                    self.haz_crates[best_ind].state = 1
+                
+                # Set state of actuators
+                self.wait_for_plier()
+                continue
             else:
-                if en_color == 0: # color is yellow
-                    self.move_to(Position(0.5, 1.4, 0))
-                    self.wait_for_motion()
-                    self.move_to(Position(0.5, 1.7, 0))
-                    self.wait_for_motion()
-                    self.send_raw("BLOCK")
-                    break
-                else:
-                    self.move_to(Position(3 - 0.5, 1.4, 0))
-                    self.wait_for_motion()
-                    self.move_to(Position(3 - 0.5, 1.7, 0))
-                    self.wait_for_motion()
-                    self.send_raw("BLOCK")
+                self.get_logger().info("Nothing to do, going for the release position")
+                release = True
 
+    def get_mean_pose(self, objects):
+        """Calcule la position moyenne (x, y, theta_circulaire) d'une liste d'objets."""
+        mx = np.mean([obj.x for obj in objects])
+        my = np.mean([obj.y for obj in objects])
+        m_sin = np.mean([np.sin(obj.theta) for obj in objects])
+        m_cos = np.mean([np.cos(obj.theta) for obj in objects])
+        return Position(mx, my, np.arctan2(m_sin, m_cos))
 
-    def find_final_pos(self, index, en_color):
-        size_crates = 0.1
-        size_robot = 0.27
-        pos_out = self.end_poses[self.dest_crates[index][en_color]] # If yellow 0
-        incr = self.available_end[self.dest_crates[index][en_color]]
-        if pos_out[2] % 2 == 0:
-            return [pos_out[0] + (pos_out[2] - 1) * (size_crates / 2 + size_robot + size_crates * incr), pos_out[1], pos_out[2]]
-        else:
-            return [pos_out[0], pos_out[1] + size_crates / 2 + size_robot + size_crates * incr, 3 * pos_out[2]]
+    def rotate_point(self, x, y, theta):
+        """Applique une rotation 2D simple."""
+        cos_t, sin_t = np.cos(theta), np.sin(theta)
+        rx = x * cos_t - y * sin_t
+        ry = x * sin_t + y * cos_t
+        return rx, ry
 
-    def angular_distance(a1, a2):
-        diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
-        return abs(diff)
+    def compute_release_rewards(self):
+        max_reward = float('-inf')
+        best_zone_id = None
+        for id, zone in self.zones.items():
+            if len(zone.state) > 0:
+                continue
+            reward = self.compute_release_penality(zone.x, zone.y)
 
-    def compute_penality(self, pos):
-        angle_coeff = 0.05
-        coeff_center = 0 # -0.005
+            # 5. Mise à jour du champion global
+            if reward > max_reward:
+                max_reward = reward
+                best_zone_id = id
+        return best_zone_id
+
+    def compute_release_penality(self, x, y):
+        coeff_center = 1 # -0.005
         coeff_dst = -1
         coeff_enn = 0 # 0.05
         # coeef_end = -0.0001
-        val_center = (1.5 - pos[0]) ** 2 + (1 - pos[1]) ** 2
-        if pos[2] % 2 == 0:
-            angle = pos[2] * np.pi / 2
-        elif self.robot_pos.y > pos[1] and pos[1] > 0.5:
-            angle = 3 * np.pi / 2
-        else:
-            angle = np.pi / 2
-        val_dst = (self.robot_pos.x - pos[0]) ** 2 + (self.robot_pos.y - pos[1]) ** 2 + angle_coeff * (self.robot_pos.t - angle) ** 2
+        val_center = (1.5 - x) ** 2 + (1 - y) ** 2
+        val_dst = (self.robot_pos.x - x) ** 2 + (self.robot_pos.y - y) ** 2
         if self.x_enn is not None:
-            val_ennemi = (self.x_enn - pos[0]) ** 2 + (self.y_enn - pos[1]) ** 2
+            val_ennemi = (self.x_enn - x) ** 2 + (self.y_enn - y) ** 2
         else:
             val_ennemi = 0
         return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
 
-    def take_crates(self, angle):
-        self.kalman(False)
-        self.vaccumgripper(VACCUMGRIPPER_struct(0, 1, 2))
-        self.vaccumgripper(VACCUMGRIPPER_struct(1, 1, 2))
-        self.vaccumgripper(VACCUMGRIPPER_struct(2, 1, 2))
-        self.vaccumgripper(VACCUMGRIPPER_struct(3, 1, 2))
-        self.vaccumgripper(VACCUMGRIPPER_struct(4, 1, 2))
-        self.vaccumgripper(VACCUMGRIPPER_struct(5, 1, 2))
-        self.vaccumgripper(VACCUMGRIPPER_struct(6, 1, 2))
-        self.vaccumgripper(VACCUMGRIPPER_struct(7, 1, 2))
-        self.sleep(0.1)
-        push_dst = 0.15
-        if angle == 0:
-            self.relative_move_to(Position(push_dst, 0, 0))
-        elif angle == 1:
-            self.relative_move_to(Position(0, push_dst, 0))
-        elif angle == 2:
-            self.relative_move_to(Position(-push_dst, 0, 0))
-        elif angle == 3:
-            self.relative_move_to(Position(0, -push_dst, 0))
+    def compute_pick_penality(self, x, y):
+        angle_coeff = 0
+        coeff_center = -1 # -0.005
+        coeff_dst = -1
+        coeff_enn = 0 # 0.05
+        # coeef_end = -0.0001
+        val_center = (1.5 - x) ** 2 + (1 - y) ** 2
+        val_dst = (self.robot_pos.x - x) ** 2 + (self.robot_pos.y - y) ** 2
+        if self.x_enn is not None:
+            val_ennemi = (self.x_enn - x) ** 2 + (self.y_enn - y) ** 2
         else:
-            self.relative_move_to(Position(0, 0, 0))
-            self.get_logger().error(f"Invalid angle for taking cans: {angle}")
-            pass
-        self.wait_for_motion()
-        self.kalman(True)
-        self.sleep(0.1)
+            val_ennemi = 0
+        return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
 
-    def drop_crates(self, destination, default_angle):
-        push_dst = 0.1
-        self.move_to(Position(destination[0], destination[1], destination[2] * np.pi / 2 + default_angle))
-        self.wait_for_motion()
+    def compute_pick_rewards(self):
+        """
+        Calcule la meilleure opportunité de ramassage et retourne l'identifiant, 
+        le stack, l'orientation d'approche et les coordonnées du point d'entrée.
+        """
+        max_reward = float('-inf')
+        best_crate_id = None
+        target_stack_id = None
+        use_inverted_approach = False
+        
+        approach_distance = 0.25
+        reviewed_ids = set()
 
-        # self.valve(VALVE_struct(2))
-        if destination[2] == 0:
-            self.relative_move_to(Position(push_dst, 0, 0))
-            self.wait_for_motion()
-            self.vaccumgripper(VACCUMGRIPPER_struct(0, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(1, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(2, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(3, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(4, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(5, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(6, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(7, 3, 2))
-            self.relative_move_to(Position(-push_dst, 0, 0))
-            self.wait_for_motion()
-        elif destination[2] == 2:
-            self.relative_move_to(Position(-push_dst, 0, 0))
-            self.wait_for_motion()
-            self.vaccumgripper(VACCUMGRIPPER_struct(0, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(1, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(2, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(3, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(4, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(5, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(6, 3, 2))
-            self.vaccumgripper(VACCUMGRIPPER_struct(7, 3, 2))
-            self.relative_move_to(Position(push_dst, 0, 0))
-            self.wait_for_motion()
-        elif destination[2] == 3:
-            self.relative_move_to(Position(0, -push_dst, 0))
-            self.wait_for_motion()
-            self.vaccumgripper(VACCUMGRIPPER_struct(0, 3, 2))
-            # self.vaccumgripper(VACCUMGRIPPER_struct(1, 3, 2))
-            # self.vaccumgripper(VACCUMGRIPPER_struct(2, 3, 2))
-            # self.vaccumgripper(VACCUMGRIPPER_struct(3, 3, 2))
-            # self.vaccumgripper(VACCUMGRIPPER_struct(4, 3, 2))
-            # self.vaccumgripper(VACCUMGRIPPER_struct(5, 3, 2))
-            # self.vaccumgripper(VACCUMGRIPPER_struct(6, 3, 2))
-            # self.vaccumgripper(VACCUMGRIPPER_struct(7, 3, 2))
-            self.relative_move_to(Position(0, push_dst, 0))
-            self.wait_for_motion()
-        else:
-            self.get_logger().error(f"Invalid angle for dropping cans: "
-                                    f"{destination[2]}")
+        for crate_id, crate in self.haz_crates.items():
+            if crate_id in reviewed_ids:
+                continue
 
+            # 1. Filtres de sécurité et d'état
+            if (crate.color == self.color or crate.color == 2) and crate.state == 100:
+                reviewed_ids.add(crate_id)
+                continue
+            if crate.state == 1 or crate.state == 100: 
+                reviewed_ids.add(crate_id)
+                continue
+            
+            # 2. Consolidation des données (Caisse seule ou Pile)
+            stack_id = self.get_stack_linked(crate_id)
+            if stack_id is not None:
+                group_ids = self.stacks[stack_id]
+                group_crates = [self.haz_crates[pid] for pid in group_ids]
+                mean_x = np.mean([c.x for c in group_crates])
+                mean_y = np.mean([c.y for c in group_crates])
+                
+                # Moyenne circulaire des angles
+                sum_sin = np.sum([np.sin(c.theta) for c in group_crates])
+                sum_cos = np.sum([np.cos(c.theta) for c in group_crates])
+                mean_theta = np.arctan2(sum_sin, sum_cos)
+                
+                for pid in group_ids:
+                    reviewed_ids.add(pid)
+            else:
+                mean_x, mean_y, mean_theta = crate.x, crate.y, crate.theta
+                reviewed_ids.add(crate_id)
+
+            # 3. Calcul de l'orientation d'approche perpendiculaire
+            offset_x = np.cos(mean_theta) * approach_distance
+            offset_y = np.sin(mean_theta) * approach_distance
+
+            entry_point_std = (mean_x - offset_x, mean_y - offset_y)
+            entry_point_inv = (mean_x + offset_x, mean_y + offset_y)
+
+            # 4. Évaluation des points d'entrée
+            reward_std = self.compute_pick_penality(*entry_point_std)
+            reward_inv = self.compute_pick_penality(*entry_point_inv)
+
+            # Sélection locale du meilleur point
+            if reward_inv > reward_std:
+                current_local_reward = reward_inv
+                current_inverted = True
+            else:
+                current_local_reward = reward_std
+                current_inverted = False
+            
+            # 5. Mise à jour du champion global
+            if current_local_reward > max_reward:
+                max_reward = current_local_reward
+                best_crate_id = crate_id
+                target_stack_id = stack_id
+                use_inverted_approach = current_inverted
+                            
+        return best_crate_id, target_stack_id, use_inverted_approach
+
+    def get_stack_linked(self, target_index):
+        """
+        Vérifie si un indice est présent dans l'une des listes du dictionnaire.
+        
+        Args:
+            stacks_dict (dict): Dictionnaire de listes {stack_id: [indices...]}
+            target_index (int): L'indice à rechercher
+            
+        Returns:
+            int/None: L'ID du stack s'il est trouvé, sinon None.
+        """
+        for stack_id, indices in self.stacks.items():
+            if target_index in indices:
+                return stack_id
+                
+        return None
+
+    def get_best_side_pliers_release(self, angle_target):
+        max_reward = float('+inf')
+        best_pliers_side = None
+        for side in range(4):
+            side_pliers_ids = range(side * 4, (side + 1) * 4)
+            if any(self.pliers[pl_id].state >= 0 for pl_id in side_pliers_ids):
+                rew = self.angular_distance(self.robot_pos.t + self.pliers[side * 4].theta, angle_target)
+                if rew < max_reward:
+                    max_reward = rew
+                    best_pliers_side = side
+        return best_pliers_side
+
+    def get_best_side_pliers(self, stack_len):
+        """
+        Identifie les côtés du robot ayant suffisamment de ventouses libres en ligne.
+        
+        Args:
+            stack_len (int): Nombre d'objets dans la pile à ramasser.
+            
+        Returns:
+            list: Liste des side_ids (0, 1, 2 ou 3) capables de prendre la pile.
+        """
+        available_sides = []
+        
+        # Il y a 4 côtés (0, 1, 2, 3)
+        for side in range(4):
+            # On récupère les 4 pinces de ce côté spécifique
+            # Les IDs sont organisés par blocs de 4 : [0,1,2,3], [4,5,6,7], etc.
+            side_pliers_ids = range(side * 4, (side + 1) * 4)
+            
+            max_consecutive = 0
+            current_consecutive = 0
+            max_list_consecutive = []
+            current_list_consecutive = []
+            
+            for p_id in side_pliers_ids:
+                if self.pliers[p_id].state == -1:
+                    current_consecutive += 1
+                    current_list_consecutive.append(p_id)
+                    if current_consecutive > max_consecutive:
+                        max_consecutive = current_consecutive
+                        max_list_consecutive = current_list_consecutive
+                else:
+                    current_consecutive = 0 # Rupture de la ligne
+                    current_list_consecutive = []            
+            # Si le plus grand groupe de ventouses libres est suffisant
+            if max_consecutive >= stack_len:
+                available_sides.append(max_list_consecutive[:stack_len])
+        
+        # for side in available_sides:
+        #     self.robot_pos.t + self.pliers[side].theta 
+        return available_sides if available_sides != [] else None
+
+    def angular_distance(self, a1, a2):
+        diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
+        return abs(diff)
 
 def main(args=None):
     """Run main loop."""

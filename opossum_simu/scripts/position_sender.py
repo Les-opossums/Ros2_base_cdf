@@ -161,10 +161,10 @@ class PositionSender(Node):
         for k in self.actuators[name].keys():
             act = self.actuators[name][k]
             act.state_int = result[k]
-            # 0: free, 1: picking, 2: dropping, 3: reverting
+            # 0: free, 1: picking, 2: dropping, 3: reverting, 4: keep up
             if result[k] in (0, 2, 3) and act.state != 'free':
-                if act.state != 'running':
-                    # The state of an object is "free_color" or "free_rot" (rot is eq to a spcific color, black, because rotten objects are not grabbable), we want to keep the color information when the object is released
+                if act.state not in ('running', 'keeping') :
+                    # The state of an object is "free_color" or "free_rot", we want to keep the color information when the object is released
                     if result[k] == 2: # dropping, so we need to update the color of the object to the one of the robot
                         self.objects[int(act.state)].state = 'free' + "*" + self.objects[int(act.state)].state.split("*")[-1]
                     elif result[k] == 3: # picking, so we need to update the color of the object to the inverse of the one of the robot
@@ -173,6 +173,8 @@ class PositionSender(Node):
                 act.state = 'free'
             elif result[k] == 1 and act.state == 'free':
                 act.state = 'running'
+            elif result[k] == 4 and act.state == 'running':
+                act.state = 'keeping'
 
     def _init_servers(self):
         self.srv = self.create_service(Trigger, 'send_global_data', self._reset_global_objects)
@@ -216,7 +218,7 @@ class PositionSender(Node):
         self._action_take(name, act, msg, cos, sin, old_theta)
 
     def _action_take(self, name, act, msg, cos, sin, old_theta):
-        if act.state == 'free':
+        if act.state == 'free' or act.state == 'keeping':
             return
         x_ = act.x * cos - act.y * sin + msg.x
         y_ = act.x * sin + act.y * cos + msg.y
@@ -260,7 +262,7 @@ class PositionSender(Node):
             msg_global.robots.append(robot)
         while len(self.modified_objects) > 0:
             msg_global.objects.append(self.objects[self.modified_objects.pop()])
-        mapping_st = {0: "free", 1: "pick", 2: "drop", 3: "revdrop"}
+        mapping_st = {0: "free", 1: "pick", 2: "drop", 3: "revdrop", 4: "keeping"}
         for name in self.robot_names:
             cpos = self.current_pos[name]
             cos_ = np.cos(cpos.z)
@@ -293,13 +295,13 @@ def encode_state(state) -> int:
     """Encode a list of booleans into an integer."""
     result = 0
     for i, value in enumerate(state):
-        result |= (int(value) << (i * 2))
+        result |= (int(value) << (i * 3))
     return result
 
 def decode_state(value: int, length: int) -> list[int]:
     """Decode an integer into a list of booleans of given length."""
     # Now, i will have not only true of false, but 0: free, 1: picking, 2: dropping, 3: revert_dropping, so need to review the archi, now need 2 bits for each.
-    return [(value >> (i * 2)) & 0b11 for i in range(length)]
+    return [(value >> (i * 3)) & 0b111 for i in range(length)]
 
 def main(args=None):
     """Run the main loop."""

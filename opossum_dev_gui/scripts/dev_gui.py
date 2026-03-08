@@ -559,6 +559,7 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
             "vaccum_gripper*pick": (0.03, 0.01),
             "vaccum_gripper*drop": (0.03, 0.01),
             "vaccum_gripper*revdrop": (0.03, 0.01),
+            "vaccum_gripper*keeping": (0.03, 0.01),
             
         } | {name: (0.35, 0.35) for name in self.robot_names}
 

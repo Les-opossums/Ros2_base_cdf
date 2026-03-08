@@ -18,7 +18,7 @@ from opossum_simu.math_simu import lidar_scan
 from sensor_msgs.msg import LaserScan
 
 
-class LidarSimulation(Node):
+class CameraSimulation(Node):
     """Simulate the lidar sensor by returning points corresponding to beacons."""
 
     def __init__(self):

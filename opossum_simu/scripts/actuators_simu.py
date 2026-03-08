@@ -39,6 +39,7 @@ class ActuatorsSimu(Node):
         #         ("short_motor_srv", rclpy.Parameter.Type.STRING),
         #     ],
         # )
+        self.time_pliers_move = 1.5
         self.blocking = False
         if self.blocking:
             self._goal_queue = collections.deque()
@@ -94,7 +95,20 @@ class ActuatorsSimu(Node):
                 self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = mode
             else:
                 self.states[f"VACCUMGRIPPER{id * 2 + side}"] = mode
-            response.response = request_split[0] + "," + request_split[1] + "," + request_split[2]
+            state_vector = encode_state(list(self.states.values()))
+            self.pub_change_state.publish(Int64(data=state_vector))
+
+            time.sleep(self.time_pliers_move)
+            if mode == 1:
+                end_mode = 4
+            else: 
+                end_mode = 0  
+            if side == 2:
+                self.states[f"VACCUMGRIPPER{id * 2}"] = end_mode
+                self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = end_mode
+            else:
+                self.states[f"VACCUMGRIPPER{id * 2 + side}"] = end_mode
+            response.response = "PINCEFEEDBACK," + request_split[1] + "," + request_split[2] + ",1,1"
         state_vector = encode_state(list(self.states.values()))
         self.pub_change_state.publish(Int64(data=state_vector))
         return response
@@ -150,13 +164,13 @@ def encode_state(state) -> int:
     """Encode a list of booleans into an integer."""
     result = 0
     for i, value in enumerate(state):
-        result |= (int(value) << (i * 2))
+        result |= (int(value) << (i * 3))
     return result
 
 def decode_state(value: int, length: int) -> list[int]:
     """Decode an integer into a list of booleans of given length."""
-    # Now, i will have not only true of false, but 0: free, 1: picking, 2: dropping, 3: revert_dropping, so need to review the archi, now need 2 bits for each.
-    return [(value >> (i * 2)) & 0b11 for i in range(length)]
+    # Now, i will have not only true of false, but 0: free, 1: picking, 2: dropping, 3: revert_dropping, 4: keep it so need to review the archi, now need 2 bits for each.
+    return [(value >> (i * 3)) & 0b111 for i in range(length)]
 
 
 def main(args=None):

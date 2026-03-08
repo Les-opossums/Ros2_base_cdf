@@ -83,7 +83,17 @@ class MotorSimu(Node):
 
         self.pub_zync_raspi = self.create_publisher(String, "zync_raspi", 10)
         self.timer = self.create_timer(0.1, self.send_robot_data)
-    
+        self.timer2 = self.create_timer(self.compute_period, self.pub_real_pos)
+
+    def pub_real_pos(self):
+        self.pub_real_position.publish(
+            Point(
+                x=float(self.position[0].item()),
+                y=float(self.position[1].item()),
+                z=float(self.position[2].item()),
+            )
+        )
+
     def send_robot_data(self):
         self.pub_zync_raspi.publish(
             String(
@@ -232,13 +242,6 @@ class MotorSimu(Node):
                     )
                     reached_position = np.allclose(self.position[:, 0], self.obj)
                     self.real_time = time.time()
-                    self.pub_real_position.publish(
-                        Point(
-                            x=float(self.position[0].item()),
-                            y=float(self.position[1].item()),
-                            z=float(self.position[2].item()),
-                        )
-                    )
                     time.sleep(self.compute_period)
                 if self.ask_for_block:
                     self.ask_for_block = False
@@ -285,13 +288,6 @@ class MotorSimu(Node):
         ):
             pot_pos = self.position[:2, :] + np.random.uniform(-0.05, 0.05, (2, 1))
         self.position[:2, :] = pot_pos
-        self.pub_real_position.publish(
-            Point(
-                x=float(self.position[0].item()),
-                y=float(self.position[1].item()),
-                z=float(self.position[2].item()),
-            )
-        )
 
     def _ordered_moves(self):
         """Do straight moves when there is a request."""

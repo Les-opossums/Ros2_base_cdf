@@ -98,29 +98,7 @@ def generate_launch_description():
                 )
             ]
         ),
-        launch_arguments={"robot_names": robot_names}.items()
-    )
-
-    action_sequencer_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                PathJoinSubstitution(
-                    [FindPackageShare("opossum_action_sequencer"), "launch", "action_sequencer.launch.py"]
-                )
-            ]
-        ),
-        launch_arguments={"robot_names": robot_names}.items()
-    )
-
-    ihm_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                PathJoinSubstitution(
-                    [FindPackageShare("opossum_ihm"), "launch", "ihm.launch.py"]
-                )
-            ]
-        ),
-        launch_arguments={"robot_names": robot_names}.items()
+        launch_arguments={"simulation": simulation, "robot_names": robot_names}.items()
     )
 
     action_sequencer_launch = IncludeLaunchDescription(
