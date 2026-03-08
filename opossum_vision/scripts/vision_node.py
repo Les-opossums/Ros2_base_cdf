@@ -237,8 +237,8 @@ class VisionNode(Node):
                 p.y = float(splitted_data[3])/1000
                 p.z = float(splitted_data[4]) 
                 p.theta = float(splitted_data[5])*3.14159/180  # Conversion en radians
-                p.in_stack = 1 # int(splitted_data[6])
-                p.stack_id = 1 # int(splitted_data[7])
+                p.in_stack = int(splitted_data[6])
+                p.stack_id = int(splitted_data[7])
                 p.in_center = 0. # float(splitted_data[8])
                 self.aruco_pub.publish(p)
             except Exception as e:

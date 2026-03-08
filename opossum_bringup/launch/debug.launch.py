@@ -104,6 +104,21 @@ def generate_launch_description():
         parameters=[param_nav],
         )
 
+    param_vision_path = PathJoinSubstitution(
+        [FindPackageShare("opossum_vision"), 
+        "config", 
+        "vision_params.yaml"]
+    )
+    param_vision = ParameterFile(param_vision_path, allow_substs=True)
+
+    node_vision = Node(
+        namespace=namespace,
+        package="opossum_vision",
+        executable="vision_node.py",
+        name="vision_node",
+        parameters=[param_vision],
+    )
+
     ld.add_action(node_ihm)
     ld.add_action(param_server)
     ld.add_action(node_action_sequencer)
@@ -113,5 +128,6 @@ def generate_launch_description():
     ld.add_action(node_beacon_detector)
     ld.add_action(node_obstacle_extractor)
     ld.add_action(node_avoid_obstacle)
+    ld.add_action(node_vision)
 
     return ld
