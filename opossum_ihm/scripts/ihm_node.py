@@ -4,7 +4,7 @@ import rclpy
 from rclpy.node import Node
 from opossum_msgs.srv import Init
 from opossum_ihm.interface import GUI
-from opossum_msgs.msg import LidarLoc
+from opossum_msgs.msg import LidarLoc, RobotData
 from std_msgs.msg import Int32, Bool, String
 import threading
 import time
@@ -33,6 +33,7 @@ class IhmNode(Node):
                 ("au_topic", "au"),
                 ("enable_timer_topic", "enable_timer"),
                 ("comm_state_topic", "comm_state"),
+                ("robot_data_topic", "robot_data")
             ]
         )
         self.current_score = 0
@@ -43,7 +44,7 @@ class IhmNode(Node):
         self.debug = False
         self.au = False
         self.comm_state = True
-        self.x, self.y, self.t = None, None, None
+        self.lidar_x, self.lidar_y, self.lidar_t = None, None, None
         name = self.get_namespace()
         self.name = name[1:] if name[0] == "/" else name 
 
@@ -76,6 +77,10 @@ class IhmNode(Node):
             self.get_parameter("position_topic").get_parameter_value().string_value
         )
 
+        robot_data_topic = (
+            self.get_parameter("robot_data_topic").get_parameter_value().string_value
+        )
+
         self.sub_score = self.create_subscription(
             Int32,
             score_topic,
@@ -104,6 +109,12 @@ class IhmNode(Node):
             LidarLoc,
             position_topic,
             self.lidar_loc_callback,
+            1
+        )
+        self.robot_data_sub = self.create_subscription(
+            RobotData,
+            robot_data_topic,
+            self.robot_data_callback,
             1
         )
 
@@ -149,7 +160,12 @@ class IhmNode(Node):
     def update_values(self):
         self.gui.score_app.update_score(self.score)
         self.gui.score_app.update_au(self.au, self.comm_state)
-        self.gui.score_app.update_position(self.x, self.y, self.t)
+        self.gui.score_app.update_position(self.lidar_x, 
+                                           self.lidar_y, 
+                                           self.lidar_t,
+                                           self.robot_data_x,
+                                           self.robot_data_y,
+                                           self.robot_data_t)
 
     def update_parameters(self):
         """Met à jour les paramètres via un service ROS 2."""
@@ -192,10 +208,15 @@ class IhmNode(Node):
 
     def lidar_loc_callback(self, msg: LidarLoc):
         """Receive Lidar location."""
-        self.x = msg.robot_position.x
-        self.y = msg.robot_position.y
-        self.t = msg.robot_position.z
+        self.lidar_x = msg.robot_position.x
+        self.lidar_y = msg.robot_position.y
+        self.lidar_t = msg.robot_position.z
 
+    def robot_data_callback(self, msg: RobotData):
+        """Receive robot data."""
+        self.robot_data_x = msg.x
+        self.robot_data_y = msg.y
+        self.robot_data_t = msg.theta
 
 def main(args=None):
     rclpy.init(args=args)

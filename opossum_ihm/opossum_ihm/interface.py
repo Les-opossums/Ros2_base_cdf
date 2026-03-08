@@ -99,7 +99,7 @@ class ImageApp:
         plateau_path = os.path.join(
             get_package_share_directory("opossum_ihm"),
             "images",
-            "plateau.png",
+            "map.png",
         )
         self.img = Image.open(plateau_path)
         # Pivoter l'image de 90° dans le sens des aiguilles d'une montre
@@ -344,6 +344,9 @@ class ScoreApp:
         self.lidar_pos_x = 0.
         self.lidar_pos_y = 0.
         self.lidar_pos_z = 0.
+        self.robot_data_x = 0.
+        self.robot_data_y = 0.
+        self.robot_data_t = 0.
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         if screen_width == 480 and screen_height == 800:
@@ -361,8 +364,15 @@ class ScoreApp:
 
         self.display_score = tk.StringVar()
         self.display_score.set("0")
-        self.position_text = tk.StringVar()
-        self.position_text.set(f" X: {self.lidar_pos_x:.2f} "
+        self.position_zynq = tk.StringVar()
+        self.position_zynq.set(f" ZYNQ "
+                              f" X: {self.robot_data_x:.2f} "
+                              f" Y: {self.robot_data_y:.2f} "
+                              f" T: {self.robot_data_t:.2f} "
+                              )
+        self.position_lidar = tk.StringVar()
+        self.position_lidar.set(f" LIDAR "
+                               f" X: {self.lidar_pos_x:.2f} "
                                f" Y: {self.lidar_pos_y:.2f} "
                                f" T: {self.lidar_pos_z:.2f} "
                                )
@@ -376,15 +386,25 @@ class ScoreApp:
         )
         self.zero_label.pack(expand=True)
 
-        self.position_label = tk.Label(
+        self.position_zynq_label = tk.Label(
             frame,
-            textvariable=self.position_text,
+            textvariable=self.position_zynq,
+            font=("Arial", 20),
+            bg="lightgray",
+            fg="black",
+            anchor="n"
+        )
+        self.position_zynq_label.pack(side="top", pady=10)
+
+        self.position_lidar_label = tk.Label(
+            frame,
+            textvariable=self.position_lidar,
             font=("Arial", 20),
             bg="lightgray",
             fg="black",
             anchor="s"
         )
-        self.position_label.pack(side="bottom", pady=10)
+        self.position_lidar_label.pack(side="bottom", pady=10)
 
     def update_au(self, au, comm_state):
         self.is_au = au
@@ -419,22 +439,39 @@ class ScoreApp:
         self.display_score.set(str(score))  # Mise à jour du texte
         self.zero_label.update_idletasks()
 
-    def update_position(self, x, y, t):
+    def update_position(self, x_lidar, y_lidar, t_lidar, x_zynq, y_zynq, t_zynq):
         """Met à jour la position toutes les 500ms"""
-        if x is None:
-            self.position_text.set(
+        if x_lidar is None:
+            self.position_lidar.set(
+                "LIDAR "
                 " X: --:--"
                 " Y: --:--"
                 " T: --:--"
             )
         else:
-            self.position_text.set(
-                f" X: {x:.2f}"
-                f" Y: {y:.2f}"
-                f" T: {t:.2f}"
+            self.position_lidar.set(
+                f" LIDAR "
+                f" X: {x_lidar:.2f}"
+                f" Y: {y_lidar:.2f}"
+                f" T: {t_lidar:.2f}"
             )
-        self.position_label.update_idletasks()
+        self.position_lidar_label.update_idletasks()
 
+        if x_zynq is None:
+            self.position_zynq.set(
+                " ZYNQ "
+                " X: --:--"
+                " Y: --:--"
+                " T: --:--"
+            )
+        else:
+            self.position_zynq.set(
+                f" ZYNQ "
+                f" X: {x_zynq:.2f}"
+                f" Y: {y_zynq:.2f}"
+                f" T: {t_zynq:.2f}"
+            )
+        self.position_zynq_label.update_idletasks()
 
 class ImageLabel(tk.Label):
     """
