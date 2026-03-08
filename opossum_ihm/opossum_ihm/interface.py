@@ -1,9 +1,10 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 import os
+import subprocess
 from itertools import count, cycle
 from ament_index_python.packages import get_package_share_directory
-# from rclpy.logging import get_logger
+from rclpy.logging import get_logger
 
 
 class ColorChoiceApp:
@@ -377,6 +378,18 @@ class ScoreApp:
                                f" T: {self.lidar_pos_z:.2f} "
                                )
 
+        self.restart_service_button = tk.Button(
+            frame,
+            text="Restart Service",
+            command=self.restart_launch_service,
+            bg="orange",
+            fg="black",
+            font=("Arial", 14, "bold"),
+            height=5,
+            width=20
+        )
+        self.restart_service_button.pack(side="bottom", pady=20)
+
         self.zero_label = tk.Label(
             frame,
             textvariable=self.display_score,
@@ -472,6 +485,17 @@ class ScoreApp:
                 f" T: {t_zynq:.2f}"
             )
         self.position_zynq_label.update_idletasks()
+
+    def restart_launch_service(self):
+        """Exécute la commande bash pour redémarrer le service systemd utilisateur."""
+        logger = get_logger("opossum_ihm")
+        try:
+            logger.info("Restarting 'launch.service'...")
+            subprocess.run(['systemctl', '--user', 'restart', 'launch.service'], check=True)
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Erreur : La commande a échoué avec le code retour {e.returncode}.")
+        except FileNotFoundError:
+            logger.error("Erreur : La commande 'systemctl' est introuvable sur ce système.")
 
 class ImageLabel(tk.Label):
     """
