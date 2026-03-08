@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import messagebox
 from PIL import Image, ImageTk
 import os
 import subprocess
@@ -487,15 +488,90 @@ class ScoreApp:
         self.position_zynq_label.update_idletasks()
 
     def restart_launch_service(self):
-        """Exécute la commande bash pour redémarrer le service systemd utilisateur."""
+        """Affiche un pop-up custom et exécute la commande bash pour redémarrer le service."""
         logger = get_logger("opossum_ihm")
-        try:
-            logger.info("Restarting 'launch.service'...")
-            subprocess.run(['systemctl', '--user', 'restart', 'launch.service'], check=True)
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Erreur : La commande a échoué avec le code retour {e.returncode}.")
-        except FileNotFoundError:
-            logger.error("Erreur : La commande 'systemctl' est introuvable sur ce système.")
+
+        # --- 1. Création du pop-up sur mesure ---
+        popup = tk.Toplevel(self.root)
+        popup.title("Confirmation")
+        popup.geometry("400x250")
+        popup.configure(bg="white")
+        
+        # Rend la fenêtre modale (empêche de cliquer sur la fenêtre principale derrière)
+        popup.transient(self.root)
+        popup.grab_set()
+
+        # Variable pour stocker le choix de l'utilisateur
+        confirmation = False
+
+        # Fonctions liées aux boutons
+        def on_yes():
+            nonlocal confirmation
+            confirmation = True
+            popup.destroy()
+
+        def on_no():
+            nonlocal confirmation
+            confirmation = False
+            popup.destroy()
+
+        # --- 2. Design du pop-up ---
+        lbl = tk.Label(
+            popup, 
+            text="Restart ROS 2 ?", 
+            bg="white", 
+            fg="black",
+            font=("Arial", 16, "bold")
+        )
+        lbl.pack(pady=30)
+
+        # Conteneur pour aligner les boutons côte à côte
+        btn_frame = tk.Frame(popup, bg="white")
+        btn_frame.pack(expand=True, fill="both", padx=20, pady=10)
+
+        # Gros bouton OUI
+        btn_yes = tk.Button(
+            btn_frame, 
+            text="YES", 
+            command=on_yes, 
+            bg="green", 
+            fg="white", 
+            font=("Arial", 20, "bold"),
+            width=8, 
+            height=2
+        )
+        btn_yes.pack(side="left", expand=True, padx=10)
+
+        # Gros bouton NON
+        btn_no = tk.Button(
+            btn_frame, 
+            text="NO", 
+            command=on_no, 
+            bg="red", 
+            fg="white", 
+            font=("Arial", 20, "bold"),
+            width=8, 
+            height=2
+        )
+        btn_no.pack(side="right", expand=True, padx=10)
+
+        # --- 3. Attente de la réponse ---
+        self.root.wait_window(popup)
+
+        # --- 4. Traitement du choix ---
+        if confirmation:
+            try:
+                logger.info("Redémarrage de launch.service...")
+                subprocess.run(['systemctl', '--user', 'restart', 'launch.service'], check=True)
+               
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Erreur : {e.returncode}.")
+                # Tu pourras aussi remplacer ça par un popup custom d'erreur plus tard
+                messagebox.showerror("Erreur", f"(Code: {e.returncode})")
+            except FileNotFoundError:
+                logger.error("Erreur : 'systemctl' est introuvable.")
+        else:
+            logger.info("Redémarrage annulé.")
 
 class ImageLabel(tk.Label):
     """
