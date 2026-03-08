@@ -15,9 +15,7 @@ def launch_setup(context, *args, **kwargs):
     robot_names_str = LaunchConfiguration("robot_names").perform(context)
     robot_names_list = [name.strip() for name in robot_names_str.split(",")]
 
-    param_file = PathJoinSubstitution(
-        [FindPackageShare("opossum_localisation"), "config", "localisation_params.yaml"]
-    )
+    param_file = LaunchConfiguration("localisation_params_file")   
 
     for robot in robot_names_list:
         node_tf_broadcaster = Node(
@@ -69,6 +67,14 @@ def generate_launch_description():
         "simulation", default_value="false", description="Enable simulation mode"
     )
 
+    localisation_params_arg = DeclareLaunchArgument(
+        "localisation_params_file",
+        default_value=PathJoinSubstitution(
+            [FindPackageShare("opossum_localisation"), "config", "localisation_params.yaml"]
+        ),
+        description="Chemin complet vers le fichier YAML des paramètres de localisation",
+    )
+
     return LaunchDescription(
-        [robot_names_arg, simulation_arg, OpaqueFunction(function=launch_setup)]
+        [robot_names_arg, simulation_arg, localisation_params_arg, OpaqueFunction(function=launch_setup)]
     )

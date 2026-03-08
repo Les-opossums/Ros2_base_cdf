@@ -40,7 +40,7 @@ def generate_launch_description():
     nav_params_arg = DeclareLaunchArgument(
         "nav_params_file",
         default_value=PathJoinSubstitution(
-            [FindPackageShare("opossum_nav"), "config", "nav_params.yaml"]
+            [FindPackageShare("opossum_nav"), "config", "nav_small_area_params.yaml"]
         ),
         description="Chemin complet vers le fichier YAML des paramètres de navigation",
     )
@@ -67,7 +67,7 @@ def generate_launch_description():
     localisation_params_arg = DeclareLaunchArgument(
         "localisation_params_file",
         default_value=PathJoinSubstitution(
-            [FindPackageShare("opossum_localisation"), "config", "localisation_params.yaml"]
+            [FindPackageShare("opossum_localisation"), "config", "localisation_small_area_params.yaml"]
         ),
         description="Chemin complet vers le fichier YAML de localisation",
     )

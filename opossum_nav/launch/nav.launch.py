@@ -13,9 +13,8 @@ def launch_setup(context, *args, **kwargs):
     robot_names_str = LaunchConfiguration("robot_names").perform(context)
     robot_names_list = [name.strip() for name in robot_names_str.split(",")]
 
-    param_file = PathJoinSubstitution(
-        [FindPackageShare("opossum_nav"), "config", "nav_params.yaml"]
-    )
+    param_file = LaunchConfiguration("nav_params_file")
+
     for robot in robot_names_list:
         node_avoid_obstacle = Node(
             namespace=robot,
@@ -39,7 +38,18 @@ def generate_launch_description():
     simulation_arg = DeclareLaunchArgument(
         "simulation", default_value="false", description="Enable simulation mode"
     )
-
+    nav_params_arg = DeclareLaunchArgument(
+        "nav_params_file",
+        default_value=PathJoinSubstitution(
+            [FindPackageShare("opossum_nav"), "config", "nav_params.yaml"]
+        ),
+        description="Chemin complet vers le fichier YAML des paramètres de navigation",
+    )
     return LaunchDescription(
-        [robot_names_arg, simulation_arg, OpaqueFunction(function=launch_setup)]
+        [
+            robot_names_arg, 
+            simulation_arg,
+            nav_params_arg,  
+            OpaqueFunction(function=launch_setup)
+        ]
     )
