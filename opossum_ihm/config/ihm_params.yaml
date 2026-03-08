@@ -3,6 +3,7 @@ main_robot:
     ros__parameters:
       color_topic: init_team_color
       position_topic: position_out
+      robot_data_topic: robot_data
       score_topic: score
       au_topic: au
       enable_timer_topic: enable_timer
@@ -14,11 +15,12 @@ main_robot:
       script_number: 1
       debug_mode: false
 
-seond_robot:
+second_robot:
   ihm_node:
     ros__parameters:
       color_topic: init_team_color
       position_topic: position_out
+      robot_data_topic: robot_data
       score_topic: score
       au_topic: au
       enable_timer_topic: enable_timer
