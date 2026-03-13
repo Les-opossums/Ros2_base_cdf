@@ -45,14 +45,17 @@ class LaunchSelectorApp:
         self.root.mainloop()
 
     def launch_petit_plateau(self):
-        print("Lancement de la configuration : Petit Plateau")
-        commande = ["ros2", "launch", "opossum_simu", "bringup_small_area.launch.py"]
-        subprocess.Popen(commande)
+        commande = ["ros2", "launch", "opossum_bringup", "bringup_small_area.launch.py"]
+        self.root.withdraw()
+        process = subprocess.Popen(commande)
+        process.wait() 
         self.root.destroy()
 
     def launch_grand_plateau(self):
-        commande = ["ros2", "launch", "opossum_simu", "bringup_simu.launch.py"]     
-        subprocess.Popen(commande)
+        commande = ["ros2", "launch", "opossum_bringup", "bringup_simu.launch.py"]     
+        self.root.withdraw()
+        process = subprocess.Popen(commande)
+        process.wait()
         self.root.destroy()
 
 if __name__ == "__main__":

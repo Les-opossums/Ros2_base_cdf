@@ -7,4 +7,5 @@ done
 
 export ROS_DOMAIN_ID=69
 source install/setup.bash
-ros2 launch opossum_bringup debug.launch.py
+# ros2 launch opossum_bringup debug.launch.py
+python3 /home/opossum/robot_ws/src/opossum_ihm/opossum_ihm/interface_bringup.py
