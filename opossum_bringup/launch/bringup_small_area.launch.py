@@ -220,9 +220,6 @@ def generate_launch_description():
         executable="tf_broadcaster.py",
         name="tf_broadcaster_node",
         parameters=[param_loc, {"robot_names": ["main_robot"]}],
-        respawn=True,
-        respawn_delay=2.0,
-        respawn_max_retries=1.0,
     )
 
     node_rplidar = Node(
