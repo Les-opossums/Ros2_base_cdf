@@ -1159,10 +1159,10 @@ class ActionManager(Node):
         self.send_raw(f"VMAX 0.8")
         self.send_raw(f"VTMAX 1.5")
         release = False
-        steal_poses = [[0.4, 0.4],
-                       [0.4, 1.05],
-                       [2.6, 1.05],
-                       [2.6, 0.4],
+        steal_poses = [[0.45, 0.45],
+                       [0.45, 1.1],
+                       [2.55, 1.1],
+                       [2.55, 0.45],
                       ]
         id_steal = 0
         while True:
