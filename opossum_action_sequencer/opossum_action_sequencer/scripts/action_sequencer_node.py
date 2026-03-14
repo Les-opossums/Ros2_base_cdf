@@ -119,6 +119,7 @@ class ActionManager(Node):
         self.pos_obj = None
         self.max_distance = 0.1
         self.latest_camera_msg = None
+        self.last_camera_timestamp = time.time()
 
         # Action Done
         self.is_robot_moving = False
@@ -453,6 +454,7 @@ class ActionManager(Node):
     def aruco_callback(self, msg: VisionDataFrame):
         """Continuously save the latest camera frame without processing it."""
         self.latest_camera_msg = msg
+        self.last_camera_timestamp = time.time()
 
     def _extract_color_from_id(self, aruco_id: int) -> int:
         """Map ArUco ID to internal color code."""
@@ -478,6 +480,9 @@ class ActionManager(Node):
         # 1. Wait for physical motion blur to clear
         time.sleep(0.5) 
         
+        if time.time() - self.last_camera_timestamp > 0.1:
+            return
+
         # 2. Grab the latest message in the buffer
         msg = self.latest_camera_msg
         if msg is None or not msg.object:
