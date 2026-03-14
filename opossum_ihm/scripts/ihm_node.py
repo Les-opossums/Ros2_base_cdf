@@ -45,6 +45,7 @@ class IhmNode(Node):
         self.au = False
         self.comm_state = True
         self.lidar_x, self.lidar_y, self.lidar_t = None, None, None
+        self.robot_data_x, self.robot_data_y, self.robot_data_t = None, None, None
         name = self.get_namespace()
         self.name = name[1:] if name[0] == "/" else name 
 
@@ -160,12 +161,13 @@ class IhmNode(Node):
     def update_values(self):
         self.gui.score_app.update_score(self.score)
         self.gui.score_app.update_au(self.au, self.comm_state)
-        self.gui.score_app.update_position(self.lidar_x, 
-                                           self.lidar_y, 
-                                           self.lidar_t,
-                                           self.robot_data_x,
-                                           self.robot_data_y,
-                                           self.robot_data_t)
+        if self.lidar_x is not None and self.robot_data_x is not None:
+            self.gui.score_app.update_position(self.lidar_x, 
+                                               self.lidar_y, 
+                                               self.lidar_t,
+                                               self.robot_data_x,
+                                               self.robot_data_y,
+                                               self.robot_data_t)
 
     def update_parameters(self):
         """Met à jour les paramètres via un service ROS 2."""

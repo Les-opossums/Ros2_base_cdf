@@ -20,7 +20,7 @@ echo "Lancement de la configuration : $CHOIX"
 if [ "$CHOIX" == "petit" ]; then
     exec ros2 launch opossum_bringup bringup_small_area.launch.py
 elif [ "$CHOIX" == "grand" ]; then
-    exec ros2 launch opossum_bringup bringup_simu.launch.py
+    exec ros2 launch opossum_bringup debug.launch.py
 else
     echo "Erreur : Configuration '$CHOIX' inconnue."
     exit 1

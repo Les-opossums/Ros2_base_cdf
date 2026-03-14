@@ -9,6 +9,7 @@ Environment=XAUTHORITY=/home/opossum/.Xauthority
 WorkingDirectory=/home/opossum/robot_ws
 StandardOutput=journal
 Restart=on-failure
+RestartSec=3
 TimeoutStopSec=2
 
 [Install]
