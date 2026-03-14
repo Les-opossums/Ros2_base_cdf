@@ -1,11 +1,27 @@
 #!/bin/bash
 
-while ! xset q &>/dev/null; do
-    sleep 1
-    echo "Waiting for X server to start..."
-done
+# 1. Sourcer l'environnement ROS 2 (à adapter selon votre version, ex: humble, foxy...)
+source /opt/ros/humble/setup.bash
+source /home/opossum/robot_ws/install/setup.bash
 
-export ROS_DOMAIN_ID=69
-source install/setup.bash
-# ros2 launch opossum_bringup debug.launch.py
-python3 /home/opossum/robot_ws/src/opossum_ihm/opossum_ihm/interface_bringup.py
+# 2. Définir le chemin du fichier d'état
+CONFIG_FILE="/home/opossum/robot_ws/config_plateau.txt"
+
+# 3. Lire la configuration (par défaut "petit" si le fichier n'existe pas)
+if [ -f "$CONFIG_FILE" ]; then
+    CHOIX=$(cat "$CONFIG_FILE")
+else
+    CHOIX="petit"
+fi
+
+# 4. Lancer le bon launchfile selon le choix
+echo "Lancement de la configuration : $CHOIX"
+
+if [ "$CHOIX" == "petit" ]; then
+    exec ros2 launch opossum_bringup bringup_small_area.launch.py
+elif [ "$CHOIX" == "grand" ]; then
+    exec ros2 launch opossum_bringup bringup_simu.launch.py
+else
+    echo "Erreur : Configuration '$CHOIX' inconnue."
+    exit 1
+fi

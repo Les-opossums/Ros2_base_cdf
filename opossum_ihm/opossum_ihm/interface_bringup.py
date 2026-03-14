@@ -1,11 +1,15 @@
 import tkinter as tk
 import subprocess
+import os
 
 class LaunchSelectorApp:
     def __init__(self, name="Launcher"):
         self.name = name
         self.root = tk.Tk()
         self.root.title(f"[{self.name}] Choix du plateau")
+
+        # Fichier qui stockera l'état
+        self.config_file = "/home/opossum/robot_ws/config_plateau.txt"
 
         # Gestion de l'écran (Plein écran si 480x800)
         screen_width = self.root.winfo_screenwidth()
@@ -24,7 +28,7 @@ class LaunchSelectorApp:
             text="Petit Plateau",
             bg="lightblue",
             font=("Arial", 16, "bold"),
-            command=self.launch_petit_plateau,
+            command=lambda: self.launch_service("petit"),
             width=30,
             height=10,
         )
@@ -36,7 +40,7 @@ class LaunchSelectorApp:
             text="Grand Plateau",
             bg="lightgreen",
             font=("Arial", 16, "bold"),
-            command=self.launch_grand_plateau,
+            command=lambda: self.launch_service("grand"),
             width=30,
             height=10,
         )
@@ -44,19 +48,18 @@ class LaunchSelectorApp:
 
         self.root.mainloop()
 
-    def launch_petit_plateau(self):
-        commande = ["ros2", "launch", "opossum_bringup", "bringup_small_area.launch.py"]
-        self.root.withdraw()
-        process = subprocess.Popen(commande)
-        process.wait() 
-        self.root.destroy()
+    def launch_service(self, config_choice):
+        # 1. Écrire le choix dans le fichier texte
+        with open(self.config_file, "w") as f:
+            f.write(config_choice)
 
-    def launch_grand_plateau(self):
-        commande = ["ros2", "launch", "opossum_bringup", "bringup_simu.launch.py"]     
-        self.root.withdraw()
-        process = subprocess.Popen(commande)
-        process.wait()
-        self.root.destroy()
+        # 2. Redémarrer le user service systemd
+        # Notez l'ajout de "--user" et le retrait de "sudo"
+        commande = ["systemctl", "--user", "restart", "launch.service"]
+        
+        self.root.withdraw() # Cache la fenêtre
+        subprocess.run(commande) # Lance la commande
+        self.root.destroy() # Ferme l'application Tkinter
 
 if __name__ == "__main__":
     app = LaunchSelectorApp("Robot Config")

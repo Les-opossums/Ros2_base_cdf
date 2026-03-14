@@ -1,11 +1,9 @@
 [Unit]
-Description=Run my script at boot
-After=graphical.target
-Requires=graphical.target
+Description=Lancement dynamique des noeuds ROS2
+After=graphical-session.target
 
 [Service]
 ExecStart=/home/opossum/robot_ws/src/utils/script_service.sh
-User=opossum
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/opossum/.Xauthority
 WorkingDirectory=/home/opossum/robot_ws
@@ -14,4 +12,5 @@ Restart=on-failure
 TimeoutStopSec=2
 
 [Install]
-WantedBy=graphical.target
+# default.target est le standard pour lancer un user service au démarrage de la session
+WantedBy=default.target
