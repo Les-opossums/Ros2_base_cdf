@@ -50,6 +50,14 @@ def launch_setup(context, *args, **kwargs):
             parameters=[param_file],
         )
 
+        node_camera_simu = Node(
+            namespace=robot,
+            package="opossum_simu",
+            executable="camera_simu.py",
+            name="camera_simu_node",
+            parameters=[param_file],
+        )
+
         node_actuators_simu = Node(
             namespace=robot,
             package="opossum_simu",
@@ -61,6 +69,7 @@ def launch_setup(context, *args, **kwargs):
         nodes.append(node_motor_simu)
         nodes.append(node_zynq_simu)
         nodes.append(node_lidar_simu)
+        nodes.append(node_camera_simu)
         nodes.append(node_actuators_simu)
     return nodes
 

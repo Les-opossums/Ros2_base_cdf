@@ -44,6 +44,12 @@ main_robot:
       # angle_info: [-3.1276220678165654, 3.14159265358, 0.014828970674425364] # Angle min, angle max, angle increment
       angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
 
+  camera_simu_node:
+    ros__parameters:
+      camera_angles: [0.0] # 0 deg
+      radius: [1.0]
+      cone_range: [1.396] # 80 deg
+
 second_robot:
   zynq_simu_node:
     ros__parameters:
@@ -82,3 +88,9 @@ second_robot:
       radius: 0.05
       angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
       # angle_info: [-3.1276220678165654, 3.14159265358, 0.014828970674425364] # Angle min, angle max, angle increment
+
+  camera_simu_node:
+    ros__parameters:
+      camera_angles: [0.0] # 0 deg
+      radius: [1.0]
+      cone_range: [1.396] # 80 deg

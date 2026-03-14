@@ -6,6 +6,8 @@ import sys
 import random
 import rclpy
 from rclpy.node import Node
+import json
+import math
 
 # from PyQt5.QtChart import QChart, QChartView, QLineSeries
 from PyQt5 import QtWidgets, QtGui, QtCore
@@ -65,6 +67,9 @@ class NodeGUI(Node):
         self.client_global_data = self.create_client(Trigger, 'send_global_data')
         while not self.client_global_data.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
+        self.full_state_clients = {}
+        for name in self.robot_names:
+            self.full_state_clients[name] = self.create_client(Trigger, f"{name}/get_full_board_state")
 
     def _init_subscribers(self):
         """Initialize subscribers of the node."""
@@ -78,6 +83,12 @@ class NodeGUI(Node):
                 name + "/" + position_topic,
                 functools.partial(self.position_callback, name=name),
                 10,
+            )
+            self.create_subscription(
+                String,
+                f"{name}/board_state_updates",
+                functools.partial(self.board_state_callback, name=name),
+                10
             )
         if self.set_asserv:
             asserv_topic = (
@@ -96,6 +107,10 @@ class NodeGUI(Node):
                     functools.partial(self.check_asserv_callback, name=name),
                     10,
                 )
+
+    def board_state_callback(self, msg, name):
+        """Pass the delta JSON to the interface."""
+        self.parent.update_robot_board_state(msg.data, name)
 
     def call_send_global_data(self):
         req = Trigger.Request()
@@ -122,6 +137,24 @@ class NodeGUI(Node):
     def check_asserv_callback(self, msg, name):
         """Check if an interesting data is received."""
         self.parent.update_robot_position(msg, name)
+
+    def request_full_board_state(self, name):
+        """Async request for the initial massive map dump."""
+        client = self.full_state_clients[name]
+        if client.wait_for_service(timeout_sec=0.5):
+            req = Trigger.Request()
+            future = client.call_async(req)
+            future.add_done_callback(functools.partial(self.full_state_done_callback, name=name))
+        else:
+            self.get_logger().warn(f"Service {name}/get_full_board_state not available yet.")
+
+    def full_state_done_callback(self, future, name):
+        try:
+            response = future.result()
+            if response.success:
+                self.parent.init_robot_board_state(response.message, name)
+        except Exception as e:
+            self.get_logger().error(f"Failed to get full state for {name}: {e}")
 
 
 class MapScene(QtWidgets.QGraphicsView):
@@ -165,6 +198,22 @@ class MapScene(QtWidgets.QGraphicsView):
         self.ennemis_items = []
         self.scene.addItem(self.icon_item)
         self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
+        self.crate_items = {}
+        self.plier_items = {}
+        self.robot_global_x = 0.0
+        self.robot_global_y = 0.0
+        self.robot_global_theta = 0.0
+
+    def local_to_global(self, local_x, local_y, local_t):
+        """Converts robot-frame coordinates to world-frame coordinates."""
+        cos_t = math.cos(self.robot_global_theta)
+        sin_t = math.sin(self.robot_global_theta)
+        
+        global_x = self.robot_global_x + (local_x * cos_t) - (local_y * sin_t)
+        global_y = self.robot_global_y + (local_x * sin_t) + (local_y * cos_t)
+        global_t = self.robot_global_theta + local_t
+        
+        return global_x, global_y, global_t
 
     def send_pos_goal(self, event):
         """Send the goal position on the button click."""
@@ -182,6 +231,9 @@ class MapScene(QtWidgets.QGraphicsView):
 
     @QtCore.pyqtSlot(LidarLoc)
     def update_map_position(self, msg):
+        self.robot_global_x = msg.robot_position.x
+        self.robot_global_y = msg.robot_position.y
+        self.robot_global_theta = msg.robot_position.z
         """Update the robot position."""
         map_rect = self.map_item.boundingRect()
         width = map_rect.width()
@@ -215,6 +267,111 @@ class MapScene(QtWidgets.QGraphicsView):
             old_item = self.ennemis_items.pop()
             self.scene.removeItem(old_item)
 
+    def pos_to_scene(self, x, y):
+        """Convert real (x,y) meters to scene pixels."""
+        map_rect = self.map_item.boundingRect()
+        return map_rect.width() * x / 3.0, map_rect.height() * (1 - y / 2.0)
+
+    def size_to_scene(self, w_m, h_m):
+        """Convert real-world dimensions in meters to scene pixels."""
+        map_rect = self.map_item.boundingRect()
+        # Map is 3.0m wide by 2.0m high
+        w_px = map_rect.width() * (w_m / 3.0)
+        h_px = map_rect.height() * (h_m / 2.0)
+        return w_px, h_px
+
+    # # --- NEW: Coordinate helper ---
+    # def pos_to_scene(self, x, y):
+    #     """Convert real (x,y) meters to scene pixels."""
+    #     map_rect = self.map_item.boundingRect()
+    #     width = map_rect.width()
+    #     height = map_rect.height()
+    #     return width * x / 3.0, height * (1 - y / 2.0)
+
+    # --- NEW: State Applicators ---
+    def apply_full_state(self, json_str):
+        """Initialize the whole board."""
+        try:
+            full_state = json.loads(json_str)
+            for crate in full_state.get('crates', []):
+                self._update_crate_visual(crate)
+            for plier in full_state.get('pliers', []):
+                self._update_plier_visual(plier)
+        except Exception as e:
+            print(f"Error parsing full state: {e}")
+
+    def apply_update_state(self, json_str):
+        """Update only the changed elements."""
+        try:
+            updates = json.loads(json_str)
+            for crate in updates.get('crates', []):
+                self._update_crate_visual(crate)
+            for plier in updates.get('pliers', []):
+                self._update_plier_visual(plier)
+        except Exception as e:
+            print(f"Error parsing update state: {e}")
+
+    def _update_crate_visual(self, crate_data):
+        cid = crate_data['id']
+        
+        # 1. Transform from local Robot frame to global Map frame
+        gx, gy, gt = self.local_to_global(
+            crate_data['x'], crate_data['y'], crate_data['theta']
+        )
+
+        if cid not in self.crate_items:
+            # Convert the 0.05m x 0.15m size to pixels
+            w_px, h_px = self.size_to_scene(0.05, 0.15)
+            
+            # Center the rectangle origin so it rotates around its middle
+            rect = QtWidgets.QGraphicsRectItem(-w_px/2, -h_px/2, w_px, h_px) 
+            rect.setPen(QtGui.QPen(QtCore.Qt.black))
+            self.scene.addItem(rect)
+            self.crate_items[cid] = rect
+
+        item = self.crate_items[cid]
+        px, py = self.pos_to_scene(gx, gy)
+        
+        item.setPos(px, py)
+        
+        # --- THE FIX: Add the 90-degree offset matching your original code ---
+        item.setRotation(90 - (gt * 180 / math.pi))
+
+        # Color mapping: 0=Yellow, 1=Blue, 2=Red
+        color_val = crate_data.get('color', -1)
+        if color_val == 0: color = QtGui.QColor(255, 255, 0)
+        elif color_val == 1: color = QtGui.QColor(0, 0, 255)
+        elif color_val == 2: color = QtGui.QColor(255, 0, 0)
+        else: color = QtGui.QColor(150, 150, 150)
+        item.setBrush(QtGui.QBrush(color))
+
+    def _update_plier_visual(self, plier_data):
+        pid = plier_data['id']
+        
+        # 1. Transform from local Robot frame to global Map frame
+        gx, gy, gt = self.local_to_global(
+            plier_data['x'], plier_data['y'], plier_data['theta']
+        )
+
+        if pid not in self.plier_items:
+            # Pliers are small, let's say 3cm (0.03m) circles
+            r_px, _ = self.size_to_scene(0.03, 0.03)
+            circle = QtWidgets.QGraphicsEllipseItem(-r_px/2, -r_px/2, r_px, r_px)
+            circle.setPen(QtGui.QPen(QtCore.Qt.black))
+            self.scene.addItem(circle)
+            self.plier_items[pid] = circle
+
+        item = self.plier_items[pid]
+        px, py = self.pos_to_scene(gx, gy)
+        
+        item.setPos(px, py)
+        
+        # --- THE FIX ---
+        item.setRotation(90 - (gt * 180 / math.pi))
+
+        state = plier_data.get('state', -1)
+        brush_color = QtGui.QColor(0, 255, 0) if state >= 0 else QtGui.QColor(255, 255, 255)
+        item.setBrush(QtGui.QBrush(brush_color))
 
 class DraggablePixmapItem(QtWidgets.QGraphicsPixmapItem):
     """Drag items on the Map."""
@@ -538,6 +695,13 @@ class MainRobotPage(QtWidgets.QWidget):
         self.component_pages["Motors"].update_map_position(msg)
         self.component_pages["Motors"].update_text_position(msg)
 
+    # Inside MainRobotPage class
+    def update_board_state(self, json_str):
+        self.component_pages["GlobalView"].map_scene.apply_update_state(json_str)
+        
+    def init_board_state(self, json_str):
+        self.component_pages["GlobalView"].map_scene.apply_full_state(json_str)
+
 class GeneralViewPage(QtWidgets.QGraphicsView):
     def __init__(self, robot_names, parent):
         super().__init__()
@@ -696,6 +860,7 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
 
         self._connect_to_ros()
         self.call_update_global()
+        self.fetch_initial_states()
 
     def update_robot_position(self, msg, name):
         """Update the position of the robot."""
@@ -714,7 +879,17 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
     def send_leashes(self):
         for name in self.gui_node.robot_names:
             self.send_cmd(name, "LEASH", [])
-            
+
+    def update_robot_board_state(self, json_str, name):
+        self.robot_pages[name].update_board_state(json_str)
+
+    def init_robot_board_state(self, json_str, name):
+        self.robot_pages[name].init_board_state(json_str)
+        
+    def fetch_initial_states(self):
+        for name in self.gui_node.robot_names:
+            self.gui_node.request_full_board_state(name)
+   
     def _connect_to_ros(self):
         """Connect ROS to interface."""
         self.timer = QtCore.QTimer(self)

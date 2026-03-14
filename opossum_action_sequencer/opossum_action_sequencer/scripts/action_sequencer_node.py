@@ -12,8 +12,11 @@ from rclpy.node import Node
 from rcl_interfaces.msg import ParameterEvent
 
 from std_msgs.msg import String, Bool, Int32
-from opossum_msgs.msg import RobotData, LidarLoc, VisionData
+from opossum_msgs.msg import RobotData, LidarLoc, VisionDataFrame
+from std_srvs.srv import Trigger
 
+from scipy.optimize import linear_sum_assignment
+import math
 import yaml
 import numpy as np
 from opossum_action_sequencer.utils import (
@@ -92,6 +95,8 @@ class ActionManager(Node):
         self._init_parameters()
         self._init_publishers()
         self._init_subscribers()
+        self._init_services()
+        self.last_sent_state = {'crates': {}, 'pliers': {}}
         self.script_class = None
         self.ready = False
         self.is_started = False
@@ -101,6 +106,7 @@ class ActionManager(Node):
         self.in_end_zone = False
         self.end_zone = None
         self.middle_zone = None
+        
 
         self.x_enn = None
         self.y_enn = None
@@ -110,6 +116,8 @@ class ActionManager(Node):
 
         self.new_pos = 0
         self.pos_obj = None
+        self.max_distance = 0.1
+        self.latest_camera_msg = None
 
         # Action Done
         self.is_robot_moving = False
@@ -120,6 +128,7 @@ class ActionManager(Node):
         self.motion_done = True
         self.color = None
         self._init_mapping(2026)
+
         # Process
         self.motion_done_event = Event()
         self.motion_done_event.set()
@@ -208,6 +217,7 @@ class ActionManager(Node):
             200,
             self.timer_backstage_callback
         )
+        self.pub_timer = self.create_timer(0.2, self.publish_board_state)
 
     def _init_move_timer(self):
         self.move_timer = self.create_timer(
@@ -271,6 +281,12 @@ class ActionManager(Node):
             10
         )
 
+        self.pub_board_state = self.create_publisher(
+            String,
+            "board_state_updates",
+            10
+        )
+
     def _init_subscribers(self):
         """Initialize the subscribers of the node."""
 
@@ -327,7 +343,7 @@ class ActionManager(Node):
         )
 
         self.aruco_sub = self.create_subscription(
-            VisionData,
+            VisionDataFrame,
             "aruco_loc",
             self.aruco_callback,
             10
@@ -340,15 +356,178 @@ class ActionManager(Node):
             10
         )
 
-    def aruco_callback(self, msg: VisionData):
-        if self.centering:
-            object_x = msg.x
-            object_y = msg.y
-            # verify that the object is not in the list and add it if not
-            if not any(np.sqrt((obj[0] - object_x) ** 2 + (obj[1] - object_y) ** 2) < 0.025 for obj in self.list_objects):
-                self.list_objects.append((object_x, object_y))
-            if len(self.list_objects) == 4: # If we have detected 4 objects, we can compute the barycenter
-                self.barycentre = (sum(obj[0] for obj in self.list_objects) / 4, sum(obj[1] for obj in self.list_objects) / 4)
+    def _init_services(self):
+        """Initialize the services to send full board state on demand."""
+        self.full_state_srv = self.create_service(
+            Trigger, 
+            'get_full_board_state', 
+            self.full_state_callback
+        )
+
+    def full_state_callback(self, request, response):
+        """Service callback to dump the entire board state for map initialization."""
+        full_state = {'crates': [], 'pliers': []}
+
+        # Dump all crates
+        for cid, crate in self.haz_crates.items():
+            full_state['crates'].append({
+                'id': cid, 'x': round(crate.x, 3), 'y': round(crate.y, 3),
+                'theta': round(crate.theta, 3), 'state': crate.state, 'color': crate.color
+            })
+
+        # Dump all pliers
+        for pid, plier in self.pliers.items():
+            full_state['pliers'].append({
+                'id': pid, 'x': round(plier.x, 3), 'y': round(plier.y, 3),
+                'theta': round(plier.theta, 3), 'state': plier.state
+            })
+
+        # Return it directly in the service response string
+        response.success = True
+        response.message = json.dumps(full_state)
+        
+        # Optional: You can also reset last_sent_state here so the next timer 
+        # tick forces a full delta update, just to be safe.
+        self.last_sent_state = {'crates': {}, 'pliers': {}}
+        
+        self.get_logger().info("Full board state sent to map via service.")
+        return response
+
+    def publish_board_state(self):
+        """Publish only the crates and pliers that have changed."""
+        # Wait until the map is loaded
+        if not hasattr(self, 'haz_crates') or not hasattr(self, 'pliers'):
+            return
+
+        updates = {'crates': [], 'pliers': []}
+
+        # 1. Check Crates for changes
+        for cid, crate in self.haz_crates.items():
+            # Create a tuple of the state we care about (rounded to 3 decimals ~ 1mm)
+            current_state = (round(crate.x, 3), round(crate.y, 3), round(crate.theta, 3), crate.state, crate.color)
+            last_state = self.last_sent_state['crates'].get(cid)
+            
+            if current_state != last_state:
+                updates['crates'].append({
+                    'id': cid, 'x': current_state[0], 'y': current_state[1],
+                    'theta': current_state[2], 'state': current_state[3], 'color': current_state[4]
+                })
+                # Update our memory
+                self.last_sent_state['crates'][cid] = current_state
+
+        # 2. Check Pliers for changes
+        for pid, plier in self.pliers.items():
+            current_state = (round(plier.x, 3), round(plier.y, 3), round(plier.theta, 3), plier.state)
+            last_state = self.last_sent_state['pliers'].get(pid)
+            
+            if current_state != last_state:
+                updates['pliers'].append({
+                    'id': pid, 'x': current_state[0], 'y': current_state[1],
+                    'theta': current_state[2], 'state': current_state[3]
+                })
+                self.last_sent_state['pliers'][pid] = current_state
+
+        # 3. Only publish if there is actually something new!
+        if updates['crates'] or updates['pliers']:
+            msg = String()
+            msg.data = json.dumps(updates)
+            self.pub_board_state.publish(msg)
+
+    # =========================================================================
+    # UNIFIED CAMERA CALLBACK (HUNGARIAN TRACKING WITH ARUCO ID)
+    # =========================================================================
+    def aruco_callback(self, msg: VisionDataFrame):
+        """Continuously save the latest camera frame without processing it."""
+        self.latest_camera_msg = msg
+
+    def _extract_color_from_id(self, aruco_id: int) -> int:
+        """Map ArUco ID to internal color code."""
+        if aruco_id == 37:
+            self.get_logger().info(f"YELLOW")
+            return 0  # Yellow
+        elif aruco_id == 43:
+            self.get_logger().info(f"BLUE")
+            return 1  # Blue
+        elif aruco_id == 21:
+            self.get_logger().info(f"ROT")
+            return 2  # Rot (Red)
+        return -1 # Unknown
+
+    def stare_and_update(self):
+        """Stop, let the camera settle, and process the latest frame."""
+        if self.stop:
+            return
+
+        self.get_logger().info("Staring... waiting for camera to settle.")
+        
+        # 1. Wait for physical motion blur to clear
+        time.sleep(0.2) 
+        
+        # 2. Grab the latest message in the buffer
+        msg = self.latest_camera_msg
+        if msg is None or not msg.object:
+            self.get_logger().info("Stare complete: No objects currently visible.")
+            return
+
+        self.get_logger().info("Processing camera snapshot...")
+        camera_detections = msg.object
+        current_time = time.time()
+
+        # =====================================================================
+        # EXACT SAME HUNGARIAN TRACKING LOGIC AS BEFORE
+        # =====================================================================
+        if not self.haz_crates:
+            for det in camera_detections:
+                new_id = max(self.haz_crates.keys()) + 1 if self.haz_crates else 0
+                color_val = self._extract_color_from_id(det.id)
+                new_crate = HazCrate(new_id, det.x, det.y, det.theta, rot=(color_val == 2))
+                new_crate.color = color_val
+                new_crate.last_seen = current_time
+                self.haz_crates[new_id] = new_crate
+            return
+
+        crate_ids = list(self.haz_crates.keys())
+        num_crates = len(crate_ids)
+        num_detections = len(camera_detections)
+        
+        cost_matrix = np.zeros((num_crates, num_detections))
+
+        for i, cid in enumerate(crate_ids):
+            crate = self.haz_crates[cid]
+            for j, det in enumerate(camera_detections):
+                dist = math.hypot(crate.x - det.x, crate.y - det.y)
+                cost_matrix[i, j] = dist
+
+        crate_indices, detection_indices = linear_sum_assignment(cost_matrix)
+        matched_detection_indices = set()
+
+        for crate_idx, det_idx in zip(crate_indices, detection_indices):
+            distance = cost_matrix[crate_idx, det_idx]
+
+            if distance <= self.max_distance:
+                cid = crate_ids[crate_idx]
+                matched_crate = self.haz_crates[cid]
+                det = camera_detections[det_idx]
+
+                matched_crate.x = det.x
+                matched_crate.y = det.y
+                matched_crate.theta = det.theta
+                matched_crate.last_seen = current_time
+
+                if matched_crate.color in [-1, 2]:
+                    matched_crate.color = self._extract_color_from_id(det.id)
+
+                matched_detection_indices.add(det_idx)
+
+        for j, det in enumerate(camera_detections):
+            if j not in matched_detection_indices:
+                new_id = max(self.haz_crates.keys()) + 1
+                color_val = self._extract_color_from_id(det.id)
+                new_crate = HazCrate(new_id, det.x, det.y, det.theta, rot=(color_val == 2))
+                new_crate.color = color_val
+                new_crate.last_seen = current_time
+                self.haz_crates[new_id] = new_crate
+                self.get_logger().info(f"Tracking: Discovered new crate! Assigned internal ID: {new_id}")
 
     def begin_centering(self):
         self.centering = True
@@ -514,7 +693,7 @@ class ActionManager(Node):
 
             # Si on est proche de la cible ET à l'arrêt, on débloque le script.
             if self.is_robot_arrived and is_stopped:
-                self.get_logger().info("Arrivée confirmée par calcul (Timeout logiciel)")
+                # self.get_logger().info("Arrivée confirmée par calcul (Timeout logiciel)")
                 self.motion_done = True
                 self.motion_done_event.set() # C'est ça qui débloque wait_for_motion
 
@@ -809,13 +988,9 @@ class ActionManager(Node):
                         id_active_pliers = [id for id in self.pliers.keys() if (self.pliers[id].state >= 0 and id // 4 == id_side)]
                         for id in id_active_pliers:
                             pstate = self.pliers[id].state
-                            self.get_logger().info(f"STATE PL: {pstate}")
                             if pstate >= 0:
-                                self.get_logger().info("GOIGNGINGIGN")
                                 self.haz_crates[pstate].state = 100
                                 self.zones[best_zone_ind].state.append(pstate)
-                        self.get_logger().info(f"Zone: {self.zones[best_zone_ind].state}")
-                        self.get_logger().info(f"All Zones: {self.zones}")
 
                         self.send_plier_cmd(id_active_pliers, 3)
                         self.wait_for_plier()
@@ -882,6 +1057,7 @@ class ActionManager(Node):
 
                 self.move_to(entry_pos)
                 self.wait_for_motion()
+                self.stare_and_update()
 
                 self.move_to(final_pos)
                 self.wait_for_motion()

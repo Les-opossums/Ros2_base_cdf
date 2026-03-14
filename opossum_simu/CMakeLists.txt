@@ -40,6 +40,7 @@ install(PROGRAMS
   scripts/zynq_simu.py
   scripts/motor_simu.py
   scripts/lidar_simu.py
+  scripts/camera_simu.py
   scripts/actuators_simu.py
   scripts/position_sender.py
   scripts/robot_controller.py
