@@ -117,7 +117,7 @@ class ActionManager(Node):
 
         self.new_pos = 0
         self.pos_obj = None
-        self.max_distance = 0.1
+        self.max_distance = 0.2
         self.latest_camera_msg = None
         self.last_camera_timestamp = time.time()
 
