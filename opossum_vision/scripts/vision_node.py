@@ -11,10 +11,11 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 # Assurez-vous que l'import fonctionne selon votre structure
 try:
-    from opossum_msgs.msg import RobotData, VisionData, CameraLoc
+    from opossum_msgs.msg import RobotData, VisionData, VisionDataFrame, CameraLoc
 except ImportError:
     class RobotData: pass
     class VisionData: pass
+    class VisionDataFrame: pass
     class CameraLoc: pass
 
 class VisionNode(Node):
@@ -114,7 +115,7 @@ class VisionNode(Node):
         Initialize publishers for detected objects.
         '''
         self.aruco_pub = self.create_publisher(
-            VisionData, 
+            VisionDataFrame, 
             'aruco_loc', 
             10
         )
@@ -129,12 +130,7 @@ class VisionNode(Node):
         '''
         Initialize subscribers for robot data.
         '''
-        self.data_sub = self.create_subscription(
-            RobotData,
-            self.data_topic,
-            self.robot_data_callback,
-            10
-        )
+        pass
 
     def _init_cam(self, name):
         """Initialize serial connection with handshake."""
@@ -228,23 +224,50 @@ class VisionNode(Node):
         if len(splitted_data) < 1:
             return
         if (
-            splitted_data[0] == "ARUCO" and len(splitted_data) == 9
-        ):  # ARUCO id, x, y, z, theta, in_stack
+            splitted_data[0] == "ARUCO"
+        ):  # ARUCO id_cam id_tag, x, y, z, theta, in_stack, id_cam, x, ...
+            raw_string = data.strip()
+
+            if not raw_string.startswith("ARUCO"):
+                return
+
+            parts = raw_string.split(',')
+            if not parts:
+                return
+
+            first_part_tokens = parts[0].split()
+            if len(first_part_tokens) < 3:
+                return
+
+            # Création du message global
+            vision_frame_msg = VisionDataFrame()
+
             try:
-                p = VisionData()
-                p.id = int(splitted_data[1])
-                p.x = float(splitted_data[2])/1000
-                p.y = float(splitted_data[3])/1000
-                p.z = float(splitted_data[4]) 
-                p.theta = float(splitted_data[5])*3.14159/180  # Conversion en radians
-                p.in_stack = int(splitted_data[6])
-                p.stack_id = int(splitted_data[7])
-                p.in_center = 0. # float(splitted_data[8])
-                self.aruco_pub.publish(p)
-            except Exception as e:
-                self.get_logger().warn(
-                    f"The splitted data was {splitted_data} and got: {e}"
-                )
+                vision_frame_msg.id = int(first_part_tokens[1]) # cam_id
+            except ValueError:
+                self.get_logger().error("Erreur de conversion de l'ID caméra.")
+                return
+
+            # Liste qui contiendra nos objets VisionData
+            vision_frame_msg.object = []
+
+            # -- Traitement du 1er tag --
+            tag_1_tokens = first_part_tokens[2:]
+            if tag_1_tokens:
+                obj1 = self.create_vision_data(tag_1_tokens)
+                if obj1:
+                    vision_frame_msg.object.append(obj1)
+
+            # -- Traitement des tags suivants --
+            for part in parts[1:]:
+                tag_tokens = part.split()
+                if tag_tokens:
+                    obj = self.create_vision_data(tag_tokens)
+                    if obj:
+                        vision_frame_msg.object.append(obj)
+
+            # 3. Publication du message structuré
+            self.publisher_.publish(vision_frame_msg)
 
         elif (
             splitted_data[0] == "LOC" and len(splitted_data) == 5
@@ -264,9 +287,43 @@ class VisionNode(Node):
         elif splitted_data[0] == "ERROR":
             self.get_logger().error(f"Error: {data}")
 
-    def robot_data_callback(self, msg):
-        # self.get_logger().info(f"Reçu des données sur {self.get_namespace()}")
-        pass
+    def create_vision_data(self, tokens):
+        """
+        Convertit la liste de valeurs brutes en un objet VisionData.
+        ATTENTION: Les index (tokens[1], tokens[2]...) doivent correspondre 
+        à l'ordre réel de ta trame série.
+        """
+        if len(tokens) < 5: # Vérification de sécurité minimale (ID, X, Y, Z, Theta)
+            return None
+
+        vd = VisionData()
+        vd.name = "" # Non utilisé, laissé vide
+        
+        try:
+            vd.id = int(tokens[0])
+            vd.x = float(tokens[1])
+            vd.y = float(tokens[2])
+            vd.z = float(tokens[3])
+            vd.theta = float(tokens[4])
+            
+            # Pour les attributs suivants, j'assigne des index hypothétiques.
+            # Il faudra ajuster ces index [5], [6], [7] selon la position 
+            # exacte de "in_stack", "stack_id", et "in_center" dans ta trame.
+            if len(tokens) >= 8:
+                vd.in_stack = int(float(tokens[5])) # int(float()) au cas où la valeur arriverait comme "1.0"
+                vd.stack_id = int(float(tokens[6]))
+                vd.in_center = float(tokens[7])
+            else:
+                # Valeurs par défaut si elles ne sont pas dans la trame
+                vd.in_stack = 0
+                vd.stack_id = 0
+                vd.in_center = 0.0
+
+        except ValueError as e:
+            self.get_logger().warn(f"Données ignorées, erreur de conversion: {e}")
+            return None
+            
+        return vd
 
 def main(args=None):
     rclpy.init(args=args)
