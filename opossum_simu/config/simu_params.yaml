@@ -4,6 +4,8 @@ position_sender_node:
     short_motor_srv: short_motor
     update_position_topic: update_position
     update_period: 0.1
+    config_yaml: "objects.yaml"
+    year: 2026
 
 main_robot:
   zynq_simu_node:

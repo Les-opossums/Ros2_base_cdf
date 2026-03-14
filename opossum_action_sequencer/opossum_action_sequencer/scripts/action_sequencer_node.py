@@ -34,9 +34,6 @@ import json
 from dataclasses import dataclass
 from ament_index_python.packages import get_package_share_directory
 
-YEAR = 2026
-CONFIG_YAML = "small_objects.yaml"
-
 @dataclass
 class Plier:
     """Pliers Class."""
@@ -131,7 +128,7 @@ class ActionManager(Node):
         self.robot_pos = None
         self.motion_done = True
         self.color = None
-        self._init_mapping(YEAR, CONFIG_YAML)
+        self._init_mapping()
 
         # Process
         self.motion_done_event = Event()
@@ -144,9 +141,9 @@ class ActionManager(Node):
         self.end_match_event.set()
         self.stop = False
 
-    def _init_mapping(self, year, config_yaml):
+    def _init_mapping(self):
         objects_path = os.path.join(
-            get_package_share_directory("opossum_bringup"), "config", str(year), config_yaml
+            get_package_share_directory("opossum_bringup"), "config", str(self.year), self.config_yaml
         )
 
         data = yaml.safe_load(open(objects_path, "r"))
@@ -208,7 +205,20 @@ class ActionManager(Node):
                 ("robot_data_topic", "robot_data"),
                 ("position_topic", "position_out"),
                 ("color_topic", "init_team_color"),
+                ("config_yaml", "small_objects.yaml"),
+                ("year", 2026),
             ],
+        )
+
+        self.year = (
+            self.get_parameter("year")
+            .get_parameter_value()
+            .integer_value
+        )
+        self.config_yaml = (
+            self.get_parameter("config_yaml")
+            .get_parameter_value()
+            .string_value
         )
 
     def _init_timers(self):

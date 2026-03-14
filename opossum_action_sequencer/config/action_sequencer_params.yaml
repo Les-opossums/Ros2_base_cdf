@@ -9,6 +9,8 @@ main_robot:
       robot_data_topic: robot_data
       position_topic: position_out
       color_topic: init_team_color
+      config_yaml: "objects.yaml"
+      year: 2026
 
 second_robot:
   action_sequencer_node:
@@ -21,3 +23,5 @@ second_robot:
       robot_data_topic: robot_data
       position_topic: position_out
       color_topic: init_team_color
+      config_yaml: "objects.yaml"
+      year: 2026
