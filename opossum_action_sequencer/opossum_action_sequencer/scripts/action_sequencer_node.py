@@ -476,7 +476,7 @@ class ActionManager(Node):
         self.get_logger().info("Staring... waiting for camera to settle.")
         
         # 1. Wait for physical motion blur to clear
-        time.sleep(0.2) 
+        time.sleep(0.5) 
         
         # 2. Grab the latest message in the buffer
         msg = self.latest_camera_msg
