@@ -460,7 +460,7 @@ class ActionManager(Node):
             return 0  # Yellow
         elif aruco_id == 47:
             return 1  # Blue
-        elif aruco_id == 21:
+        elif aruco_id == 41:
             return 2  # Rot (Red)
         return -1 # Unknown
 

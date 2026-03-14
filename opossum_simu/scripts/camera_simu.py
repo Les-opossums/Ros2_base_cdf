@@ -18,7 +18,7 @@ class HazCrate:
     y: float
     theta: float
     state: int
-    color: int # 37 yellow, 43 blue, 21 rot
+    color: int #  36 yellow, 47 blue, 41 rot
 
     def __init__(self, msg):
         self.id = msg.id
@@ -31,7 +31,7 @@ class HazCrate:
         elif msg.state.split("*")[-1] == "blue":
             self.color = 47
         elif msg.state.split("*")[-1] == "rot":
-            self.color = 21
+            self.color = 41
         else:
             self.color = -1
 
