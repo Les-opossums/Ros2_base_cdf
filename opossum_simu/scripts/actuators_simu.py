@@ -82,35 +82,60 @@ class ActuatorsSimu(Node):
 
     def response_callback(self, request, response):
         """Answer to the request."""
+        self.get_logger().info(f"Received: {request.data}")
         request_split = request.data.split(",")
+        
         if request_split[0] == "PUMP":
-            self.states[f"PUMP{request_split[1]}"] = int(request_split[2])
+            with self.state_lock:
+                self.states[f"PUMP{request_split[1]}"] = int(request_split[2])
             response.response = request_split[0] + "," + request_split[1] + "," + request_split[2]
-        if request_split[0] == "VACCUMGRIPPER":
+            
+        elif request_split[0] == "VACCUMGRIPPER":
             id = int(request_split[1])
             mode = int(request_split[2])
             side = int(request_split[3])
-            if side == 2:
-                self.states[f"VACCUMGRIPPER{id * 2}"] = mode
-                self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = mode
-            else:
-                self.states[f"VACCUMGRIPPER{id * 2 + side}"] = mode
-            state_vector = encode_state(list(self.states.values()))
+            
+            # 1. Safely update the initial states
+            with self.state_lock:
+                if side == 2:
+                    if mode == 4:
+                        self.states[f"VACCUMGRIPPER{id * 2}"] = 3
+                        self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = 2
+                    elif mode == 5: # <--- CHANGED TO ELIF! Prevents overwriting mode 4
+                        self.states[f"VACCUMGRIPPER{id * 2}"] = 2
+                        self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = 3
+                    else:
+                        self.states[f"VACCUMGRIPPER{id * 2}"] = mode
+                        self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = mode
+                else:
+                    self.states[f"VACCUMGRIPPER{id * 2 + side}"] = mode
+                    
+                state_vector = encode_state(list(self.states.values()))
+                
             self.pub_change_state.publish(Int64(data=state_vector))
 
+            # 2. Sleep OUTSIDE the lock so other commands can be processed in parallel
             time.sleep(self.time_pliers_move)
+            
             if mode == 1:
                 end_mode = 4
             else: 
                 end_mode = 0  
-            if side == 2:
-                self.states[f"VACCUMGRIPPER{id * 2}"] = end_mode
-                self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = end_mode
-            else:
-                self.states[f"VACCUMGRIPPER{id * 2 + side}"] = end_mode
+                
+            # 3. Safely update the final states after the sleep
+            with self.state_lock:
+                if side == 2:
+                    self.states[f"VACCUMGRIPPER{id * 2}"] = end_mode
+                    self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = end_mode
+                else:
+                    self.states[f"VACCUMGRIPPER{id * 2 + side}"] = end_mode
+                
+                self.get_logger().info(f"State: {list(self.states.values())}")
+                state_vector = encode_state(list(self.states.values()))
+                
+            self.pub_change_state.publish(Int64(data=state_vector))
             response.response = "PINCEFEEDBACK," + request_split[1] + "," + request_split[2] + ",1,1"
-        state_vector = encode_state(list(self.states.values()))
-        self.pub_change_state.publish(Int64(data=state_vector))
+
         return response
 
     def _single_handle_accepted_callback(self, goal_handle):
@@ -151,6 +176,7 @@ class ActuatorsSimu(Node):
 
     def _init_states(self):
         """Create random positions for init."""
+        self.state_lock = threading.Lock() # <--- ADD THIS
         self.states = {f"VACCUMGRIPPER{i}": 0 for i in range(16)}
         state_vector = encode_state(list(self.states.values()))
         self.pub_change_state.publish(Int64(data=state_vector))

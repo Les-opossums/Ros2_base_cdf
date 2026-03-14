@@ -10,6 +10,8 @@ import numpy as np
 from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
 from ament_index_python.packages import get_package_share_directory
+from scipy.optimize import linear_sum_assignment
+import math
 
 # Import des messages
 from opossum_msgs.srv import StringReq
@@ -20,6 +22,8 @@ from opossum_msgs.msg import PositionMap, RobotData, Objects, GlobalView, Actuat
 import functools
 from copy import deepcopy
 
+YEAR = 2026
+CONFIG_YAML = "small_objects.yaml"
 
 class PositionSender(Node):
     """Receive all the world information and send it to every captors (lidars at now)."""
@@ -52,7 +56,7 @@ class PositionSender(Node):
             self.get_parameter("update_period").get_parameter_value().double_value
         )
         objects_path = os.path.join(
-            get_package_share_directory("opossum_bringup"), "config", "2026", "objects.yaml"
+            get_package_share_directory("opossum_bringup"), "config", str(YEAR), CONFIG_YAML
         )
         self.modified_objects = []
 
@@ -205,43 +209,91 @@ class PositionSender(Node):
         self.current_pos[name] = msg
         cos_ = np.cos(msg.z)
         sin_ = np.sin(msg.z)
+
+        running_actuators = []
+
         for act in self.actuators[name].values():
-            if act.type == "pump":
-                self._action_pump(name, act, msg, cos_, sin_, old_theta)
-            elif act.type == "vaccum_gripper":
-                self._action_vaccum_gripper(name, act, msg, cos_, sin_, old_theta)
+            # Calculate global position of this actuator
+            x_ = act.x * cos_ - act.y * sin_ + msg.x
+            y_ = act.x * sin_ + act.y * cos_ + msg.y
+            theta_ = act.theta + msg.z
+
+            if act.state not in ('free', 'keeping', 'running'):
+                # 1. The actuator is ALREADY holding an object. Drag it along!
+                obj_taken = self.objects[int(act.state)]
+                obj_taken.x = x_
+                obj_taken.y = y_
+                obj_taken.theta += msg.z - old_theta
+                self.modified_objects.append(obj_taken.id)
                 
-    def _action_vaccum_gripper(self, name, act, msg, cos, sin, old_theta):
-        self._action_take(name, act, msg, cos, sin, old_theta)
+            elif act.state == 'running':
+                # 2. The actuator is actively trying to pick something up.
+                # Save it in a list so we can run the Hungarian algorithm on all of them at once.
+                running_actuators.append((act, x_, y_, theta_))
 
-    def _action_pump(self, name, act, msg, cos, sin, old_theta):
-        self._action_take(name, act, msg, cos, sin, old_theta)
+        # Run the optimal matching algorithm if any actuators are trying to pick
+        if running_actuators:
+            self._process_hungarian_picking(name, running_actuators)
+    
+    def _process_hungarian_picking(self, name, running_actuators):
+        """Use the Hungarian Algorithm to optimally assign available crates to active actuators."""
+        
+        # 1. Find all free objects
+        available_objects = [
+            obj for obj in self.objects.values() 
+            if obj.state.split("*")[0] == 'free'
+        ]
 
-    def _action_take(self, name, act, msg, cos, sin, old_theta):
-        if act.state == 'free' or act.state == 'keeping':
+        if not available_objects:
             return
-        x_ = act.x * cos - act.y * sin + msg.x
-        y_ = act.x * sin + act.y * cos + msg.y
-        theta_ = act.theta + msg.z
-        tol = 0.4
-        if act.state == 'running':
-            for obj in self.objects.values():
-                in_tol = abs((obj.theta - theta_) % np.pi) < tol
-                if obj.state.split("*")[0] == 'free' and obj.type in self.actuators_actions[act.type]["take"] and in_tol:
-                    if (obj.x - x_) ** 2 + (obj.y - y_) ** 2 < act.size ** 2:
-                        act.state = str(obj.id)
-                        obj.state = f"{name}-{act.name}" + "*" + self.objects[obj.id].state.split("*")[-1]
-                        # obj.x = x_
-                        # obj.y = y_
-                        self.modified_objects.append(obj.id)
-                        break
-        else:
-            obj_taken = self.objects[int(act.state)]
-            obj_taken.x = x_
-            obj_taken.y = y_
-            obj_taken.theta += msg.z - old_theta
-            self.modified_objects.append(obj_taken.id)    
-               
+
+        num_acts = len(running_actuators)
+        num_objs = len(available_objects)
+        cost_matrix = np.zeros((num_acts, num_objs))
+
+        # 2. Build the Cost Matrix (Combining Distance + Angle)
+        for i, (act, ax, ay, atheta) in enumerate(running_actuators):
+            for j, obj in enumerate(available_objects):
+                
+                # If the actuator isn't allowed to take this type, set an impossibly high cost
+                if obj.type not in self.actuators_actions[act.type]["take"]:
+                    cost_matrix[i, j] = 1000.0
+                    continue
+
+                dist = math.hypot(obj.x - ax, obj.y - ay)
+
+                # Calculate symmetric angular difference
+                raw_diff = abs((obj.theta - atheta) % np.pi)
+                angle_diff = min(raw_diff, np.pi - raw_diff)
+
+                # The cost is primarily distance, with a slight penalty for bad angles
+                # This ensures the closest crate is prioritized, but ties are broken by best angle!
+                cost_matrix[i, j] = dist + (angle_diff * 0.05)
+
+        # 3. Compute optimal pairs
+        act_indices, obj_indices = linear_sum_assignment(cost_matrix)
+
+        # You can safely increase this tolerance now without fear of them stealing crates!
+        tol_angle = 0.6  # (Previously 0.4)
+
+        # 4. Apply the assignments
+        for act_idx, obj_idx in zip(act_indices, obj_indices):
+            act, ax, ay, atheta = running_actuators[act_idx]
+            obj = available_objects[obj_idx]
+
+            # Double check type just in case
+            if obj.type not in self.actuators_actions[act.type]["take"]:
+                continue
+
+            dist = math.hypot(obj.x - ax, obj.y - ay)
+            raw_diff = abs((obj.theta - atheta) % np.pi)
+            angle_diff = min(raw_diff, np.pi - raw_diff)
+
+            # If the OPTIMAL match is within our generous tolerances, grab it!
+            if dist < act.size and angle_diff < tol_angle:
+                act.state = str(obj.id)
+                obj.state = f"{name}-{act.name}*" + obj.state.split("*")[-1]
+                self.modified_objects.append(obj.id) 
 
     def _publish_general_map(self):
         """Publish the postion to every captor who needs information."""

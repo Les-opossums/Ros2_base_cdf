@@ -14,6 +14,7 @@ from rcl_interfaces.msg import ParameterEvent
 from std_msgs.msg import String, Bool, Int32
 from opossum_msgs.msg import RobotData, LidarLoc, VisionDataFrame
 from std_srvs.srv import Trigger
+from types import SimpleNamespace
 
 from scipy.optimize import linear_sum_assignment
 import math
@@ -32,6 +33,9 @@ import os
 import json
 from dataclasses import dataclass
 from ament_index_python.packages import get_package_share_directory
+
+YEAR = 2026
+CONFIG_YAML = "small_objects.yaml"
 
 @dataclass
 class Plier:
@@ -127,7 +131,7 @@ class ActionManager(Node):
         self.robot_pos = None
         self.motion_done = True
         self.color = None
-        self._init_mapping(2026)
+        self._init_mapping(YEAR, CONFIG_YAML)
 
         # Process
         self.motion_done_event = Event()
@@ -140,9 +144,9 @@ class ActionManager(Node):
         self.end_match_event.set()
         self.stop = False
 
-    def _init_mapping(self, year):
+    def _init_mapping(self, year, config_yaml):
         objects_path = os.path.join(
-            get_package_share_directory("opossum_bringup"), "config", str(year), "objects.yaml"
+            get_package_share_directory("opossum_bringup"), "config", str(year), config_yaml
         )
 
         data = yaml.safe_load(open(objects_path, "r"))
@@ -443,19 +447,20 @@ class ActionManager(Node):
     def _extract_color_from_id(self, aruco_id: int) -> int:
         """Map ArUco ID to internal color code."""
         if aruco_id == 37:
-            self.get_logger().info(f"YELLOW")
             return 0  # Yellow
         elif aruco_id == 43:
-            self.get_logger().info(f"BLUE")
             return 1  # Blue
         elif aruco_id == 21:
-            self.get_logger().info(f"ROT")
             return 2  # Rot (Red)
         return -1 # Unknown
 
     def stare_and_update(self):
-        """Stop, let the camera settle, and process the latest frame."""
+        """Stop, let the camera settle, and process the latest frame in World Coordinates."""
         if self.stop:
+            return
+
+        if getattr(self, 'robot_pos', None) is None:
+            self.get_logger().warn("Stare failed: Robot position unknown.")
             return
 
         self.get_logger().info("Staring... waiting for camera to settle.")
@@ -474,10 +479,26 @@ class ActionManager(Node):
         current_time = time.time()
 
         # =====================================================================
-        # EXACT SAME HUNGARIAN TRACKING LOGIC AS BEFORE
+        # 3. TRANSFORM DETECTIONS: ROBOT FRAME -> WORLD FRAME
+        # =====================================================================
+        world_detections = []
+        cos_t = math.cos(self.robot_pos.t)
+        sin_t = math.sin(self.robot_pos.t)
+
+        for det in camera_detections:
+            world_det = SimpleNamespace()
+            world_det.id = det.id
+            world_det.x = self.robot_pos.x + (det.x * cos_t - det.y * sin_t)
+            world_det.y = self.robot_pos.y + (det.x * sin_t + det.y * cos_t)
+            world_det.theta = self.robot_pos.t + det.theta
+            world_detections.append(world_det)
+
+
+        # =====================================================================
+        # 4. HUNGARIAN TRACKING LOGIC (Using World Detections)
         # =====================================================================
         if not self.haz_crates:
-            for det in camera_detections:
+            for det in world_detections:
                 new_id = max(self.haz_crates.keys()) + 1 if self.haz_crates else 0
                 color_val = self._extract_color_from_id(det.id)
                 new_crate = HazCrate(new_id, det.x, det.y, det.theta, rot=(color_val == 2))
@@ -488,13 +509,14 @@ class ActionManager(Node):
 
         crate_ids = list(self.haz_crates.keys())
         num_crates = len(crate_ids)
-        num_detections = len(camera_detections)
+        num_detections = len(world_detections)
         
         cost_matrix = np.zeros((num_crates, num_detections))
 
         for i, cid in enumerate(crate_ids):
             crate = self.haz_crates[cid]
-            for j, det in enumerate(camera_detections):
+            for j, det in enumerate(world_detections):
+                # Now we are comparing World to World!
                 dist = math.hypot(crate.x - det.x, crate.y - det.y)
                 cost_matrix[i, j] = dist
 
@@ -504,10 +526,11 @@ class ActionManager(Node):
         for crate_idx, det_idx in zip(crate_indices, detection_indices):
             distance = cost_matrix[crate_idx, det_idx]
 
+            # max_distance should probably be around 0.10 to 0.15 (10-15cm) to allow for minor camera errors
             if distance <= self.max_distance:
                 cid = crate_ids[crate_idx]
                 matched_crate = self.haz_crates[cid]
-                det = camera_detections[det_idx]
+                det = world_detections[det_idx]
 
                 matched_crate.x = det.x
                 matched_crate.y = det.y
@@ -519,7 +542,7 @@ class ActionManager(Node):
 
                 matched_detection_indices.add(det_idx)
 
-        for j, det in enumerate(camera_detections):
+        for j, det in enumerate(world_detections):
             if j not in matched_detection_indices:
                 new_id = max(self.haz_crates.keys()) + 1
                 color_val = self._extract_color_from_id(det.id)
@@ -527,7 +550,23 @@ class ActionManager(Node):
                 new_crate.color = color_val
                 new_crate.last_seen = current_time
                 self.haz_crates[new_id] = new_crate
-                self.get_logger().info(f"Tracking: Discovered new crate! Assigned internal ID: {new_id}")
+                self.get_logger().info(f"Tracking: Discovered new crate! Assigned internal ID: {new_id} at X:{det.x:.2f} Y:{det.y:.2f}")
+
+        # # =====================================================================
+        # # OPTIONAL: 5. GHOST CLEANUP 
+        # # (Remove crates that we haven't seen in a while to handle stolen/moved crates)
+        # # =====================================================================
+        # timeout_seconds = 10.0 # How long until we forget a crate exists
+        # stale_crates = []
+        # for cid, crate in self.haz_crates.items():
+        #     if current_time - crate.last_seen > timeout_seconds:
+        #         # Don't delete crates that are currently inside our map stacks or held by pliers
+        #         if crate.state == -1 and not self.get_stack_linked(cid):
+        #             stale_crates.append(cid)
+                    
+        # for cid in stale_crates:
+        #     del self.haz_crates[cid]
+        #     self.get_logger().info(f"Tracking: Removed stale crate ID {cid} from memory.")
 
     def begin_centering(self):
         self.centering = True
@@ -862,37 +901,81 @@ class ActionManager(Node):
         if not self.stop:
             self.pliers_event.wait()
 
-    def send_plier_cmd(self, ids, mode):
-        """Compute and send the vacuum gripper command with pair optimization."""
+    def send_plier_cmd(self, ids: dict):
+        """Compute and send the vacuum gripper command with pair optimization.
+        
+        ids: dict containing the plier ID as key and the assigned action string as value.
+             Example: {2: "pick", 7: "drop", 8: "rev_drop", 0: "pick"}
+             
+        Modes:
+        1: pick
+        2: drop
+        3: rev_drop
+        4: rev_drop for the first, drop for the second
+        5: drop for the first, rev_drop for the second
+        """
         if self.stop or not ids:
             return
 
         self.pliers_event.clear()
-        # 1. Trier et éliminer les doublons pour faciliter le groupement
-        sorted_ids = sorted(list(set(ids)))
+        
+        # Map string actions to their base modes
+        action_map = {
+            "pick": 1,
+            "drop": 2,
+            "rev_drop": 3
+        }
+
+        # 1. Trier les clés (IDs) pour faciliter le groupement
+        sorted_ids = sorted(ids.keys())
         processed_ids = set()
 
-        for i in range(len(sorted_ids)):
-            current_id = sorted_ids[i]
-            
+        for current_id in sorted_ids:
             if current_id in processed_ids:
                 continue
 
-            # Vérifier si c'est un ID pair (ex: 0, 2, 4) et si son voisin direct (n+1) est aussi dans la liste
+            cmd_id = current_id // 2
             pair_neighbor = current_id + 1
-            
-            if current_id % 2 == 0 and pair_neighbor in sorted_ids:
-                # On a une paire complète (ex: 0 et 1). On envoie l'argument '2'
-                cmd_id = current_id // 2
-                self.pub_command.publish(String(data=f"VACCUMGRIPPER {cmd_id} {mode} 2"))
-                processed_ids.add(current_id)
-                processed_ids.add(pair_neighbor)
-            else:
-                # ID seul ou voisin manquant. On envoie séparément avec 0 ou 1
-                cmd_id = current_id // 2
-                side = current_id % 2
-                self.pub_command.publish(String(data=f"VACCUMGRIPPER {cmd_id} {mode} {side}"))
-                processed_ids.add(current_id)
+            action1 = ids[current_id]
+
+            # Vérifier si c'est un ID pair et si son voisin direct est aussi commandé
+            if current_id % 2 == 0 and pair_neighbor in ids:
+                action2 = ids[pair_neighbor]
+                
+                # Cas A : Les deux pinces ont la même action (ex: pick/pick)
+                if action1 == action2:
+                    mode = action_map.get(action1, 1) # Fallback to 1 if unknown string
+                    self.pub_command.publish(String(data=f"VACCUMGRIPPER {cmd_id} {mode} 2"))
+                    self.get_logger().info(f"PUB HERE 0")
+                    processed_ids.add(current_id)
+                    processed_ids.add(pair_neighbor)
+                    continue
+                
+                # Cas B : Combinaison mixte spéciale -> rev_drop(0) et drop(1)
+                elif action1 == "rev_drop" and action2 == "drop":
+                    self.pub_command.publish(String(data=f"VACCUMGRIPPER {cmd_id} 4 2"))
+                    self.get_logger().info(f"PUB HERE 1")
+                    processed_ids.add(current_id)
+                    processed_ids.add(pair_neighbor)
+                    continue
+                
+                # Cas C : Combinaison mixte spéciale -> drop(0) et rev_drop(1)
+                elif action1 == "drop" and action2 == "rev_drop":
+                    self.pub_command.publish(String(data=f"VACCUMGRIPPER {cmd_id} 5 2"))
+                    self.get_logger().info(f"PUB HERE 2")
+                    processed_ids.add(current_id)
+                    processed_ids.add(pair_neighbor)
+                    continue
+                
+                # Si actions mixtes non supportées par paire (ex: pick + drop),
+                # on laisse le code continuer pour les traiter individuellement.
+
+            # Traitement individuel (ID seul, voisin manquant, ou paire incompatible)
+            mode = action_map.get(action1, 1)
+            side = current_id % 2
+            self.pub_command.publish(String(data=f"VACCUMGRIPPER {cmd_id} {mode} {side}"))
+            self.get_logger().info(f"PUB HERE 4")
+            processed_ids.add(current_id)
 
     def vaccumgripper(self, vg: VACCUMGRIPPER_struct):
         """Compute the pump action."""
@@ -985,14 +1068,14 @@ class ActionManager(Node):
                         self.move_to(fpos)
                         self.wait_for_motion()
 
-                        id_active_pliers = [id for id in self.pliers.keys() if (self.pliers[id].state >= 0 and id // 4 == id_side)]
-                        for id in id_active_pliers:
+                        id_active_pliers = {id: "drop" if self.haz_crates[self.pliers[id].state].color == self.color else "rev_drop" for id in self.pliers.keys() if (self.pliers[id].state >= 0 and id // 4 == id_side)}
+                        for id in id_active_pliers.keys():
                             pstate = self.pliers[id].state
                             if pstate >= 0:
                                 self.haz_crates[pstate].state = 100
                                 self.zones[best_zone_ind].state.append(pstate)
 
-                        self.send_plier_cmd(id_active_pliers, 3)
+                        self.send_plier_cmd(id_active_pliers)
                         self.wait_for_plier()
 
                         # Set state of actuators
@@ -1096,9 +1179,10 @@ class ActionManager(Node):
                     new_state = 100 + best_obj_id
                     self.pliers[pl_id].state = new_state
                     self.haz_crates[best_obj_id].state = 1
-                    
+                
+                dict_sel_pliers = {id: "pick" for id in selected_pliers_ids}
                 # 5. Envoyer la commande
-                self.send_plier_cmd(selected_pliers_ids, mode=1)
+                self.send_plier_cmd(dict_sel_pliers)
                 # Set state of objects
                 if stack_id is not None:
                     for haz_id in self.stacks[stack_id]:

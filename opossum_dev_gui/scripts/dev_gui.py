@@ -203,6 +203,7 @@ class MapScene(QtWidgets.QGraphicsView):
         self.robot_global_x = 0.0
         self.robot_global_y = 0.0
         self.robot_global_theta = 0.0
+        self.plier_local_states = {}
 
     def local_to_global(self, local_x, local_y, local_t):
         """Converts robot-frame coordinates to world-frame coordinates."""
@@ -228,6 +229,35 @@ class MapScene(QtWidgets.QGraphicsView):
         width = map_rect.width()
         height = map_rect.height()
         return 3 * x / width, 2 * (1 - y / height)
+
+    def _redraw_pliers(self):
+        """Redraw all pliers based on their saved local states and the robot's current pose."""
+        for pid, plier_data in self.plier_local_states.items():
+            
+            # 1. Transform from local Robot frame to global Map frame
+            gx, gy, gt = self.local_to_global(
+                plier_data['x'], plier_data['y'], plier_data['theta']
+            )
+
+            if pid not in self.plier_items:
+                # Create the 3cm circle if it doesn't exist
+                r_px, _ = self.size_to_scene(0.03, 0.03)
+                circle = QtWidgets.QGraphicsEllipseItem(-r_px/2, -r_px/2, r_px, r_px)
+                circle.setPen(QtGui.QPen(QtCore.Qt.black))
+                circle.setZValue(2.0)
+                self.scene.addItem(circle)
+                self.plier_items[pid] = circle
+
+            item = self.plier_items[pid]
+            px, py = self.pos_to_scene(gx, gy)
+            
+            item.setPos(px, py)
+            item.setRotation(90 - (gt * 180 / math.pi)) 
+
+            # Update Color (Green if holding something, White if empty)
+            state = plier_data.get('state', -1)
+            brush_color = QtGui.QColor(0, 255, 0) if state >= 0 else QtGui.QColor(255, 255, 255)
+            item.setBrush(QtGui.QBrush(brush_color))
 
     @QtCore.pyqtSlot(LidarLoc)
     def update_map_position(self, msg):
@@ -266,6 +296,7 @@ class MapScene(QtWidgets.QGraphicsView):
         while len(self.ennemis_items) > index:
             old_item = self.ennemis_items.pop()
             self.scene.removeItem(old_item)
+        self._redraw_pliers()
 
     def pos_to_scene(self, x, y):
         """Convert real (x,y) meters to scene pixels."""
@@ -295,8 +326,12 @@ class MapScene(QtWidgets.QGraphicsView):
             full_state = json.loads(json_str)
             for crate in full_state.get('crates', []):
                 self._update_crate_visual(crate)
+            
+            # --- UPDATED: Save local state and trigger redraw ---
             for plier in full_state.get('pliers', []):
-                self._update_plier_visual(plier)
+                self.plier_local_states[plier['id']] = plier
+            self._redraw_pliers()
+            
         except Exception as e:
             print(f"Error parsing full state: {e}")
 
@@ -306,36 +341,32 @@ class MapScene(QtWidgets.QGraphicsView):
             updates = json.loads(json_str)
             for crate in updates.get('crates', []):
                 self._update_crate_visual(crate)
+                
+            # --- UPDATED: Save local state and trigger redraw ---
             for plier in updates.get('pliers', []):
-                self._update_plier_visual(plier)
+                self.plier_local_states[plier['id']] = plier
+            self._redraw_pliers()
+            
         except Exception as e:
             print(f"Error parsing update state: {e}")
 
     def _update_crate_visual(self, crate_data):
+        # Crates are now correctly World Frame! No math needed here.
         cid = crate_data['id']
         
-        # 1. Transform from local Robot frame to global Map frame
-        gx, gy, gt = self.local_to_global(
-            crate_data['x'], crate_data['y'], crate_data['theta']
-        )
-
         if cid not in self.crate_items:
-            # Convert the 0.05m x 0.15m size to pixels
             w_px, h_px = self.size_to_scene(0.05, 0.15)
-            
-            # Center the rectangle origin so it rotates around its middle
             rect = QtWidgets.QGraphicsRectItem(-w_px/2, -h_px/2, w_px, h_px) 
             rect.setPen(QtGui.QPen(QtCore.Qt.black))
+            rect.setZValue(1.0)
             self.scene.addItem(rect)
             self.crate_items[cid] = rect
 
         item = self.crate_items[cid]
-        px, py = self.pos_to_scene(gx, gy)
+        px, py = self.pos_to_scene(crate_data['x'], crate_data['y'])
         
         item.setPos(px, py)
-        
-        # --- THE FIX: Add the 90-degree offset matching your original code ---
-        item.setRotation(90 - (gt * 180 / math.pi))
+        item.setRotation(90 - (crate_data['theta'] * 180 / math.pi))
 
         # Color mapping: 0=Yellow, 1=Blue, 2=Red
         color_val = crate_data.get('color', -1)
@@ -772,6 +803,12 @@ class GeneralViewPage(QtWidgets.QGraphicsView):
             key = f"{elem.type}-{elem.id}"
             if key not in self.icons:
                 item = QtWidgets.QGraphicsPixmapItem()
+                if "vaccum_gripper" in elem.type:
+                    item.setZValue(2.0)  # Actuators on top of crates
+                elif "haz_crate" in elem.type:
+                    item.setZValue(1.0)  # Crates below actuators
+                else:
+                    item.setZValue(1.5)  # Fallback for anything else
                 self.icons[key] = {"item": item, "state": elem.state, "type": elem.type}
                 self.scene.addItem(item)
                 to_update.append(key)

@@ -120,6 +120,10 @@ class CameraSimulation(Node):
             cam_world_angle = r_theta + cam_angle_robot
 
             for obj_id, crate in self.haz_crates.items():
+                
+                if crate.state != 1:
+                    continue
+
                 # 1. Vecteur Robot -> Objet (World)
                 dx = crate.x - rx
                 dy = crate.y - ry
@@ -152,7 +156,7 @@ class CameraSimulation(Node):
                     # Angle relatif de l'objet (Robot Frame)
                     obj_msg.theta = (crate.theta - r_theta + np.pi) % (2 * np.pi) - np.pi
                     
-                    obj_msg.id = cam_idx
+                    obj_msg.id = crate.color
                     global_msg.object.append(obj_msg)
 
         self.pub_cam.publish(global_msg)

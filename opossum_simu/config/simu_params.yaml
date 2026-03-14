@@ -46,9 +46,9 @@ main_robot:
 
   camera_simu_node:
     ros__parameters:
-      camera_angles: [0.0] # 0 deg
-      radius: [1.0]
-      cone_range: [1.396] # 80 deg
+      camera_angles: [0.0, 2.093333, 4.186666] # 0 deg
+      radius: [1.0, 1.0, 1.0]
+      cone_range: [1.396, 1.396, 1.396] # 80 deg
 
 second_robot:
   zynq_simu_node:
