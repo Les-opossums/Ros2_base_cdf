@@ -294,7 +294,13 @@ class MotorSimu(Node):
         real_delta = time.time() - self.real_time
         deltas = self.obj[:2] - self.position[:2, 0]
         dst = np.linalg.norm(deltas)
-        dangle = self.obj[2] % (2 * np.pi) - self.position[2] % (2 * np.pi)
+        # 1. Calculate the raw difference
+        raw_diff = self.obj[2] - self.position[2]
+
+        # 2. Normalize the difference to strictly fall within [-pi, pi]
+        dangle = (raw_diff + np.pi) % (2 * np.pi) - np.pi
+
+        # 3. Apply your velocity based on the true shortest direction
         va = self.angular_velocity if dangle >= 0 else -self.angular_velocity
         if dst < self.linear_velocity * real_delta:
             self.velocity[:2, 0] = np.array([0, 0])

@@ -43,7 +43,7 @@ class PositionSender(Node):
                 ("short_motor_srv", rclpy.Parameter.Type.STRING),
                 ("update_period", rclpy.Parameter.Type.DOUBLE),
                 ("update_position_topic", rclpy.Parameter.Type.STRING),
-                ("config_yaml", "small_objects.yaml"),
+                ("board_config", "small_objects"),
                 ("year", 2026),
             ],
         )
@@ -55,9 +55,9 @@ class PositionSender(Node):
             self.get_parameter("update_period").get_parameter_value().double_value
         )
         self.year = self.get_parameter("year").get_parameter_value().integer_value
-        self.config_yaml = self.get_parameter("config_yaml").get_parameter_value().string_value
+        self.board_config = self.get_parameter("board_config").get_parameter_value().string_value
         objects_path = os.path.join(
-            get_package_share_directory("opossum_bringup"), "config", str(self.year), self.config_yaml
+            get_package_share_directory("opossum_bringup"), "config", str(self.year), f"{self.board_config}.yaml"
         )
         self.modified_objects = []
 

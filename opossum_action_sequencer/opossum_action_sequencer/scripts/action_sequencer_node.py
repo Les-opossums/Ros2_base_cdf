@@ -7,6 +7,9 @@
 # Use the Actuators ID, so we can manage them 1 by one.
 # Actions for pliers
 # 0: free, 1: picking, 2: dropping, 3: reverting
+
+
+## TODO: PICK ONLY THE ONES NOT THE ROGHT COLOR IN THE ZONES AND TURN IT. 
 import rclpy
 from rclpy.node import Node
 from rcl_interfaces.msg import ParameterEvent
@@ -51,6 +54,7 @@ class Plier:
         self.y = data['y']
         self.theta = data['t']
         self.state = -1
+        self.is_running = False
         self.side_id = id % 4
         self.side_robot = (id // 4) * np.pi / 2
 
@@ -80,13 +84,15 @@ class ZoneRelease:
     id: int
     x: float
     y: float
-    state: int
+    size: float
+    crate_ids: list
 
-    def __init__(self, id, x, y):
+    def __init__(self, id, x, y, size):
         self.id = id
         self.x = x
         self.y = y
-        self.state = []
+        self.size = size
+        self.crate_ids = []
 
 class ActionManager(Node):
     """Action Manager Node."""
@@ -144,7 +150,7 @@ class ActionManager(Node):
 
     def _init_mapping(self):
         objects_path = os.path.join(
-            get_package_share_directory("opossum_bringup"), "config", str(self.year), self.config_yaml
+            get_package_share_directory("opossum_bringup"), "config", str(self.year), f"{self.board_config}.yaml"
         )
 
         data = yaml.safe_load(open(objects_path, "r"))
@@ -182,7 +188,7 @@ class ActionManager(Node):
                 crates_count += 1
 
         for id, zone in data['zones'].items():
-            self.zones[id] = ZoneRelease(id, zone['x'], zone['y'])
+            self.zones[id] = ZoneRelease(id, zone['x'], zone['y'], zone['size'])
         
         self.final_zone = data['final_zone']
 
@@ -206,18 +212,24 @@ class ActionManager(Node):
                 ("robot_data_topic", "robot_data"),
                 ("position_topic", "position_out"),
                 ("color_topic", "init_team_color"),
-                ("config_yaml", "small_objects.yaml"),
+                ("board_config", "small_objects"),
                 ("year", 2026),
+                ("boundaries", [0.0, 3.0, 0.0, 2.0]),
             ],
         )
 
+        self.boundaries = self.year = (
+            self.get_parameter("boundaries")
+            .get_parameter_value()
+            .double_array_value
+        )
         self.year = (
             self.get_parameter("year")
             .get_parameter_value()
             .integer_value
         )
-        self.config_yaml = (
-            self.get_parameter("config_yaml")
+        self.board_config = (
+            self.get_parameter("board_config")
             .get_parameter_value()
             .string_value
         )
@@ -480,17 +492,15 @@ class ActionManager(Node):
         # 1. Wait for physical motion blur to clear
         time.sleep(0.5) 
         
-        if time.time() - self.last_camera_timestamp > 0.1:
+        if time.time() - self.last_camera_timestamp > 0.4:
             return
 
         # 2. Grab the latest message in the buffer
-        self.get_logger().info(f"timestamp: {self.last_camera_timestamp}, ctime: {time.time()}")
         msg = self.latest_camera_msg
         if msg is None or not msg.object:
             self.get_logger().info("Stare complete: No objects currently visible.")
             return
 
-        self.get_logger().info("Processing camera snapshot...")
         camera_detections = msg.object
         current_time = time.time()
 
@@ -508,11 +518,6 @@ class ActionManager(Node):
             world_det.y = self.robot_pos.y + (det.x * sin_t + det.y * cos_t)
             world_det.theta = self.robot_pos.t + det.theta
             world_detections.append(world_det)
-            self.get_logger().info(f"DET: {det.id}")
-            self.get_logger().info(f"POS: x: {self.robot_pos.x} y: {self.robot_pos.y}, t: {self.robot_pos.t}")
-            self.get_logger().info(f"LD: x: {det.x} y: {det.y}, t: {det.theta}")
-            self.get_logger().info(f"WD: x: {world_det.x} y: {world_det.y}, t: {world_det.theta}")
-
 
         # =====================================================================
         # 4. HUNGARIAN TRACKING LOGIC (Using World Detections)
@@ -681,7 +686,6 @@ class ActionManager(Node):
     def feedback_callback(self, msg):
         """Receive the data from Zynq."""
         if msg.data.startswith("LEASH") and self.ready and not self.is_started:
-            self.get_logger().info(f"I REACEIVED LEASH FOR {self.get_namespace()}")
             self._init_timers()
             self.is_started = True
             self.match_time = time.time()
@@ -715,29 +719,19 @@ class ActionManager(Node):
             self.motion_done_event.set()
 
         elif msg.data.startswith("PINCEFEEDBACK"):
+            self.get_logger().info(f"{msg.data}")
             data = msg.data.split()[1:]
             id = int(data[0])
             # action = int(data[1])
-            s0 = int(data[2])
-            s1 = int(data[3])
-            plier0 = self.pliers[id  * 2]
-            plier1 = self.pliers[id  * 2 + 1]
-            # for pl in self.pliers.values():
-            #     self.get_logger().info(f"Before state: {pl.state}")
-            if plier0.state >= 99:
-                if s0 == 1:
-                    plier0.state -= 100
-                else:
-                    plier0.state = -2
-            
-            if plier1.state >= 99:
-                if s1 == 1:
-                    plier1.state -= 100
-                else:
-                    plier1.state = -2
-            # for pl in self.pliers.values():
-            #     self.get_logger().info(f"state: {pl.state}")
-            if all(pl.state < 99 for pl in self.pliers.values()):
+            id_internal = int(data[2])
+            # s1 = int(data[3]) # Check the success
+            if id_internal == 2:
+                self.pliers[id * 2].is_running = False
+                self.pliers[id * 2 + 1].is_running = False
+            else:
+                self.pliers[id * 2 + id_internal].is_running = False
+
+            if not any(pl.is_running for pl in self.pliers.values()):
                 self.pliers_event.set()
 
     def robot_data_callback(self, msg: RobotData):
@@ -925,7 +919,7 @@ class ActionManager(Node):
         """Compute and send the vacuum gripper command with pair optimization.
         
         ids: dict containing the plier ID as key and the assigned action string as value.
-             Example: {2: "pick", 7: "drop", 8: "rev_drop", 0: "pick"}
+             Example: {2: ["pick", ID crate], 7: ["drop",  ID crate], 8: ["rev_drop", ID crate], 0: "pick"}
              
         Modes:
         1: pick
@@ -956,17 +950,61 @@ class ActionManager(Node):
 
             cmd_id = current_id // 2
             pair_neighbor = current_id + 1
-            action1 = ids[current_id]
+
+            action1 = ids[current_id][0]
+            plier1 = self.pliers[current_id]
+            crate1 = self.haz_crates[ids[current_id][1]]
 
             # Vérifier si c'est un ID pair et si son voisin direct est aussi commandé
             if current_id % 2 == 0 and pair_neighbor in ids:
-                action2 = ids[pair_neighbor]
+                action2 = ids[pair_neighbor][0]
+                plier2 = self.pliers[pair_neighbor]
+                crate2 = self.haz_crates[ids[pair_neighbor][1]]
                 
                 # Cas A : Les deux pinces ont la même action (ex: pick/pick)
                 if action1 == action2:
                     mode = action_map.get(action1, 1) # Fallback to 1 if unknown string
                     self.pub_command.publish(String(data=f"PINCE {cmd_id} {mode} 2"))
-                    self.get_logger().info(f"PUB HERE 0")
+                    
+                    if mode == 1:
+                        plier1.state = crate1.id
+                        plier2.state = crate2.id
+                        crate1.state = current_id
+                        crate2.state = pair_neighbor
+                    else:
+                        plier1.state = -1
+                        plier2.state = -1
+                        crate1.state = -1
+                        crate2.state = -1
+                        
+                        # Update pos
+                        self.update_crate_pos(plier1, crate1)
+                        self.update_crate_pos(plier2, crate2)
+
+                        # Update color if needed
+                        if mode == 3:
+                            if crate1.color == 1:
+                                crate1.color = 0
+                            elif crate1.color == 0:
+                                crate1.color = 1
+                            if crate2.color == 1:
+                                crate2.color = 0
+                            elif crate2.color == 0:
+                                crate2.color = 1
+
+                        # Check zone
+                        zone_id1 = self.get_current_zone(crate1.x, crate1.y)
+                        zone_id2 = self.get_current_zone(crate2.x, crate2.y)
+                        if zone_id1 is not None:
+                            self.zones[zone_id1].crate_ids.append(crate1.id)
+                        if zone_id2 is not None:
+                            self.zones[zone_id2].crate_ids.append(crate2.id)
+                    
+                    # Set plier running
+                    plier1.is_running = True
+                    plier2.is_running = True
+
+                    # Remove for next check the ids
                     processed_ids.add(current_id)
                     processed_ids.add(pair_neighbor)
                     continue
@@ -974,7 +1012,25 @@ class ActionManager(Node):
                 # Cas B : Combinaison mixte spéciale -> rev_drop(0) et drop(1)
                 elif action1 == "rev_drop" and action2 == "drop":
                     self.pub_command.publish(String(data=f"PINCE {cmd_id} 4 2"))
-                    self.get_logger().info(f"PUB HERE 1")
+                    self.get_logger().info(f"PINCE {cmd_id} 4 2")
+                    plier1.state = -1
+                    plier2.state = -1
+                    crate1.state = -1
+                    crate2.state = -1
+                    self.update_crate_pos(plier1, crate1)
+                    self.update_crate_pos(plier2, crate2)
+                    if crate1.color == 1:
+                        crate1.color = 0
+                    elif crate1.color == 0:
+                        crate1.color = 1
+                    zone_id1 = self.get_current_zone(crate1.x, crate1.y)
+                    zone_id2 = self.get_current_zone(crate2.x, crate2.y)
+                    if zone_id1 is not None:
+                        self.zones[zone_id1].crate_ids.append(crate1.id)
+                    if zone_id2 is not None:
+                        self.zones[zone_id2].crate_ids.append(crate2.id)
+                    plier1.is_running = True
+                    plier2.is_running = True
                     processed_ids.add(current_id)
                     processed_ids.add(pair_neighbor)
                     continue
@@ -982,7 +1038,24 @@ class ActionManager(Node):
                 # Cas C : Combinaison mixte spéciale -> drop(0) et rev_drop(1)
                 elif action1 == "drop" and action2 == "rev_drop":
                     self.pub_command.publish(String(data=f"PINCE {cmd_id} 5 2"))
-                    self.get_logger().info(f"PUB HERE 2")
+                    plier1.state = -1
+                    plier2.state = -1
+                    crate1.state = -1
+                    crate2.state = -1
+                    self.update_crate_pos(plier1, crate1)
+                    self.update_crate_pos(plier2, crate2)
+                    if crate2.color == 1:
+                        crate2.color = 0
+                    elif crate2.color == 0:
+                        crate2.color = 1
+                    zone_id1 = self.get_current_zone(crate1.x, crate1.y)
+                    zone_id2 = self.get_current_zone(crate2.x, crate2.y)
+                    if zone_id1 is not None:
+                        self.zones[zone_id1].crate_ids.append(crate1.id)
+                    if zone_id2 is not None:
+                        self.zones[zone_id2].crate_ids.append(crate2.id)
+                    plier1.is_running = True
+                    plier2.is_running = True
                     processed_ids.add(current_id)
                     processed_ids.add(pair_neighbor)
                     continue
@@ -994,9 +1067,43 @@ class ActionManager(Node):
             mode = action_map.get(action1, 1)
             side = current_id % 2
             self.pub_command.publish(String(data=f"PINCE {cmd_id} {mode} {side}"))
-            self.get_logger().info(f"PUB HERE 4")
+            self.get_logger().info(f"PINCE {cmd_id} {mode} {side}")
+            if mode == 1:
+                plier1.state = crate1.id
+                crate1.state = current_id
+            else:
+                plier1.state = -1
+                crate1.state = -1
+                if mode == 3:
+                    if crate1.color == 1:
+                        crate1.color = 0
+                    elif crate1.color == 0:
+                        crate1.color = 1
+                self.update_crate_pos(plier1, crate1)
+                zone_id = self.get_current_zone(crate1.x, crate1.y)
+                if zone_id is not None:
+                    self.zones[zone_id].crate_ids.append(crate1.id)
+            plier1.is_running = True
             processed_ids.add(current_id)
 
+    def update_crate_pos(self, plier, crate):
+        """Update the position of the crate in the world reference."""
+        # 1. Grab the robot's current global pose
+        rx = self.robot_pos.x
+        ry = self.robot_pos.y
+        rt = self.robot_pos.t
+        
+        # 2. Pre-compute sin and cos for efficiency
+        cos_t = math.cos(rt)
+        sin_t = math.sin(rt)
+        
+        # 3. Apply the 2D rotation and translation to the plier's local coordinates
+        crate.x = rx + (plier.x * cos_t) - (plier.y * sin_t)
+        crate.y = ry + (plier.x * sin_t) + (plier.y * cos_t)
+        
+        # 4. The global angle is simply the robot's angle plus the actuator's angle
+        crate.theta = rt + plier.theta
+    
     def vaccumgripper(self, vg: VACCUMGRIPPER_struct):
         """Compute the pump action."""
         if not self.stop:
@@ -1055,48 +1162,41 @@ class ActionManager(Node):
         return -1 if val < 0 else 1
 
     def smart_moves(self):
-        self.send_raw(f"VMAX 0.5")
+        self.send_raw(f"VMAX 0.8")
         self.send_raw(f"VTMAX 1.5")
         release = False
+        steal_poses = [[0.4, 0.4],
+                       [0.4, 1.05],
+                       [2.6, 1.05],
+                       [2.6, 0.4],
+                      ]
+        id_steal = 0
         while True:
-
             best_ind, stack_id, is_inv = self.compute_pick_rewards()
             if release:
-                best_zone_ind = self.compute_release_rewards()
+                best_zone_ind, best_pos = self.compute_release_rewards()
                 if best_zone_ind is not None:
-                    best_zone = self.zones[best_zone_ind]
-                    self.get_logger().info(f"Best zone: {best_zone}")
-                    dx = self.robot_pos.x - best_zone.x
-                    dy = self.robot_pos.y - best_zone.y
                     distance = 0.28
-                    if dx > dy:
-                        if dx > 0:
-                            fpos = Position(best_zone.x + distance, best_zone.y, 0.0)
-                            angle = 3.14
-                        else:
-                            fpos = Position(best_zone.x - distance, best_zone.y, 0.0)
-                            angle = 0
-                    else:
-                        if dy > 0:
-                            fpos = Position(best_zone.x, best_zone.y + distance, 0.0)
-                            angle = 4.71
-                        else:
-                            fpos = Position(best_zone.x, best_zone.y - distance, 0.0)
-                            angle = 1.57
-                    id_side = self.get_best_side_pliers_release(angle)
+                    id_side = self.get_best_side_pliers_release(best_pos[2])
                     if id_side is not None:
-                        fpos.t = angle - self.pliers[id_side * 4].theta
-                        self.get_logger().info(f"fpos: {fpos}")
+                        fpos = Position(best_pos[0], best_pos[1], best_pos[2] - self.pliers[id_side * 4].theta)
                         self.move_to(fpos)
                         self.wait_for_motion()
+                        
+                        id_active_pliers = {}
+                        for id in self.pliers.keys():
+                            plier = self.pliers[id]
+                            if plier.state == -1 or id // 4 != id_side:
+                                continue
+                            
+                            crate = self.haz_crates[plier.state]
+                            if crate.color in (-1, 2) or crate.color == self.color:
+                                id_active_pliers[id] = ["drop", plier.state]
 
-                        id_active_pliers = {id: "drop" if self.haz_crates[self.pliers[id].state].color == self.color else "rev_drop" for id in self.pliers.keys() if (self.pliers[id].state >= 0 and id // 4 == id_side)}
-                        for id in id_active_pliers.keys():
-                            pstate = self.pliers[id].state
-                            if pstate >= 0:
-                                self.haz_crates[pstate].state = 100
-                                self.zones[best_zone_ind].state.append(pstate)
+                            else:
+                                id_active_pliers[id] = ["rev_drop", plier.state]
 
+                        # Here when we activate pliers, we give dict of ID: [the action, the ID of the Haz]
                         self.send_plier_cmd(id_active_pliers)
                         self.wait_for_plier()
 
@@ -1129,10 +1229,6 @@ class ActionManager(Node):
                 # C. Calculer les centres de masse (Crates et Pliers)
                 target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in target_ids])
                 pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in selected_pliers_ids])
-
-                # D. Étape 1 : Navigation vers le point d'entrée
-                # On s'aligne face à la caisse. On ajoute pi car le robot "recule" ou "fait face" ?
-                # Si le robot doit faire face, l'angle est target_pos.theta
                 
 
                 # E. Étape 2 : Alignement final (Calcul de l'offset)
@@ -1184,6 +1280,7 @@ class ActionManager(Node):
                 # 3. Associer chaque pince à l'objet le plus proche (Nearest Neighbor)
                 remaining_targets = list(target_ids) # Copie des IDs d'objets dans la pile
 
+                dict_sel_pliers = {}
                 for pl_id, (px, py) in pliers_in_map.items():
                     if not remaining_targets:
                         break
@@ -1196,28 +1293,27 @@ class ActionManager(Node):
                     
                     # Retirer l'objet de la liste pour ne pas l'assigner deux fois
                     remaining_targets.remove(best_obj_id)
-                    
-                    # 4. Appliquer le State 100 + ID
-                    new_state = 100 + best_obj_id
-                    self.pliers[pl_id].state = new_state
-                    self.haz_crates[best_obj_id].state = 1
-                
-                dict_sel_pliers = {id: "pick" for id in selected_pliers_ids}
+                    dict_sel_pliers[pl_id] = ["pick", best_obj_id]
+
                 # 5. Envoyer la commande
                 self.send_plier_cmd(dict_sel_pliers)
-                # Set state of objects
-                if stack_id is not None:
-                    for haz_id in self.stacks[stack_id]:
-                        self.haz_crates[haz_id].state = 1
-                else:
-                    self.haz_crates[best_ind].state = 1
                 
                 # Set state of actuators
                 self.wait_for_plier()
                 continue
-            else:
+            elif any(pl.state != -1 for pl in self.pliers.values()):
                 self.get_logger().info("Nothing to do, going for the release position")
                 release = True
+                time.sleep(0.3)
+            else:
+                self.get_logger().info("Nothing to do: Turning...")
+                pos = steal_poses[id_steal % len(steal_poses)]
+                if not (self.boundaries[0] + 0.35 < pos[0] < self.boundaries[1] - 0.35 and self.boundaries[2] + 0.35 < pos[1] < self.boundaries[3] - 0.35): 
+                    continue
+                self.move_to(Position(pos[0], pos[1], (id_steal * 2.3998) % (2 * np.pi)))
+                self.wait_for_motion()
+                self.stare_and_update()
+                id_steal += 1
 
     def get_mean_pose(self, objects):
         """Calcule la position moyenne (x, y, theta_circulaire) d'une liste d'objets."""
@@ -1226,6 +1322,25 @@ class ActionManager(Node):
         m_sin = np.mean([np.sin(obj.theta) for obj in objects])
         m_cos = np.mean([np.cos(obj.theta) for obj in objects])
         return Position(mx, my, np.arctan2(m_sin, m_cos))
+
+    def get_current_zone(self, x, y):
+        """
+        Checks which square the point (x, y) is inside.
+        
+        squares: dict like { 'zone_1': {'x': 1.0, 'y': 1.5, 'size': 0.5}, ... }
+        Returns the ID of the zone, or None if the point is outside all zones.
+        """
+        for zone_id, sq in self.zones.items():
+            cx = sq.x
+            cy = sq.y
+            half_size = sq.size / 2.0  # Calculate half-size once per square
+            
+            # Check if X is within bounds AND Y is within bounds
+            if (cx - half_size <= x <= cx + half_size) and \
+            (cy - half_size <= y <= cy + half_size):
+                return zone_id  # We found the zone! Return it immediately.
+                
+        return None  # The loop finished without finding a match
 
     def rotate_point(self, x, y, theta):
         """Applique une rotation 2D simple."""
@@ -1238,28 +1353,43 @@ class ActionManager(Node):
         max_reward = float('-inf')
         best_zone_id = None
         for id, zone in self.zones.items():
-            if len(zone.state) > 0:
+            if len(zone.crate_ids) > 0:
                 continue
-            reward = self.compute_release_penality(zone.x, zone.y)
+            x = zone.x
+            y = zone.y 
 
-            # 5. Mise à jour du champion global
-            if reward > max_reward:
-                max_reward = reward
-                best_zone_id = id
-        return best_zone_id
+            distance = 0.28
+            av_poses = [[x + distance, y, 3.14],
+                        [x - distance, y, 0.0],
+                        [x, y + distance, 4.71],
+                        [x, y - distance, 1.57],
+                    ]
+
+            for pos in av_poses:
+                if not (self.boundaries[0] + 0.35 < pos[0] < self.boundaries[1] - 0.35 and self.boundaries[2] + 0.35 < pos[1] < self.boundaries[3] - 0.35): 
+                    continue
+                reward = self.compute_release_penality(x, y)
+
+                # 5. Mise à jour du champion global
+                if reward > max_reward:
+                    max_reward = reward
+                    best_zone_id = id
+                    best_pos = pos
+        return best_zone_id, best_pos
 
     def compute_release_penality(self, x, y):
         coeff_center = -10 # -0.005
         coeff_dst = 0
         coeff_enn = 0 # 0.05
         # coeef_end = -0.0001
+        
         val_center = (1.5 - x) ** 2 + (1 - y) ** 2
         val_dst = (self.robot_pos.x - x) ** 2 + (self.robot_pos.y - y) ** 2
         if self.x_enn is not None:
             val_ennemi = (self.x_enn - x) ** 2 + (self.y_enn - y) ** 2
         else:
             val_ennemi = 0
-        self.get_logger().info(f"For {x}, {y}, center: {val_center}, coeff_dst: {coeff_dst}, total: {coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center}")
+        # self.get_logger().info(f"For {x}, {y}, center: {val_center}, coeff_dst: {coeff_dst}, total: {coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center}")
         return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
 
     def compute_pick_penality(self, x, y):
@@ -1293,10 +1423,7 @@ class ActionManager(Node):
                 continue
 
             # 1. Filtres de sécurité et d'état
-            if (crate.color == self.color or crate.color == 2) and crate.state == 100:
-                reviewed_ids.add(crate_id)
-                continue
-            if crate.state == 1 or crate.state == 100: 
+            if crate.state >= 0 or (self.get_current_zone(crate.x, crate.y) is not None and (crate.color == self.color or crate.color == 2)): 
                 reviewed_ids.add(crate_id)
                 continue
             

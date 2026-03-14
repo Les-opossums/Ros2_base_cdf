@@ -82,7 +82,6 @@ class ActuatorsSimu(Node):
 
     def response_callback(self, request, response):
         """Answer to the request."""
-        self.get_logger().info(f"Received: {request.data}")
         request_split = request.data.split(",")
         
         if request_split[0] == "PUMP":
@@ -130,11 +129,10 @@ class ActuatorsSimu(Node):
                 else:
                     self.states[f"PINCE{id * 2 + side}"] = end_mode
                 
-                self.get_logger().info(f"State: {list(self.states.values())}")
                 state_vector = encode_state(list(self.states.values()))
                 
             self.pub_change_state.publish(Int64(data=state_vector))
-            response.response = "PINCEFEEDBACK," + request_split[1] + "," + request_split[2] + ",1,1"
+            response.response = f"PINCEFEEDBACK,{request_split[1]},{request_split[2]},{request_split[3]},1"
 
         return response
 

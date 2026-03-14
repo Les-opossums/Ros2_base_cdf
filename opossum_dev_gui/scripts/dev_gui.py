@@ -211,6 +211,7 @@ class MapScene(QtWidgets.QGraphicsView):
         self.robot_global_y = 0.0
         self.robot_global_theta = 0.0
         self.plier_local_states = {}
+        self.crate_local_states = {}
 
     def local_to_global(self, local_x, local_y, local_t):
         """Converts robot-frame coordinates to world-frame coordinates."""
@@ -266,6 +267,32 @@ class MapScene(QtWidgets.QGraphicsView):
             brush_color = QtGui.QColor(0, 255, 0) if state >= 0 else QtGui.QColor(255, 255, 255)
             item.setBrush(QtGui.QBrush(brush_color))
 
+    def _redraw_crates(self):
+        """Continuously update the position of crates being carried by the robot."""
+        # Make sure the dictionaries exist before looping
+        if not hasattr(self, 'crate_local_states') or not hasattr(self, 'plier_local_states'):
+            return
+
+        for cid, crate_data in self.crate_local_states.items():
+            plier_id = crate_data.get('state', -1)
+            
+            # If the crate is held by a plier (state is the plier's ID)
+            if plier_id != -1 and plier_id in self.plier_local_states:
+                plier_data = self.plier_local_states[plier_id]
+                
+                if cid in self.crate_items:
+                    # 1. Get the global position of the PLIER holding this crate
+                    gx, gy, gt = self.local_to_global(
+                        plier_data['x'], plier_data['y'], plier_data['theta']
+                    )
+                    
+                    # 2. Move the crate to exactly match the plier's position and rotation
+                    item = self.crate_items[cid]
+                    px, py = self.pos_to_scene(gx, gy)
+                    
+                    item.setPos(px, py)
+                    item.setRotation(90 - (gt * 180 / math.pi))
+
     @QtCore.pyqtSlot(LidarLoc)
     def update_map_position(self, msg):
         self.robot_global_x = msg.robot_position.x
@@ -304,6 +331,7 @@ class MapScene(QtWidgets.QGraphicsView):
             old_item = self.ennemis_items.pop()
             self.scene.removeItem(old_item)
         self._redraw_pliers()
+        self._redraw_crates()
 
     def pos_to_scene(self, x, y):
         """Convert real (x,y) meters to scene pixels."""
@@ -332,12 +360,15 @@ class MapScene(QtWidgets.QGraphicsView):
         try:
             full_state = json.loads(json_str)
             for crate in full_state.get('crates', []):
+                # --- NEW: Save the raw crate data ---
+                self.crate_local_states[crate['id']] = crate 
                 self._update_crate_visual(crate)
             
-            # --- UPDATED: Save local state and trigger redraw ---
             for plier in full_state.get('pliers', []):
                 self.plier_local_states[plier['id']] = plier
             self._redraw_pliers()
+            # --- NEW: Trigger crate redraw too ---
+            self._redraw_crates() 
             
         except Exception as e:
             print(f"Error parsing full state: {e}")
@@ -347,12 +378,15 @@ class MapScene(QtWidgets.QGraphicsView):
         try:
             updates = json.loads(json_str)
             for crate in updates.get('crates', []):
+                # --- NEW: Save the raw crate data ---
+                self.crate_local_states[crate['id']] = crate
                 self._update_crate_visual(crate)
                 
-            # --- UPDATED: Save local state and trigger redraw ---
             for plier in updates.get('pliers', []):
                 self.plier_local_states[plier['id']] = plier
             self._redraw_pliers()
+            # --- NEW: Trigger crate redraw too ---
+            self._redraw_crates()
             
         except Exception as e:
             print(f"Error parsing update state: {e}")

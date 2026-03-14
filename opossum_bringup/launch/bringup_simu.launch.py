@@ -14,6 +14,7 @@ def generate_launch_description():
         "simulation", default_value="true", description="Enable simulation mode"
     )
     simulation = LaunchConfiguration("simulation")
+
     robot_names_arg = DeclareLaunchArgument(
         "robot_names",
         default_value="main_robot",
@@ -21,6 +22,13 @@ def generate_launch_description():
         description="Set list of robots",
     )
     robot_names = LaunchConfiguration("robot_names")
+
+    board_config_arg = DeclareLaunchArgument(
+        "board_config",
+        default_value="objects",
+        description="Set list of robots",
+    )
+    board_config = LaunchConfiguration("board_config")
 
     simu_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -34,7 +42,7 @@ def generate_launch_description():
                 )
             ]
         ),
-        launch_arguments={"robot_names": robot_names}.items(),
+        launch_arguments={"robot_names": robot_names, "board_config": board_config}.items(),
     )
 
     nav_params_arg = DeclareLaunchArgument(
@@ -133,13 +141,14 @@ def generate_launch_description():
                 )
             ]
         ),
-        launch_arguments={"robot_names": robot_names}.items()
+        launch_arguments={"robot_names": robot_names, "board_config": board_config}.items()
     )
 
     return LaunchDescription(
         [
             simulation_arg,
             robot_names_arg,
+            board_config_arg,
             nav_params_arg,
             localisation_params_arg,
             comm_launch,

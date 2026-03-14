@@ -100,42 +100,42 @@ map:
     y: 1.2
     t: 1.57079632679
     shape: clean
-  8:
-    type: half_haz_stack_crates
-    x: 1.1
-    y: 1.725
-    t: 0.0
-    shape: clean
-  9:
-    type: half_haz_stack_crates
-    x: 1.35
-    y: 1.775
-    t: 0.0
-    shape: clean
-  10:
-    type: half_haz_stack_crates
-    x: 1.65
-    y: 1.775
-    t: 0.0
-    shape: clean
-  11:
-    type: half_haz_stack_crates
-    x: 1.9
-    y: 1.725
-    t: 0.0
-    shape: clean
-  12:
-    type: half_haz_stack_crates
-    x: 0.8
-    y: 1.675
-    t: 0.0
-    shape: rot
-  13:
-    type: half_haz_stack_crates
-    x: 2.2
-    y: 1.675
-    t: 0.0
-    shape: rot
+  # 8:
+  #   type: half_haz_stack_crates
+  #   x: 1.1
+  #   y: 1.725
+  #   t: 0.0
+  #   shape: clean
+  # 9:
+  #   type: half_haz_stack_crates
+  #   x: 1.35
+  #   y: 1.775
+  #   t: 0.0
+  #   shape: clean
+  # 10:
+  #   type: half_haz_stack_crates
+  #   x: 1.65
+  #   y: 1.775
+  #   t: 0.0
+  #   shape: clean
+  # 11:
+  #   type: half_haz_stack_crates
+  #   x: 1.9
+  #   y: 1.725
+  #   t: 0.0
+  #   shape: clean
+  # 12:
+  #   type: half_haz_stack_crates
+  #   x: 0.8
+  #   y: 1.675
+  #   t: 0.0
+  #   shape: rot
+  # 13:
+  #   type: half_haz_stack_crates
+  #   x: 2.2
+  #   y: 1.675
+  #   t: 0.0
+  #   shape: rot
   14:
     type: cursor
     x: 0.8

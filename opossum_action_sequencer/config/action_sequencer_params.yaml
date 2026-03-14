@@ -9,7 +9,9 @@ main_robot:
       robot_data_topic: robot_data
       position_topic: position_out
       color_topic: init_team_color
-      config_yaml: "small_objects.yaml"
+      # boundaries: [0.0, 1.0, 0.0, 2.0]
+      boundaries: [0.0, 3.0, 0.0, 2.0]
+      # config_yaml: "small_objects.yaml"
       year: 2026
 
 second_robot:
@@ -23,5 +25,7 @@ second_robot:
       robot_data_topic: robot_data
       position_topic: position_out
       color_topic: init_team_color
-      config_yaml: "small_objects.yaml"
+      # boundaries: [0.0, 1.0, 0.0, 2.0]
+      boundaries: [0.0, 3.0, 0.0, 2.0]
+      # config_yaml: "small_objects.yaml"
       year: 2026
