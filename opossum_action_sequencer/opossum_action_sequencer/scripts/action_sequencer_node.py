@@ -484,6 +484,7 @@ class ActionManager(Node):
             return
 
         # 2. Grab the latest message in the buffer
+        self.get_logger().info(f"timestamp: {self.last_camera_timestamp}, ctime: {time.time()}")
         msg = self.latest_camera_msg
         if msg is None or not msg.object:
             self.get_logger().info("Stare complete: No objects currently visible.")
