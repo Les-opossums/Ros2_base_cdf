@@ -653,7 +653,6 @@ class ActionManager(Node):
 
                 if script_num in script_map:
                     module_path, log_msg = script_map[script_num]
-                    # self.get_logger().info(f"[{my_namespace}] {log_msg}")
 
                     # Dynamically import the Script class
                     module = __import__(module_path, fromlist=["Script"])
@@ -704,7 +703,6 @@ class ActionManager(Node):
             elif msg.data[-1] == "2":
                 self.pub_au.publish(Bool(data=True))
             else:
-                # self.get_logger().info("AU deactivated")
                 self.pub_au.publish(Bool(data=False))
 
         elif msg.data.startswith("YELLOWSWITCH"):
@@ -719,7 +717,6 @@ class ActionManager(Node):
             self.motion_done_event.set()
 
         elif msg.data.startswith("PINCEFEEDBACK"):
-            self.get_logger().info(f"{msg.data}")
             data = msg.data.split()[1:]
             id = int(data[0])
             # action = int(data[1])
@@ -746,7 +743,6 @@ class ActionManager(Node):
 
             # Si on est proche de la cible ET à l'arrêt, on débloque le script.
             if self.is_robot_arrived and is_stopped:
-                # self.get_logger().info("Arrivée confirmée par calcul (Timeout logiciel)")
                 self.motion_done = True
                 self.motion_done_event.set() # C'est ça qui débloque wait_for_motion
 
@@ -1012,7 +1008,6 @@ class ActionManager(Node):
                 # Cas B : Combinaison mixte spéciale -> rev_drop(0) et drop(1)
                 elif action1 == "rev_drop" and action2 == "drop":
                     self.pub_command.publish(String(data=f"PINCE {cmd_id} 4 2"))
-                    self.get_logger().info(f"PINCE {cmd_id} 4 2")
                     plier1.state = -1
                     plier2.state = -1
                     crate1.state = -1
@@ -1067,7 +1062,6 @@ class ActionManager(Node):
             mode = action_map.get(action1, 1)
             side = current_id % 2
             self.pub_command.publish(String(data=f"PINCE {cmd_id} {mode} {side}"))
-            self.get_logger().info(f"PINCE {cmd_id} {mode} {side}")
             if mode == 1:
                 plier1.state = crate1.id
                 crate1.state = current_id
@@ -1352,6 +1346,7 @@ class ActionManager(Node):
     def compute_release_rewards(self):
         max_reward = float('-inf')
         best_zone_id = None
+        best_pos = None
         for id, zone in self.zones.items():
             if len(zone.crate_ids) > 0:
                 continue
@@ -1378,9 +1373,9 @@ class ActionManager(Node):
         return best_zone_id, best_pos
 
     def compute_release_penality(self, x, y):
-        coeff_center = -10 # -0.005
-        coeff_dst = 0
-        coeff_enn = 0 # 0.05
+        coeff_center = 1 # -0.005
+        coeff_dst = -1
+        coeff_enn = -5 # 0.05
         # coeef_end = -0.0001
         
         val_center = (1.5 - x) ** 2 + (1 - y) ** 2
@@ -1389,13 +1384,12 @@ class ActionManager(Node):
             val_ennemi = (self.x_enn - x) ** 2 + (self.y_enn - y) ** 2
         else:
             val_ennemi = 0
-        # self.get_logger().info(f"For {x}, {y}, center: {val_center}, coeff_dst: {coeff_dst}, total: {coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center}")
         return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
 
     def compute_pick_penality(self, x, y):
         coeff_center = -1 # -0.005
         coeff_dst = -1
-        coeff_enn = -10 # 0.05
+        coeff_enn = -4 # 0.05
         # coeef_end = -0.0001
         val_center = (1.5 - x) ** 2 + (1 - y) ** 2
         val_dst = (self.robot_pos.x - x) ** 2 + (self.robot_pos.y - y) ** 2
