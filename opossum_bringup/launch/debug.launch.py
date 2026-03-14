@@ -63,6 +63,7 @@ def generate_launch_description():
 
     node_tf_broadcaster = Node(
         package="opossum_localisation",
+        namespace=namespace,
         executable="tf_broadcaster.py",
         name="tf_broadcaster_node",
         parameters=[param_loc, {"robot_names": ["main_robot"]}],
