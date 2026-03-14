@@ -304,7 +304,7 @@ class VisionNode(Node):
             vd.x = float(tokens[1])
             vd.y = float(tokens[2])
             vd.z = float(tokens[3])
-            vd.theta = float(tokens[4])
+            vd.theta = float(tokens[4]) * 3.14159265 / 180.0 + 3.14156 / 2 # Conversion en radians
             
             # Pour les attributs suivants, j'assigne des index hypothétiques.
             # Il faudra ajuster ces index [5], [6], [7] selon la position 

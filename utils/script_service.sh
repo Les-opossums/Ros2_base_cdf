@@ -3,6 +3,7 @@
 # 1. Sourcer l'environnement ROS 2 (à adapter selon votre version, ex: humble, foxy...)
 source /opt/ros/humble/setup.bash
 source /home/opossum/robot_ws/install/setup.bash
+export ROS_DOMAIN_ID=69
 
 # 2. Définir le chemin du fichier d'état
 CONFIG_FILE="/home/opossum/robot_ws/config_plateau.txt"

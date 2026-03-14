@@ -6,6 +6,7 @@ After=graphical-session.target
 ExecStart=/home/opossum/robot_ws/src/utils/script_service.sh
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/opossum/.Xauthority
+Environment="ROS_DOMAIN_ID=69"
 WorkingDirectory=/home/opossum/robot_ws
 StandardOutput=journal
 Restart=on-failure
