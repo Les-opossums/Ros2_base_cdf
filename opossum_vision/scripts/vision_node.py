@@ -236,6 +236,7 @@ class VisionNode(Node):
                 return
 
             first_part_tokens = parts[0].split()
+            self.get_logger().info(f"Received ARUCO data: {first_part_tokens}")
             if len(first_part_tokens) < 3:
                 return
 
@@ -267,7 +268,7 @@ class VisionNode(Node):
                         vision_frame_msg.object.append(obj)
 
             # 3. Publication du message structuré
-            self.publisher_.publish(vision_frame_msg)
+            self.aruco_pub.publish(vision_frame_msg)
 
         elif (
             splitted_data[0] == "LOC" and len(splitted_data) == 5
