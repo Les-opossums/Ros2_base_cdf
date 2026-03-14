@@ -28,7 +28,7 @@ class TfBroadcaster(Node):
                 ("robot_data_topic", rclpy.Parameter.Type.STRING),
                 ("visualization_topic", rclpy.Parameter.Type.STRING),
                 ("default_color", rclpy.Parameter.Type.STRING),
-                ("available_colors", rclpy.Parameter.Type.STRING_ARRAY),
+                ("available_colors", ["yellow", "blue"]),
                 ("init_visu_srv", rclpy.Parameter.Type.STRING),
                 ("boundaries", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("beacons", rclpy.Parameter.Type.DOUBLE_ARRAY),
