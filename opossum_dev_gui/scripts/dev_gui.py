@@ -44,6 +44,7 @@ class NodeGUI(Node):
                 ("command_topic", rclpy.Parameter.Type.STRING),
                 ("feedback_command_topic", rclpy.Parameter.Type.STRING),
                 ("robot_names", rclpy.Parameter.Type.STRING_ARRAY),
+                ("simulation", True)
             ],
         )
         self.robot_names = (
@@ -52,28 +53,34 @@ class NodeGUI(Node):
         self.set_asserv = (
             self.get_parameter("set_asserv").get_parameter_value().bool_value
         )
+        self.simulation = (
+            self.get_parameter("simulation").get_parameter_value().bool_value
+        )
 
     def _init_publishers(self):
         """Initialize subscribers of the node."""
-        self.command_topic = (
-            self.get_parameter("command_topic").get_parameter_value().string_value
-        )
-        self.pub_command = {
-            name: self.create_publisher(String, name + "/" + self.command_topic, 10)
-            for name in self.robot_names
-        }
+        if self.simulation:
+            self.command_topic = (
+                self.get_parameter("command_topic").get_parameter_value().string_value
+            )
+            self.pub_command = {
+                name: self.create_publisher(String, name + "/" + self.command_topic, 10)
+                for name in self.robot_names
+            }
 
     def _init_clients(self):
-        self.client_global_data = self.create_client(Trigger, 'send_global_data')
-        while not self.client_global_data.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('service not available, waiting again...')
+        if self.simulation:
+            self.client_global_data = self.create_client(Trigger, 'send_global_data')
+            while not self.client_global_data.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info('service not available, waiting again...')
         self.full_state_clients = {}
         for name in self.robot_names:
             self.full_state_clients[name] = self.create_client(Trigger, f"{name}/get_full_board_state")
 
     def _init_subscribers(self):
         """Initialize subscribers of the node."""
-        self.create_subscription(GlobalView, 'global_view', self.global_view_callback, 10)
+        if self.simulation:
+            self.create_subscription(GlobalView, 'global_view', self.global_view_callback, 10)
         position_topic = (
             self.get_parameter("position_topic").get_parameter_value().string_value
         )
