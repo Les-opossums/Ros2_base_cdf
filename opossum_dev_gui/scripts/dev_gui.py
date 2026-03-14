@@ -914,15 +914,18 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         self.robot_pages['General View'].update_global_view(msg)
 
     def call_update_global(self):
-        self.gui_node.call_send_global_data()
+        if self.gui_node.simulation:
+            self.gui_node.call_send_global_data()
 
     def send_cmd(self, name, command_name, args):
         """Send the command request to node ROS."""
-        self.gui_node.publish_command(name, command_name, args)
+        if self.gui_node.simulation:
+            self.gui_node.publish_command(name, command_name, args)
 
     def send_leashes(self):
-        for name in self.gui_node.robot_names:
-            self.send_cmd(name, "LEASH", [])
+        if self.gui_node.simulation:
+            for name in self.gui_node.robot_names:
+                self.send_cmd(name, "LEASH", [])
 
     def update_robot_board_state(self, json_str, name):
         self.robot_pages[name].update_board_state(json_str)

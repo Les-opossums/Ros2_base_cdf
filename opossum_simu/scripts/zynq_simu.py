@@ -136,7 +136,7 @@ class ZynqSimulation(Node):
         ):
             self.send_short_cmd("motors", name, args)
         elif (
-            name in ("PUMP", "VACCUMGRIPPER")
+            name in ("PUMP", "PINCE")
         ):
             self.send_short_cmd("actuators", name, args)
         elif name == "MOVE":

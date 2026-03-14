@@ -955,7 +955,7 @@ class ActionManager(Node):
                 # Cas A : Les deux pinces ont la même action (ex: pick/pick)
                 if action1 == action2:
                     mode = action_map.get(action1, 1) # Fallback to 1 if unknown string
-                    self.pub_command.publish(String(data=f"VACCUMGRIPPER {cmd_id} {mode} 2"))
+                    self.pub_command.publish(String(data=f"PINCE {cmd_id} {mode} 2"))
                     self.get_logger().info(f"PUB HERE 0")
                     processed_ids.add(current_id)
                     processed_ids.add(pair_neighbor)
@@ -963,7 +963,7 @@ class ActionManager(Node):
                 
                 # Cas B : Combinaison mixte spéciale -> rev_drop(0) et drop(1)
                 elif action1 == "rev_drop" and action2 == "drop":
-                    self.pub_command.publish(String(data=f"VACCUMGRIPPER {cmd_id} 4 2"))
+                    self.pub_command.publish(String(data=f"PINCE {cmd_id} 4 2"))
                     self.get_logger().info(f"PUB HERE 1")
                     processed_ids.add(current_id)
                     processed_ids.add(pair_neighbor)
@@ -971,7 +971,7 @@ class ActionManager(Node):
                 
                 # Cas C : Combinaison mixte spéciale -> drop(0) et rev_drop(1)
                 elif action1 == "drop" and action2 == "rev_drop":
-                    self.pub_command.publish(String(data=f"VACCUMGRIPPER {cmd_id} 5 2"))
+                    self.pub_command.publish(String(data=f"PINCE {cmd_id} 5 2"))
                     self.get_logger().info(f"PUB HERE 2")
                     processed_ids.add(current_id)
                     processed_ids.add(pair_neighbor)
@@ -983,7 +983,7 @@ class ActionManager(Node):
             # Traitement individuel (ID seul, voisin manquant, ou paire incompatible)
             mode = action_map.get(action1, 1)
             side = current_id % 2
-            self.pub_command.publish(String(data=f"VACCUMGRIPPER {cmd_id} {mode} {side}"))
+            self.pub_command.publish(String(data=f"PINCE {cmd_id} {mode} {side}"))
             self.get_logger().info(f"PUB HERE 4")
             processed_ids.add(current_id)
 

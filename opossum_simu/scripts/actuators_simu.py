@@ -90,7 +90,7 @@ class ActuatorsSimu(Node):
                 self.states[f"PUMP{request_split[1]}"] = int(request_split[2])
             response.response = request_split[0] + "," + request_split[1] + "," + request_split[2]
             
-        elif request_split[0] == "VACCUMGRIPPER":
+        elif request_split[0] == "PINCE":
             id = int(request_split[1])
             mode = int(request_split[2])
             side = int(request_split[3])
@@ -99,16 +99,16 @@ class ActuatorsSimu(Node):
             with self.state_lock:
                 if side == 2:
                     if mode == 4:
-                        self.states[f"VACCUMGRIPPER{id * 2}"] = 3
-                        self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = 2
+                        self.states[f"PINCE{id * 2}"] = 3
+                        self.states[f"PINCE{id * 2 + 1}"] = 2
                     elif mode == 5: # <--- CHANGED TO ELIF! Prevents overwriting mode 4
-                        self.states[f"VACCUMGRIPPER{id * 2}"] = 2
-                        self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = 3
+                        self.states[f"PINCE{id * 2}"] = 2
+                        self.states[f"PINCE{id * 2 + 1}"] = 3
                     else:
-                        self.states[f"VACCUMGRIPPER{id * 2}"] = mode
-                        self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = mode
+                        self.states[f"PINCE{id * 2}"] = mode
+                        self.states[f"PINCE{id * 2 + 1}"] = mode
                 else:
-                    self.states[f"VACCUMGRIPPER{id * 2 + side}"] = mode
+                    self.states[f"PINCE{id * 2 + side}"] = mode
                     
                 state_vector = encode_state(list(self.states.values()))
                 
@@ -125,10 +125,10 @@ class ActuatorsSimu(Node):
             # 3. Safely update the final states after the sleep
             with self.state_lock:
                 if side == 2:
-                    self.states[f"VACCUMGRIPPER{id * 2}"] = end_mode
-                    self.states[f"VACCUMGRIPPER{id * 2 + 1}"] = end_mode
+                    self.states[f"PINCE{id * 2}"] = end_mode
+                    self.states[f"PINCE{id * 2 + 1}"] = end_mode
                 else:
-                    self.states[f"VACCUMGRIPPER{id * 2 + side}"] = end_mode
+                    self.states[f"PINCE{id * 2 + side}"] = end_mode
                 
                 self.get_logger().info(f"State: {list(self.states.values())}")
                 state_vector = encode_state(list(self.states.values()))
@@ -177,7 +177,7 @@ class ActuatorsSimu(Node):
     def _init_states(self):
         """Create random positions for init."""
         self.state_lock = threading.Lock() # <--- ADD THIS
-        self.states = {f"VACCUMGRIPPER{i}": 0 for i in range(16)}
+        self.states = {f"PINCE{i}": 0 for i in range(16)}
         state_vector = encode_state(list(self.states.values()))
         self.pub_change_state.publish(Int64(data=state_vector))
 
