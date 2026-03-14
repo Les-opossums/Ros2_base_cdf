@@ -1238,7 +1238,7 @@ class ActionManager(Node):
 
     def compute_release_penality(self, x, y):
         coeff_center = -10 # -0.005
-        coeff_dst = -1
+        coeff_dst = 0
         coeff_enn = 0 # 0.05
         # coeef_end = -0.0001
         val_center = (1.5 - x) ** 2 + (1 - y) ** 2
