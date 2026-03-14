@@ -502,6 +502,9 @@ class ActionManager(Node):
             world_det.y = self.robot_pos.y + (det.x * sin_t + det.y * cos_t)
             world_det.theta = self.robot_pos.t + det.theta
             world_detections.append(world_det)
+            self.get_logger().info(f"DET: {det.id}")
+            self.get_logger().info(f"LD: x: {det.x} y: {det.y}, t: {self.robot_pos.t}")
+            self.get_logger().info(f"WD: x: {world_det.x} y: {world_det.y}, t: {world_det.theta}")
 
 
         # =====================================================================
