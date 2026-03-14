@@ -456,9 +456,9 @@ class ActionManager(Node):
 
     def _extract_color_from_id(self, aruco_id: int) -> int:
         """Map ArUco ID to internal color code."""
-        if aruco_id == 37:
+        if aruco_id == 36:
             return 0  # Yellow
-        elif aruco_id == 43:
+        elif aruco_id == 47:
             return 1  # Blue
         elif aruco_id == 21:
             return 2  # Rot (Red)
@@ -1059,6 +1059,7 @@ class ActionManager(Node):
                 best_zone_ind = self.compute_release_rewards()
                 if best_zone_ind is not None:
                     best_zone = self.zones[best_zone_ind]
+                    self.get_logger().info(f"Best zone: {best_zone}")
                     dx = self.robot_pos.x - best_zone.x
                     dy = self.robot_pos.y - best_zone.y
                     distance = 0.15
@@ -1079,6 +1080,7 @@ class ActionManager(Node):
                     id_side = self.get_best_side_pliers_release(angle)
                     if id_side is not None:
                         fpos.t = angle - self.pliers[id_side * 4].theta
+                        self.get_logger().info(f"fpos: {fpos}")
                         self.move_to(fpos)
                         self.wait_for_motion()
 

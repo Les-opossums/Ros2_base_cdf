@@ -27,9 +27,9 @@ class HazCrate:
         self.theta = msg.theta
         self.state = 1 if msg.state.split("*")[0] == 'free' else 0
         if msg.state.split("*")[-1] == "yellow":
-            self.color = 37
+            self.color = 36
         elif msg.state.split("*")[-1] == "blue":
-            self.color = 43
+            self.color = 47
         elif msg.state.split("*")[-1] == "rot":
             self.color = 21
         else:
