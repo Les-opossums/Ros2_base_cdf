@@ -4,7 +4,7 @@ position_sender_node:
     short_motor_srv: short_motor
     update_position_topic: update_position
     update_period: 0.1
-    config_yaml: "objects.yaml"
+    config_yaml: "small_objects.yaml"
     year: 2026
 
 main_robot:
@@ -93,6 +93,6 @@ second_robot:
 
   camera_simu_node:
     ros__parameters:
-      camera_angles: [0.0] # 0 deg
-      radius: [1.0]
-      cone_range: [1.396] # 80 deg
+      camera_angles: [0.0, 2.093333, 4.186666] # 0 deg
+      radius: [1.0, 1.0, 1.0]
+      cone_range: [1.396, 1.396, 1.396] # 80 deg

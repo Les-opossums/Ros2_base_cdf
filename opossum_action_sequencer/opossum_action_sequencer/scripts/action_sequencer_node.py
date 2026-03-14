@@ -1239,7 +1239,7 @@ class ActionManager(Node):
     def compute_release_penality(self, x, y):
         coeff_center = 1 # -0.005
         coeff_dst = -1
-        coeff_enn = 0 # 0.05
+        coeff_enn = -10 # 0.05
         # coeef_end = -0.0001
         val_center = (1.5 - x) ** 2 + (1 - y) ** 2
         val_dst = (self.robot_pos.x - x) ** 2 + (self.robot_pos.y - y) ** 2
@@ -1253,13 +1253,14 @@ class ActionManager(Node):
         angle_coeff = 0
         coeff_center = -1 # -0.005
         coeff_dst = -1
-        coeff_enn = 0 # 0.05
+        coeff_enn = -10 # 0.05
         # coeef_end = -0.0001
         val_center = (1.5 - x) ** 2 + (1 - y) ** 2
         val_dst = (self.robot_pos.x - x) ** 2 + (self.robot_pos.y - y) ** 2
         if self.x_enn is not None:
             val_ennemi = (self.x_enn - x) ** 2 + (self.y_enn - y) ** 2
         else:
+            self.get_logger().info(f"Ennemi not detected")
             val_ennemi = 0
         return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
 
