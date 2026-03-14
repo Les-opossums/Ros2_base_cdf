@@ -1260,7 +1260,6 @@ class ActionManager(Node):
         if self.x_enn is not None:
             val_ennemi = (self.x_enn - x) ** 2 + (self.y_enn - y) ** 2
         else:
-            self.get_logger().info(f"Ennemi not detected")
             val_ennemi = 0
         return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
 
