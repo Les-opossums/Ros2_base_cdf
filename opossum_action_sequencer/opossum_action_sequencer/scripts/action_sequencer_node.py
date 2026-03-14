@@ -1045,7 +1045,7 @@ class ActionManager(Node):
         return -1 if val < 0 else 1
 
     def smart_moves(self):
-        self.send_raw(f"VMAX 0.8")
+        self.send_raw(f"VMAX 0.5")
         self.send_raw(f"VTMAX 1.5")
         release = False
         while True:
