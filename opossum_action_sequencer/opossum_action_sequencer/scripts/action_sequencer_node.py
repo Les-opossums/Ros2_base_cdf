@@ -1237,9 +1237,9 @@ class ActionManager(Node):
         return best_zone_id
 
     def compute_release_penality(self, x, y):
-        coeff_center = 1 # -0.005
+        coeff_center = -10 # -0.005
         coeff_dst = -1
-        coeff_enn = -10 # 0.05
+        coeff_enn = 0 # 0.05
         # coeef_end = -0.0001
         val_center = (1.5 - x) ** 2 + (1 - y) ** 2
         val_dst = (self.robot_pos.x - x) ** 2 + (self.robot_pos.y - y) ** 2
@@ -1247,10 +1247,10 @@ class ActionManager(Node):
             val_ennemi = (self.x_enn - x) ** 2 + (self.y_enn - y) ** 2
         else:
             val_ennemi = 0
+        self.get_logger().info(f"For {x}, {y}, center: {val_center}, coeff_dst: {coeff_dst}, total: {coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center}")
         return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
 
     def compute_pick_penality(self, x, y):
-        angle_coeff = 0
         coeff_center = -1 # -0.005
         coeff_dst = -1
         coeff_enn = -10 # 0.05
