@@ -1062,7 +1062,7 @@ class ActionManager(Node):
                     self.get_logger().info(f"Best zone: {best_zone}")
                     dx = self.robot_pos.x - best_zone.x
                     dy = self.robot_pos.y - best_zone.y
-                    distance = 0.27
+                    distance = 0.28
                     if dx > dy:
                         if dx > 0:
                             fpos = Position(best_zone.x + distance, best_zone.y, 0.0)
