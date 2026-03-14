@@ -32,9 +32,9 @@ class TfBroadcaster(Node):
                 ("init_visu_srv", rclpy.Parameter.Type.STRING),
                 ("boundaries", rclpy.Parameter.Type.DOUBLE_ARRAY),
                 ("beacons", rclpy.Parameter.Type.DOUBLE_ARRAY),
-                ("robot_names", rclpy.Parameter.Type.STRING_ARRAY),
-                ("enable_wait_color", rclpy.Parameter.Type.BOOL),
-                ("color_topic", rclpy.Parameter.Type.STRING),
+                ("robot_names", ["main_robot", "second_robot"]),
+                ("enable_wait_color", True),
+                ("color_topic", "init_team_color"),
             ],
         )
         self._init_main_parameters()
