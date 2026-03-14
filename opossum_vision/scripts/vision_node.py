@@ -236,7 +236,6 @@ class VisionNode(Node):
                 return
 
             first_part_tokens = parts[0].split()
-            self.get_logger().info(f"Received ARUCO data: {first_part_tokens}")
             if len(first_part_tokens) < 3:
                 return
 
