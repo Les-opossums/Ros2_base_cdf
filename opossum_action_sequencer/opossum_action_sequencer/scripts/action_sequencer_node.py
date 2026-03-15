@@ -1196,7 +1196,7 @@ class ActionManager(Node):
         self.send_raw(f"VMAX 0.3")
         self.send_raw(f"VTMAX 1.5")
         
-        activate_check_stack = False
+        activate_check_stack = True
         steal_poses = [[0.45, 0.45], [0.45, 1.1], [2.55, 1.1], [2.55, 0.45]]
         id_steal = 0
 
@@ -1278,7 +1278,6 @@ class ActionManager(Node):
                         id_active_pliers_all[pid] = ["drop", plier.state]
                     self.send_plier_cmd(id_active_pliers)
                     self.wait_for_plier()
-                    release = False
 
             # =================================================================
             # 3. GO FOR A TAKE
@@ -1590,7 +1589,7 @@ class ActionManager(Node):
             if self.is_any_point_in_zone(id):
                 continue
             x = zone.x
-            y = zone.y 
+            y = zone.y
 
             distance = 0.26
             av_poses = [[x + distance, y, 3.14],
