@@ -428,9 +428,9 @@ class ActionManager(Node):
 
     def _extract_color_from_id(self, aruco_id: int) -> int:
         """Map ArUco ID to internal color code."""
-        if aruco_id == 36:
+        if aruco_id == 47:
             return 0  # Yellow
-        elif aruco_id == 47:
+        elif aruco_id == 36:
             return 1  # Blue
         elif aruco_id == 41:
             return 2  # Rot (Red)
@@ -1548,7 +1548,7 @@ class ActionManager(Node):
         
         # 3. Check every crate (We use .values() to get the actual HazCrate objects)
         for crate in self.haz_crates.values():
-            if (min_x <= crate.x <= max_x) and (min_y <= crate.y <= max_y):
+            if (min_x <= crate.x <= max_x) and (min_y <= crate.y <= max_y) and crate.state == -1:
                 return True  # Found one! Exit immediately.
                 
         return False # Looked at all crates, none were in the zone
@@ -1587,8 +1587,8 @@ class ActionManager(Node):
         best_zone_id = None
         best_pos = None
         for id, zone in self.zones.items():
-            # if self.is_any_point_in_zone(id):
-            #     continue
+            if self.is_any_point_in_zone(id):
+                continue
             x = zone.x
             y = zone.y 
 
