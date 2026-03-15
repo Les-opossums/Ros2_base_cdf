@@ -1592,7 +1592,7 @@ class ActionManager(Node):
             x = zone.x
             y = zone.y 
 
-            distance = 0.23
+            distance = 0.26
             av_poses = [[x + distance, y, 3.14],
                         [x - distance, y, 0.0],
                         [x, y + distance, 4.71],
