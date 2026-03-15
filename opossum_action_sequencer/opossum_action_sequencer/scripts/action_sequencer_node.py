@@ -1238,7 +1238,7 @@ class ActionManager(Node):
                             self.get_logger().info(f"Navigating release waypoint: {wp}")
                             self.move_to(Position(wp[0], wp[1], target_angle))
                             self.wait_for_motion()
-                            self.stare_and_update()
+                    self.stare_and_update()
 
                     # Configure dropping actions safely
                     with self.data_lock:
@@ -1336,7 +1336,7 @@ class ActionManager(Node):
                             # Normal grid steps
                             self.move_to(Position(wp[0], wp[1], final_robot_theta))
                         self.wait_for_motion()
-                        self.stare_and_update() # Kept from your old code to update map on the way!
+                self.stare_and_update() # Kept from your old code to update map on the way!
 
                 # B. --- VERIFICATION ---
                 # We are parked at the entry point. Make sure it's not a ghost!
