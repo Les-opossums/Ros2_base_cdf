@@ -150,7 +150,8 @@ class ActionManager(Node):
         self.end_match_event.set()
         self.stop = False
         self.data_lock = threading.Lock()
-        self.camera_angles = [0.0, 2.093333, 4.186666]
+        # self.camera_angles = [0.0, 2.093333, 4.186666]
+        self.camera_angles = [0.0]
 
     def _init_mapping(self):
         objects_path = os.path.join(
@@ -536,21 +537,51 @@ class ActionManager(Node):
                 self.haz_crates[new_id] = new_crate
                 self.get_logger().info(f"Tracking: Discovered new crate! Assigned internal ID: {new_id} at X:{det.x:.2f} Y:{det.y:.2f}")
 
-        # # =====================================================================
-        # # OPTIONAL: 5. GHOST CLEANUP 
-        # # (Remove crates that we haven't seen in a while to handle stolen/moved crates)
-        # # =====================================================================
-        # timeout_seconds = 10.0 # How long until we forget a crate exists
-        # stale_crates = []
-        # for cid, crate in self.haz_crates.items():
-        #     if current_time - crate.last_seen > timeout_seconds:
-        #         # Don't delete crates that are currently inside our map stacks or held by pliers
-        #         if crate.state == -1 and not self.get_stack_linked(cid):
-        #             stale_crates.append(cid)
+        # =====================================================================
+        # 5. GHOST CLEANUP (FOV & Range Verification)
+        # =====================================================================
+        ghost_ids = []
+        fov_half = math.radians(65.0 / 2.0) # 65 degrees FOV divided by 2
+        max_range = 0.80 # 80cm limit
+
+        for cid, crate in self.haz_crates.items():
+            if crate.last_seen == current_time or crate.state != -1:
+                continue
+                
+            # Distance to crate
+            dist = math.hypot(crate.x - self.robot_pos.x, crate.y - self.robot_pos.y)
+            
+            # If it is close enough to see...
+            if dist <= max_range:
+                angle_to_crate = math.atan2(crate.y - self.robot_pos.y, crate.x - self.robot_pos.x)
+                is_in_view = False
+                
+                # Check if it falls inside any of our 3 camera cones!
+                for cam_angle in self.camera_angles:
+                    cam_global_angle = self.robot_pos.t + cam_angle
+                    diff = self.angular_distance(angle_to_crate, cam_global_angle)
                     
-        # for cid in stale_crates:
-        #     del self.haz_crates[cid]
-        #     self.get_logger().info(f"Tracking: Removed stale crate ID {cid} from memory.")
+                    if diff <= fov_half:
+                        is_in_view = True
+                        break
+                        
+                if is_in_view:
+                    # Should be perfectly visible, but wasn't detected!
+                    ghost_ids.append(cid)
+
+        # Erase the ghosts
+        for cid in ghost_ids:
+            self.get_logger().warn(f"GHOST DETECTED: Crate {cid} missing from expected FOV! Erasing.")
+            ghost_crate = self.haz_crates[cid]
+            
+            if ghost_crate.state != -1 and ghost_crate.state in self.pliers:
+                self.pliers[ghost_crate.state].state = -1
+                    
+            for stack_list in self.stacks.values():
+                if cid in stack_list:
+                    stack_list.remove(cid)
+                    
+            del self.haz_crates[cid]
         self.get_logger().info("Finished staring go back to match.")
 
     def begin_centering(self):
@@ -1100,10 +1131,71 @@ class ActionManager(Node):
     def any_plier_used(self):
         return any(pl.state != -1 for pl in self.pliers.values())
 
+    def _rebuild_stacks(self):
+        """Dynamically groups adjacent, aligned crates into stacks based on real-world geometry."""
+        with self.data_lock:
+            self.stacks.clear()
+            
+            # 1. Only consider crates sitting freely on the floor
+            free_crates = [cid for cid, crate in self.haz_crates.items() if crate.state == -1]
+            visited = set()
+            stack_counter = 0
+            
+            for cid in free_crates:
+                if cid in visited:
+                    continue
+                    
+                current_stack = [cid]
+                visited.add(cid)
+                
+                # 2. Breadth-First Search to find all connected crates in a line
+                queue = [cid]
+                while queue:
+                    curr_id = queue.pop(0)
+                    C = self.haz_crates[curr_id]
+                    
+                    for other_id in free_crates:
+                        if other_id in visited:
+                            continue
+                            
+                        O = self.haz_crates[other_id]
+                        dx = O.x - C.x
+                        dy = O.y - C.y
+                        dist = math.hypot(dx, dy)
+                        
+                        # If they are too far apart to be neighbors, ignore immediately
+                        if dist > 0.28:
+                            continue
+                            
+                        # 3. Check Angle Alignment (modulo pi in case one is spun 180 degrees)
+                        angle_diff = abs(C.theta - O.theta) % math.pi
+                        if angle_diff > math.pi / 2: 
+                            angle_diff = math.pi - angle_diff
+                            
+                        if angle_diff > 0.35: # ~20 degrees tolerance
+                            continue
+                            
+                        # 4. The Magic Math: Perpendicular and Parallel Distances
+                        parallel_dist = abs(dx * math.cos(C.theta) + dy * math.sin(C.theta))
+                        perp_dist = abs(-dx * math.sin(C.theta) + dy * math.cos(C.theta))
+                        
+                        # If they are perfectly side-by-side!
+                        if parallel_dist < 0.12 and perp_dist < 0.25:
+                            current_stack.append(other_id)
+                            visited.add(other_id)
+                            queue.append(other_id)
+                            
+                # 5. Only save it as a "stack" if there are at least 2 crates
+                if len(current_stack) > 1:
+                    self.stacks[stack_counter] = current_stack
+                    stack_counter += 1
+                    self.get_logger().info(f"Dynamically formed new stack {stack_counter-1} with crates: {current_stack}")
+
     def smart_moves(self):
         self.send_raw(f"VMAX 0.8")
         self.send_raw(f"VTMAX 1.5")
         
+        activate_check_stack = False
         steal_poses = [[0.45, 0.45], [0.45, 1.1], [2.55, 1.1], [2.55, 0.45]]
         id_steal = 0
         release = False
@@ -1127,8 +1219,7 @@ class ActionManager(Node):
             # =================================================================
             # 3. GO FOR A TAKE
             # =================================================================
-            if pick_crate_ind is not None:
-                # Read target data safely
+            if pick_crate_ind is not None and not release:
                 with self.data_lock:
                     target_ids = self.stacks[stack_id] if stack_id is not None else [pick_crate_ind]
                     pliers_config = self.get_best_side_pliers(len(target_ids))
@@ -1140,10 +1231,10 @@ class ActionManager(Node):
                 
                 selected_pliers_ids = pliers_config[0]
     
-                # Calculate kinematics safely
                 with self.data_lock:
                     target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in target_ids])
                     pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in selected_pliers_ids])
+                    current_robot_theta = self.robot_pos.t
                 
                 target_angle = target_pos.t + (np.pi if is_inv else 0.0)
                 final_robot_theta = target_angle - pliers_pos.t
@@ -1156,19 +1247,60 @@ class ActionManager(Node):
                     final_robot_theta
                 )
 
-                # Drive through the grid waypoints! (Skip index 0, which is the current pos)
-                if len(pick_path) > 1:
-                    for wp in pick_path[1:]:
-                        self.get_logger().info(f"Navigating pick waypoint: {wp}")
-                        self.move_to(Position(wp[0], wp[1], final_robot_theta))
-                        self.wait_for_motion()
-                        self.stare_and_update()
+                # --- Calculate Best Camera Aim for the Entry Point ---
+                entry_point = pick_path[-1] if len(pick_path) > 0 else (self.robot_pos.x, self.robot_pos.y)
+                angle_to_crate = math.atan2(target_pos.y - entry_point[1], target_pos.x - entry_point[0])
+                
+                if activate_check_stack:
+                    best_camera_theta = current_robot_theta
+                    min_rot = float('inf')
+                    for cam_angle in self.camera_angles:
+                        req_theta = (angle_to_crate - cam_angle) % (2 * math.pi)
+                        if req_theta > math.pi: req_theta -= 2 * math.pi
+                        
+                        rot = self.angular_distance(current_robot_theta, req_theta)
+                        if rot < min_rot:
+                            min_rot = rot
+                            best_camera_theta = req_theta
 
-                # Plunge into the final position
+                # A. Drive the Grid Path (Aiming the camera on the final step!)
+                if len(pick_path) > 1:
+                    for i, wp in enumerate(pick_path[1:]):
+                        if activate_check_stack and i == len(pick_path[1:]) - 1:
+                            # Last step: Drift in aiming the camera!
+                            self.get_logger().info(f"Aiming camera while arriving at entry point: {wp}")
+                            self.move_to(Position(wp[0], wp[1], best_camera_theta))
+                        else:
+                            # Normal grid steps
+                            self.move_to(Position(wp[0], wp[1], final_robot_theta))
+                        self.wait_for_motion()
+                        self.stare_and_update() # Kept from your old code to update map on the way!
+
+                # B. --- VERIFICATION ---
+                # We are parked at the entry point. Make sure it's not a ghost!
+                if activate_check_stack:
+                    is_ghost = False
+                    with self.data_lock:
+                        for cid in target_ids:
+                            if cid not in self.haz_crates:
+                                is_ghost = True
+                                break
+                                
+                    if is_ghost:
+                        self.get_logger().warn("Crate missing after approach! Aborting pick...")
+                        continue 
+
+                # C. Realignment (Rotate back to align the pliers with the crate)
+                # FIX: ONLY realign if the robot actually needs to turn! (Prevents 0-distance hang)
+                if not activate_check_stack or abs(self.angular_distance(best_camera_theta, final_robot_theta)) > 0.05:
+                    self.move_to(Position(entry_point[0], entry_point[1], final_robot_theta))
+                    self.wait_for_motion()
+
+                # D. Plunge into the final position!
                 self.move_to(final_pos)
                 self.wait_for_motion()
 
-                # Activate pliers
+                # E. Activate pliers
                 with self.data_lock:
                     robot_x, robot_y, robot_t = final_pos.x, final_pos.y, final_pos.t
                     pliers_in_map = {}
@@ -1177,11 +1309,19 @@ class ActionManager(Node):
                         rx, ry = self.rotate_point(p_local.x, p_local.y, robot_t)
                         pliers_in_map[pl_id] = (robot_x + rx, robot_y + ry)
 
-                    remaining_targets = list(target_ids)
+                    # --- THE FIX: Filter out any ghosts that were deleted during the drive ---
+                    remaining_targets = [tid for tid in target_ids if tid in self.haz_crates]
+                    
+                    # Safety check: If ALL crates in the stack turned out to be ghosts, abort!
+                    if not remaining_targets:
+                        self.get_logger().warn("All targets vanished during approach! Aborting plier activation.")
+                        continue 
+                    # -------------------------------------------------------------------------
+
                     dict_sel_pliers = {}
                     for pl_id, (px, py) in pliers_in_map.items():
-                        if not remaining_targets:
-                            continue
+                        if not remaining_targets: continue
+                        
                         best_obj_id = min(
                             remaining_targets, 
                             key=lambda obj_id: (self.haz_crates[obj_id].x - px)**2 + (self.haz_crates[obj_id].y - py)**2
@@ -1189,6 +1329,7 @@ class ActionManager(Node):
                         remaining_targets.remove(best_obj_id)
                         dict_sel_pliers[pl_id] = ["pick", best_obj_id]
 
+                # Send commands and wait
                 self.send_plier_cmd(dict_sel_pliers)
                 self.wait_for_plier()
                 continue
@@ -1508,7 +1649,7 @@ class ActionManager(Node):
         use_inverted_approach = False
         best_path = []
         
-        approach_distance = 0.25
+        approach_distance = 0.3
         reviewed_ids = set()
         
         start_pos = (self.robot_pos.x, self.robot_pos.y)
@@ -1519,7 +1660,7 @@ class ActionManager(Node):
                 continue
 
             # 1. Filtres de sécurité
-            if crate.state >= 0 or (self.get_current_zone(crate.x, crate.y) is not None and (crate.color == self.color or crate.color == 2)): 
+            if crate.state >= 0 or (self.get_current_zone(crate.x, crate.y) is not None and (crate.color in (-1, self.color, 2))): 
                 reviewed_ids.add(crate_id)
                 continue
             
