@@ -200,6 +200,7 @@ class ActionManager(Node):
         self.list_objects = []
         self.is_center = False
         self.try_center = 0
+        self.rect = (0.45, 2.55, 0.45, 1.1) if self.board_config == "objects" else (0.45, 0.55, 0.45, 1.1)
 
     def _init_parameters(self) -> None:
         """Initialize the parameters of the node."""
@@ -446,7 +447,6 @@ class ActionManager(Node):
         # 1. Wait for physical motion blur to clear
         time.sleep(0.5) 
         
-        self.get_logger().info(f"Delta time: {time.time() - self.last_camera_timestamp}")
         if time.time() - self.last_camera_timestamp > 0.4:
             return
 
@@ -871,7 +871,7 @@ class ActionManager(Node):
     def wait_for_plier(self):
         """Compute the wait_for_motion action."""
         if not self.stop:
-            self.pliers_event.wait(timeout=5.0)
+            self.pliers_event.wait(timeout=10.0)
 
     def send_plier_cmd(self, ids: dict):
         """Compute and send the vacuum gripper command with pair optimization.
@@ -1100,7 +1100,6 @@ class ActionManager(Node):
     def smart_moves(self):
         self.send_raw(f"VMAX 0.8")
         self.send_raw(f"VTMAX 1.5")
-        release = False
         steal_poses = [[0.45, 0.45],
                        [0.45, 1.1],
                        [2.55, 1.1],
@@ -1108,25 +1107,15 @@ class ActionManager(Node):
                       ]
         id_steal = 0
         while not self.match_finished:
-            best_ind, stack_id, is_inv = self.compute_pick_rewards()
-            best_zone_ind, best_pos = self.compute_release_rewards()
-            if not self.any_plier_used() and release:
-                self.get_logger().info(f"Set release to false, no pliers holding anything")
-                release = False
+            pick_crate_ind, stack_id, is_inv = self.compute_pick_rewards()
+            release_zone_ind, best_pos = self.compute_release_rewards()
 
-            if best_ind is not None:
+            # Go for a take
+            if pick_crate_ind is not None: # Mean we can take something here
                 # Depending on the stack len (or alone) we check available pliers
                 # A. Déterminer le groupe d'objets (Stack ou Single)
-                target_ids = self.stacks[stack_id] if stack_id is not None else [best_ind]
-
-                # B. Trouver les pinces disponibles
-                pliers_config = self.get_best_side_pliers(len(target_ids))
-                if not pliers_config:
-                    self.get_logger().warn("Cible trouvée mais aucune pince disponible. Passage en mode Release.")
-                    release = True
-                    continue
-                
-                selected_pliers_ids = pliers_config[0]
+                target_ids = self.stacks[stack_id] if stack_id is not None else [pick_crate_ind]
+                selected_pliers_ids = self.get_best_side_pliers(len(target_ids))[0]
     
                 # C. Calculer les centres de masse (Crates et Pliers)
                 target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in target_ids])
@@ -1146,11 +1135,9 @@ class ActionManager(Node):
                 x_offset, y_offset = self.rotate_point(pliers_pos.x, pliers_pos.y, final_robot_theta)
                 
                 distance = 0.15
-                entry_pos = Position(
-                    target_pos.x - x_offset - distance * np.cos(target_angle),
-                    target_pos.y - y_offset - distance * np.sin(target_angle),
-                    final_robot_theta
-                )
+                ep = (target_pos.x - x_offset - distance * np.cos(target_angle),
+                    target_pos.y - y_offset - distance * np.sin(target_angle))
+
                 # Position finale du robot = Position Caisse - Offset Pince
                 final_pos = Position(
                     target_pos.x - x_offset,
@@ -1158,9 +1145,11 @@ class ActionManager(Node):
                     final_robot_theta
                 )
 
-                self.move_to(entry_pos)
-                self.wait_for_motion()
-                self.stare_and_update()
+                for pos in self.get_safe_perimeter_path(ep)[0][:-1]: # 1 is the cost it has.
+                    self.get_logger().info(f"FPOS TAKE: {pos}")
+                    self.move_to(Position(pos[0], pos[1], final_robot_theta))
+                    self.wait_for_motion()
+                    self.stare_and_update()
 
                 self.move_to(final_pos)
                 self.wait_for_motion()
@@ -1204,55 +1193,39 @@ class ActionManager(Node):
                 # Set state of actuators
                 self.wait_for_plier()
                 continue
-
-            if release and best_zone_ind is not None:
+            
+            # Go for a release
+            if release_zone_ind is not None:
                 distance = 0.28
                 id_side = self.get_best_side_pliers_release(best_pos[2])
-                if id_side is not None:
-                    fpos = Position(best_pos[0], best_pos[1], best_pos[2] - self.pliers[id_side * 4].theta)
-                    self.move_to(fpos)
+                fpos = (best_pos[0], best_pos[1])
+                for pos in self.get_safe_perimeter_path(fpos)[0][:-1]: # 1 is the cost it has.
+                    self.get_logger().info(f"FPOS RELEASE: {pos}")
+                    self.move_to(Position(fpos[0], fpos[1], best_pos[2] - self.pliers[id_side * 4].theta))
                     self.wait_for_motion()
+                    self.stare_and_update()
+                
+                # Set the action to do for each.
+                id_active_pliers = {}
+                for id in self.pliers.keys():
+                    plier = self.pliers[id]
+                    if plier.state == -1 or id // 4 != id_side:
+                        continue
                     
-                    id_active_pliers = {}
-                    for id in self.pliers.keys():
-                        plier = self.pliers[id]
-                        if plier.state == -1 or id // 4 != id_side:
-                            continue
-                        
-                        crate = self.haz_crates[plier.state]
-                        if crate.color in (-1, 2) or crate.color == self.color:
-                            id_active_pliers[id] = ["drop", plier.state]
+                    crate = self.haz_crates[plier.state]
+                    if crate.color in (-1, 2) or crate.color == self.color:
+                        id_active_pliers[id] = ["drop", plier.state]
 
-                        else:
-                            id_active_pliers[id] = ["rev_drop", plier.state]
+                    else:
+                        id_active_pliers[id] = ["rev_drop", plier.state]
 
-                    # Here when we activate pliers, we give dict of ID: [the action, the ID of the Haz]
-                    self.send_plier_cmd(id_active_pliers)
-                    self.wait_for_plier()
+                # Here when we activate pliers, we give dict of ID: [the action, the ID of the Haz]
+                self.send_plier_cmd(id_active_pliers)
+                self.wait_for_plier()
 
-                    # Set state of actuators
-                    for pl_id in id_active_pliers:
-                        self.pliers[pl_id].state = -1
-                else: 
-                    self.get_logger().info("Issue cannot find anymore plier taken")
-                    release = False
-
-            elif best_zone_ind is None:
-                self.get_logger().info("Issue cannot find")
-                self.move_to(Position(self.final_zone["x"], self.final_zone["y"], 0.0))
-                self.wait_for_motion()
-                time.sleep(0.2)
-                release = False
-            # Get the best crate to take, according to the color / positions... 
-            
-
-            elif self.any_plier_used():
-                self.get_logger().info("Nothing to do, going for the release position")
-                release = True
-                time.sleep(0.3)
-
+            # Turn on board to check if something exists
             else:
-                self.get_logger().info("Nothing to do: Turning...")
+                self.get_logger().info("Nothing to do: Try steal...")
                 pos = steal_poses[id_steal % len(steal_poses)]
                 if not (self.boundaries[0] + 0.35 < pos[0] < self.boundaries[1] - 0.35 and self.boundaries[2] + 0.35 < pos[1] < self.boundaries[3] - 0.35): 
                     continue
@@ -1261,6 +1234,84 @@ class ActionManager(Node):
                 self.stare_and_update()
                 id_steal += 1
                 time.sleep(0.1)
+
+    def get_safe_perimeter_path(self, target_pos):
+        """
+        Finds the shortest path along a safe rectangle perimeter to a target.
+        
+        robot_pos: (x, y) tuple of the robot
+        target_pos: (x, y) tuple of the object to grab
+        rect: (x_min, x_max, y_min, y_max) tuple defining the safe perimeter
+        """
+        x_min, x_max, y_min, y_max = self.rect
+        cx, cy = (x_min + x_max) / 2.0, (y_min + y_max) / 2.0  # Center of rect
+        robot_pos = (self.robot_pos.x, self.robot_pos.y) 
+        # 1. Project a point to the nearest edge of the rectangle
+        def project_to_edge(x, y):
+            px = max(x_min, min(x, x_max))
+            py = max(y_min, min(y, y_max))
+            # If strictly inside the rectangle, push it to the nearest edge
+            if x_min < px < x_max and y_min < py < y_max:
+                dists = {
+                    (x_min, py): px - x_min,
+                    (x_max, py): x_max - px,
+                    (px, y_min): py - y_min,
+                    (px, y_max): y_max - py
+                }
+                px, py = min(dists, key=dists.get)
+            return round(px, 4), round(py, 4)
+
+        # 2. Find where Robot ENTERS the ring, and where it DIVES for the object
+        entry = project_to_edge(*robot_pos)
+        dive = project_to_edge(*target_pos)
+
+        # 3. Gather all points on our Ring Road and remove duplicates
+        perimeter_points = [
+            (x_min, y_max), (x_max, y_max), # Top-Left, Top-Right
+            (x_max, y_min), (x_min, y_min), # Bottom-Right, Bottom-Left
+            entry, dive
+        ]
+        perimeter_points = list(set(perimeter_points)) 
+        
+        # 4. The Math Trick: Sort points by their angle from the center!
+        # This perfectly orders them counter-clockwise around the rectangle.
+        perimeter_points.sort(key=lambda p: math.atan2(p[1] - cy, p[0] - cx))
+        
+        i_entry = perimeter_points.index(entry)
+        i_dive = perimeter_points.index(dive)
+        n = len(perimeter_points)
+        
+        # 5. Extract the two possible paths (Clockwise & Counter-Clockwise)
+        path_ccw, path_cw = [], []
+        
+        i = i_entry
+        while True:
+            path_ccw.append(perimeter_points[i])
+            if i == i_dive: break
+            i = (i + 1) % n  # Step forward
+            
+        i = i_entry
+        while True:
+            path_cw.append(perimeter_points[i])
+            if i == i_dive: break
+            i = (i - 1) % n  # Step backward
+
+        # 6. Calculate total distances to pick the shortest one
+        def calc_dist(path):
+            return sum(math.hypot(path[j][0]-path[j-1][0], path[j][1]-path[j-1][1]) for j in range(1, len(path)))
+
+        best_perimeter_path = path_ccw if calc_dist(path_ccw) < calc_dist(path_cw) else path_cw
+
+        # 7. Add the starting robot position and final object position
+        final_path = [robot_pos] + best_perimeter_path + [target_pos]
+        
+        # Clean up redundant points (e.g., if robot is already on the entry point)
+        cleaned_path = []
+        for p in final_path:
+            if not cleaned_path or cleaned_path[-1] != p:
+                cleaned_path.append(p)
+                
+        return cleaned_path, calc_dist(cleaned_path)
 
     def get_mean_pose(self, objects):
         """Calcule la position moyenne (x, y, theta_circulaire) d'une liste d'objets."""
@@ -1348,6 +1399,8 @@ class ActionManager(Node):
         return rx, ry
 
     def compute_release_rewards(self):
+        if not self.any_plier_used():
+            return None, None
         max_reward = float('-inf')
         best_zone_id = None
         best_pos = None
@@ -1408,6 +1461,9 @@ class ActionManager(Node):
         Calcule la meilleure opportunité de ramassage et retourne l'identifiant, 
         le stack, l'orientation d'approche et les coordonnées du point d'entrée.
         """
+        if not self.any_plier_side_available():
+            return None, None, None
+
         max_reward = float('-inf')
         best_crate_id = None
         target_stack_id = None
@@ -1546,6 +1602,135 @@ class ActionManager(Node):
     def angular_distance(self, a1, a2):
         diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
         return abs(diff)
+
+    def any_plier_side_available(self):
+        for side in range(4):
+            if any(self.pliers[pl_id].state >= 0 for pl_id in range(side * 4, (side + 1) * 4)):
+                continue
+            return True
+        return False
+
+    def get_street_grid_path(self, start, target, x_min, x_max, y_min, y_max):
+        import heapq
+        
+        # Helper to round coordinates (prevents floating point errors in the graph)
+        def pt(x, y): return (round(x, 4), round(y, 4))
+        
+        start = pt(*start)
+        target = pt(*target)
+        nodes = set([start, target])
+        
+        x_lines = [x_min, x_max]
+        y_lines = [y_min, y_max]
+        
+        # 1. Add the 4 main intersections
+        for x in x_lines:
+            for y in y_lines:
+                nodes.add(pt(x, y))
+                
+        # 2. Project Start and Target onto the lines (ONLY if within board boundaries)
+        for p in [start, target]:
+            for x in x_lines:
+                if self.boundaries[2] <= p[1] <= self.boundaries[3]: nodes.add(pt(x, p[1]))
+            for y in y_lines:
+                if self.boundaries[0] <= p[0] <= self.boundaries[1]: nodes.add(pt(p[0], y))
+                    
+        nodes = list(nodes)
+        edges = {n: [] for n in nodes}
+        
+        def add_edge(n1, n2):
+            if n1 != n2:
+                dist = math.hypot(n1[0]-n2[0], n1[1]-n2[1])
+                edges[n1].append((dist, n2))
+                edges[n2].append((dist, n1))
+
+        # 3. Connect nodes that share the same horizontal or vertical "Street"
+        for i, n1 in enumerate(nodes):
+            for n2 in nodes[i+1:]:
+                if n1[0] == n2[0] and n1[0] in x_lines: add_edge(n1, n2)
+                elif n1[1] == n2[1] and n1[1] in y_lines: add_edge(n1, n2)
+                    
+        # 4. Connect Start and Target to their respective projections
+        for x in x_lines:
+            if self.boundaries[2] <= start[1] <= self.boundaries[3]: add_edge(start, pt(x, start[1]))
+            if self.boundaries[2] <= target[1] <= self.boundaries[3]: add_edge(target, pt(x, target[1]))
+        for y in y_lines:
+            if self.boundaries[0] <= start[0] <= self.boundaries[1]: add_edge(start, pt(start[0], y))
+            if self.boundaries[0] <= target[0] <= self.boundaries[1]: add_edge(target, pt(target[0], y))
+
+        # 5. Mini-Dijkstra Pathfinding
+        queue = [(0, start, [start])]
+        visited = set()
+        
+        while queue:
+            cost, current, path = heapq.heappop(queue)
+            if current == target:
+                # Clean up the path (remove unnecessary middle points on straight lines)
+                cleaned = []
+                for p in path:
+                    if len(cleaned) >= 2:
+                        dx1, dy1 = cleaned[-1][0] - cleaned[-2][0], cleaned[-1][1] - cleaned[-2][1]
+                        dx2, dy2 = p[0] - cleaned[-1][0], p[1] - cleaned[-1][1]
+                        if abs(dx1*dy2 - dx2*dy1) < 1e-4: cleaned.pop() # Remove collinear point
+                    cleaned.append(p)
+                return cleaned, cost
+                
+            if current in visited: continue
+            visited.add(current)
+            
+            for d, neighbor in edges[current]:
+                if neighbor not in visited:
+                    heapq.heappush(queue, (cost + d, neighbor, path + [neighbor]))
+                    
+        return [], float('inf') # Return infinity if completely trapped
+
+    def get_best_pickup_target(self, objects_to_check, x_min, x_max, y_min, y_max, offset_dist=0.25):
+        """
+        Evaluates all objects, checks both entry points, respects boundaries, 
+        and calculates the absolute shortest path.
+        """
+        best_crate_id = None
+        best_path = []
+        min_total_dist = float('inf')
+        best_is_inverted = False
+
+        start_pos = (self.robot_pos.x, self.robot_pos.y)
+
+        for obj in objects_to_check:
+            # 1. Calculate the two entry points (Front and Back)
+            entries = [
+                (obj.x - offset_dist * math.cos(obj.theta), obj.y - offset_dist * math.sin(obj.theta), False), # Standard
+                (obj.x + offset_dist * math.cos(obj.theta), obj.y + offset_dist * math.sin(obj.theta), True)   # Inverted (pi)
+            ]
+            
+            for ex, ey, is_inv in entries:
+                # 2. Filter out entry points that go out of the board limits!
+                if not (self.boundaries[0] <= ex <= self.boundaries[1] and 
+                        self.boundaries[2] <= ey <= self.boundaries[3]):
+                    continue 
+                    
+                target_pos = (ex, ey)
+                
+                # 3. Check if we have a direct straight-line path
+                if self.is_direct_path_clear(start_pos, target_pos, target_crate_id=obj.id):
+                    dist = math.hypot(ex - start_pos[0], ey - start_pos[1])
+                    path = [start_pos, target_pos]
+                else:
+                    # 4. Fallback to the Street Grid path
+                    path, dist = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
+                    
+                    # 5. Security Check: Ensure the final "dive" from the grid to the crate isn't blocked!
+                    if len(path) >= 2 and not self.is_direct_path_clear(path[-2], target_pos, target_crate_id=obj.id):
+                        dist = float('inf') # Blocked by other crates, discard this entry point
+                
+                # 6. Keep the absolute shortest path
+                if dist < min_total_dist:
+                    min_total_dist = dist
+                    best_path = path
+                    best_crate_id = obj.id
+                    best_is_inverted = is_inv
+
+        return best_crate_id, best_path, best_is_inverted, min_total_dist
 
 def main(args=None):
     """Run main loop."""
