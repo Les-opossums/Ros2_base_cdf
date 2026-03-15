@@ -449,7 +449,7 @@ class ActionManager(Node):
         
         # 1. Wait for physical motion blur to clear
         self.send_raw("LED 20 0 255 0")
-        time.sleep(0.5) 
+        time.sleep(2.0) 
         
         if time.time() - self.last_camera_timestamp > 0.4:
             return
