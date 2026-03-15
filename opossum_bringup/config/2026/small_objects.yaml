@@ -80,28 +80,28 @@ actuators:
   3:
     type: vaccum_gripper
     name: vaccum_gripper9
-    x: 0.23
+    x: 0.25
     y: -0.075
     t: 0.0
     size: 0.02
   2:
     type: vaccum_gripper
     name: vaccum_gripper10
-    x: 0.23
+    x: 0.25
     y: -0.025
     t: 0.0
     size: 0.02
   1:
     type: vaccum_gripper
     name: vaccum_gripper11
-    x: 0.23
+    x: 0.25
     y: 0.025
     t: 0.0
     size: 0.02
   0:
     type: vaccum_gripper
     name: vaccum_gripper12
-    x: 0.23
+    x: 0.25
     y: 0.075
     t: 0.0
     size: 0.02
@@ -111,28 +111,28 @@ actuators:
     type: vaccum_gripper
     name: vaccum_gripper16
     x: 0.075
-    y: 0.23
+    y: 0.25
     t: 1.57
     size: 0.02
   14:
     type: vaccum_gripper
     name: vaccum_gripper15
     x: 0.025
-    y: 0.23
+    y: 0.25
     t: 1.57
     size: 0.02
   13:
     type: vaccum_gripper
     name: vaccum_gripper14
     x: -0.025
-    y: 0.23
+    y: 0.25
     t: 1.57
     size: 0.02
   12:
     type: vaccum_gripper
     name: vaccum_gripper13
     x: -0.075
-    y: 0.23
+    y: 0.25
     t: 1.57
     size: 0.02
 
@@ -140,28 +140,28 @@ actuators:
   11:
     type: vaccum_gripper
     name: vaccum_gripper1
-    x: -0.23
+    x: -0.25
     y: 0.075
     t: 3.14
     size: 0.02
   10:
     type: vaccum_gripper
     name: vaccum_gripper2
-    x: -0.23
+    x: -0.25
     y: 0.025
     t: 3.14
     size: 0.02
   9:
     type: vaccum_gripper
     name: vaccum_gripper3
-    x: -0.23
+    x: -0.25
     y: -0.025
     t: 3.14
     size: 0.02
   8:
     type: vaccum_gripper
     name: vaccum_gripper4
-    x: -0.23
+    x: -0.25
     y: -0.075
     t: 3.14
     size: 0.02
@@ -171,28 +171,28 @@ actuators:
     type: vaccum_gripper
     name: vaccum_gripper8
     x: -0.075
-    y: -0.23
+    y: -0.25
     t: 4.71
     size: 0.02
   6:
     type: vaccum_gripper
     name: vaccum_gripper7
     x: -0.025
-    y: -0.23
+    y: -0.25
     t: 4.71
     size: 0.02
   5:
     type: vaccum_gripper
     name: vaccum_gripper6
     x: 0.025
-    y: -0.23
+    y: -0.25
     t: 4.71
     size: 0.02
   4:
     type: vaccum_gripper
     name: vaccum_gripper5
     x: 0.075
-    y: -0.23
+    y: -0.25
     t: 4.71
     size: 0.02
 
