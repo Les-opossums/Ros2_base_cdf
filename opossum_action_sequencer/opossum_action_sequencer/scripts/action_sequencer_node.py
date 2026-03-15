@@ -485,6 +485,7 @@ class ActionManager(Node):
                 color_val = self._extract_color_from_id(det.id)
                 new_crate = HazCrate(new_id, det.x, det.y, det.theta, rot=(color_val == 2))
                 new_crate.color = color_val
+                self.get_logger().info(f"Color val: {color_val}, det_id: {det.id} at {det.x}, {det.y}")
                 new_crate.last_seen = current_time
                 self.haz_crates[new_id] = new_crate
             return
@@ -530,6 +531,7 @@ class ActionManager(Node):
                 color_val = self._extract_color_from_id(det.id)
                 new_crate = HazCrate(new_id, det.x, det.y, det.theta, rot=(color_val == 2))
                 new_crate.color = color_val
+                self.get_logger().info(f"Color val: {color_val}, det_id: {det.id} at {det.x}, {det.y}")
                 new_crate.last_seen = current_time
                 self.haz_crates[new_id] = new_crate
                 self.get_logger().info(f"Tracking: Discovered new crate! Assigned internal ID: {new_id} at X:{det.x:.2f} Y:{det.y:.2f}")
@@ -678,15 +680,16 @@ class ActionManager(Node):
             data = msg.data.split()[1:]
             id = int(data[0])
             # action = int(data[1])
-            id_internal = int(data[2])
-            # s1 = int(data[3]) # Check the success
-            if id_internal == 2:
+            p0 = int(data[2])
+            p1 = int(data[3])
+            if self.pliers[id * 2].is_running:
                 self.pliers[id * 2].is_running = False
+                if not p0:
+                    self.get_logger().warn(f"The first plier of ID {id} failed.")
+            if self.pliers[id * 2 + 1].is_running:
                 self.pliers[id * 2 + 1].is_running = False
-            else:
-                self.pliers[id * 2 + id_internal].is_running = False
-
-            self.get_logger().info(f"PFEED: {msg.data}.")
+                if not p1:
+                    self.get_logger().warn(f"The second plier of ID {id} failed.")
 
             if not any(pl.is_running for pl in self.pliers.values()):
                 self.pliers_event.set()
