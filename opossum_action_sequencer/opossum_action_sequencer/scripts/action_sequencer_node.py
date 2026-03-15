@@ -996,7 +996,7 @@ class ActionManager(Node):
                 
                 # Cas B : Combinaison mixte spéciale -> rev_drop(0) et drop(1)
                 elif action1 == "rev_drop" and action2 == "drop":
-                    self.pub_command.publish(String(data=f"PINCE {cmd_id} 4 2"))
+                    self.pub_command.publish(String(data=f"PINCE {cmd_id} 5 2"))
                     plier1.state = -1
                     plier2.state = -1
                     crate1.state = -1
@@ -1015,7 +1015,7 @@ class ActionManager(Node):
                 
                 # Cas C : Combinaison mixte spéciale -> drop(0) et rev_drop(1)
                 elif action1 == "drop" and action2 == "rev_drop":
-                    self.pub_command.publish(String(data=f"PINCE {cmd_id} 5 2"))
+                    self.pub_command.publish(String(data=f"PINCE {cmd_id} 4 2"))
                     plier1.state = -1
                     plier2.state = -1
                     crate1.state = -1
