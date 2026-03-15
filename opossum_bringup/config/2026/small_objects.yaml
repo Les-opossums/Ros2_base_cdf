@@ -54,13 +54,13 @@ objects:
 map:
   4:
     type: full_haz_stack_crates
-    x: 0.125
+    x: 0.175
     y: 0.4
     t: -1.57079632679
     shape: clean
   5:
     type: full_haz_stack_crates
-    x: 0.125
+    x: 0.175
     y: 1.2
     t: -1.57079632679
     shape: clean

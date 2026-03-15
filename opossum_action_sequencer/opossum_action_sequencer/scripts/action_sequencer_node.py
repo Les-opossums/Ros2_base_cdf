@@ -582,6 +582,7 @@ class ActionManager(Node):
                     stack_list.remove(cid)
                     
             del self.haz_crates[cid]
+        # self._rebuild_stacks()
         self.get_logger().info("Finished staring go back to match.")
 
     def begin_centering(self):
@@ -1164,7 +1165,7 @@ class ActionManager(Node):
                         dist = math.hypot(dx, dy)
                         
                         # If they are too far apart to be neighbors, ignore immediately
-                        if dist > 0.28:
+                        if dist > 0.25:
                             continue
                             
                         # 3. Check Angle Alignment (modulo pi in case one is spun 180 degrees)
@@ -1192,7 +1193,7 @@ class ActionManager(Node):
                     self.get_logger().info(f"Dynamically formed new stack {stack_counter-1} with crates: {current_stack}")
 
     def smart_moves(self):
-        self.send_raw(f"VMAX 0.8")
+        self.send_raw(f"VMAX 0.3")
         self.send_raw(f"VTMAX 1.5")
         
         activate_check_stack = False
@@ -1593,7 +1594,7 @@ class ActionManager(Node):
             x = zone.x
             y = zone.y 
 
-            distance = 0.28
+            distance = 0.23
             av_poses = [[x + distance, y, 3.14],
                         [x - distance, y, 0.0],
                         [x, y + distance, 4.71],
@@ -1865,7 +1866,7 @@ class ActionManager(Node):
                     
         return [], float('inf') # Return infinity if completely trapped
 
-    def get_best_pickup_target(self, objects_to_check, x_min, x_max, y_min, y_max, offset_dist=0.25):
+    def get_best_pickup_target(self, objects_to_check, x_min, x_max, y_min, y_max, offset_dist=0.23):
         """
         Evaluates all objects, checks both entry points, respects boundaries, 
         and calculates the absolute shortest path.
@@ -1913,7 +1914,7 @@ class ActionManager(Node):
 
         return best_crate_id, best_path, best_is_inverted, min_total_dist
 
-    def is_direct_path_clear(self, start_pos, target_pos, target_crate_id=None, margin=0.225):
+    def is_direct_path_clear(self, start_pos, target_pos, target_crate_id=None, margin=0.23):
         """Checks if the straight line between two points hits any crates."""
         x1, y1 = start_pos
         x2, y2 = target_pos
