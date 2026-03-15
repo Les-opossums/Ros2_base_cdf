@@ -132,7 +132,7 @@ class ActuatorsSimu(Node):
                 state_vector = encode_state(list(self.states.values()))
                 
             self.pub_change_state.publish(Int64(data=state_vector))
-            response.response = f"PINCEFEEDBACK,{request_split[1]},{request_split[2]},{request_split[3]},1"
+            response.response = f"PINCEFEEDBACK,{request_split[1]},{request_split[2]},1,1"
 
         return response
 
