@@ -1131,7 +1131,9 @@ class ActionManager(Node):
         id_steal = 0
         while not self.match_finished:
             best_ind, stack_id, is_inv = self.compute_pick_rewards()
-            if release:
+            if not any(pl.is_running for pl in self.pliers.values()):
+                release = False
+            elif release:
                 best_zone_ind, best_pos = self.compute_release_rewards()
                 if best_zone_ind is not None:
                     distance = 0.28
