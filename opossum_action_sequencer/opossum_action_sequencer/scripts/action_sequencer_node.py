@@ -1131,10 +1131,10 @@ class ActionManager(Node):
         id_steal = 0
         while not self.match_finished:
             best_ind, stack_id, is_inv = self.compute_pick_rewards()
+            best_zone_ind, best_pos = self.compute_release_rewards()
             if not any(pl.is_running for pl in self.pliers.values()):
                 release = False
-            elif release:
-                best_zone_ind, best_pos = self.compute_release_rewards()
+            if release: #  and best_zone_ind is not None:
                 if best_zone_ind is not None:
                     distance = 0.28
                     id_side = self.get_best_side_pliers_release(best_pos[2])
@@ -1303,6 +1303,57 @@ class ActionManager(Node):
                 
         return None  # The loop finished without finding a match
 
+    def is_any_point_in_zone(self, id_zone):
+        """
+        Checks if any haz_crate is currently sitting inside the specified zone.
+        
+        Args:
+            id_zone: The integer/string ID of the zone in self.zones
+            
+        Returns:
+            True if at least one crate is in the zone, False otherwise.
+        """
+        if id_zone not in self.zones:
+            self.get_logger().warn(f"Zone ID {id_zone} does not exist!")
+            return False
+            
+        # 1. Grab the specific zone object
+        zone = self.zones[id_zone]
+        
+        # 2. Calculate its boundaries once
+        half_size = zone.size / 2.0
+        min_x = zone.x - half_size
+        max_x = zone.x + half_size
+        min_y = zone.y - half_size
+        max_y = zone.y + half_size
+        
+        # 3. Check every crate (We use .values() to get the actual HazCrate objects)
+        for crate in self.haz_crates.values():
+            if (min_x <= crate.x <= max_x) and (min_y <= crate.y <= max_y):
+                return True  # Found one! Exit immediately.
+                
+        return False # Looked at all crates, none were in the zone
+    
+    def get_all_points_in_zone(self, points, zone_x, zone_y, zone_size):
+        """
+        Finds all points that are inside a specific square zone.
+        
+        Returns a list of all points found inside the zone.
+        """
+        half_size = zone_size / 2.0
+        min_x = zone_x - half_size
+        max_x = zone_x + half_size
+        min_y = zone_y - half_size
+        max_y = zone_y + half_size
+        
+        points_inside = []
+        
+        for p in points:
+            if (min_x <= p.x <= max_x) and (min_y <= p.y <= max_y):
+                points_inside.append(p)  # Add it to our list and keep checking the rest
+                
+        return points_inside
+
     def rotate_point(self, x, y, theta):
         """Applique une rotation 2D simple."""
         cos_t, sin_t = np.cos(theta), np.sin(theta)
@@ -1315,7 +1366,7 @@ class ActionManager(Node):
         best_zone_id = None
         best_pos = None
         for id, zone in self.zones.items():
-            if len(zone.crate_ids) > 0:
+            if self.is_any_point_in_zone(id):
                 continue
             x = zone.x
             y = zone.y 
