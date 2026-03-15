@@ -1208,7 +1208,7 @@ class ActionManager(Node):
             # =================================================================
             with self.data_lock:
                 pick_crate_ind, stack_id, is_inv, pick_path = self.compute_pick_rewards()
-                release_zone_ind, best_pos = self.compute_release_rewards()
+                release_zone_ind, best_release_pos = self.compute_release_rewards()
                 any_running = any(pl.is_running for pl in self.pliers.values())
                 pliers_used = any(pl.state != -1 for pl in self.pliers.values())
                 start_pos = (self.robot_pos.x, self.robot_pos.y)
@@ -1339,15 +1339,15 @@ class ActionManager(Node):
             # 2. GO FOR A RELEASE (If we hold crates or decided to release)
             # =================================================================
             elif pliers_used or release:
-                if best_pos is not None:
+                if best_release_pos is not None:
                     # Calculate targets and angles securely
                     with self.data_lock:
-                        id_side = self.get_best_side_pliers_release(best_pos[2])
+                        id_side = self.get_best_side_pliers_release(best_release_pos[2])
                         pliers_theta = self.pliers[id_side * 4].theta if id_side is not None else 0.0
                         
                     if id_side is not None:
-                        target_angle = best_pos[2] - pliers_theta
-                        target_pos = (best_pos[0], best_pos[1])
+                        target_angle = best_release_pos[2] - pliers_theta
+                        target_pos = (best_release_pos[0], best_release_pos[1])
 
                         # Calculate the safe path to the release zone!
                         with self.data_lock:
@@ -1397,6 +1397,14 @@ class ActionManager(Node):
                         final_pos = Position(self.final_zone["x"], self.final_zone["y"], 0.0)
                     self.move_to(final_pos)
                     self.wait_for_motion()
+                    id_active_pliers_all = {}
+                    for pid, plier in self.pliers.items():
+                        if plier.state == -1:
+                            continue
+                        
+                        id_active_pliers_all[pid] = ["drop", plier.state]
+                    self.send_plier_cmd(id_active_pliers)
+                    self.wait_for_plier()
                     release = False
             
             # =================================================================
