@@ -549,6 +549,7 @@ class ActionManager(Node):
         # for cid in stale_crates:
         #     del self.haz_crates[cid]
         #     self.get_logger().info(f"Tracking: Removed stale crate ID {cid} from memory.")
+        self.get_logger().info("Finished staring go back to match.")
 
     def begin_centering(self):
         self.centering = True
@@ -684,6 +685,8 @@ class ActionManager(Node):
                 self.pliers[id * 2 + 1].is_running = False
             else:
                 self.pliers[id * 2 + id_internal].is_running = False
+
+            self.get_logger().info(f"PFEED: {msg.data}.")
 
             if not any(pl.is_running for pl in self.pliers.values()):
                 self.pliers_event.set()

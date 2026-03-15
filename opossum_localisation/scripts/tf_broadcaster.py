@@ -123,7 +123,7 @@ class TfBroadcaster(Node):
             )
             self.sub_robot_data = self.create_subscription(
                 RobotData,
-                name + "/" + robot_data_topic,
+                name + "/" + "robot_data",
                 functools.partial(self.broadcast_tf_from_robot_data, name=name),
                 10,
             )

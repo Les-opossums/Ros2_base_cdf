@@ -55,7 +55,7 @@ class KeyboardController(Node):
             self.get_parameter("robot_data_topic").get_parameter_value().string_value
         )
         self.sub_robot_data = self.create_subscription(
-            RobotData, self.robot_data_topic, self.robot_data_callback, 10
+            RobotData, "robot_data", self.robot_data_callback, 10
         )
         self.sub_au = self.create_subscription(
             Bool, "/main_robot/au", self.update_au, 10

@@ -159,7 +159,7 @@ class Communication(Node):
         robot_data_topic = (
             self.get_parameter("robot_data_topic").get_parameter_value().string_value
         )
-        self.pub_robot_data = self.create_publisher(RobotData, robot_data_topic, 10)
+        self.pub_robot_data = self.create_publisher(RobotData, "robot_data", 10)
 
         goal_position_topic = (
             self.get_parameter("goal_position_topic").get_parameter_value().string_value

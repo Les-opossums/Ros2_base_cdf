@@ -131,7 +131,7 @@ class ObstacleAvoider(Node):
             self.get_parameter("goal_position_topic").get_parameter_value().string_value
         )
         self.sub_robot_data = self.create_subscription(
-            RobotData, robot_data_topic, self.robot_data_callback, 10
+            RobotData, "robot_data", self.robot_data_callback, 10
         )
         self.sub_scan = self.create_subscription(
             LaserScan, scan_topic, self.scan_callback, 10

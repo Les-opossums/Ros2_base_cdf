@@ -34,7 +34,7 @@ second_robot:
       visualization_topic: visualization_limit
       obstacle_detection_distance: 0.3
       detection_mode: rectangle
-      cone_range: 60.0
+      cone_range: 60.0 # deg
       thickness: 0.4
       # boundaries:  [0.0, 1.0, 0.0, 2.0]
       boundaries: [0.0, 3.0, 0.0, 2.0]

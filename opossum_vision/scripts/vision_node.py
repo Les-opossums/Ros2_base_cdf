@@ -32,7 +32,6 @@ class VisionNode(Node):
                 ("cards_name", rclpy.Parameter.Type.STRING_ARRAY),
                 ("command_topic", rclpy.Parameter.Type.STRING),
                 ("feedback_command_topic", rclpy.Parameter.Type.STRING),
-                ("robot_data_topic", rclpy.Parameter.Type.STRING),
                 ("goal_position_topic", rclpy.Parameter.Type.STRING),
                 ("frequency", rclpy.Parameter.Type.DOUBLE),
             ],
@@ -67,9 +66,6 @@ class VisionNode(Node):
             self.buffer_simu_rcv = ""
         self.frequency = (
             self.get_parameter("frequency").get_parameter_value().double_value
-        )
-        self.data_topic = (
-            self.get_parameter("robot_data_topic").get_parameter_value().string_value
         )
         self.command_topic = (
             self.get_parameter("command_topic").get_parameter_value().string_value

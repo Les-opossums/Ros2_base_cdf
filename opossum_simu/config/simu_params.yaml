@@ -61,7 +61,7 @@ second_robot:
     ros__parameters:
       real_position_topic: real_position
       short_motor_srv: short_motor
-      random_moves: false
+      random_moves: False
       # boundaries:  [0.0, 1.0, 0.0, 2.0]
       boundaries: [0.0, 3.0, 0.0, 2.0]
       compute_period: 0.1
@@ -70,10 +70,7 @@ second_robot:
 
   lidar_simu_node:
     ros__parameters:
-      # object_topic: raw_obstacles
-      # scan_topic: scan
       # update_position_topic: update_position
-      # color_service: init_team_color
       default_color: yellow
       available_colors: ["yellow", "blue"]
       # boundaries:  [0.0, 1.0, 0.0, 2.0]
@@ -85,8 +82,8 @@ second_robot:
       use_lidar_points: true
       lidar_range: 10.
       radius: 0.05
-      angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
       # angle_info: [-3.1276220678165654, 3.14159265358, 0.014828970674425364] # Angle min, angle max, angle increment
+      angle_info: [-3.1276220678165654, 3.14159265358, 0.0034828970674425364] # Angle min, angle max, angle increment
 
   camera_simu_node:
     ros__parameters:
