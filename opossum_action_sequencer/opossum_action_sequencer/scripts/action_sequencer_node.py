@@ -1132,46 +1132,47 @@ class ActionManager(Node):
         while not self.match_finished:
             best_ind, stack_id, is_inv = self.compute_pick_rewards()
             best_zone_ind, best_pos = self.compute_release_rewards()
-            if not any(pl.is_running for pl in self.pliers.values()):
+            if not any(pl.state >= 0 for pl in self.pliers.values()) and release:
+                self.get_logger().info(f"Set release to false, no pliers holding anything")
                 release = False
-            if release: #  and best_zone_ind is not None:
-                if best_zone_ind is not None:
-                    distance = 0.28
-                    id_side = self.get_best_side_pliers_release(best_pos[2])
-                    if id_side is not None:
-                        fpos = Position(best_pos[0], best_pos[1], best_pos[2] - self.pliers[id_side * 4].theta)
-                        self.move_to(fpos)
-                        self.wait_for_motion()
-                        
-                        id_active_pliers = {}
-                        for id in self.pliers.keys():
-                            plier = self.pliers[id]
-                            if plier.state == -1 or id // 4 != id_side:
-                                continue
-                            
-                            crate = self.haz_crates[plier.state]
-                            if crate.color in (-1, 2) or crate.color == self.color:
-                                id_active_pliers[id] = ["drop", plier.state]
 
-                            else:
-                                id_active_pliers[id] = ["rev_drop", plier.state]
-
-                        # Here when we activate pliers, we give dict of ID: [the action, the ID of the Haz]
-                        self.send_plier_cmd(id_active_pliers)
-                        self.wait_for_plier()
-
-                        # Set state of actuators
-                        for pl_id in id_active_pliers:
-                            self.pliers[pl_id].state = -1
-                    else: 
-                        self.get_logger().info("Issue cannot find anymore plier taken")
-                        release = False
-                else: 
-                    self.get_logger().info("Issue cannot find")
-                    self.move_to(Position(self.final_zone["x"], self.final_zone["y"], 0.0))
+            if release and best_zone_ind is not None:
+                distance = 0.28
+                id_side = self.get_best_side_pliers_release(best_pos[2])
+                if id_side is not None:
+                    fpos = Position(best_pos[0], best_pos[1], best_pos[2] - self.pliers[id_side * 4].theta)
+                    self.move_to(fpos)
                     self.wait_for_motion()
-                    time.sleep(0.2)
+                    
+                    id_active_pliers = {}
+                    for id in self.pliers.keys():
+                        plier = self.pliers[id]
+                        if plier.state == -1 or id // 4 != id_side:
+                            continue
+                        
+                        crate = self.haz_crates[plier.state]
+                        if crate.color in (-1, 2) or crate.color == self.color:
+                            id_active_pliers[id] = ["drop", plier.state]
+
+                        else:
+                            id_active_pliers[id] = ["rev_drop", plier.state]
+
+                    # Here when we activate pliers, we give dict of ID: [the action, the ID of the Haz]
+                    self.send_plier_cmd(id_active_pliers)
+                    self.wait_for_plier()
+
+                    # Set state of actuators
+                    for pl_id in id_active_pliers:
+                        self.pliers[pl_id].state = -1
+                else: 
+                    self.get_logger().info("Issue cannot find anymore plier taken")
                     release = False
+            elif best_zone_ind is None:
+                self.get_logger().info("Issue cannot find")
+                self.move_to(Position(self.final_zone["x"], self.final_zone["y"], 0.0))
+                self.wait_for_motion()
+                time.sleep(0.2)
+                release = False
             # Get the best crate to take, according to the color / positions... 
             elif best_ind is not None:
                 # Depending on the stack len (or alone) we check available pliers
