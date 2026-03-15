@@ -225,40 +225,29 @@ class VisionNode(Node):
             return
         if (
             splitted_data[0] == "ARUCO"
-        ):  # ARUCO id_cam id_tag, x, y, z, theta, in_stack, id_cam, x, ...
-            raw_string = data.strip()
-
-            if not raw_string.startswith("ARUCO"):
+        ):  
+            # Format actuel : ARUCO <CAM_ID> , <INFO_TAG_1>, <INFO_TAG_2>
+            parts = data.split(',')
+            
+            if len(parts) < 1:
                 return
 
-            parts = raw_string.split(',')
-            if not parts:
+            # 1. Extraction de l'ID caméra depuis parts[0] ("ARUCO <CAM_ID>")
+            header_tokens = parts[0].split()
+            if len(header_tokens) < 2:
                 return
 
-            first_part_tokens = parts[0].split()
-            if len(first_part_tokens) < 3:
-                return
-
-            # Création du message global
             vision_frame_msg = VisionDataFrame()
 
             try:
-                vision_frame_msg.id = int(first_part_tokens[1]) # cam_id
+                vision_frame_msg.id = int(header_tokens[1]) # cam_id
             except ValueError:
                 self.get_logger().error("Erreur de conversion de l'ID caméra.")
                 return
 
-            # Liste qui contiendra nos objets VisionData
             vision_frame_msg.object = []
 
-            # -- Traitement du 1er tag --
-            tag_1_tokens = first_part_tokens[2:]
-            if tag_1_tokens:
-                obj1 = self.create_vision_data(tag_1_tokens)
-                if obj1:
-                    vision_frame_msg.object.append(obj1)
-
-            # -- Traitement des tags suivants --
+            # 2. Traitement direct et unifié de tous les tags (à partir de parts[1])
             for part in parts[1:]:
                 tag_tokens = part.split()
                 if tag_tokens:
@@ -266,7 +255,7 @@ class VisionNode(Node):
                     if obj:
                         vision_frame_msg.object.append(obj)
 
-            # 3. Publication du message structuré
+            # 3. Publication
             self.aruco_pub.publish(vision_frame_msg)
 
         elif (
