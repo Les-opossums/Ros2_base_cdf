@@ -1119,6 +1119,9 @@ class ActionManager(Node):
     def sign(self, val):
         return -1 if val < 0 else 1
 
+    def any_plier_used(self):
+        return any(pl.state != -1 for pl in self.pliers.values())
+
     def smart_moves(self):
         self.send_raw(f"VMAX 0.8")
         self.send_raw(f"VTMAX 1.5")
@@ -1132,7 +1135,7 @@ class ActionManager(Node):
         while not self.match_finished:
             best_ind, stack_id, is_inv = self.compute_pick_rewards()
             best_zone_ind, best_pos = self.compute_release_rewards()
-            if not any(pl.state >= 0 for pl in self.pliers.values()) and release:
+            if not self.any_plier_used() and release:
                 self.get_logger().info(f"Set release to false, no pliers holding anything")
                 release = False
 
@@ -1167,13 +1170,7 @@ class ActionManager(Node):
                 else: 
                     self.get_logger().info("Issue cannot find anymore plier taken")
                     release = False
-            elif best_zone_ind is None:
-                self.get_logger().info("Issue cannot find")
-                self.move_to(Position(self.final_zone["x"], self.final_zone["y"], 0.0))
-                self.wait_for_motion()
-                time.sleep(0.2)
-                release = False
-            # Get the best crate to take, according to the color / positions... 
+
             elif best_ind is not None:
                 # Depending on the stack len (or alone) we check available pliers
                 # A. Déterminer le groupe d'objets (Stack ou Single)
@@ -1263,10 +1260,21 @@ class ActionManager(Node):
                 # Set state of actuators
                 self.wait_for_plier()
                 continue
-            elif any(pl.state != -1 for pl in self.pliers.values()):
+
+            elif best_zone_ind is None:
+                self.get_logger().info("Issue cannot find")
+                self.move_to(Position(self.final_zone["x"], self.final_zone["y"], 0.0))
+                self.wait_for_motion()
+                time.sleep(0.2)
+                release = False
+            # Get the best crate to take, according to the color / positions... 
+            
+
+            elif self.any_plier_used():
                 self.get_logger().info("Nothing to do, going for the release position")
                 release = True
                 time.sleep(0.3)
+
             else:
                 self.get_logger().info("Nothing to do: Turning...")
                 pos = steal_poses[id_steal % len(steal_poses)]
