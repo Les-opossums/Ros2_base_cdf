@@ -1168,7 +1168,7 @@ class ActionManager(Node):
                     self.get_logger().info("Issue cannot find")
                     self.move_to(Position(self.final_zone["x"], self.final_zone["y"], 0.0))
                     self.wait_for_motion()
-                    break
+                    release = False
             # Get the best crate to take, according to the color / positions... 
             elif best_ind is not None:
                 # Depending on the stack len (or alone) we check available pliers
