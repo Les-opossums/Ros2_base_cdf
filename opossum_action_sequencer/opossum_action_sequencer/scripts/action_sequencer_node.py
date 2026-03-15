@@ -1199,7 +1199,6 @@ class ActionManager(Node):
         activate_check_stack = False
         steal_poses = [[0.45, 0.45], [0.45, 1.1], [2.55, 1.1], [2.55, 0.45]]
         id_steal = 0
-        release = False
 
         while not self.match_finished:
             
@@ -1209,25 +1208,88 @@ class ActionManager(Node):
             with self.data_lock:
                 pick_crate_ind, stack_id, is_inv, pick_path = self.compute_pick_rewards()
                 release_zone_ind, best_release_pos = self.compute_release_rewards()
-                any_running = any(pl.is_running for pl in self.pliers.values())
                 pliers_used = any(pl.state != -1 for pl in self.pliers.values())
                 start_pos = (self.robot_pos.x, self.robot_pos.y)
                 x_min, x_max, y_min, y_max = self.rect
 
-            if not any_running:
-                release = False
+            # =================================================================
+            # 2. GO FOR A RELEASE (If we hold crates or decided to release)
+            # =================================================================
+            if pliers_used:
+                if best_release_pos is not None:
+                    # Calculate targets and angles securely
+                    with self.data_lock:
+                        id_side = self.get_best_side_pliers_release(best_release_pos[2])
+                        pliers_theta = self.pliers[id_side * 4].theta if id_side is not None else 0.0
+                        
+                    target_angle = best_release_pos[2] - pliers_theta
+                    target_pos = (best_release_pos[0], best_release_pos[1])
+
+                    # Calculate the safe path to the release zone!
+                    with self.data_lock:
+                        if self.is_direct_path_clear(start_pos, target_pos):
+                            rel_path = [start_pos, target_pos]
+                        else:
+                            rel_path, _ = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
+
+                    # Drive the grid path
+                    if len(rel_path) > 1:
+                        for wp in rel_path[1:]:
+                            self.get_logger().info(f"Navigating release waypoint: {wp}")
+                            self.move_to(Position(wp[0], wp[1], target_angle))
+                            self.wait_for_motion()
+                            self.stare_and_update()
+
+                    # Configure dropping actions safely
+                    with self.data_lock:
+                        id_active_pliers = {}
+                        for pid, plier in self.pliers.items():
+                            if plier.state == -1 or pid // 4 != id_side:
+                                continue
+                            
+                            crate = self.haz_crates[plier.state]
+                            if crate.color in (-1, 2) or crate.color == self.color:
+                                id_active_pliers[pid] = ["drop", plier.state]
+                            else:
+                                id_active_pliers[pid] = ["rev_drop", plier.state]
+
+                    # Send commands and wait
+                    self.send_plier_cmd(id_active_pliers)
+                    self.wait_for_plier()
+
+                    # Clear plier states
+                    with self.data_lock:
+                        for pl_id in id_active_pliers:
+                            self.pliers[pl_id].state = -1
+                            
+                    continue
+
+                else: 
+                    self.get_logger().info("Issue: Cannot find release zone. Going to final zone.")
+                    with self.data_lock:
+                        final_pos = Position(self.final_zone["x"], self.final_zone["y"], 0.0)
+                    self.move_to(final_pos)
+                    self.wait_for_motion()
+                    id_active_pliers_all = {}
+                    for pid, plier in self.pliers.items():
+                        if plier.state == -1:
+                            continue
+                        
+                        id_active_pliers_all[pid] = ["drop", plier.state]
+                    self.send_plier_cmd(id_active_pliers)
+                    self.wait_for_plier()
+                    release = False
 
             # =================================================================
             # 3. GO FOR A TAKE
             # =================================================================
-            if pick_crate_ind is not None and not release:
+            if pick_crate_ind is not None:
                 with self.data_lock:
                     target_ids = self.stacks[stack_id] if stack_id is not None else [pick_crate_ind]
                     pliers_config = self.get_best_side_pliers(len(target_ids))
 
                 if not pliers_config:
                     self.get_logger().warn("Target found but no pliers available. Switching to Release.")
-                    release = True
                     continue
                 
                 selected_pliers_ids = pliers_config[0]
@@ -1334,78 +1396,6 @@ class ActionManager(Node):
                 self.send_plier_cmd(dict_sel_pliers)
                 self.wait_for_plier()
                 continue
-
-            # =================================================================
-            # 2. GO FOR A RELEASE (If we hold crates or decided to release)
-            # =================================================================
-            elif pliers_used or release:
-                if best_release_pos is not None:
-                    # Calculate targets and angles securely
-                    with self.data_lock:
-                        id_side = self.get_best_side_pliers_release(best_release_pos[2])
-                        pliers_theta = self.pliers[id_side * 4].theta if id_side is not None else 0.0
-                        
-                    if id_side is not None:
-                        target_angle = best_release_pos[2] - pliers_theta
-                        target_pos = (best_release_pos[0], best_release_pos[1])
-
-                        # Calculate the safe path to the release zone!
-                        with self.data_lock:
-                            if self.is_direct_path_clear(start_pos, target_pos):
-                                rel_path = [start_pos, target_pos]
-                            else:
-                                rel_path, _ = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
-
-                        # Drive the grid path
-                        if len(rel_path) > 1:
-                            for wp in rel_path[1:]:
-                                self.get_logger().info(f"Navigating release waypoint: {wp}")
-                                self.move_to(Position(wp[0], wp[1], target_angle))
-                                self.wait_for_motion()
-                                self.stare_and_update()
-
-                        # Configure dropping actions safely
-                        with self.data_lock:
-                            id_active_pliers = {}
-                            for pid, plier in self.pliers.items():
-                                if plier.state == -1 or pid // 4 != id_side:
-                                    continue
-                                
-                                crate = self.haz_crates[plier.state]
-                                if crate.color in (-1, 2) or crate.color == self.color:
-                                    id_active_pliers[pid] = ["drop", plier.state]
-                                else:
-                                    id_active_pliers[pid] = ["rev_drop", plier.state]
-
-                        # Send commands and wait
-                        self.send_plier_cmd(id_active_pliers)
-                        self.wait_for_plier()
-
-                        # Clear plier states
-                        with self.data_lock:
-                            for pl_id in id_active_pliers:
-                                self.pliers[pl_id].state = -1
-                                
-                        release = False
-                        continue
-                    else: 
-                        self.get_logger().info("Issue: Cannot find active plier side.")
-                        release = False
-                else: 
-                    self.get_logger().info("Issue: Cannot find release zone. Going to final zone.")
-                    with self.data_lock:
-                        final_pos = Position(self.final_zone["x"], self.final_zone["y"], 0.0)
-                    self.move_to(final_pos)
-                    self.wait_for_motion()
-                    id_active_pliers_all = {}
-                    for pid, plier in self.pliers.items():
-                        if plier.state == -1:
-                            continue
-                        
-                        id_active_pliers_all[pid] = ["drop", plier.state]
-                    self.send_plier_cmd(id_active_pliers)
-                    self.wait_for_plier()
-                    release = False
             
             # =================================================================
             # 4. EXPLORE / STEAL
@@ -1597,8 +1587,8 @@ class ActionManager(Node):
         best_zone_id = None
         best_pos = None
         for id, zone in self.zones.items():
-            if self.is_any_point_in_zone(id):
-                continue
+            # if self.is_any_point_in_zone(id):
+            #     continue
             x = zone.x
             y = zone.y 
 
