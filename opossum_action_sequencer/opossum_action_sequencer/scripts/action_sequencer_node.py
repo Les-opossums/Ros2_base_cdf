@@ -448,6 +448,7 @@ class ActionManager(Node):
         self.get_logger().info("Staring... waiting for camera to settle.")
         
         # 1. Wait for physical motion blur to clear
+        self.send_raw("LED 20 0 255 0")
         time.sleep(0.5) 
         
         if time.time() - self.last_camera_timestamp > 0.4:
@@ -486,7 +487,6 @@ class ActionManager(Node):
                 color_val = self._extract_color_from_id(det.id)
                 new_crate = HazCrate(new_id, det.x, det.y, det.theta, rot=(color_val == 2))
                 new_crate.color = color_val
-                self.get_logger().info(f"Color val: {color_val}, det_id: {det.id} at {det.x}, {det.y}")
                 new_crate.last_seen = current_time
                 self.haz_crates[new_id] = new_crate
             return
@@ -520,9 +520,9 @@ class ActionManager(Node):
                 matched_crate.y = det.y
                 matched_crate.theta = det.theta
                 matched_crate.last_seen = current_time
+                matched_crate.color = self._extract_color_from_id(det.id)
 
-                if matched_crate.color in [-1, 2]:
-                    matched_crate.color = self._extract_color_from_id(det.id)
+                # if matched_crate.color in [-1, 2]:
 
                 matched_detection_indices.add(det_idx)
 
@@ -532,7 +532,6 @@ class ActionManager(Node):
                 color_val = self._extract_color_from_id(det.id)
                 new_crate = HazCrate(new_id, det.x, det.y, det.theta, rot=(color_val == 2))
                 new_crate.color = color_val
-                self.get_logger().info(f"Color val: {color_val}, det_id: {det.id} at {det.x}, {det.y}")
                 new_crate.last_seen = current_time
                 self.haz_crates[new_id] = new_crate
                 self.get_logger().info(f"Tracking: Discovered new crate! Assigned internal ID: {new_id} at X:{det.x:.2f} Y:{det.y:.2f}")
@@ -582,6 +581,7 @@ class ActionManager(Node):
                     stack_list.remove(cid)
                     
             del self.haz_crates[cid]
+        self.send_raw("LED 20 0 0 255")
         # self._rebuild_stacks()
         self.get_logger().info("Finished staring go back to match.")
 
