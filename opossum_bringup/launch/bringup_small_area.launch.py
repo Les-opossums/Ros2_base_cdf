@@ -36,7 +36,11 @@ def generate_launch_description():
         namespace=namespace,
         executable="action_sequencer_node.py",
         name="action_sequencer_node",
-        parameters=[{}],
+        parameters=[{
+            "board_config": "small_objects",
+            "year": 2026,
+            "boundaries": [0.0, 1.0, 0.0, 2.0],
+        }],
     )
 
     param_com_path = PathJoinSubstitution(

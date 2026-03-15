@@ -13,6 +13,8 @@
 import rclpy
 from rclpy.node import Node
 from rcl_interfaces.msg import ParameterEvent
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
 
 from std_msgs.msg import String, Bool, Int32
 from opossum_msgs.msg import RobotData, LidarLoc, VisionDataFrame
@@ -99,6 +101,7 @@ class ActionManager(Node):
 
     def __init__(self):
         super().__init__("action_sequencer_node")
+        self.cb_group = ReentrantCallbackGroup()
         self._init_parameters()
         self._init_publishers()
         self._init_subscribers()
@@ -113,6 +116,7 @@ class ActionManager(Node):
         self.in_end_zone = False
         self.end_zone = None
         self.middle_zone = None
+        self.match_finished = False
         
 
         self.x_enn = None
@@ -204,14 +208,6 @@ class ActionManager(Node):
         self.declare_parameters(
             namespace="",
             parameters=[
-                ("command_topic", "command"),
-                ("score_topic", "score"),
-                ("au_topic", "au"),
-                ("end_of_match_topic", "end_of_match"),
-                ("feedback_command_topic", "feedback_command"),
-                ("robot_data_topic", "robot_data"),
-                ("position_topic", "position_out"),
-                ("color_topic", "init_team_color"),
                 ("board_config", "small_objects"),
                 ("year", 2026),
                 ("boundaries", [0.0, 3.0, 0.0, 2.0]),
@@ -238,18 +234,21 @@ class ActionManager(Node):
         """Initialize the timers of the node."""
         self.timer_match = self.create_timer(
             200,
-            self.timer_match_callback
+            self.timer_match_callback,
+            callback_group=self.cb_group
         )
         self.timer_backstage = self.create_timer(
             200,
-            self.timer_backstage_callback
+            self.timer_backstage_callback,
+            callback_group=self.cb_group
         )
-        self.pub_timer = self.create_timer(0.2, self.publish_board_state)
+        self.pub_timer = self.create_timer(0.2, self.publish_board_state,callback_group=self.cb_group)
 
     def _init_move_timer(self):
         self.move_timer = self.create_timer(
             2,
-            self.timer_move_callback
+            self.timer_move_callback,
+            callback_group=self.cb_group
         )
 
     def _reset_move_timer(self):
@@ -260,51 +259,27 @@ class ActionManager(Node):
 
     def _init_publishers(self):
         """Initialize the publishers of the node."""
-        command_topic = (
-            self.get_parameter("command_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
-        score_topic = (
-            self.get_parameter("score_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
-        au_topic = (
-            self.get_parameter("au_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
-        end_of_match_topic = (
-            self.get_parameter("end_of_match_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
         self.pub_command = self.create_publisher(
             String,
-            command_topic,
+            "command",
             10
         )
 
         self.pub_score = self.create_publisher(
             Int32,
-            score_topic,
+            "score",
             10
         )
 
         self.pub_au = self.create_publisher(
             Bool,
-            au_topic,
+            "au",
             10
         )
 
         self.pub_end_of_match = self.create_publisher(
             Bool,
-            end_of_match_topic,
+            "end_of_match",
             10
         )
 
@@ -316,71 +291,52 @@ class ActionManager(Node):
 
     def _init_subscribers(self):
         """Initialize the subscribers of the node."""
-
-        feedback_command_topic = (
-            self.get_parameter("feedback_command_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
-        robot_data_topic = (
-            self.get_parameter("robot_data_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
-        position_topic = (
-            self.get_parameter("position_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
-        color_topic = (
-            self.get_parameter("color_topic")
-            .get_parameter_value()
-            .string_value
-        )
-
         self.subscription = self.create_subscription(
             ParameterEvent,
             "/parameter_events",
             self.parameter_event_callback,
-            10
+            10,
+            callback_group=self.cb_group
         )
 
         self.sub_feedback = self.create_subscription(
             String,
-            feedback_command_topic,
+            "feedback_command",
             self.feedback_callback,
-            10
+            10,
+            callback_group=self.cb_group
         )
 
         self.lidar_loc_sub = self.create_subscription(
             LidarLoc,
-            position_topic,
+            "position_out",
             self.lidar_loc_callback,
-            10
+            10,
+            callback_group=self.cb_group
         )
 
         self.color_sub = self.create_subscription(
             String,
-            color_topic,
+            "init_team_color",
             self.color_callback,
-            10
+            10,
+            callback_group=self.cb_group
         )
 
         self.aruco_sub = self.create_subscription(
             VisionDataFrame,
             "aruco_loc",
             self.aruco_callback,
-            10
+            10,
+            callback_group=self.cb_group
         )
 
         self.robot_data_sub = self.create_subscription(
             RobotData,
-            robot_data_topic,
+            "robot_data",
             self.robot_data_callback,
-            10
+            10,
+            callback_group=self.cb_group
         )
 
     def _init_services(self):
@@ -492,6 +448,7 @@ class ActionManager(Node):
         # 1. Wait for physical motion blur to clear
         time.sleep(0.5) 
         
+        self.get_logger().info(f"Delta time: {time.time() - self.last_camera_timestamp}")
         if time.time() - self.last_camera_timestamp > 0.4:
             return
 
@@ -750,6 +707,7 @@ class ActionManager(Node):
         """Timer callback for match time."""
         if not self.is_ended:
             self.pub_end_of_match.publish(Bool(data=True))
+            self.match_finished = True
             self.get_logger().warn("Match time exceeded")
             self.stop_script()
 
@@ -1165,7 +1123,7 @@ class ActionManager(Node):
                        [2.55, 0.45],
                       ]
         id_steal = 0
-        while True:
+        while not self.match_finished:
             best_ind, stack_id, is_inv = self.compute_pick_rewards()
             if release:
                 best_zone_ind, best_pos = self.compute_release_rewards()
@@ -1308,6 +1266,7 @@ class ActionManager(Node):
                 self.wait_for_motion()
                 self.stare_and_update()
                 id_steal += 1
+                time.sleep(0.1)
 
     def get_mean_pose(self, objects):
         """Calcule la position moyenne (x, y, theta_circulaire) d'une liste d'objets."""
@@ -1546,10 +1505,18 @@ def main(args=None):
     """Run main loop."""
     rclpy.init(args=args)
     action_manager_node = ActionManager()
-    rclpy.spin(action_manager_node)
-    action_manager_node.destroy_node()
-    rclpy.shutdown()
-
+    
+    # --- NEW: Spin with the MultiThreadedExecutor ---
+    executor = MultiThreadedExecutor()
+    executor.add_node(action_manager_node)
+    
+    try:
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        action_manager_node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

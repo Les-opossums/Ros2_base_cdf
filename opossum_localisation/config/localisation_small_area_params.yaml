@@ -55,7 +55,7 @@ main_robot:
       distance_tolerance_beacons: 0.1
       angle_tolerance: 0.7853981633974483
       robot_position_topic: robot_position_input
-      enable_wait_color: False
+      enable_wait_color: true
       enable_initial_position: False
 
   tf_broadcaster_node:
@@ -129,7 +129,7 @@ second_robot:
       distance_tolerance: 0.3
       angle_tolerance: 0.7853981633974483
       robot_position_topic: robot_position_input
-      enable_wait_color: False
+      enable_wait_color: true
       enable_initial_position: False
 
   tf_broadcaster_node:
