@@ -87,14 +87,12 @@ class ZoneRelease:
     x: float
     y: float
     size: float
-    crate_ids: list
 
     def __init__(self, id, x, y, size):
         self.id = id
         self.x = x
         self.y = y
         self.size = size
-        self.crate_ids = []
 
 class ActionManager(Node):
     """Action Manager Node."""
@@ -873,7 +871,7 @@ class ActionManager(Node):
     def wait_for_plier(self):
         """Compute the wait_for_motion action."""
         if not self.stop:
-            self.pliers_event.wait()
+            self.pliers_event.wait(timeout=5.0)
 
     def send_plier_cmd(self, ids: dict):
         """Compute and send the vacuum gripper command with pair optimization.
@@ -952,14 +950,6 @@ class ActionManager(Node):
                             elif crate2.color == 0:
                                 crate2.color = 1
 
-                        # Check zone
-                        zone_id1 = self.get_current_zone(crate1.x, crate1.y)
-                        zone_id2 = self.get_current_zone(crate2.x, crate2.y)
-                        if zone_id1 is not None:
-                            self.zones[zone_id1].crate_ids.append(crate1.id)
-                        if zone_id2 is not None:
-                            self.zones[zone_id2].crate_ids.append(crate2.id)
-                    
                     # Set plier running
                     plier1.is_running = True
                     plier2.is_running = True
@@ -982,12 +972,6 @@ class ActionManager(Node):
                         crate1.color = 0
                     elif crate1.color == 0:
                         crate1.color = 1
-                    zone_id1 = self.get_current_zone(crate1.x, crate1.y)
-                    zone_id2 = self.get_current_zone(crate2.x, crate2.y)
-                    if zone_id1 is not None:
-                        self.zones[zone_id1].crate_ids.append(crate1.id)
-                    if zone_id2 is not None:
-                        self.zones[zone_id2].crate_ids.append(crate2.id)
                     plier1.is_running = True
                     plier2.is_running = True
                     processed_ids.add(current_id)
@@ -1007,12 +991,6 @@ class ActionManager(Node):
                         crate2.color = 0
                     elif crate2.color == 0:
                         crate2.color = 1
-                    zone_id1 = self.get_current_zone(crate1.x, crate1.y)
-                    zone_id2 = self.get_current_zone(crate2.x, crate2.y)
-                    if zone_id1 is not None:
-                        self.zones[zone_id1].crate_ids.append(crate1.id)
-                    if zone_id2 is not None:
-                        self.zones[zone_id2].crate_ids.append(crate2.id)
                     plier1.is_running = True
                     plier2.is_running = True
                     processed_ids.add(current_id)
@@ -1038,9 +1016,6 @@ class ActionManager(Node):
                     elif crate1.color == 0:
                         crate1.color = 1
                 self.update_crate_pos(plier1, crate1)
-                zone_id = self.get_current_zone(crate1.x, crate1.y)
-                if zone_id is not None:
-                    self.zones[zone_id].crate_ids.append(crate1.id)
             plier1.is_running = True
             processed_ids.add(current_id)
 
@@ -1139,39 +1114,7 @@ class ActionManager(Node):
                 self.get_logger().info(f"Set release to false, no pliers holding anything")
                 release = False
 
-            if release and best_zone_ind is not None:
-                distance = 0.28
-                id_side = self.get_best_side_pliers_release(best_pos[2])
-                if id_side is not None:
-                    fpos = Position(best_pos[0], best_pos[1], best_pos[2] - self.pliers[id_side * 4].theta)
-                    self.move_to(fpos)
-                    self.wait_for_motion()
-                    
-                    id_active_pliers = {}
-                    for id in self.pliers.keys():
-                        plier = self.pliers[id]
-                        if plier.state == -1 or id // 4 != id_side:
-                            continue
-                        
-                        crate = self.haz_crates[plier.state]
-                        if crate.color in (-1, 2) or crate.color == self.color:
-                            id_active_pliers[id] = ["drop", plier.state]
-
-                        else:
-                            id_active_pliers[id] = ["rev_drop", plier.state]
-
-                    # Here when we activate pliers, we give dict of ID: [the action, the ID of the Haz]
-                    self.send_plier_cmd(id_active_pliers)
-                    self.wait_for_plier()
-
-                    # Set state of actuators
-                    for pl_id in id_active_pliers:
-                        self.pliers[pl_id].state = -1
-                else: 
-                    self.get_logger().info("Issue cannot find anymore plier taken")
-                    release = False
-
-            elif best_ind is not None:
+            if best_ind is not None:
                 # Depending on the stack len (or alone) we check available pliers
                 # A. Déterminer le groupe d'objets (Stack ou Single)
                 target_ids = self.stacks[stack_id] if stack_id is not None else [best_ind]
@@ -1242,7 +1185,8 @@ class ActionManager(Node):
                 dict_sel_pliers = {}
                 for pl_id, (px, py) in pliers_in_map.items():
                     if not remaining_targets:
-                        break
+                        self.get_logger().info(f"Remaining")
+                        continue
                         
                     # Trouver l'objet le plus proche de CETTE pince spécifique
                     best_obj_id = min(
@@ -1260,6 +1204,38 @@ class ActionManager(Node):
                 # Set state of actuators
                 self.wait_for_plier()
                 continue
+
+            if release and best_zone_ind is not None:
+                distance = 0.28
+                id_side = self.get_best_side_pliers_release(best_pos[2])
+                if id_side is not None:
+                    fpos = Position(best_pos[0], best_pos[1], best_pos[2] - self.pliers[id_side * 4].theta)
+                    self.move_to(fpos)
+                    self.wait_for_motion()
+                    
+                    id_active_pliers = {}
+                    for id in self.pliers.keys():
+                        plier = self.pliers[id]
+                        if plier.state == -1 or id // 4 != id_side:
+                            continue
+                        
+                        crate = self.haz_crates[plier.state]
+                        if crate.color in (-1, 2) or crate.color == self.color:
+                            id_active_pliers[id] = ["drop", plier.state]
+
+                        else:
+                            id_active_pliers[id] = ["rev_drop", plier.state]
+
+                    # Here when we activate pliers, we give dict of ID: [the action, the ID of the Haz]
+                    self.send_plier_cmd(id_active_pliers)
+                    self.wait_for_plier()
+
+                    # Set state of actuators
+                    for pl_id in id_active_pliers:
+                        self.pliers[pl_id].state = -1
+                else: 
+                    self.get_logger().info("Issue cannot find anymore plier taken")
+                    release = False
 
             elif best_zone_ind is None:
                 self.get_logger().info("Issue cannot find")
@@ -1559,7 +1535,8 @@ class ActionManager(Node):
                     current_consecutive = 0 # Rupture de la ligne
                     current_list_consecutive = []            
             # Si le plus grand groupe de ventouses libres est suffisant
-            if max_consecutive >= stack_len:
+            if max_consecutive == 4:
+            # if max_consecutive >= stack_len:
                 available_sides.append(max_list_consecutive[:stack_len])
         
         # for side in available_sides:
