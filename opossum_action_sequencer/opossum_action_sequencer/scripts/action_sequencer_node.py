@@ -1406,8 +1406,8 @@ class ActionManager(Node):
                 
                 # Check boundaries safely
                 with self.data_lock:
-                    in_bounds = (self.boundaries[0] + 0.35 < pos[0] < self.boundaries[1] - 0.35 and 
-                                 self.boundaries[2] + 0.35 < pos[1] < self.boundaries[3] - 0.35)
+                    in_bounds = (self.boundaries[0] + 0.25 < pos[0] < self.boundaries[1] - 0.25 and 
+                                 self.boundaries[2] + 0.25 < pos[1] < self.boundaries[3] - 0.25)
                 
                 if in_bounds:
                     self.move_to(Position(pos[0], pos[1], (id_steal * 2.3998) % (2 * np.pi)))
@@ -1600,7 +1600,7 @@ class ActionManager(Node):
                     ]
 
             for pos in av_poses:
-                if not (self.boundaries[0] + 0.35 < pos[0] < self.boundaries[1] - 0.35 and self.boundaries[2] + 0.35 < pos[1] < self.boundaries[3] - 0.35): 
+                if not (self.boundaries[0] + 0.2 < pos[0] < self.boundaries[1] - 0.2 and self.boundaries[2] + 0.2 < pos[1] < self.boundaries[3] - 0.2): 
                     continue
                 reward = self.compute_release_penality(x, y)
 
