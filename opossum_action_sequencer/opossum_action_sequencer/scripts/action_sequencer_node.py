@@ -1709,7 +1709,7 @@ class ActionManager(Node):
                 continue
 
             # 1. Filtres de sécurité
-            if crate.state >= 0 or (self.get_current_zone(crate.x, crate.y) is not None and (crate.color in (-1, self.color, 2))): 
+            if crate.state >= 0 or (self.get_current_zone(crate.x, crate.y, crate.theta) is not None and (crate.color in (-1, self.color, 2))): 
                 reviewed_ids.add(crate_id)
                 continue
             
