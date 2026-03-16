@@ -1600,7 +1600,7 @@ class ActionManager(Node):
                 
         return False # Looked at all crates, none were in the zone
     
-    def get_all_points_in_zone(self, points, id_zone):
+    def get_all_points_in_zone(self, id_zone):
         """
         Finds all points that are inside a specific square zone.
         
