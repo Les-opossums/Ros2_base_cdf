@@ -400,6 +400,18 @@ class MapScene(QtWidgets.QGraphicsView):
             rect = QtWidgets.QGraphicsRectItem(-w_px/2, -h_px/2, w_px, h_px) 
             rect.setPen(QtGui.QPen(QtCore.Qt.black))
             rect.setZValue(1.0)
+            
+            # --- NEW: Add the ID as a Text Item ---
+            # By passing 'rect' as the second argument, the text becomes a child of the crate!
+            text_item = QtWidgets.QGraphicsSimpleTextItem(str(cid), rect)
+            font = QtGui.QFont("Arial", 10, QtGui.QFont.Bold)
+            text_item.setFont(font)
+            
+            # Center the text inside the rectangle
+            text_rect = text_item.boundingRect()
+            text_item.setPos(-text_rect.width() / 2, -text_rect.height() / 2)
+            # --------------------------------------
+
             self.scene.addItem(rect)
             self.crate_items[cid] = rect
 
@@ -411,11 +423,25 @@ class MapScene(QtWidgets.QGraphicsView):
 
         # Color mapping: 0=Yellow, 1=Blue, 2=Red
         color_val = crate_data.get('color', -1)
-        if color_val == 0: color = QtGui.QColor(255, 255, 0)
-        elif color_val == 1: color = QtGui.QColor(0, 0, 255)
-        elif color_val == 2: color = QtGui.QColor(255, 0, 0)
-        else: color = QtGui.QColor(150, 150, 150)
+        text_color = QtCore.Qt.white # Default text color
+
+        if color_val == 0: 
+            color = QtGui.QColor(255, 255, 0)
+            text_color = QtCore.Qt.black # Yellow needs black text to be readable!
+        elif color_val == 1: 
+            color = QtGui.QColor(0, 0, 255)
+        elif color_val == 2: 
+            color = QtGui.QColor(255, 0, 0)
+        else: 
+            color = QtGui.QColor(150, 150, 150)
+            text_color = QtCore.Qt.black
+            
         item.setBrush(QtGui.QBrush(color))
+        
+        # --- NEW: Update the text color dynamically ---
+        for child in item.childItems():
+            if isinstance(child, QtWidgets.QGraphicsSimpleTextItem):
+                child.setBrush(QtGui.QBrush(text_color))
 
     def _update_plier_visual(self, plier_data):
         pid = plier_data['id']

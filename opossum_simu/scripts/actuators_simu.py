@@ -98,11 +98,11 @@ class ActuatorsSimu(Node):
             with self.state_lock:
                 if side == 2:
                     if mode == 4:
-                        self.states[f"PINCE{id * 2}"] = 3
-                        self.states[f"PINCE{id * 2 + 1}"] = 2
-                    elif mode == 5: # <--- CHANGED TO ELIF! Prevents overwriting mode 4
                         self.states[f"PINCE{id * 2}"] = 2
                         self.states[f"PINCE{id * 2 + 1}"] = 3
+                    elif mode == 5: # <--- CHANGED TO ELIF! Prevents overwriting mode 4
+                        self.states[f"PINCE{id * 2}"] = 3
+                        self.states[f"PINCE{id * 2 + 1}"] = 2
                     else:
                         self.states[f"PINCE{id * 2}"] = mode
                         self.states[f"PINCE{id * 2 + 1}"] = mode

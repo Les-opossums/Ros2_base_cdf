@@ -958,7 +958,7 @@ class ActionManager(Node):
                 if action1 == action2:
                     mode = action_map.get(action1, 1) # Fallback to 1 if unknown string
                     self.pub_command.publish(String(data=f"PINCE {cmd_id} {mode} 2"))
-                    
+                    self.get_logger().info(f"PINCE {cmd_id} {mode} 2")
                     if mode == 1:
                         plier1.state = crate1.id
                         plier2.state = crate2.id
@@ -997,6 +997,7 @@ class ActionManager(Node):
                 # Cas B : Combinaison mixte spéciale -> rev_drop(0) et drop(1)
                 elif action1 == "rev_drop" and action2 == "drop":
                     self.pub_command.publish(String(data=f"PINCE {cmd_id} 5 2"))
+                    self.get_logger().info(f"PINCE {cmd_id} 5 2")
                     plier1.state = -1
                     plier2.state = -1
                     crate1.state = -1
@@ -1016,6 +1017,7 @@ class ActionManager(Node):
                 # Cas C : Combinaison mixte spéciale -> drop(0) et rev_drop(1)
                 elif action1 == "drop" and action2 == "rev_drop":
                     self.pub_command.publish(String(data=f"PINCE {cmd_id} 4 2"))
+                    self.get_logger().info(f"PINCE {cmd_id} 4 2")
                     plier1.state = -1
                     plier2.state = -1
                     crate1.state = -1
@@ -1039,6 +1041,7 @@ class ActionManager(Node):
             mode = action_map.get(action1, 1)
             side = current_id % 2
             self.pub_command.publish(String(data=f"PINCE {cmd_id} {mode} {side}"))
+            self.get_logger().info(f"PINCE {cmd_id} {mode} {side}")
             if mode == 1:
                 plier1.state = crate1.id
                 crate1.state = current_id
@@ -1371,27 +1374,40 @@ class ActionManager(Node):
                         rx, ry = self.rotate_point(p_local.x, p_local.y, robot_t)
                         pliers_in_map[pl_id] = (robot_x + rx, robot_y + ry)
 
-                    # --- THE FIX: Filter out any ghosts that were deleted during the drive ---
                     remaining_targets = [tid for tid in target_ids if tid in self.haz_crates]
                     
-                    # Safety check: If ALL crates in the stack turned out to be ghosts, abort!
                     if not remaining_targets:
-                        self.get_logger().warn("All targets vanished during approach! Aborting plier activation.")
+                        self.get_logger().warn("All targets vanished during approach! Aborting.")
                         continue 
-                    # -------------------------------------------------------------------------
 
+                    # --- THE FIX: Optimal Bipartite Matching (Hungarian Algorithm) ---
+                    # 1. Convert dicts/sets to strict lists so indices match up
+                    plier_list = list(pliers_in_map.keys())
+                    target_list = list(remaining_targets)
+
+                    # 2. Build a Cost Matrix (Rows = Pliers, Columns = Crates)
+                    cost_matrix = np.zeros((len(plier_list), len(target_list)))
+                    
+                    for i, pl_id in enumerate(plier_list):
+                        px, py = pliers_in_map[pl_id]
+                        for j, obj_id in enumerate(target_list):
+                            cx = self.haz_crates[obj_id].x
+                            cy = self.haz_crates[obj_id].y
+                            # Cost is the squared distance between this plier and this crate
+                            cost_matrix[i, j] = (cx - px)**2 + (cy - py)**2
+
+                    # 3. Solve for the lowest total global distance!
+                    # (This automatically handles cases where len(pliers) != len(targets))
+                    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+                    # 4. Map the optimal pairs back to your command dictionary
                     dict_sel_pliers = {}
-                    for pl_id, (px, py) in pliers_in_map.items():
-                        if not remaining_targets: continue
-                        
-                        best_obj_id = min(
-                            remaining_targets, 
-                            key=lambda obj_id: (self.haz_crates[obj_id].x - px)**2 + (self.haz_crates[obj_id].y - py)**2
-                        )
-                        remaining_targets.remove(best_obj_id)
+                    for i, j in zip(row_ind, col_ind):
+                        pl_id = plier_list[i]
+                        best_obj_id = target_list[j]
                         dict_sel_pliers[pl_id] = ["pick", best_obj_id]
+                    # -----------------------------------------------------------------
 
-                # Send commands and wait
                 self.send_plier_cmd(dict_sel_pliers)
                 self.wait_for_plier()
                 continue
