@@ -582,7 +582,7 @@ class ActionManager(Node):
                     
             del self.haz_crates[cid]
         self.send_raw("LED 20 0 0 255")
-        # self._rebuild_stacks()
+        self._rebuild_stacks()
         self.get_logger().info("Finished staring go back to match.")
 
     def begin_centering(self):
@@ -1518,24 +1518,56 @@ class ActionManager(Node):
         m_cos = np.mean([np.cos(obj.theta) for obj in objects])
         return Position(mx, my, np.arctan2(m_sin, m_cos))
 
-    def get_current_zone(self, x, y):
+    def get_current_zone(self, x, y, theta):
         """
-        Checks which square the point (x, y) is inside.
+        Checks if ANY part of a rotated crate (0.15m x 0.05m) is inside the zone.
+        Uses the Separating Axis Theorem (SAT) for OBB-AABB collision.
+        """
+        # Crate dimensions
+        hl = 0.15 / 2.0  # Half-length
+        hw = 0.05 / 2.0  # Half-width
         
-        squares: dict like { 'zone_1': {'x': 1.0, 'y': 1.5, 'size': 0.5}, ... }
-        Returns the ID of the zone, or None if the point is outside all zones.
-        """
+        cos_t = math.cos(theta)
+        sin_t = math.sin(theta)
+        
+        # 1. Calculate the crate's projected "radius" on the global X and Y axes
+        r_cx = abs(hl * cos_t) + abs(hw * sin_t)
+        r_cy = abs(hl * sin_t) + abs(hw * cos_t)
+        
         for zone_id, sq in self.zones.items():
-            cx = sq.x
-            cy = sq.y
-            half_size = sq.size / 2.0  # Calculate half-size once per square
+            zx = sq.x
+            zy = sq.y
+            hz = sq.size / 2.0  # Zone half-size
             
-            # Check if X is within bounds AND Y is within bounds
-            if (cx - half_size <= x <= cx + half_size) and \
-            (cy - half_size <= y <= cy + half_size):
-                return zone_id  # We found the zone! Return it immediately.
+            # --- Axis 1 & 2: Global X and Y (The Zone's flat edges) ---
+            if abs(x - zx) > (hz + r_cx):
+                continue # Shadows don't overlap on X, skip to next zone!
                 
-        return None  # The loop finished without finding a match
+            if abs(y - zy) > (hz + r_cy):
+                continue # Shadows don't overlap on Y, skip to next zone!
+                
+            # --- Axis 3 & 4: The Crate's Local X and Y (The Crate's rotated edges) ---
+            # Calculate the zone's projected "radius" onto the rotated crate's axes
+            r_z_local = hz * (abs(cos_t) + abs(sin_t))
+            
+            # Vector from Crate center to Zone center
+            dx = zx - x
+            dy = zy - y
+            
+            # Project that vector onto the Crate's local X axis
+            dx_local = abs(dx * cos_t + dy * sin_t)
+            if dx_local > (hl + r_z_local):
+                continue # Shadows don't overlap on local X!
+                
+            # Project that vector onto the Crate's local Y axis
+            dy_local = abs(-dx * sin_t + dy * cos_t)
+            if dy_local > (hw + r_z_local):
+                continue # Shadows don't overlap on local Y!
+                
+            # If we survived all 4 axis checks, they are definitively colliding!
+            return zone_id
+            
+        return None
 
     def is_any_point_in_zone(self, id_zone):
         """
@@ -1568,17 +1600,18 @@ class ActionManager(Node):
                 
         return False # Looked at all crates, none were in the zone
     
-    def get_all_points_in_zone(self, points, zone_x, zone_y, zone_size):
+    def get_all_points_in_zone(self, points, id_zone):
         """
         Finds all points that are inside a specific square zone.
         
         Returns a list of all points found inside the zone.
         """
-        half_size = zone_size / 2.0
-        min_x = zone_x - half_size
-        max_x = zone_x + half_size
-        min_y = zone_y - half_size
-        max_y = zone_y + half_size
+        zone = self.zones[id_zone]
+        half_size = zone.size / 2.0
+        min_x = zone.x - half_size
+        max_x = zone.x + half_size
+        min_y = zone.d - half_size
+        max_y = zone.d + half_size
         
         points_inside = []
         
@@ -1602,8 +1635,10 @@ class ActionManager(Node):
         best_zone_id = None
         best_pos = None
         for id, zone in self.zones.items():
-            if self.is_any_point_in_zone(id):
+            if len(self.get_all_points_in_zone(id)) > 3:
                 continue
+            # if self.is_any_point_in_zone(id):
+            #     continue
             x = zone.x
             y = zone.y
 
