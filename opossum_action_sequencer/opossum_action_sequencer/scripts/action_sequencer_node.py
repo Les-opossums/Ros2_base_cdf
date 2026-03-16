@@ -1610,8 +1610,8 @@ class ActionManager(Node):
         half_size = zone.size / 2.0
         min_x = zone.x - half_size
         max_x = zone.x + half_size
-        min_y = zone.d - half_size
-        max_y = zone.d + half_size
+        min_y = zone.y - half_size
+        max_y = zone.y + half_size
         
         points_inside = []
         
