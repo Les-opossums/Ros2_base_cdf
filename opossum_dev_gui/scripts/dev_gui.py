@@ -354,6 +354,13 @@ class MapScene(QtWidgets.QGraphicsView):
     #     height = map_rect.height()
     #     return width * x / 3.0, height * (1 - y / 2.0)
 
+    def resizeEvent(self, event):
+        """Make the map dynamically adjust when the window is resized."""
+        super().resizeEvent(event)
+        # Force the view to keep the map item fully visible and scaled
+        if hasattr(self, 'map_item'):
+            self.fitInView(self.map_item, QtCore.Qt.KeepAspectRatio)
+            
     # --- NEW: State Applicators ---
     def apply_full_state(self, json_str):
         """Initialize the whole board."""
