@@ -1615,9 +1615,9 @@ class ActionManager(Node):
         
         points_inside = []
         
-        for p in points:
+        for p in self.pliers.values():
             if (min_x <= p.x <= max_x) and (min_y <= p.y <= max_y):
-                points_inside.append(p)  # Add it to our list and keep checking the rest
+                points_inside.append(p.id)  # Add it to our list and keep checking the rest
                 
         return points_inside
 
