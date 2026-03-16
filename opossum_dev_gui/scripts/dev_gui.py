@@ -248,7 +248,6 @@ class MapScene(QtWidgets.QGraphicsView):
             )
 
             if pid not in self.plier_items:
-                # Create the 3cm circle if it doesn't exist
                 r_px, _ = self.size_to_scene(0.03, 0.03)
                 circle = QtWidgets.QGraphicsEllipseItem(-r_px/2, -r_px/2, r_px, r_px)
                 circle.setPen(QtGui.QPen(QtCore.Qt.black))
@@ -262,36 +261,84 @@ class MapScene(QtWidgets.QGraphicsView):
             item.setPos(px, py)
             item.setRotation(90 - (gt * 180 / math.pi)) 
 
-            # Update Color (Green if holding something, White if empty)
+            # Update Color: Purple if running, Green if holding, White if free
+            is_running = plier_data.get('is_running', False)
             state = plier_data.get('state', -1)
-            brush_color = QtGui.QColor(0, 255, 0) if state >= 0 else QtGui.QColor(255, 255, 255)
+            
+            if is_running:
+                brush_color = QtGui.QColor(170, 0, 255) # Purple
+            elif state >= 0:
+                brush_color = QtGui.QColor(0, 255, 0)   # Green
+            else:
+                brush_color = QtGui.QColor(255, 255, 255) # White
+                
             item.setBrush(QtGui.QBrush(brush_color))
 
+    def _update_plier_visual(self, plier_data):
+        pid = plier_data['id']
+        gx, gy, gt = self.local_to_global(
+            plier_data['x'], plier_data['y'], plier_data['theta']
+        )
+
+        if pid not in self.plier_items:
+            r_px, _ = self.size_to_scene(0.03, 0.03)
+            circle = QtWidgets.QGraphicsEllipseItem(-r_px/2, -r_px/2, r_px, r_px)
+            circle.setPen(QtGui.QPen(QtCore.Qt.black))
+            circle.setZValue(2.0)
+            self.scene.addItem(circle)
+            self.plier_items[pid] = circle
+
+        item = self.plier_items[pid]
+        px, py = self.pos_to_scene(gx, gy)
+        
+        item.setPos(px, py)
+        item.setRotation(90 - (gt * 180 / math.pi))
+
+        # Update Color: Purple if running, Green if holding, White if free
+        is_running = plier_data.get('is_running', False)
+        state = plier_data.get('state', -1)
+        
+        if is_running:
+            brush_color = QtGui.QColor(170, 0, 255) # Purple
+        elif state >= 0:
+            brush_color = QtGui.QColor(0, 255, 0)   # Green
+        else:
+            brush_color = QtGui.QColor(255, 255, 255) # White
+            
+        item.setBrush(QtGui.QBrush(brush_color))
+
     def _redraw_crates(self):
-        """Continuously update the position of crates being carried by the robot."""
-        # Make sure the dictionaries exist before looping
+        """Continuously update the position and visuals of crates being carried or targeted."""
         if not hasattr(self, 'crate_local_states') or not hasattr(self, 'plier_local_states'):
             return
 
         for cid, crate_data in self.crate_local_states.items():
             plier_id = crate_data.get('state', -1)
+            item = self.crate_items.get(cid)
             
-            # If the crate is held by a plier (state is the plier's ID)
+            if not item:
+                continue
+
+            # If the crate is linked to a plier
             if plier_id != -1 and plier_id in self.plier_local_states:
                 plier_data = self.plier_local_states[plier_id]
                 
-                if cid in self.crate_items:
-                    # 1. Get the global position of the PLIER holding this crate
-                    gx, gy, gt = self.local_to_global(
-                        plier_data['x'], plier_data['y'], plier_data['theta']
-                    )
+                # 1. Move the crate to perfectly track the plier
+                gx, gy, gt = self.local_to_global(
+                    plier_data['x'], plier_data['y'], plier_data['theta']
+                )
+                px, py = self.pos_to_scene(gx, gy)
+                item.setPos(px, py)
+                item.setRotation(90 - (gt * 180 / math.pi))
+
+                # 2. Apply "Held" Visuals
+                item.setOpacity(0.5)  # 50% transparent as long as it is linked to a plier
+                item.setPen(QtGui.QPen(QtCore.Qt.black)) # Keep the normal solid black outline
                     
-                    # 2. Move the crate to exactly match the plier's position and rotation
-                    item = self.crate_items[cid]
-                    px, py = self.pos_to_scene(gx, gy)
-                    
-                    item.setPos(px, py)
-                    item.setRotation(90 - (gt * 180 / math.pi))
+            else:
+                # 3. Apply "Free" Visuals (Crate is sitting on the board)
+                item.setOpacity(1.0) # Full opacity
+                item.setPen(QtGui.QPen(QtCore.Qt.black)) # Normal black outline
 
     @QtCore.pyqtSlot(LidarLoc)
     def update_map_position(self, msg):
@@ -360,7 +407,7 @@ class MapScene(QtWidgets.QGraphicsView):
         # Force the view to keep the map item fully visible and scaled
         if hasattr(self, 'map_item'):
             self.fitInView(self.map_item, QtCore.Qt.KeepAspectRatio)
-            
+
     # --- NEW: State Applicators ---
     def apply_full_state(self, json_str):
         """Initialize the whole board."""
@@ -450,33 +497,33 @@ class MapScene(QtWidgets.QGraphicsView):
             if isinstance(child, QtWidgets.QGraphicsSimpleTextItem):
                 child.setBrush(QtGui.QBrush(text_color))
 
-    def _update_plier_visual(self, plier_data):
-        pid = plier_data['id']
+    # def _update_plier_visual(self, plier_data):
+    #     pid = plier_data['id']
         
-        # 1. Transform from local Robot frame to global Map frame
-        gx, gy, gt = self.local_to_global(
-            plier_data['x'], plier_data['y'], plier_data['theta']
-        )
+    #     # 1. Transform from local Robot frame to global Map frame
+    #     gx, gy, gt = self.local_to_global(
+    #         plier_data['x'], plier_data['y'], plier_data['theta']
+    #     )
 
-        if pid not in self.plier_items:
-            # Pliers are small, let's say 3cm (0.03m) circles
-            r_px, _ = self.size_to_scene(0.03, 0.03)
-            circle = QtWidgets.QGraphicsEllipseItem(-r_px/2, -r_px/2, r_px, r_px)
-            circle.setPen(QtGui.QPen(QtCore.Qt.black))
-            self.scene.addItem(circle)
-            self.plier_items[pid] = circle
+    #     if pid not in self.plier_items:
+    #         # Pliers are small, let's say 3cm (0.03m) circles
+    #         r_px, _ = self.size_to_scene(0.03, 0.03)
+    #         circle = QtWidgets.QGraphicsEllipseItem(-r_px/2, -r_px/2, r_px, r_px)
+    #         circle.setPen(QtGui.QPen(QtCore.Qt.black))
+    #         self.scene.addItem(circle)
+    #         self.plier_items[pid] = circle
 
-        item = self.plier_items[pid]
-        px, py = self.pos_to_scene(gx, gy)
+    #     item = self.plier_items[pid]
+    #     px, py = self.pos_to_scene(gx, gy)
         
-        item.setPos(px, py)
+    #     item.setPos(px, py)
         
-        # --- THE FIX ---
-        item.setRotation(90 - (gt * 180 / math.pi))
+    #     # --- THE FIX ---
+    #     item.setRotation(90 - (gt * 180 / math.pi))
 
-        state = plier_data.get('state', -1)
-        brush_color = QtGui.QColor(0, 255, 0) if state >= 0 else QtGui.QColor(255, 255, 255)
-        item.setBrush(QtGui.QBrush(brush_color))
+    #     state = plier_data.get('state', -1)
+    #     brush_color = QtGui.QColor(0, 255, 0) if state >= 0 else QtGui.QColor(255, 255, 255)
+    #     item.setBrush(QtGui.QBrush(brush_color))
 
 class DraggablePixmapItem(QtWidgets.QGraphicsPixmapItem):
     """Drag items on the Map."""

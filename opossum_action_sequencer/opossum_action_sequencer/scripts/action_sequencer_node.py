@@ -2,14 +2,15 @@
 # -*- coding: utf-8 -*-
 """Action Sequencer Node."""
 
-### IDEA SMART SCRPIT: 
-# Use stacks and also save solo crates so we can choose the strategy. 
-# Use the Actuators ID, so we can manage them 1 by one.
+# TODO: Update issue on GUI not taking the crate
+# TODO: Remove ghosts (review does not seem to work)
+# TODO: Review the path finder, sometimes the robot goes above known stacks
+# TODO: optimize angles for take / release, sometimes does the whoel turn (but dont take in in the cost, just after)
+# TODO add a go back to zone before the end
+
 # Actions for pliers
 # 0: free, 1: picking, 2: dropping, 3: reverting
 
-
-## TODO: PICK ONLY THE ONES NOT THE ROGHT COLOR IN THE ZONES AND TURN IT. 
 import rclpy
 from rclpy.node import Node
 from rcl_interfaces.msg import ParameterEvent
@@ -149,7 +150,7 @@ class ActionManager(Node):
         self.end_match_event = Event()
         self.end_match_event.set()
         self.stop = False
-        self.data_lock = threading.Lock()
+        self.data_lock = threading.RLock()  # <--- Added the 'R'
         # self.camera_angles = [0.0, 2.093333, 4.186666]
         self.camera_angles = [0.0]
 
@@ -160,7 +161,6 @@ class ActionManager(Node):
 
         data = yaml.safe_load(open(objects_path, "r"))
         self.pliers = {}
-        self.stacks = {}
         self.haz_crates = {}
         self.zones = {}
 
@@ -181,7 +181,6 @@ class ActionManager(Node):
             if "crates" not in type_obj:
                 continue
                 
-            self.stacks[id] = []
             rot = obj['shape'] == 'rot'
 
             for element in stacks[type_obj].values():
@@ -189,7 +188,6 @@ class ActionManager(Node):
                 y = obj['y'] + element['x'] * sin_ + element['y'] * cos_
                 t = obj['t'] + element['t']
                 self.haz_crates[crates_count] = HazCrate(crates_count, x, y, t, rot)
-                self.stacks[id].append(crates_count)
                 crates_count += 1
 
         for id, zone in data['zones'].items():
@@ -402,13 +400,15 @@ class ActionManager(Node):
 
         # 2. Check Pliers for changes
         for pid, plier in self.pliers.items():
-            current_state = (round(plier.x, 3), round(plier.y, 3), round(plier.theta, 3), plier.state)
+            # Add plier.is_running to the tuple so it triggers an update when it changes!
+            current_state = (round(plier.x, 3), round(plier.y, 3), round(plier.theta, 3), plier.state, plier.is_running)
             last_state = self.last_sent_state['pliers'].get(pid)
             
             if current_state != last_state:
                 updates['pliers'].append({
                     'id': pid, 'x': current_state[0], 'y': current_state[1],
-                    'theta': current_state[2], 'state': current_state[3]
+                    'theta': current_state[2], 'state': current_state[3],
+                    'is_running': plier.is_running  # <-- ADD THIS
                 })
                 self.last_sent_state['pliers'][pid] = current_state
 
@@ -449,9 +449,9 @@ class ActionManager(Node):
         
         # 1. Wait for physical motion blur to clear
         self.send_raw("LED 20 0 255 0")
-        time.sleep(2.0) 
+        time.sleep(0.3) 
         
-        if time.time() - self.last_camera_timestamp > 0.4:
+        if time.time() - self.last_camera_timestamp > 0.2:
             return
 
         # 2. Grab the latest message in the buffer
@@ -569,20 +569,15 @@ class ActionManager(Node):
                     ghost_ids.append(cid)
 
         # Erase the ghosts
-        for cid in ghost_ids:
-            self.get_logger().warn(f"GHOST DETECTED: Crate {cid} missing from expected FOV! Erasing.")
-            ghost_crate = self.haz_crates[cid]
+        # for cid in ghost_ids:
+        #     self.get_logger().warn(f"GHOST DETECTED: Crate {cid} missing from expected FOV! Erasing.")
+        #     ghost_crate = self.haz_crates[cid]
             
-            if ghost_crate.state != -1 and ghost_crate.state in self.pliers:
-                self.pliers[ghost_crate.state].state = -1
+        #     if ghost_crate.state != -1 and ghost_crate.state in self.pliers:
+        #         self.pliers[ghost_crate.state].state = -1
                     
-            for stack_list in self.stacks.values():
-                if cid in stack_list:
-                    stack_list.remove(cid)
-                    
-            del self.haz_crates[cid]
+        #     del self.haz_crates[cid]
         self.send_raw("LED 20 0 0 255")
-        self._rebuild_stacks()
         self.get_logger().info("Finished staring go back to match.")
 
     def begin_centering(self):
@@ -712,16 +707,23 @@ class ActionManager(Node):
             data = msg.data.split()[1:]
             id = int(data[0])
             # action = int(data[1])
-            p0 = int(data[2])
-            p1 = int(data[3])
-            if self.pliers[id * 2].is_running:
-                self.pliers[id * 2].is_running = False
-                if not p0:
+            v0 = int(data[2])
+            v1 = int(data[3])
+            p0 = self.pliers[id * 2]
+            p1 = self.pliers[id * 2 + 1]
+            if p0.is_running:
+                p0.is_running = False
+                if not v0 and p0.state != -1:
                     self.get_logger().warn(f"The first plier of ID {id} failed.")
-            if self.pliers[id * 2 + 1].is_running:
-                self.pliers[id * 2 + 1].is_running = False
-                if not p1:
+                    self.haz_crates[p0.state].state = -1
+                    p0.state = -1
+
+            if p1.is_running:
+                p1.is_running = False
+                if not v1 and p1.state != -1:
                     self.get_logger().warn(f"The second plier of ID {id} failed.")
+                    self.haz_crates[p1.state].state = -1
+                    p1.state = -1
 
             if not any(pl.is_running for pl in self.pliers.values()):
                 self.pliers_event.set()
@@ -958,7 +960,6 @@ class ActionManager(Node):
                 if action1 == action2:
                     mode = action_map.get(action1, 1) # Fallback to 1 if unknown string
                     self.pub_command.publish(String(data=f"PINCE {cmd_id} {mode} 2"))
-                    self.get_logger().info(f"PINCE {cmd_id} {mode} 2")
                     if mode == 1:
                         plier1.state = crate1.id
                         plier2.state = crate2.id
@@ -997,7 +998,6 @@ class ActionManager(Node):
                 # Cas B : Combinaison mixte spéciale -> rev_drop(0) et drop(1)
                 elif action1 == "rev_drop" and action2 == "drop":
                     self.pub_command.publish(String(data=f"PINCE {cmd_id} 5 2"))
-                    self.get_logger().info(f"PINCE {cmd_id} 5 2")
                     plier1.state = -1
                     plier2.state = -1
                     crate1.state = -1
@@ -1017,7 +1017,6 @@ class ActionManager(Node):
                 # Cas C : Combinaison mixte spéciale -> drop(0) et rev_drop(1)
                 elif action1 == "drop" and action2 == "rev_drop":
                     self.pub_command.publish(String(data=f"PINCE {cmd_id} 4 2"))
-                    self.get_logger().info(f"PINCE {cmd_id} 4 2")
                     plier1.state = -1
                     plier2.state = -1
                     crate1.state = -1
@@ -1041,7 +1040,6 @@ class ActionManager(Node):
             mode = action_map.get(action1, 1)
             side = current_id % 2
             self.pub_command.publish(String(data=f"PINCE {cmd_id} {mode} {side}"))
-            self.get_logger().info(f"PINCE {cmd_id} {mode} {side}")
             if mode == 1:
                 plier1.state = crate1.id
                 crate1.state = current_id
@@ -1135,71 +1133,83 @@ class ActionManager(Node):
     def any_plier_used(self):
         return any(pl.state != -1 for pl in self.pliers.values())
 
-    def _rebuild_stacks(self):
-        """Dynamically groups adjacent, aligned crates into stacks based on real-world geometry."""
+    def generate_current_stacks(self):
+        """
+        Calculates stacks using Geometric Adjacency and Connected Components.
+        Rules: Crates must be parallel, aligned lengthwise, side-by-side (~0.05m apart), max 4 per stack.
+        """
+        # --- Strict Geometric Tolerances ---
+        WIDTH = 0.05  # Ideal distance between centers when side-by-side
+        ANGLE_TOLERANCE = math.radians(15)  # 15 degrees max rotation difference
+        LONG_TOLERANCE = 0.03  # Allow up to 3cm of sliding/misalignment lengthwise
+        LAT_TOLERANCE = 0.02   # Allow the lateral gap to be between 3cm and 7cm
+        
         with self.data_lock:
-            self.stacks.clear()
+            # 1. Grab only free crates
+            available_crates = [c for c in self.haz_crates.values() if c.state == -1]
             
-            # 1. Only consider crates sitting freely on the floor
-            free_crates = [cid for cid, crate in self.haz_crates.items() if crate.state == -1]
+            # 2. Build an Adjacency Graph (Dictionary of connections)
+            adjacency = {c.id: [] for c in available_crates}
+            
+            for i in range(len(available_crates)):
+                c1 = available_crates[i]
+                for j in range(i + 1, len(available_crates)):
+                    c2 = available_crates[j]
+                    
+                    # Rule A: Angles must be parallel. 
+                    # math.remainder(diff, pi) handles crates that are flipped 180 degrees!
+                    angle_diff = math.remainder(c1.theta - c2.theta, math.pi)
+                    if abs(angle_diff) > ANGLE_TOLERANCE:
+                        continue
+                        
+                    # Rule B: Calculate the relative distance
+                    dx = c2.x - c1.x
+                    dy = c2.y - c1.y
+                    
+                    # Project that distance onto Crate 1's local axes
+                    cos_t = math.cos(c1.theta)
+                    sin_t = math.sin(c1.theta)
+                    
+                    long_dist = abs(dx * cos_t + dy * sin_t)
+                    lat_dist = abs(-dx * sin_t + dy * cos_t)
+                    
+                    # Rule C: They must be perfectly side-by-side
+                    # long_dist ~ 0 (flush ends), lat_dist ~ 0.05 (touching sides)
+                    if long_dist <= LONG_TOLERANCE and abs(lat_dist - WIDTH) <= LAT_TOLERANCE:
+                        # They are geometrically locked! Connect them in the graph.
+                        adjacency[c1.id].append(c2.id)
+                        adjacency[c2.id].append(c1.id)
+                        
+            # 3. Find Connected Components (The Stacks)
             visited = set()
-            stack_counter = 0
+            stack_ids_only = []
             
-            for cid in free_crates:
-                if cid in visited:
-                    continue
+            for crate in available_crates:
+                if crate.id not in visited:
+                    # Run a quick BFS to collect all crates connected in this specific row
+                    component = []
+                    queue = [crate.id]
                     
-                current_stack = [cid]
-                visited.add(cid)
-                
-                # 2. Breadth-First Search to find all connected crates in a line
-                queue = [cid]
-                while queue:
-                    curr_id = queue.pop(0)
-                    C = self.haz_crates[curr_id]
+                    while queue:
+                        curr = queue.pop(0)
+                        if curr not in visited:
+                            visited.add(curr)
+                            component.append(curr)
+                            # Add all valid neighbors to the queue
+                            queue.extend([neighbor for neighbor in adjacency[curr] if neighbor not in visited])
                     
-                    for other_id in free_crates:
-                        if other_id in visited:
-                            continue
-                            
-                        O = self.haz_crates[other_id]
-                        dx = O.x - C.x
-                        dy = O.y - C.y
-                        dist = math.hypot(dx, dy)
+                    # 4. Enforce the Max 4 Rule
+                    # If we found 5 crates in a row, slice it into [4] and [1]
+                    for i in range(0, len(component), 4):
+                        stack_ids_only.append(component[i:i+4])
                         
-                        # If they are too far apart to be neighbors, ignore immediately
-                        if dist > 0.25:
-                            continue
-                            
-                        # 3. Check Angle Alignment (modulo pi in case one is spun 180 degrees)
-                        angle_diff = abs(C.theta - O.theta) % math.pi
-                        if angle_diff > math.pi / 2: 
-                            angle_diff = math.pi - angle_diff
-                            
-                        if angle_diff > 0.35: # ~20 degrees tolerance
-                            continue
-                            
-                        # 4. The Magic Math: Perpendicular and Parallel Distances
-                        parallel_dist = abs(dx * math.cos(C.theta) + dy * math.sin(C.theta))
-                        perp_dist = abs(-dx * math.sin(C.theta) + dy * math.cos(C.theta))
-                        
-                        # If they are perfectly side-by-side!
-                        if parallel_dist < 0.12 and perp_dist < 0.25:
-                            current_stack.append(other_id)
-                            visited.add(other_id)
-                            queue.append(other_id)
-                            
-                # 5. Only save it as a "stack" if there are at least 2 crates
-                if len(current_stack) > 1:
-                    self.stacks[stack_counter] = current_stack
-                    stack_counter += 1
-                    self.get_logger().info(f"Dynamically formed new stack {stack_counter-1} with crates: {current_stack}")
+        return stack_ids_only
 
     def smart_moves(self):
-        self.send_raw(f"VMAX 0.3")
+        self.send_raw(f"VMAX 0.7")
         self.send_raw(f"VTMAX 1.5")
         
-        activate_check_stack = True
+        activate_check_stack = False
         steal_poses = [[0.45, 0.45], [0.45, 1.1], [2.55, 1.1], [2.55, 0.45]]
         id_steal = 0
 
@@ -1209,8 +1219,8 @@ class ActionManager(Node):
             # 1. READ WORLD STATE SAFELY (Using Thread Lock)
             # =================================================================
             with self.data_lock:
-                pick_crate_ind, stack_id, is_inv, pick_path = self.compute_pick_rewards()
-                release_zone_ind, best_release_pos = self.compute_release_rewards()
+                pick_crate_ids, is_inv, pick_path = self.compute_pick_rewards()
+                release_zone_ind, best_release_pos, rel_path = self.compute_release_rewards() # Unpacked rel_path!
                 pliers_used = any(pl.state != -1 for pl in self.pliers.values())
                 start_pos = (self.robot_pos.x, self.robot_pos.y)
                 x_min, x_max, y_min, y_max = self.rect
@@ -1226,14 +1236,9 @@ class ActionManager(Node):
                         pliers_theta = self.pliers[id_side * 4].theta if id_side is not None else 0.0
                         
                     target_angle = best_release_pos[2] - pliers_theta
-                    target_pos = (best_release_pos[0], best_release_pos[1])
 
-                    # Calculate the safe path to the release zone!
-                    with self.data_lock:
-                        if self.is_direct_path_clear(start_pos, target_pos):
-                            rel_path = [start_pos, target_pos]
-                        else:
-                            rel_path, _ = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
+                    # --- DELETED REDUNDANT PATH MATH HERE ---
+                    # We just use the 'rel_path' generated by compute_release_rewards!
 
                     # Drive the grid path
                     if len(rel_path) > 1:
@@ -1271,24 +1276,32 @@ class ActionManager(Node):
                     self.get_logger().info("Issue: Cannot find release zone. Going to final zone.")
                     with self.data_lock:
                         final_pos = Position(self.final_zone["x"], self.final_zone["y"], 0.0)
+                        
                     self.move_to(final_pos)
                     self.wait_for_motion()
-                    id_active_pliers_all = {}
-                    for pid, plier in self.pliers.items():
-                        if plier.state == -1:
-                            continue
-                        
-                        id_active_pliers_all[pid] = ["drop", plier.state]
-                    self.send_plier_cmd(id_active_pliers)
+                    
+                    with self.data_lock:
+                        id_active_pliers_all = {}
+                        for pid, plier in self.pliers.items():
+                            if plier.state != -1:
+                                id_active_pliers_all[pid] = ["drop", plier.state]
+                                
+                    # FIX: Correct variable name used here
+                    self.send_plier_cmd(id_active_pliers_all)
                     self.wait_for_plier()
+                    
+                    with self.data_lock:
+                        for pl_id in id_active_pliers_all:
+                            self.pliers[pl_id].state = -1
+                            
+                    continue # Restart loop after dropping at final zone!
 
             # =================================================================
             # 3. GO FOR A TAKE
             # =================================================================
-            if pick_crate_ind is not None:
+            if pick_crate_ids is not None:
                 with self.data_lock:
-                    target_ids = self.stacks[stack_id] if stack_id is not None else [pick_crate_ind]
-                    pliers_config = self.get_best_side_pliers(len(target_ids))
+                    pliers_config = self.get_best_side_pliers(len(pick_crate_ids))
 
                 if not pliers_config:
                     self.get_logger().warn("Target found but no pliers available. Switching to Release.")
@@ -1297,7 +1310,7 @@ class ActionManager(Node):
                 selected_pliers_ids = pliers_config[0]
     
                 with self.data_lock:
-                    target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in target_ids])
+                    target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in pick_crate_ids])
                     pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in selected_pliers_ids])
                     current_robot_theta = self.robot_pos.t
                 
@@ -1346,7 +1359,7 @@ class ActionManager(Node):
                 if activate_check_stack:
                     is_ghost = False
                     with self.data_lock:
-                        for cid in target_ids:
+                        for cid in pick_crate_ids:
                             if cid not in self.haz_crates:
                                 is_ghost = True
                                 break
@@ -1374,7 +1387,7 @@ class ActionManager(Node):
                         rx, ry = self.rotate_point(p_local.x, p_local.y, robot_t)
                         pliers_in_map[pl_id] = (robot_x + rx, robot_y + ry)
 
-                    remaining_targets = [tid for tid in target_ids if tid in self.haz_crates]
+                    remaining_targets = [tid for tid in pick_crate_ids if tid in self.haz_crates]
                     
                     if not remaining_targets:
                         self.get_logger().warn("All targets vanished during approach! Aborting.")
@@ -1569,6 +1582,54 @@ class ActionManager(Node):
             
         return None
 
+    def in_final_zone(self, x, y, theta):
+        """
+        Checks if ANY part of a rotated crate (0.15m x 0.05m) is inside the zone.
+        Uses the Separating Axis Theorem (SAT) for OBB-AABB collision.
+        """
+        # Crate dimensions
+        hl = 0.15 / 2.0  # Half-length
+        hw = 0.05 / 2.0  # Half-width
+        
+        cos_t = math.cos(theta)
+        sin_t = math.sin(theta)
+        
+        # 1. Calculate the crate's projected "radius" on the global X and Y axes
+        r_cx = abs(hl * cos_t) + abs(hw * sin_t)
+        r_cy = abs(hl * sin_t) + abs(hw * cos_t)
+        
+        zx = self.final_zone['x']
+        zy = self.final_zone['y']
+        hz = self.final_zone['size'] / 2.0  # Zone half-size
+        
+        # --- Axis 1 & 2: Global X and Y (The Zone's flat edges) ---
+        if abs(x - zx) > (hz + r_cx):
+            return False # Shadows don't overlap on X, skip to next zone!
+            
+        if abs(y - zy) > (hz + r_cy):
+            return False # Shadows don't overlap on Y, skip to next zone!
+            
+        # --- Axis 3 & 4: The Crate's Local X and Y (The Crate's rotated edges) ---
+        # Calculate the zone's projected "radius" onto the rotated crate's axes
+        r_z_local = hz * (abs(cos_t) + abs(sin_t))
+        
+        # Vector from Crate center to Zone center
+        dx = zx - x
+        dy = zy - y
+        
+        # Project that vector onto the Crate's local X axis
+        dx_local = abs(dx * cos_t + dy * sin_t)
+        if dx_local > (hl + r_z_local):
+            return False # Shadows don't overlap on local X!
+            
+        # Project that vector onto the Crate's local Y axis
+        dy_local = abs(-dx * sin_t + dy * cos_t)
+        if dy_local > (hw + r_z_local):
+            return False # Shadows don't overlap on local Y!
+            
+        # If we survived all 4 axis checks, they are definitively colliding!
+        return True
+            
     def is_any_point_in_zone(self, id_zone):
         """
         Checks if any haz_crate is currently sitting inside the specified zone.
@@ -1602,22 +1663,60 @@ class ActionManager(Node):
     
     def get_all_points_in_zone(self, id_zone):
         """
-        Finds all points that are inside a specific square zone.
-        
-        Returns a list of all points found inside the zone.
+        Finds all haz_crates that have ANY part inside a specific square zone.
+        Uses SAT for precise OBB-AABB collision. Crates are already in global coordinates.
         """
+        if id_zone not in self.zones:
+            return []
+            
         zone = self.zones[id_zone]
-        half_size = zone.size / 2.0
-        min_x = zone.x - half_size
-        max_x = zone.x + half_size
-        min_y = zone.y - half_size
-        max_y = zone.y + half_size
+        zx = zone.x
+        zy = zone.y
+        hz = zone.size / 2.0  # Zone half-size
+        
+        # --- Crate Dimensions ---
+        hl = 0.15 / 2.0  # Half-length
+        hw = 0.05 / 2.0  # Half-width
         
         points_inside = []
         
-        for p in self.pliers.values():
-            if (min_x <= p.x <= max_x) and (min_y <= p.y <= max_y):
-                points_inside.append(p.id)  # Add it to our list and keep checking the rest
+        # Lock the data so the camera thread doesn't change haz_crates while we iterate!
+        with self.data_lock:
+            for c in self.haz_crates.values():
+                # Crates are already in global map coordinates, so no transform needed!
+                cx = c.x
+                cy = c.y
+                ct = c.theta
+                
+                cos_ct = math.cos(ct)
+                sin_ct = math.sin(ct)
+                
+                # 1. Calculate the crate's projected "radius" on global X and Y
+                r_cx = abs(hl * cos_ct) + abs(hw * sin_ct)
+                r_cy = abs(hl * sin_ct) + abs(hw * cos_ct)
+                
+                # --- SAT Axis 1 & 2: Global X and Y ---
+                if abs(cx - zx) > (hz + r_cx):
+                    continue # Shadows don't overlap on X
+                if abs(cy - zy) > (hz + r_cy):
+                    continue # Shadows don't overlap on Y
+                    
+                # --- SAT Axis 3 & 4: Crate's Local X and Y ---
+                r_z_local = hz * (abs(cos_ct) + abs(sin_ct))
+                
+                dx = zx - cx
+                dy = zy - cy
+                
+                dx_local = abs(dx * cos_ct + dy * sin_ct)
+                if dx_local > (hl + r_z_local):
+                    continue # Shadows don't overlap on crate's local X
+                    
+                dy_local = abs(-dx * sin_ct + dy * cos_ct)
+                if dy_local > (hw + r_z_local):
+                    continue # Shadows don't overlap on crate's local Y
+                    
+                # If it survives all 4 checks, the crate is definitively touching the zone!
+                points_inside.append(c.id)
                 
         return points_inside
 
@@ -1628,52 +1727,84 @@ class ActionManager(Node):
         ry = x * sin_t + y * cos_t
         return rx, ry
 
+    def compute_release_penality(self, px, py, path_distance):
+        """Calculates the score of a specific release pose using actual path distance."""
+        coeff_center = 1 
+        coeff_dst = -1
+        coeff_enn = -5 
+        
+        val_center = (1.5 - px) ** 2 + (1 - py) ** 2
+        # Use the TRUE path distance, not just a straight line guess!
+        val_dst = path_distance**2 
+        
+        if self.x_enn is not None:
+            val_ennemi = (self.x_enn - px) ** 2 + (self.y_enn - py) ** 2
+        else:
+            val_ennemi = 0
+            
+        return (coeff_dst * val_dst) + (coeff_enn * val_ennemi) + (coeff_center * val_center)
+
+
     def compute_release_rewards(self):
         if not self.any_plier_used():
-            return None, None
+            return None, None, []
+            
         max_reward = float('-inf')
         best_zone_id = None
         best_pos = None
-        for id, zone in self.zones.items():
-            if len(self.get_all_points_in_zone(id)) > 3:
-                continue
-            # if self.is_any_point_in_zone(id):
-            #     continue
-            x = zone.x
-            y = zone.y
-
-            distance = 0.26
-            av_poses = [[x + distance, y, 3.14],
-                        [x - distance, y, 0.0],
-                        [x, y + distance, 4.71],
-                        [x, y - distance, 1.57],
-                    ]
-
-            for pos in av_poses:
-                if not (self.boundaries[0] + 0.2 < pos[0] < self.boundaries[1] - 0.2 and self.boundaries[2] + 0.2 < pos[1] < self.boundaries[3] - 0.2): 
-                    continue
-                reward = self.compute_release_penality(x, y)
-
-                # 5. Mise à jour du champion global
-                if reward > max_reward:
-                    max_reward = reward
-                    best_zone_id = id
-                    best_pos = pos
-        return best_zone_id, best_pos
-
-    def compute_release_penality(self, x, y):
-        coeff_center = 1 # -0.005
-        coeff_dst = -1
-        coeff_enn = -5 # 0.05
-        # coeef_end = -0.0001
+        best_path = []
         
-        val_center = (1.5 - x) ** 2 + (1 - y) ** 2
-        val_dst = (self.robot_pos.x - x) ** 2 + (self.robot_pos.y - y) ** 2
-        if self.x_enn is not None:
-            val_ennemi = (self.x_enn - x) ** 2 + (self.y_enn - y) ** 2
-        else:
-            val_ennemi = 0
-        return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
+        start_pos = (self.robot_pos.x, self.robot_pos.y)
+        x_min, x_max, y_min, y_max = self.rect
+
+        with self.data_lock: # Lock data while we check paths
+            for z_id, zone in self.zones.items():
+                if len(self.get_all_points_in_zone(z_id)) > 0:
+                    continue # Zone is occupied
+                
+                x = zone.x
+                y = zone.y
+                distance = 0.26
+                av_poses = [
+                    [x + distance, y, 3.14],
+                    [x - distance, y, 0.0],
+                    [x, y + distance, 4.71],
+                    [x, y - distance, 1.57],
+                ]
+
+                for pos in av_poses:
+                    # Boundary check
+                    if not (self.boundaries[0] + 0.2 < pos[0] < self.boundaries[1] - 0.2 and 
+                            self.boundaries[2] + 0.2 < pos[1] < self.boundaries[3] - 0.2): 
+                        continue
+                        
+                    target_pos = (pos[0], pos[1])
+                    
+                    # 1. Physically check the path to this specific side!
+                    if self.is_direct_path_clear(start_pos, target_pos):
+                        dist = math.hypot(pos[0] - start_pos[0], pos[1] - start_pos[1])
+                        path = [start_pos, target_pos]
+                    else:
+                        path, dist = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
+                        # Security Check: Dive blocked?
+                        if len(path) >= 2 and not self.is_direct_path_clear(path[-2], target_pos):
+                            dist = float('inf')
+                            
+                    # If this side is completely blocked, skip it!
+                    if dist == float('inf'):
+                        continue
+
+                    # 2. Score the position using the ACTUAL path distance
+                    reward = self.compute_release_penality(pos[0], pos[1], dist)
+
+                    # 3. Update the global champion
+                    if reward > max_reward:
+                        max_reward = reward
+                        best_zone_id = z_id
+                        best_pos = pos
+                        best_path = path
+                        
+        return best_zone_id, best_pos, best_path
 
     def compute_pick_penality(self, x, y):
         coeff_center = -1 # -0.005
@@ -1690,73 +1821,80 @@ class ActionManager(Node):
 
     def compute_pick_rewards(self):
         if not self.any_plier_side_available():
-            return None, None, None, []
+            return None, None, []
 
         min_total_dist = float('inf')
-        best_crate_id = None
-        target_stack_id = None
+        best_target_ids = None  # Replaces best_crate_id and target_stack_id
         use_inverted_approach = False
         best_path = []
         
         approach_distance = 0.3
-        reviewed_ids = set()
-        
         start_pos = (self.robot_pos.x, self.robot_pos.y)
         x_min, x_max, y_min, y_max = self.rect
 
-        for crate_id, crate in self.haz_crates.items():
-            if crate_id in reviewed_ids:
-                continue
+        with self.data_lock:
+            # 1. Grab the freshest stacks right now!
+            # Returns a list of ID lists: e.g., [[1], [2, 3], [4]]
+            current_stacks = self.generate_current_stacks()
 
-            # 1. Filtres de sécurité
-            if crate.state >= 0 or (self.get_current_zone(crate.x, crate.y, crate.theta) is not None and (crate.color in (-1, self.color, 2))): 
-                reviewed_ids.add(crate_id)
-                continue
-            
-            # 2. Consolidation des données (Caisse seule ou Pile)
-            stack_id = self.get_stack_linked(crate_id)
-            if stack_id is not None:
-                group_ids = self.stacks[stack_id]
-                group_crates = [self.haz_crates[pid] for pid in group_ids]
+            # 2. Iterate through the stacks instead of individual crates
+            for stack_ids in current_stacks:
+                
+                # Fetch the actual crate objects for this stack
+                group_crates = [self.haz_crates[cid] for cid in stack_ids if cid in self.haz_crates]
+                if not group_crates:
+                    continue
+
+                # 3. Security Filters
+                # If ANY crate in this stack is in a safe zone, skip the entire stack
+                skip_stack = False
+                for crate in group_crates:
+                    if self.get_current_zone(crate.x, crate.y, crate.theta) is not None and (crate.color in (-1, self.color, 2)) or self.in_final_zone(crate.x, crate.y, crate.theta):
+                        skip_stack = True
+                        break
+                
+                if skip_stack:
+                    continue
+                
+                # 4. Consolidation (Math works perfectly whether it's 1 crate or 3!)
                 mean_x = np.mean([c.x for c in group_crates])
                 mean_y = np.mean([c.y for c in group_crates])
-                mean_theta = np.arctan2(np.sum([np.sin(c.theta) for c in group_crates]), np.sum([np.cos(c.theta) for c in group_crates]))
-                for pid in group_ids: reviewed_ids.add(pid)
-            else:
-                mean_x, mean_y, mean_theta = crate.x, crate.y, crate.theta
-                reviewed_ids.add(crate_id)
+                mean_theta = np.arctan2(np.sum([np.sin(c.theta) for c in group_crates]), 
+                                        np.sum([np.cos(c.theta) for c in group_crates]))
 
-            # 3. Calcul des points d'entrée
-            entries = [
-                (mean_x - approach_distance * np.cos(mean_theta), mean_y - approach_distance * np.sin(mean_theta), False),
-                (mean_x + approach_distance * np.cos(mean_theta), mean_y + approach_distance * np.sin(mean_theta), True)
-            ]
+                # 5. Calculate Entry Points
+                entries = [
+                    (mean_x - approach_distance * np.cos(mean_theta), mean_y - approach_distance * np.sin(mean_theta), False),
+                    (mean_x + approach_distance * np.cos(mean_theta), mean_y + approach_distance * np.sin(mean_theta), True)
+                ]
 
-            for ex, ey, is_inv in entries:
-                if not (self.boundaries[0] <= ex <= self.boundaries[1] and self.boundaries[2] <= ey <= self.boundaries[3]):
-                    continue
+                for ex, ey, is_inv in entries:
+                    if not (self.boundaries[0] <= ex <= self.boundaries[1] and self.boundaries[2] <= ey <= self.boundaries[3]):
+                        continue
+                        
+                    target_pos = (ex, ey)
                     
-                target_pos = (ex, ey)
-                
-                # 4. Check Path! Line of sight, then Street Grid
-                if self.is_direct_path_clear(start_pos, target_pos, target_crate_id=crate_id):
-                    dist = math.hypot(ex - start_pos[0], ey - start_pos[1])
-                    path = [start_pos, target_pos]
-                else:
-                    path, dist = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
-                    # Security Check: Dive blocked?
-                    if len(path) >= 2 and not self.is_direct_path_clear(path[-2], target_pos, target_crate_id=crate_id):
-                        dist = float('inf')
+                    # Pass the primary crate ID to ignore collisions with the target itself
+                    primary_id = stack_ids[0]
+                    
+                    # 6. Check Path!
+                    if self.is_direct_path_clear(start_pos, target_pos, target_crate_id=primary_id):
+                        dist = math.hypot(ex - start_pos[0], ey - start_pos[1])
+                        path = [start_pos, target_pos]
+                    else:
+                        path, dist = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
+                        # Security Check: Dive blocked?
+                        if len(path) >= 2 and not self.is_direct_path_clear(path[-2], target_pos, target_crate_id=primary_id):
+                            dist = float('inf')
 
-                # 5. Save the absolute best one
-                if dist < min_total_dist:
-                    min_total_dist = dist
-                    best_crate_id = crate_id
-                    target_stack_id = stack_id
-                    use_inverted_approach = is_inv
-                    best_path = path
+                    # 7. Save the absolute best one
+                    if dist < min_total_dist:
+                        min_total_dist = dist
+                        best_target_ids = stack_ids  # Save the whole list of IDs!
+                        use_inverted_approach = is_inv
+                        best_path = path
                             
-        return best_crate_id, target_stack_id, use_inverted_approach, best_path
+        return best_target_ids, use_inverted_approach, best_path
 
     def get_stack_linked(self, target_index):
         """

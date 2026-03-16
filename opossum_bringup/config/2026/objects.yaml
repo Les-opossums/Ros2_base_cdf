@@ -322,8 +322,8 @@ final_zone:
   0:
     x: 0.3
     y: 1.725
-    size: 0.45
+    size: 0.5
   1:
     x: 2.7
     y: 1.725
-    size: 0.45
+    size: 0.5

@@ -3,6 +3,7 @@
 """Simulate the state of the robot and receives the actions."""
 
 import rclpy
+import random
 from rclpy.node import Node
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 import time
@@ -100,7 +101,7 @@ class ActuatorsSimu(Node):
                     if mode == 4:
                         self.states[f"PINCE{id * 2}"] = 2
                         self.states[f"PINCE{id * 2 + 1}"] = 3
-                    elif mode == 5: # <--- CHANGED TO ELIF! Prevents overwriting mode 4
+                    elif mode == 5:
                         self.states[f"PINCE{id * 2}"] = 3
                         self.states[f"PINCE{id * 2 + 1}"] = 2
                     else:
@@ -116,23 +117,36 @@ class ActuatorsSimu(Node):
             # 2. Sleep OUTSIDE the lock so other commands can be processed in parallel
             time.sleep(self.time_pliers_move)
             
-            if mode == 1:
-                end_mode = 4
-            else: 
-                end_mode = 0  
+            # 3. Simulate success/failure (80% chance of success)
+            # If the side is acting, roll the dice. If not, it defaults to 0.
+            succ1 = 1 if (side in [0, 2] and random.random() < 0.8) else 0
+            succ2 = 1 if (side in [1, 2] and random.random() < 0.8) else 0
                 
-            # 3. Safely update the final states after the sleep
+            # Determine the final state based on the mode and whether it succeeded
+            if mode == 1:
+                end_mode1 = 4 if succ1 == 1 else 0
+                end_mode2 = 4 if succ2 == 1 else 0
+            else: 
+                # For drops/reverts, the state goes to 0 regardless of success/failure
+                end_mode1 = 0  
+                end_mode2 = 0
+                
+            # 4. Safely update the final states after the sleep
             with self.state_lock:
                 if side == 2:
-                    self.states[f"PINCE{id * 2}"] = end_mode
-                    self.states[f"PINCE{id * 2 + 1}"] = end_mode
-                else:
-                    self.states[f"PINCE{id * 2 + side}"] = end_mode
+                    self.states[f"PINCE{id * 2}"] = end_mode1
+                    self.states[f"PINCE{id * 2 + 1}"] = end_mode2
+                elif side == 0:
+                    self.states[f"PINCE{id * 2}"] = end_mode1
+                elif side == 1:
+                    self.states[f"PINCE{id * 2 + 1}"] = end_mode2
                 
                 state_vector = encode_state(list(self.states.values()))
                 
             self.pub_change_state.publish(Int64(data=state_vector))
-            response.response = f"PINCEFEEDBACK,{request_split[1]},{request_split[2]},1,1"
+            
+            # Format the response with the calculated success values
+            response.response = f"PINCEFEEDBACK,{request_split[1]},{request_split[2]},{succ1},{succ2}"
 
         return response
 
