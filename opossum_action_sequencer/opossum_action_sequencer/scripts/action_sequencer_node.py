@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """Action Sequencer Node."""
 
-# TODO: Update issue on GUI not taking the crate
 # TODO: Remove ghosts (review does not seem to work)
 # TODO: Review the path finder, sometimes the robot goes above known stacks
 # TODO: optimize angles for take / release, sometimes does the whoel turn (but dont take in in the cost, just after)
@@ -82,6 +81,10 @@ class HazCrate:
         self.state = -1
         self.color = 2 if rot else -1 # -1 don't know, 0 yellow, 1 blue, 2 rot + 100 in zone
         self.last_seen = None
+        self.pick_reward = float('-inf') 
+        self.best_pick_path = []
+        self.use_inverted = False
+        self.is_part_of_stack = [] # Store the IDs of the stack it belongs to
 
 @dataclass
 class ZoneRelease:
@@ -95,6 +98,9 @@ class ZoneRelease:
         self.x = x
         self.y = y
         self.size = size
+        self.release_reward = float('-inf')
+        self.best_release_path = []
+        self.best_release_pos = None
 
 class ActionManager(Node):
     """Action Manager Node."""
@@ -244,7 +250,11 @@ class ActionManager(Node):
             callback_group=self.cb_group
         )
         self.pub_timer = self.create_timer(0.2, self.publish_board_state,callback_group=self.cb_group)
-
+        self.timer_planner = self.create_timer(
+            0.5, 
+            self.continuous_planner_callback, 
+            callback_group=self.cb_group
+        )
     def _init_move_timer(self):
         self.move_timer = self.create_timer(
             2,
@@ -352,11 +362,12 @@ class ActionManager(Node):
         """Service callback to dump the entire board state for map initialization."""
         full_state = {'crates': [], 'pliers': []}
 
-        # Dump all crates
         for cid, crate in self.haz_crates.items():
             full_state['crates'].append({
                 'id': cid, 'x': round(crate.x, 3), 'y': round(crate.y, 3),
-                'theta': round(crate.theta, 3), 'state': crate.state, 'color': crate.color
+                'theta': round(crate.theta, 3), 'state': crate.state, 'color': crate.color, 
+                'reward': crate.pick_reward,
+                'path': crate.best_pick_path  # <-- SEND THE PATH HERE TOO
             })
 
         # Dump all pliers
@@ -379,7 +390,6 @@ class ActionManager(Node):
 
     def publish_board_state(self):
         """Publish only the crates and pliers that have changed."""
-        # Wait until the map is loaded
         if not hasattr(self, 'haz_crates') or not hasattr(self, 'pliers'):
             return
 
@@ -387,16 +397,19 @@ class ActionManager(Node):
 
         # 1. Check Crates for changes
         for cid, crate in self.haz_crates.items():
-            # Create a tuple of the state we care about (rounded to 3 decimals ~ 1mm)
-            current_state = (round(crate.x, 3), round(crate.y, 3), round(crate.theta, 3), crate.state, crate.color)
+            # --- THE FIX: We added crate.pick_reward to the tuple! ---
+            # Now, if the score changes (even if the crate doesn't move), it sends the update to the GUI!
+            current_state = (round(crate.x, 3), round(crate.y, 3), round(crate.theta, 3), 
+                             crate.state, crate.color, round(crate.pick_reward, 2))
             last_state = self.last_sent_state['crates'].get(cid)
             
             if current_state != last_state:
                 updates['crates'].append({
                     'id': cid, 'x': current_state[0], 'y': current_state[1],
-                    'theta': current_state[2], 'state': current_state[3], 'color': current_state[4]
+                    'theta': current_state[2], 'state': current_state[3], 'color': current_state[4], 
+                    'reward': crate.pick_reward,
+                    'path': crate.best_pick_path # <-- SEND THE PATH TO THE GUI
                 })
-                # Update our memory
                 self.last_sent_state['crates'][cid] = current_state
 
         # 2. Check Pliers for changes
@@ -728,6 +741,144 @@ class ActionManager(Node):
 
             if not any(pl.is_running for pl in self.pliers.values()):
                 self.pliers_event.set()
+    
+    def continuous_planner_callback(self):
+        """Background thread: Continuously scores every crate and zone on the map."""
+        if self.stop or not hasattr(self, 'haz_crates') or getattr(self, 'robot_pos', None) is None:
+            return
+
+        with self.data_lock:
+            start_pos = (self.robot_pos.x, self.robot_pos.y)
+            x_min, x_max, y_min, y_max = self.rect
+
+            # =================================================================
+            # A. SCORE ALL PICKUP OPTIONS
+            # =================================================================
+            # 1. Reset all crate scores to negative infinity
+            for crate in self.haz_crates.values():
+                crate.pick_reward = float('-inf')
+                
+            current_stacks = self.generate_current_stacks()
+            approach_distance = 0.3
+
+            for stack_ids in current_stacks:
+                group_crates = [self.haz_crates[cid] for cid in stack_ids if cid in self.haz_crates]
+                if not group_crates:
+                    continue
+
+                # Security Filter: If any crate in stack is safe, skip the whole stack
+                skip_stack = False
+                for crate in group_crates:
+                    if (self.get_current_zone(crate.x, crate.y, crate.theta) is not None and crate.color in (-1, self.color, 2)) or self.in_final_zone(crate.x, crate.y, crate.theta):
+                        skip_stack = True
+                        break
+                
+                if skip_stack:
+                    continue
+
+                # Consolidation math
+                mean_x = np.mean([c.x for c in group_crates])
+                mean_y = np.mean([c.y for c in group_crates])
+                mean_theta = np.arctan2(np.sum([np.sin(c.theta) for c in group_crates]), 
+                                        np.sum([np.cos(c.theta) for c in group_crates]))
+
+                # Calculate Entry Points
+                entries = [
+                    (mean_x - approach_distance * np.cos(mean_theta), mean_y - approach_distance * np.sin(mean_theta), False),
+                    (mean_x + approach_distance * np.cos(mean_theta), mean_y + approach_distance * np.sin(mean_theta), True)
+                ]
+
+                best_dist = float('inf')
+                best_path = []
+                best_inv = False
+
+                primary_id = stack_ids[0]
+
+                for ex, ey, is_inv in entries:
+                    if not (self.boundaries[0] <= ex <= self.boundaries[1] and self.boundaries[2] <= ey <= self.boundaries[3]):
+                        continue
+                        
+                    target_pos = (ex, ey)
+                    
+                    # Check Path
+                    if self.is_direct_path_clear(start_pos, target_pos, target_crate_id=primary_id):
+                        dist = math.hypot(ex - start_pos[0], ey - start_pos[1])
+                        path = [start_pos, target_pos]
+                    else:
+                        path, dist = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
+                        if len(path) >= 2 and not self.is_direct_path_clear(path[-2], target_pos, target_crate_id=primary_id):
+                            dist = float('inf')
+
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_path = path
+                        best_inv = is_inv
+
+                # Write the final score into ALL crates in this stack
+                if best_dist != float('inf'):
+                    reward = self.compute_pick_penality(mean_x, mean_y)
+                    for cid in stack_ids:
+                        if cid in self.haz_crates:
+                            crate = self.haz_crates[cid]
+                            crate.pick_reward = reward
+                            crate.best_pick_path = best_path
+                            crate.use_inverted = best_inv
+                            crate.is_part_of_stack = stack_ids
+
+            # =================================================================
+            # B. SCORE ALL RELEASE OPTIONS
+            # =================================================================
+            # 1. Check if we even need to release
+            if not self.any_plier_used():
+                return
+                
+            for z_id, zone in self.zones.items():
+                zone.release_reward = float('-inf')
+                
+                # Check if occupied
+                if len(self.get_all_points_in_zone(z_id)) > 0:
+                    continue 
+                
+                x = zone.x
+                y = zone.y
+                distance = 0.26
+                av_poses = [
+                    [x + distance, y, 3.14],
+                    [x - distance, y, 0.0],
+                    [x, y + distance, 4.71],
+                    [x, y - distance, 1.57],
+                ]
+
+                best_dist = float('inf')
+                best_path = []
+                best_pos = None
+
+                for pos in av_poses:
+                    if not (self.boundaries[0] + 0.2 < pos[0] < self.boundaries[1] - 0.2 and 
+                            self.boundaries[2] + 0.2 < pos[1] < self.boundaries[3] - 0.2): 
+                        continue
+                        
+                    target_pos = (pos[0], pos[1])
+                    
+                    if self.is_direct_path_clear(start_pos, target_pos):
+                        dist = math.hypot(pos[0] - start_pos[0], pos[1] - start_pos[1])
+                        path = [start_pos, target_pos]
+                    else:
+                        path, dist = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
+                        if len(path) >= 2 and not self.is_direct_path_clear(path[-2], target_pos):
+                            dist = float('inf')
+                            
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_path = path
+                        best_pos = pos
+
+                # Write the final score into the zone
+                if best_dist != float('inf'):
+                    reward = self.compute_release_penality(best_pos[0], best_pos[1], best_dist)
+                    zone.release_reward = reward
+                    zone.best_release_path = best_path
+                    zone.best_release_pos = best_pos
 
     def robot_data_callback(self, msg: RobotData):
         """Receive the Robot Data from Zynq."""
@@ -1122,15 +1273,6 @@ class ActionManager(Node):
             )
             self.pub_command.publish(String(data=f"{command}"))
 
-    def add_score(self, score):
-        """Update the score."""
-        if not self.stop:
-            self.pub_score.publish(Int32(data=score))
-            time.sleep(0.1)
-
-    def sign(self, val):
-        return -1 if val < 0 else 1
-
     def any_plier_used(self):
         return any(pl.state != -1 for pl in self.pliers.values())
 
@@ -1207,8 +1349,8 @@ class ActionManager(Node):
         return stack_ids_only
 
     def smart_moves(self):
-        self.send_raw(f"VMAX 0.7")
-        self.send_raw(f"VTMAX 1.5")
+        self.send_raw("VMAX 0.7")
+        self.send_raw("VTMAX 1.5")
         
         activate_check_stack = False
         steal_poses = [[0.45, 0.45], [0.45, 1.1], [2.55, 1.1], [2.55, 0.45]]
@@ -1216,91 +1358,102 @@ class ActionManager(Node):
 
         while not self.match_finished:
             
+            action = None
+            
             # =================================================================
-            # 1. READ WORLD STATE SAFELY (Using Thread Lock)
+            # 1. INSTANTLY CHOOSE THE BEST ACTION FROM CACHED SCORES
             # =================================================================
             with self.data_lock:
-                pick_crate_ids, is_inv, pick_path = self.compute_pick_rewards()
-                release_zone_ind, best_release_pos, rel_path = self.compute_release_rewards() # Unpacked rel_path!
                 pliers_used = any(pl.state != -1 for pl in self.pliers.values())
-                start_pos = (self.robot_pos.x, self.robot_pos.y)
-                x_min, x_max, y_min, y_max = self.rect
-
-            # =================================================================
-            # 2. GO FOR A RELEASE (If we hold crates or decided to release)
-            # =================================================================
-            if pliers_used:
-                if best_release_pos is not None:
-                    # Calculate targets and angles securely
-                    with self.data_lock:
-                        id_side = self.get_best_side_pliers_release(best_release_pos[2])
-                        pliers_theta = self.pliers[id_side * 4].theta if id_side is not None else 0.0
-                        
-                    target_angle = best_release_pos[2] - pliers_theta
-
-                    # --- DELETED REDUNDANT PATH MATH HERE ---
-                    # We just use the 'rel_path' generated by compute_release_rewards!
-
-                    # Drive the grid path
-                    if len(rel_path) > 1:
-                        for wp in rel_path[1:]:
-                            self.get_logger().info(f"Navigating release waypoint: {wp}")
-                            self.move_to(Position(wp[0], wp[1], target_angle))
-                            self.wait_for_motion()
-                    self.stare_and_update()
-
-                    # Configure dropping actions safely
-                    with self.data_lock:
-                        id_active_pliers = {}
-                        for pid, plier in self.pliers.items():
-                            if plier.state == -1 or pid // 4 != id_side:
-                                continue
-                            
-                            crate = self.haz_crates[plier.state]
-                            if crate.color in (-1, 2) or crate.color == self.color:
-                                id_active_pliers[pid] = ["drop", plier.state]
-                            else:
-                                id_active_pliers[pid] = ["rev_drop", plier.state]
-
-                    # Send commands and wait
-                    self.send_plier_cmd(id_active_pliers)
-                    self.wait_for_plier()
-
-                    # Clear plier states
-                    with self.data_lock:
-                        for pl_id in id_active_pliers:
-                            self.pliers[pl_id].state = -1
-                            
-                    continue
-
-                else: 
-                    self.get_logger().info("Issue: Cannot find release zone. Going to final zone.")
-                    with self.data_lock:
-                        final_pos = Position(self.final_zone["x"], self.final_zone["y"], 0.0)
-                        
-                    self.move_to(final_pos)
-                    self.wait_for_motion()
+                
+                if pliers_used:
+                    # Find the highest scoring zone
+                    best_zone = max(self.zones.values(), key=lambda z: z.release_reward, default=None)
                     
-                    with self.data_lock:
-                        id_active_pliers_all = {}
-                        for pid, plier in self.pliers.items():
-                            if plier.state != -1:
-                                id_active_pliers_all[pid] = ["drop", plier.state]
-                                
-                    # FIX: Correct variable name used here
-                    self.send_plier_cmd(id_active_pliers_all)
-                    self.wait_for_plier()
+                    if best_zone and best_zone.release_reward > float('-inf'):
+                        rel_path = best_zone.best_release_path
+                        best_release_pos = best_zone.best_release_pos
+                        action = "RELEASE"
+                    else:
+                        action = "FINAL_ZONE"
+                else:
+                    # Find the highest scoring crate
+                    best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
                     
-                    with self.data_lock:
-                        for pl_id in id_active_pliers_all:
-                            self.pliers[pl_id].state = -1
-                            
-                    continue # Restart loop after dropping at final zone!
+                    if best_crate and best_crate.pick_reward > float('-inf'):
+                        pick_crate_ids = best_crate.is_part_of_stack
+                        pick_path = best_crate.best_pick_path
+                        is_inv = best_crate.use_inverted
+                        action = "PICK"
+                    else:
+                        action = "EXPLORE"
 
             # =================================================================
-            # 3. GO FOR A TAKE
+            # 2. EXECUTE RELEASE
             # =================================================================
-            if pick_crate_ids is not None:
+            if action == "RELEASE":
+                self.get_logger().info(f"Executing RELEASE at {best_release_pos}")
+                with self.data_lock:
+                    id_side = self.get_best_side_pliers_release(best_release_pos[2])
+                    pliers_theta = self.pliers[id_side * 4].theta if id_side is not None else 0.0
+                    
+                target_angle = best_release_pos[2] - pliers_theta
+
+                if len(rel_path) > 1:
+                    for wp in rel_path[1:]:
+                        self.move_to(Position(wp[0], wp[1], target_angle))
+                        self.wait_for_motion()
+                self.stare_and_update()
+
+                with self.data_lock:
+                    id_active_pliers = {}
+                    for pid, plier in self.pliers.items():
+                        if plier.state == -1 or pid // 4 != id_side:
+                            continue
+                        
+                        crate = self.haz_crates[plier.state]
+                        if crate.color in (-1, 2) or crate.color == self.color:
+                            id_active_pliers[pid] = ["drop", plier.state]
+                        else:
+                            id_active_pliers[pid] = ["rev_drop", plier.state]
+
+                self.send_plier_cmd(id_active_pliers)
+                self.wait_for_plier()
+
+                with self.data_lock:
+                    for pl_id in id_active_pliers:
+                        self.pliers[pl_id].state = -1
+                continue
+
+            # =================================================================
+            # 3. EXECUTE FINAL ZONE FALLBACK
+            # =================================================================
+            elif action == "FINAL_ZONE":
+                self.get_logger().info("Cannot find release zone. Going to final zone.")
+                with self.data_lock:
+                    final_pos = Position(self.final_zone["x"], self.final_zone["y"], 0.0)
+                    
+                self.move_to(final_pos)
+                self.wait_for_motion()
+                
+                with self.data_lock:
+                    id_active_pliers_all = {}
+                    for pid, plier in self.pliers.items():
+                        if plier.state != -1:
+                            id_active_pliers_all[pid] = ["drop", plier.state]
+                            
+                self.send_plier_cmd(id_active_pliers_all)
+                self.wait_for_plier()
+                
+                with self.data_lock:
+                    for pl_id in id_active_pliers_all:
+                        self.pliers[pl_id].state = -1
+                continue
+
+            # =================================================================
+            # 4. EXECUTE PICK
+            # =================================================================
+            elif action == "PICK":
                 with self.data_lock:
                     pliers_config = self.get_best_side_pliers(len(pick_crate_ids))
 
@@ -1309,7 +1462,7 @@ class ActionManager(Node):
                     continue
                 
                 selected_pliers_ids = pliers_config[0]
-    
+
                 with self.data_lock:
                     target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in pick_crate_ids])
                     pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in selected_pliers_ids])
@@ -1326,7 +1479,6 @@ class ActionManager(Node):
                     final_robot_theta
                 )
 
-                # --- Calculate Best Camera Aim for the Entry Point ---
                 entry_point = pick_path[-1] if len(pick_path) > 0 else (self.robot_pos.x, self.robot_pos.y)
                 angle_to_crate = math.atan2(target_pos.y - entry_point[1], target_pos.x - entry_point[0])
                 
@@ -1342,21 +1494,15 @@ class ActionManager(Node):
                             min_rot = rot
                             best_camera_theta = req_theta
 
-                # A. Drive the Grid Path (Aiming the camera on the final step!)
                 if len(pick_path) > 1:
                     for i, wp in enumerate(pick_path[1:]):
                         if activate_check_stack and i == len(pick_path[1:]) - 1:
-                            # Last step: Drift in aiming the camera!
-                            self.get_logger().info(f"Aiming camera while arriving at entry point: {wp}")
                             self.move_to(Position(wp[0], wp[1], best_camera_theta))
                         else:
-                            # Normal grid steps
                             self.move_to(Position(wp[0], wp[1], final_robot_theta))
                         self.wait_for_motion()
-                self.stare_and_update() # Kept from your old code to update map on the way!
+                self.stare_and_update()
 
-                # B. --- VERIFICATION ---
-                # We are parked at the entry point. Make sure it's not a ghost!
                 if activate_check_stack:
                     is_ghost = False
                     with self.data_lock:
@@ -1364,22 +1510,17 @@ class ActionManager(Node):
                             if cid not in self.haz_crates:
                                 is_ghost = True
                                 break
-                                
                     if is_ghost:
                         self.get_logger().warn("Crate missing after approach! Aborting pick...")
                         continue 
 
-                # C. Realignment (Rotate back to align the pliers with the crate)
-                # FIX: ONLY realign if the robot actually needs to turn! (Prevents 0-distance hang)
                 if not activate_check_stack or abs(self.angular_distance(best_camera_theta, final_robot_theta)) > 0.05:
                     self.move_to(Position(entry_point[0], entry_point[1], final_robot_theta))
                     self.wait_for_motion()
 
-                # D. Plunge into the final position!
                 self.move_to(final_pos)
                 self.wait_for_motion()
 
-                # E. Activate pliers
                 with self.data_lock:
                     robot_x, robot_y, robot_t = final_pos.x, final_pos.y, final_pos.t
                     pliers_in_map = {}
@@ -1394,12 +1535,8 @@ class ActionManager(Node):
                         self.get_logger().warn("All targets vanished during approach! Aborting.")
                         continue 
 
-                    # --- THE FIX: Optimal Bipartite Matching (Hungarian Algorithm) ---
-                    # 1. Convert dicts/sets to strict lists so indices match up
                     plier_list = list(pliers_in_map.keys())
                     target_list = list(remaining_targets)
-
-                    # 2. Build a Cost Matrix (Rows = Pliers, Columns = Crates)
                     cost_matrix = np.zeros((len(plier_list), len(target_list)))
                     
                     for i, pl_id in enumerate(plier_list):
@@ -1407,33 +1544,27 @@ class ActionManager(Node):
                         for j, obj_id in enumerate(target_list):
                             cx = self.haz_crates[obj_id].x
                             cy = self.haz_crates[obj_id].y
-                            # Cost is the squared distance between this plier and this crate
                             cost_matrix[i, j] = (cx - px)**2 + (cy - py)**2
 
-                    # 3. Solve for the lowest total global distance!
-                    # (This automatically handles cases where len(pliers) != len(targets))
                     row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
-                    # 4. Map the optimal pairs back to your command dictionary
                     dict_sel_pliers = {}
                     for i, j in zip(row_ind, col_ind):
                         pl_id = plier_list[i]
                         best_obj_id = target_list[j]
                         dict_sel_pliers[pl_id] = ["pick", best_obj_id]
-                    # -----------------------------------------------------------------
 
                 self.send_plier_cmd(dict_sel_pliers)
                 self.wait_for_plier()
                 continue
-            
+
             # =================================================================
-            # 4. EXPLORE / STEAL
+            # 5. EXECUTE EXPLORE / STEAL
             # =================================================================
-            else:
+            elif action == "EXPLORE":
                 self.get_logger().info("Nothing to do: Exploring / Stealing...")
                 pos = steal_poses[id_steal % len(steal_poses)]
                 
-                # Check boundaries safely
                 with self.data_lock:
                     in_bounds = (self.boundaries[0] + 0.25 < pos[0] < self.boundaries[1] - 0.25 and 
                                  self.boundaries[2] + 0.25 < pos[1] < self.boundaries[3] - 0.25)

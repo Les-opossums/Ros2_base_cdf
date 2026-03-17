@@ -420,6 +420,7 @@ class MapScene(QtWidgets.QGraphicsView):
             self.scene.removeItem(old_item)
         self._redraw_pliers()
         self._redraw_crates()
+        self._redraw_paths()
 
     @QtCore.pyqtSlot(LidarLoc)
     def update_ghost_position(self, msg):
@@ -485,7 +486,8 @@ class MapScene(QtWidgets.QGraphicsView):
                 self.plier_local_states[plier['id']] = plier
             self._redraw_pliers()
             # --- NEW: Trigger crate redraw too ---
-            self._redraw_crates() 
+            self._redraw_crates()
+            self._redraw_paths()
             
         except Exception as e:
             print(f"Error parsing full state: {e}")
@@ -504,47 +506,49 @@ class MapScene(QtWidgets.QGraphicsView):
             self._redraw_pliers()
             # --- NEW: Trigger crate redraw too ---
             self._redraw_crates()
+            self._redraw_paths()
             
         except Exception as e:
             print(f"Error parsing update state: {e}")
 
     def _update_crate_visual(self, crate_data):
-        # Crates are now correctly World Frame! No math needed here.
         cid = crate_data['id']
-        
+        reward = crate_data.get('reward', float('-inf'))
+
+        # 1. Format the text to show ONLY the Score
+        if reward > -99999:
+            display_text = f"{reward:.2f}"
+        else:
+            display_text = "-"
+
+        # 2. Create the crate if it doesn't exist yet
         if cid not in self.crate_items:
             w_px, h_px = self.size_to_scene(0.05, 0.15)
             rect = QtWidgets.QGraphicsRectItem(-w_px/2, -h_px/2, w_px, h_px) 
             rect.setPen(QtGui.QPen(QtCore.Qt.black))
             rect.setZValue(1.0)
             
-            # --- NEW: Add the ID as a Text Item ---
-            # By passing 'rect' as the second argument, the text becomes a child of the crate!
-            text_item = QtWidgets.QGraphicsSimpleTextItem(str(cid), rect)
-            font = QtGui.QFont("Arial", 10, QtGui.QFont.Bold)
+            # Add the Text Item
+            text_item = QtWidgets.QGraphicsSimpleTextItem(display_text, rect)
+            font = QtGui.QFont("Arial", 10, QtGui.QFont.Bold) # Larger font since it's just one line
             text_item.setFont(font)
             
-            # Center the text inside the rectangle
-            text_rect = text_item.boundingRect()
-            text_item.setPos(-text_rect.width() / 2, -text_rect.height() / 2)
-            # --------------------------------------
-
             self.scene.addItem(rect)
             self.crate_items[cid] = rect
 
+        # 3. Update Position and Rotation
         item = self.crate_items[cid]
         px, py = self.pos_to_scene(crate_data['x'], crate_data['y'])
-        
         item.setPos(px, py)
         item.setRotation(90 - (crate_data['theta'] * 180 / math.pi))
 
-        # Color mapping: 0=Yellow, 1=Blue, 2=Red
+        # 4. Color mapping
         color_val = crate_data.get('color', -1)
         text_color = QtCore.Qt.white # Default text color
 
         if color_val == 0: 
             color = QtGui.QColor(255, 255, 0)
-            text_color = QtCore.Qt.black # Yellow needs black text to be readable!
+            text_color = QtCore.Qt.black # Yellow needs black text to be readable
         elif color_val == 1: 
             color = QtGui.QColor(0, 0, 255)
         elif color_val == 2: 
@@ -555,10 +559,75 @@ class MapScene(QtWidgets.QGraphicsView):
             
         item.setBrush(QtGui.QBrush(color))
         
-        # --- NEW: Update the text color dynamically ---
+        # 5. --- THE FIX: Dynamically update, ROTATE, and Center the Text ---
         for child in item.childItems():
             if isinstance(child, QtWidgets.QGraphicsSimpleTextItem):
+                child.setText(display_text)
                 child.setBrush(QtGui.QBrush(text_color))
+                
+                # Setup rotation around the exact center of the text bounding box
+                text_rect = child.boundingRect()
+                child.setTransformOriginPoint(text_rect.width() / 2, text_rect.height() / 2)
+                
+                # Rotate it 90 degrees!
+                child.setRotation(90) 
+                
+                # Center the rotated text item perfectly inside the crate
+                child.setPos(-text_rect.width() / 2, -text_rect.height() / 2)
+
+    def _redraw_paths(self):
+        """Draw the paths of the top 2 highest scoring targets."""
+        # 1. Clear old paths from the screen
+        for item in getattr(self, 'path_items', []):
+            if item in self.scene.items():
+                self.scene.removeItem(item)
+        self.path_items = []
+
+        # 2. Get crates with valid rewards and sort them from highest to lowest score
+        valid_crates = [c for c in self.crate_local_states.values() if c.get('reward', float('-inf')) > -99999]
+        valid_crates.sort(key=lambda c: c['reward'], reverse=True)
+
+        drawn_paths = []
+        # Top target path is bright Green. Second best target path is Orange.
+        colors = [QtGui.QColor(0, 255, 0, 200), QtGui.QColor(255, 165, 0, 200)] 
+
+        for crate in valid_crates:
+            path_pts = crate.get('path', [])
+            
+            # If there is no path, skip it
+            if not path_pts or len(path_pts) < 2:
+                continue
+
+            # Skip if we already drew this exact path (crates in the same stack share paths)
+            if path_pts in drawn_paths:
+                continue
+
+            color = colors[len(drawn_paths)]
+            drawn_paths.append(path_pts)
+
+            # 3. Build the QPainterPath trajectory
+            qpath = QtGui.QPainterPath()
+            start_px, start_py = self.pos_to_scene(path_pts[0][0], path_pts[0][1])
+            qpath.moveTo(start_px, start_py)
+
+            for pt in path_pts[1:]:
+                px, py = self.pos_to_scene(pt[0], pt[1])
+                qpath.lineTo(px, py)
+
+            # 4. Draw the dashed path item on the map
+            path_item = QtWidgets.QGraphicsPathItem(qpath)
+            pen = QtGui.QPen(color)
+            pen.setWidth(4)
+            pen.setStyle(QtCore.Qt.DashLine) 
+            path_item.setPen(pen)
+            path_item.setZValue(0.8) # Put it below the crates but above the map background
+            
+            self.scene.addItem(path_item)
+            self.path_items.append(path_item)
+
+            # Stop once we have drawn the top 2 paths
+            if len(drawn_paths) >= 2:
+                break
 
     # def _update_plier_visual(self, plier_data):
     #     pid = plier_data['id']
