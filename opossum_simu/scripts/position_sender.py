@@ -172,7 +172,7 @@ class PositionSender(Node):
             if result[k] in (0, 2, 3) and act.state != 'free':
                 if act.state not in ('running', 'keeping') :
                     # The state of an object is "free_color" or "free_rot", we want to keep the color information when the object is released
-                    if result[k] == 2: # dropping, so we need to update the color of the object to the one of the robot
+                    if result[k] in (0, 2): # dropping, so we need to update the color of the object to the one of the robot
                         self.objects[int(act.state)].state = 'free' + "*" + self.objects[int(act.state)].state.split("*")[-1]
                     elif result[k] == 3: # picking, so we need to update the color of the object to the inverse of the one of the robot
                         self.objects[int(act.state)].state = 'free' + "*" + self.inv_colors[self.objects[int(act.state)].state.split("*")[-1]]
@@ -230,7 +230,6 @@ class PositionSender(Node):
                 self.modified_objects.append(obj_taken.id)
                 
             elif act.state == 'running':
-                # 2. The actuator is actively trying to pick something up.
                 # Save it in a list so we can run the Hungarian algorithm on all of them at once.
                 running_actuators.append((act, x_, y_, theta_))
 

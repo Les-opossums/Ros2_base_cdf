@@ -13,7 +13,7 @@ import math
 from PyQt5 import QtWidgets, QtGui, QtCore
 from ament_index_python.packages import get_package_share_directory
 import os
-from opossum_msgs.msg import LidarLoc, GlobalView
+from opossum_msgs.msg import LidarLoc, GlobalView, RobotData
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 import functools
@@ -56,6 +56,7 @@ class NodeGUI(Node):
         self.simulation = (
             self.get_parameter("simulation").get_parameter_value().bool_value
         )
+        self.msg_lidar = None
 
     def _init_publishers(self):
         """Initialize subscribers of the node."""
@@ -88,9 +89,16 @@ class NodeGUI(Node):
             self.create_subscription(
                 LidarLoc,
                 name + "/" + position_topic,
-                functools.partial(self.position_callback, name=name),
+                functools.partial(self.update_lidar_data, name=name),
                 10,
             )
+            if not self.parent.use_only_lidar_points:
+                self.create_subscription(
+                    RobotData,
+                    name + "/" + "robot_data",
+                    functools.partial(self.position_callback, name=name),
+                    10,
+                )
             self.create_subscription(
                 String,
                 f"{name}/board_state_updates",
@@ -137,9 +145,25 @@ class NodeGUI(Node):
     def global_view_callback(self, msg):
         self.parent.update_global_view(msg)
 
+    def update_lidar_data(self, msg, name):
+        """Update the lidar data."""
+        self.msg_lidar = msg
+        if self.parent.use_only_lidar_points:
+            self.parent.update_robot_position(msg, name)
+        if self.parent.use_ghost_lidar_points:
+            self.parent.update_ghost_position(msg, name)
+
     def position_callback(self, msg, name):
         """Receive the last known information and display it."""
-        self.parent.update_robot_position(msg, name)
+        new_msg = LidarLoc()
+        new_msg.robot_position.x = msg.x
+        new_msg.robot_position.y = msg.y
+        new_msg.robot_position.z = msg.theta
+        if self.msg_lidar is not None:  
+            new_msg.other_robot_position = self.msg_lidar.other_robot_position
+            new_msg.balises = self.msg_lidar.balises
+
+        self.parent.update_robot_position(new_msg, name)
 
     def check_asserv_callback(self, msg, name):
         """Check if an interesting data is received."""
@@ -195,6 +219,17 @@ class MapScene(QtWidgets.QGraphicsView):
         self.icon_width = icon_rect.width()
         self.icon_height = icon_rect.height()
         self.icon_item.setPos(5, 5)  # Position initiale
+        self.icon_item.setZValue(0.2) # Ensure main robot is always on top
+
+        # --- NEW: GHOST ROBOT ADDITION ---
+        # is_movable=False so you don't accidentally drag the ghost!
+        self.ghost_item = DraggablePixmapItem(self.icon_pixmap, is_movable=False)
+        self.ghost_item.setScale(1.15)   # <-- NEW: Makes it exactly 15% larger!
+        self.ghost_item.setOpacity(0.4)  # 40% opaque (0.0 is invisible, 1.0 is solid)
+        self.ghost_item.setZValue(0.1)   # Sit just below the main robot
+        self.scene.addItem(self.ghost_item)
+        # ---------------------------------
+        
         m_pixmap = QtGui.QPixmap(self.mad_icon).scaled(
             50, 50, QtCore.Qt.KeepAspectRatio
         )
@@ -212,6 +247,12 @@ class MapScene(QtWidgets.QGraphicsView):
         self.robot_global_theta = 0.0
         self.plier_local_states = {}
         self.crate_local_states = {}
+
+    # --- ADD THIS NEW METHOD ANYWHERE INSIDE MapScene ---
+    def set_ghost_visibility(self, visible: bool):
+        """Instantly hide or show the ghost item on the map."""
+        if hasattr(self, 'ghost_item'):
+            self.ghost_item.setVisible(visible)
 
     def local_to_global(self, local_x, local_y, local_t):
         """Converts robot-frame coordinates to world-frame coordinates."""
@@ -379,6 +420,28 @@ class MapScene(QtWidgets.QGraphicsView):
             self.scene.removeItem(old_item)
         self._redraw_pliers()
         self._redraw_crates()
+
+    @QtCore.pyqtSlot(LidarLoc)
+    def update_ghost_position(self, msg):
+        """Update the position of the ghost in the map."""
+        # Only update if the item exists
+        if not hasattr(self, 'ghost_item'):
+            return
+
+        map_rect = self.map_item.boundingRect()
+        width = map_rect.width()
+        height = map_rect.height()
+        
+        # Calculate position using the exact same math as the main robot
+        posx = width * msg.robot_position.x / 3.0 - self.icon_width / 2.0
+        posy = height * (1.0 - msg.robot_position.y / 2.0) - self.icon_height / 2.0
+        
+        new_pos = QtCore.QPointF(posx, posy)
+        self.ghost_item.setPos(new_pos)
+        
+        # Calculate and set rotation
+        new_rotation = -msg.robot_position.z * 180.0 / pi
+        self.ghost_item.setRotation(new_rotation)
 
     def pos_to_scene(self, x, y):
         """Convert real (x,y) meters to scene pixels."""
@@ -581,6 +644,10 @@ class GlobalViewPage(QtWidgets.QWidget):
         """Update the map of the robots."""
         self.map_scene.update_map_position(msg)
 
+    def update_ghost_position(self, msg):
+        """Update the map of the robots."""
+        self.map_scene.update_ghost_position(msg)
+
     def send_command(self, command):
         """Send command to ROS."""
         command_name = command
@@ -724,6 +791,10 @@ class MotorsPage(QtWidgets.QWidget):
     def update_map_position(self, msg):
         """Update the map of the robots."""
         self.map_scene.update_map_position(msg)
+    
+    def update_ghost_position(self, msg):
+        """Update the map of the robots."""
+        self.map_scene.update_ghost_position(msg)
 
 
 class AsservPage(QtWidgets.QWidget):
@@ -840,10 +911,17 @@ class MainRobotPage(QtWidgets.QWidget):
         """Change the page."""
         self.stackedWidgets.setCurrentIndex(index)
 
+    def update_ghost_position(self, msg):
+        if self.parent.use_ghost_lidar_points:
+            self.component_pages["GlobalView"].update_ghost_position(msg)
+            self.component_pages["GlobalView"].update_ghost_position(msg)
+
     def update_robot_position(self, msg):
         """Update robot position in every layout."""
         self.component_pages["GlobalView"].update_map_position(msg)
+        self.component_pages["GlobalView"].update_map_position(msg)
         self.component_pages["GlobalView"].update_text_position(msg)
+        self.component_pages["Motors"].update_map_position(msg)
         self.component_pages["Motors"].update_map_position(msg)
         self.component_pages["Motors"].update_text_position(msg)
 
@@ -853,6 +931,14 @@ class MainRobotPage(QtWidgets.QWidget):
         
     def init_board_state(self, json_str):
         self.component_pages["GlobalView"].map_scene.apply_full_state(json_str)
+
+    # --- ADD THIS NEW METHOD ANYWHERE INSIDE MainRobotPage ---
+    def set_ghost_visibility(self, visible: bool):
+        """Pass the visibility toggle down to all map scenes."""
+        if "GlobalView" in self.component_pages:
+            self.component_pages["GlobalView"].map_scene.set_ghost_visibility(visible)
+        if "Motors" in self.component_pages:
+            self.component_pages["Motors"].map_scene.set_ghost_visibility(visible)
 
 class GeneralViewPage(QtWidgets.QGraphicsView):
     def __init__(self, robot_names, parent):
@@ -987,14 +1073,23 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
 
     def __init__(self):
         super().__init__()
-        # Set main characteristics
         self.setWindowTitle("Orchestrator GUI")
         self.setGeometry(0, 0, 600, 800)
 
-        # ROS connection
+        # 1. Initialize variables
+        self.use_only_lidar_points = False
+        self.use_ghost_lidar_points = True  # Default to ON
+        if self.use_only_lidar_points:
+            self.use_ghost_lidar_points = False
+
         self.gui_node = NodeGUI(self)
         self.leash_button = QtWidgets.QPushButton("Send all LEASH")
         self.leash_button.clicked.connect(self.send_leashes)
+
+        # 2. --- NEW: Create the Checkbox ---
+        self.ghost_checkbox = QtWidgets.QCheckBox("Show Lidar Ghost (Debug)")
+        self.ghost_checkbox.setChecked(self.use_ghost_lidar_points)
+        self.ghost_checkbox.stateChanged.connect(self.toggle_ghost)
 
         # GUI for each robot
         self.page_name_box = QtWidgets.QComboBox()
@@ -1009,10 +1104,12 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         
         self.page_name_box.currentIndexChanged.connect(self.change_page)
 
+        # 3. Add it to your layout
         central_widget = QtWidgets.QWidget()
         self.setCentralWidget(central_widget)
         self.layout = QtWidgets.QVBoxLayout(central_widget)
         self.layout.addWidget(self.leash_button)
+        self.layout.addWidget(self.ghost_checkbox) # <-- NEW: Add to screen
         self.layout.addWidget(self.page_name_box)
         self.layout.addWidget(self.stackedWidgets)
 
@@ -1020,9 +1117,25 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         self.call_update_global()
         self.fetch_initial_states()
 
+    def toggle_ghost(self, state):
+        """Triggered when the user clicks the checkbox."""
+        is_visible = (state == QtCore.Qt.Checked)
+        
+        # 1. Update the variable so NodeGUI starts/stops passing Lidar data
+        self.use_ghost_lidar_points = is_visible
+        
+        # 2. Force the graphics items to hide/show immediately
+        for name, page in self.robot_pages.items():
+            if isinstance(page, MainRobotPage):
+                page.set_ghost_visibility(is_visible)
+
     def update_robot_position(self, msg, name):
         """Update the position of the robot."""
         self.robot_pages[name].update_robot_position(msg)
+
+    def update_ghost_position(self, msg, name):
+        """Update the position of the ghost."""
+        self.robot_pages[name].update_ghost_position(msg)
 
     def update_global_view(self, msg):
         self.robot_pages['General View'].update_global_view(msg)

@@ -7,6 +7,7 @@
 # TODO: Review the path finder, sometimes the robot goes above known stacks
 # TODO: optimize angles for take / release, sometimes does the whoel turn (but dont take in in the cost, just after)
 # TODO add a go back to zone before the end
+# TODO better handle the cross with an ennemy
 
 # Actions for pliers
 # 0: free, 1: picking, 2: dropping, 3: reverting
