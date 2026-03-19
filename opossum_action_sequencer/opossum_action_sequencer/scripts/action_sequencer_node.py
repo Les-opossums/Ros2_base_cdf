@@ -161,6 +161,34 @@ class ActionManager(Node):
         # self.camera_angles = [0.0, 2.093333, 4.186666]
         self.camera_angles = [0.0]
 
+        # --- NEW: Navigation Constraints ---
+        self.robot_radius = 0.25
+        
+        # Safe boundaries (shrunk by robot radius):
+        self.safe_x_min = 0.0 + self.robot_radius
+        self.safe_x_max = 3.0 - self.robot_radius
+        self.safe_y_min = 0.0 + self.robot_radius
+        self.safe_y_max = 2.0 - self.robot_radius
+        
+        # Forbidden Zone (Real: x=[0.6, 2.4], y=[1.55, 2.0])
+        # Expanded Forbidden Zone (grown by robot radius):
+        self.f_zone_x_min = 0.6 - self.robot_radius  # 0.35
+        self.f_zone_x_max = 2.4 + self.robot_radius  # 2.65
+        self.f_zone_y_min = 1.55 - self.robot_radius # 1.30
+        self.f_zone_y_max = 2.0                      # Capped at top
+
+    def is_point_safe(self, x, y):
+        """Check if a point is within boundaries and outside forbidden zones."""
+        # 1. Check outer boundaries
+        if not (self.safe_x_min <= x <= self.safe_x_max and self.safe_y_min <= y <= self.safe_y_max):
+            return False
+            
+        # 2. Check forbidden zone
+        if (self.f_zone_x_min <= x <= self.f_zone_x_max) and (self.f_zone_y_min <= y <= self.f_zone_y_max):
+            return False
+            
+        return True
+
     def _init_mapping(self):
         objects_path = os.path.join(
             get_package_share_directory("opossum_bringup"), "config", str(self.year), f"{self.board_config}.yaml"
@@ -2143,50 +2171,46 @@ class ActionManager(Node):
     def get_street_grid_path(self, start, target, x_min, x_max, y_min, y_max):
         import heapq
         
-        # Helper to round coordinates (prevents floating point errors in the graph)
         def pt(x, y): return (round(x, 4), round(y, 4))
         
         start = pt(*start)
         target = pt(*target)
         nodes = set([start, target])
         
-        x_lines = [x_min, x_max]
-        y_lines = [y_min, y_max]
+        # --- NEW: Use safe boundaries for the street grid ---
+        # We add lines around the forbidden zone so the robot can walk AROUND it
+        x_lines = [self.safe_x_min, self.f_zone_x_min, self.f_zone_x_max, self.safe_x_max, start[0], target[0]]
+        y_lines = [self.safe_y_min, self.f_zone_y_min, self.safe_y_max, start[1], target[1]]
         
-        # 1. Add the 4 main intersections
+        # 1. Add the intersections (ONLY if they are safe)
         for x in x_lines:
             for y in y_lines:
-                nodes.add(pt(x, y))
+                if self.is_point_safe(x, y):
+                    nodes.add(pt(x, y))
                 
-        # 2. Project Start and Target onto the lines (ONLY if within board boundaries)
+        # 2. Project Start and Target onto the lines
         for p in [start, target]:
             for x in x_lines:
-                if self.boundaries[2] <= p[1] <= self.boundaries[3]: nodes.add(pt(x, p[1]))
+                if self.is_point_safe(x, p[1]): nodes.add(pt(x, p[1]))
             for y in y_lines:
-                if self.boundaries[0] <= p[0] <= self.boundaries[1]: nodes.add(pt(p[0], y))
+                if self.is_point_safe(p[0], y): nodes.add(pt(p[0], y))
                     
         nodes = list(nodes)
         edges = {n: [] for n in nodes}
         
         def add_edge(n1, n2):
             if n1 != n2:
-                dist = math.hypot(n1[0]-n2[0], n1[1]-n2[1])
-                edges[n1].append((dist, n2))
-                edges[n2].append((dist, n1))
+                # Verify the edge doesn't cut through the forbidden zone
+                if self.is_direct_path_clear(n1, n2):
+                    dist = math.hypot(n1[0]-n2[0], n1[1]-n2[1])
+                    edges[n1].append((dist, n2))
+                    edges[n2].append((dist, n1))
 
         # 3. Connect nodes that share the same horizontal or vertical "Street"
         for i, n1 in enumerate(nodes):
             for n2 in nodes[i+1:]:
                 if n1[0] == n2[0] and n1[0] in x_lines: add_edge(n1, n2)
                 elif n1[1] == n2[1] and n1[1] in y_lines: add_edge(n1, n2)
-                    
-        # 4. Connect Start and Target to their respective projections
-        for x in x_lines:
-            if self.boundaries[2] <= start[1] <= self.boundaries[3]: add_edge(start, pt(x, start[1]))
-            if self.boundaries[2] <= target[1] <= self.boundaries[3]: add_edge(target, pt(x, target[1]))
-        for y in y_lines:
-            if self.boundaries[0] <= start[0] <= self.boundaries[1]: add_edge(start, pt(start[0], y))
-            if self.boundaries[0] <= target[0] <= self.boundaries[1]: add_edge(target, pt(target[0], y))
 
         # 5. Mini-Dijkstra Pathfinding
         queue = [(0, start, [start])]
@@ -2195,13 +2219,12 @@ class ActionManager(Node):
         while queue:
             cost, current, path = heapq.heappop(queue)
             if current == target:
-                # Clean up the path (remove unnecessary middle points on straight lines)
                 cleaned = []
                 for p in path:
                     if len(cleaned) >= 2:
                         dx1, dy1 = cleaned[-1][0] - cleaned[-2][0], cleaned[-1][1] - cleaned[-2][1]
                         dx2, dy2 = p[0] - cleaned[-1][0], p[1] - cleaned[-1][1]
-                        if abs(dx1*dy2 - dx2*dy1) < 1e-4: cleaned.pop() # Remove collinear point
+                        if abs(dx1*dy2 - dx2*dy1) < 1e-4: cleaned.pop() 
                     cleaned.append(p)
                 return cleaned, cost
                 
@@ -2212,7 +2235,7 @@ class ActionManager(Node):
                 if neighbor not in visited:
                     heapq.heappush(queue, (cost + d, neighbor, path + [neighbor]))
                     
-        return [], float('inf') # Return infinity if completely trapped
+        return [], float('inf')
 
     def get_best_pickup_target(self, objects_to_check, x_min, x_max, y_min, y_max, offset_dist=0.23):
         """
@@ -2263,27 +2286,41 @@ class ActionManager(Node):
         return best_crate_id, best_path, best_is_inverted, min_total_dist
 
     def is_direct_path_clear(self, start_pos, target_pos, target_crate_id=None, margin=0.23):
-        """Checks if the straight line between two points hits any crates."""
+        """Checks if the straight line hits crates OR the forbidden zone."""
         x1, y1 = start_pos
         x2, y2 = target_pos
+        
+        # --- NEW: Quick check if start or end are fundamentally unsafe ---
+        if not self.is_point_safe(x1, y1) or not self.is_point_safe(x2, y2):
+            return False
+
         dx = x2 - x1
         dy = y2 - y1
-        length_sq = dx**2 + dy**2
+        length = math.hypot(dx, dy)
         
-        if length_sq == 0:
+        if length == 0:
             return True
             
+        # --- NEW: Sample points along the line to check for forbidden zone intersection ---
+        # We sample every 10cm to ensure the line doesn't cross the forbidden zone
+        steps = int(length / 0.1)
+        if steps > 0:
+            for i in range(1, steps):
+                tx = x1 + (dx * (i / steps))
+                ty = y1 + (dy * (i / steps))
+                if not self.is_point_safe(tx, ty):
+                    return False # The path cuts through the forbidden zone!
+
+        # --- OLD LOGIC: Check against crates ---
+        length_sq = length**2
         for cid, crate in self.haz_crates.items():
-            # Ignore the target crate and crates already picked up
             if cid == target_crate_id or crate.state != -1:
                 continue
 
-            # Project crate center onto the line segment to find closest point
             t = max(0.0, min(1.0, ((crate.x - x1) * dx + (crate.y - y1) * dy) / length_sq))
             closest_x = x1 + t * dx
             closest_y = y1 + t * dy
             
-            # If the closest point is smaller than our margin, the path is blocked!
             if math.hypot(crate.x - closest_x, crate.y - closest_y) < margin:
                 return False 
                 
