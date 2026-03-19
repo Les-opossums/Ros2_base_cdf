@@ -245,8 +245,29 @@ class MapScene(QtWidgets.QGraphicsView):
         self.robot_global_x = 0.0
         self.robot_global_y = 0.0
         self.robot_global_theta = 0.0
+        
         self.plier_local_states = {}
         self.crate_local_states = {}
+        
+        # --- NEW: Zone variables and Path selector ---
+        self.zone_local_states = {}
+        self.zone_items = {}
+        self.path_items = []
+        self.max_paths_to_show = 3
+
+        # Create a dropdown menu floating on the View
+        self.path_selector = QtWidgets.QComboBox(self)
+        self.path_selector.addItems(["0 paths", "1 path", "2 paths", "3 paths"])
+        self.path_selector.setCurrentIndex(3) # Default to showing 3
+        self.path_selector.move(10, 10) # Position in the top-left corner
+        self.path_selector.setStyleSheet("background-color: white; font-weight: bold;")
+        self.path_selector.currentIndexChanged.connect(self.set_max_paths)
+
+    # --- NEW METHOD: Triggered by the dropdown ---
+    def set_max_paths(self, index):
+        """Update how many paths to show based on dropdown selection."""
+        self.max_paths_to_show = index
+        self._redraw_paths()
 
     # --- ADD THIS NEW METHOD ANYWHERE INSIDE MapScene ---
     def set_ghost_visibility(self, visible: bool):
@@ -472,20 +493,24 @@ class MapScene(QtWidgets.QGraphicsView):
         if hasattr(self, 'map_item'):
             self.fitInView(self.map_item, QtCore.Qt.KeepAspectRatio)
 
-    # --- NEW: State Applicators ---
     def apply_full_state(self, json_str):
         """Initialize the whole board."""
         try:
             full_state = json.loads(json_str)
+            
             for crate in full_state.get('crates', []):
-                # --- NEW: Save the raw crate data ---
                 self.crate_local_states[crate['id']] = crate 
                 self._update_crate_visual(crate)
-            
+                
             for plier in full_state.get('pliers', []):
                 self.plier_local_states[plier['id']] = plier
+                
+            # --- NEW: Process Zones ---
+            for zone in full_state.get('zones', []):
+                self.zone_local_states[zone['id']] = zone
+                self._update_zone_visual(zone)
+
             self._redraw_pliers()
-            # --- NEW: Trigger crate redraw too ---
             self._redraw_crates()
             self._redraw_paths()
             
@@ -496,15 +521,20 @@ class MapScene(QtWidgets.QGraphicsView):
         """Update only the changed elements."""
         try:
             updates = json.loads(json_str)
+            
             for crate in updates.get('crates', []):
-                # --- NEW: Save the raw crate data ---
                 self.crate_local_states[crate['id']] = crate
                 self._update_crate_visual(crate)
                 
             for plier in updates.get('pliers', []):
                 self.plier_local_states[plier['id']] = plier
+                
+            # --- NEW: Process Zones ---
+            for zone in updates.get('zones', []):
+                self.zone_local_states[zone['id']] = zone
+                self._update_zone_visual(zone)
+
             self._redraw_pliers()
-            # --- NEW: Trigger crate redraw too ---
             self._redraw_crates()
             self._redraw_paths()
             
@@ -575,87 +605,114 @@ class MapScene(QtWidgets.QGraphicsView):
                 # Center the rotated text item perfectly inside the crate
                 child.setPos(-text_rect.width() / 2, -text_rect.height() / 2)
 
+    def _update_zone_visual(self, zone_data):
+        """Draw or update the release zones with their rewards."""
+        zid = zone_data['id']
+        reward = zone_data.get('reward', float('-inf'))
+        
+        if reward > -99999:
+            display_text = f"Zone {zid}\n{reward:.1f}"
+        else:
+            display_text = f"Zone {zid}\n-"
+            
+        # Create the zone if it doesn't exist
+        if zid not in self.zone_items:
+            # Assume zone is roughly 30x30 cm. Adjust 0.3 if needed.
+            w_px, h_px = self.size_to_scene(0.3, 0.3)
+            rect = QtWidgets.QGraphicsRectItem(-w_px/2, -h_px/2, w_px, h_px)
+            
+            # Semi-transparent green background with dashed border
+            rect.setBrush(QtGui.QBrush(QtGui.QColor(0, 255, 0, 40))) 
+            rect.setPen(QtGui.QPen(QtCore.Qt.darkGreen, 2, QtCore.Qt.DashLine))
+            rect.setZValue(0.1) # Keep it on the floor
+            
+            # Add reward text
+            text_item = QtWidgets.QGraphicsSimpleTextItem(display_text, rect)
+            text_item.setFont(QtGui.QFont("Arial", 9, QtGui.QFont.Bold))
+            text_item.setBrush(QtGui.QBrush(QtCore.Qt.black))
+            
+            self.scene.addItem(rect)
+            self.zone_items[zid] = rect
+
+        item = self.zone_items[zid]
+        px, py = self.pos_to_scene(zone_data['x'], zone_data['y'])
+        item.setPos(px, py)
+        
+        # Update text and keep it centered
+        for child in item.childItems():
+            if isinstance(child, QtWidgets.QGraphicsSimpleTextItem):
+                child.setText(display_text)
+                r = child.boundingRect()
+                child.setPos(-r.width()/2, -r.height()/2)
+
     def _redraw_paths(self):
-        """Draw the paths of the top 2 highest scoring targets."""
+        """Draw top N paths for both Picking (Crates) and Releasing (Zones)."""
         # 1. Clear old paths from the screen
         for item in getattr(self, 'path_items', []):
             if item in self.scene.items():
                 self.scene.removeItem(item)
         self.path_items = []
 
-        # 2. Get crates with valid rewards and sort them from highest to lowest score
-        valid_crates = [c for c in self.crate_local_states.values() if c.get('reward', float('-inf')) > -99999]
+        # If user selected "0 paths", stop here.
+        if self.max_paths_to_show == 0:
+            return
+
+        # 2. Get valid crates and zones, and sort them highest to lowest score
+        valid_crates = [c for c in self.crate_local_states.values() if c.get('reward', float('-inf')) > -99999 and 'path' in c]
         valid_crates.sort(key=lambda c: c['reward'], reverse=True)
 
-        drawn_paths = []
-        # Top target path is bright Green. Second best target path is Orange.
-        colors = [QtGui.QColor(0, 255, 0, 200), QtGui.QColor(255, 165, 0, 200)] 
+        valid_zones = [z for z in getattr(self, 'zone_local_states', {}).values() if z.get('reward', float('-inf')) > -99999 and 'path' in z]
+        valid_zones.sort(key=lambda z: z['reward'], reverse=True)
 
-        for crate in valid_crates:
-            path_pts = crate.get('path', [])
-            
-            # If there is no path, skip it
-            if not path_pts or len(path_pts) < 2:
-                continue
-
-            # Skip if we already drew this exact path (crates in the same stack share paths)
-            if path_pts in drawn_paths:
-                continue
-
-            color = colors[len(drawn_paths)]
-            drawn_paths.append(path_pts)
-
-            # 3. Build the QPainterPath trajectory
+        # 3. Helper function to draw a line
+        def draw_trajectory(path_pts, color, is_first):
+            if not path_pts or len(path_pts) < 2: 
+                return
             qpath = QtGui.QPainterPath()
-            start_px, start_py = self.pos_to_scene(path_pts[0][0], path_pts[0][1])
-            qpath.moveTo(start_px, start_py)
-
+            sx, sy = self.pos_to_scene(path_pts[0][0], path_pts[0][1])
+            qpath.moveTo(sx, sy)
             for pt in path_pts[1:]:
                 px, py = self.pos_to_scene(pt[0], pt[1])
                 qpath.lineTo(px, py)
-
-            # 4. Draw the dashed path item on the map
-            path_item = QtWidgets.QGraphicsPathItem(qpath)
-            pen = QtGui.QPen(color)
-            pen.setWidth(4)
-            pen.setStyle(QtCore.Qt.DashLine) 
-            path_item.setPen(pen)
-            path_item.setZValue(0.8) # Put it below the crates but above the map background
             
-            self.scene.addItem(path_item)
-            self.path_items.append(path_item)
+            item = QtWidgets.QGraphicsPathItem(qpath)
+            pen = QtGui.QPen(color)
+            # Make the best path 6px thick, others 3px thick
+            pen.setWidth(6 if is_first else 3)
+            pen.setStyle(QtCore.Qt.DashLine)
+            item.setPen(pen)
+            item.setZValue(0.8) # Above floor, below crates
+            self.scene.addItem(item)
+            self.path_items.append(item)
 
-            # Stop once we have drawn the top 2 paths
-            if len(drawn_paths) >= 2:
+        # 4. Draw Top N Picking Paths (Shades of Blue)
+        blue_shades = [QtGui.QColor(0, 0, 255, 200), QtGui.QColor(0, 150, 255, 200), QtGui.QColor(100, 200, 255, 200)]
+        drawn_crate_paths = []
+        for crate in valid_crates:
+            if len(drawn_crate_paths) >= self.max_paths_to_show: 
                 break
+            
+            # Prevent drawing the exact same path twice for crates in the same stack
+            if crate['path'] in drawn_crate_paths: 
+                continue
+            
+            is_best = (len(drawn_crate_paths) == 0)
+            draw_trajectory(crate['path'], blue_shades[len(drawn_crate_paths) % 3], is_best)
+            drawn_crate_paths.append(crate['path'])
 
-    # def _update_plier_visual(self, plier_data):
-    #     pid = plier_data['id']
-        
-    #     # 1. Transform from local Robot frame to global Map frame
-    #     gx, gy, gt = self.local_to_global(
-    #         plier_data['x'], plier_data['y'], plier_data['theta']
-    #     )
-
-    #     if pid not in self.plier_items:
-    #         # Pliers are small, let's say 3cm (0.03m) circles
-    #         r_px, _ = self.size_to_scene(0.03, 0.03)
-    #         circle = QtWidgets.QGraphicsEllipseItem(-r_px/2, -r_px/2, r_px, r_px)
-    #         circle.setPen(QtGui.QPen(QtCore.Qt.black))
-    #         self.scene.addItem(circle)
-    #         self.plier_items[pid] = circle
-
-    #     item = self.plier_items[pid]
-    #     px, py = self.pos_to_scene(gx, gy)
-        
-    #     item.setPos(px, py)
-        
-    #     # --- THE FIX ---
-    #     item.setRotation(90 - (gt * 180 / math.pi))
-
-    #     state = plier_data.get('state', -1)
-    #     brush_color = QtGui.QColor(0, 255, 0) if state >= 0 else QtGui.QColor(255, 255, 255)
-    #     item.setBrush(QtGui.QBrush(brush_color))
+        # 5. Draw Top N Release Paths (Shades of Green)
+        green_shades = [QtGui.QColor(0, 255, 0, 200), QtGui.QColor(150, 255, 0, 200), QtGui.QColor(200, 255, 100, 200)]
+        drawn_zone_paths = []
+        for zone in valid_zones:
+            if len(drawn_zone_paths) >= self.max_paths_to_show: 
+                break
+            
+            if zone['path'] in drawn_zone_paths: 
+                continue
+                
+            is_best = (len(drawn_zone_paths) == 0)
+            draw_trajectory(zone['path'], green_shades[len(drawn_zone_paths) % 3], is_best)
+            drawn_zone_paths.append(zone['path'])
 
 class DraggablePixmapItem(QtWidgets.QGraphicsPixmapItem):
     """Drag items on the Map."""

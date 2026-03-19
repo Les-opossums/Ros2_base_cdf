@@ -360,45 +360,61 @@ class ActionManager(Node):
 
     def full_state_callback(self, request, response):
         """Service callback to dump the entire board state for map initialization."""
-        full_state = {'crates': [], 'pliers': []}
+        # --- THE FIX: Add 'zones' to the initialization dictionary ---
+        full_state = {'crates': [], 'pliers': [], 'zones': []}
 
         for cid, crate in self.haz_crates.items():
             full_state['crates'].append({
                 'id': cid, 'x': round(crate.x, 3), 'y': round(crate.y, 3),
                 'theta': round(crate.theta, 3), 'state': crate.state, 'color': crate.color, 
                 'reward': crate.pick_reward,
-                'path': crate.best_pick_path  # <-- SEND THE PATH HERE TOO
+                'path': crate.best_pick_path  
             })
 
         # Dump all pliers
         for pid, plier in self.pliers.items():
             full_state['pliers'].append({
                 'id': pid, 'x': round(plier.x, 3), 'y': round(plier.y, 3),
-                'theta': round(plier.theta, 3), 'state': plier.state
+                'theta': round(plier.theta, 3), 'state': plier.state,
+                'is_running': plier.is_running  # <-- THE FIX: Added to match the publisher!
             })
+
+        # --- THE FIX: Dump all zones ---
+        if hasattr(self, 'zones'):
+            for zid, zone in self.zones.items():
+                full_state['zones'].append({
+                    'id': zid, 
+                    'x': round(zone.x, 3), 
+                    'y': round(zone.y, 3),
+                    'reward': zone.release_reward,
+                    'path': zone.best_release_path
+                })
 
         # Return it directly in the service response string
         response.success = True
         response.message = json.dumps(full_state)
         
-        # Optional: You can also reset last_sent_state here so the next timer 
-        # tick forces a full delta update, just to be safe.
-        self.last_sent_state = {'crates': {}, 'pliers': {}}
+        # --- THE FIX: Add 'zones' to the reset dictionary so the delta publisher works correctly ---
+        self.last_sent_state = {'crates': {}, 'pliers': {}, 'zones': {}}
         
         self.get_logger().info("Full board state sent to map via service.")
         return response
 
     def publish_board_state(self):
-        """Publish only the crates and pliers that have changed."""
-        if not hasattr(self, 'haz_crates') or not hasattr(self, 'pliers'):
+        """Publish only the crates, pliers, and zones that have changed."""
+        # Make sure we have the required attributes
+        if not hasattr(self, 'haz_crates') or not hasattr(self, 'pliers') or not hasattr(self, 'zones'):
             return
 
-        updates = {'crates': [], 'pliers': []}
+        # --- THE FIX: Add 'zones' to the updates dictionary ---
+        updates = {'crates': [], 'pliers': [], 'zones': []}
+
+        # Ensure 'zones' exists in the last_sent_state dictionary
+        if 'zones' not in self.last_sent_state:
+            self.last_sent_state['zones'] = {}
 
         # 1. Check Crates for changes
         for cid, crate in self.haz_crates.items():
-            # --- THE FIX: We added crate.pick_reward to the tuple! ---
-            # Now, if the score changes (even if the crate doesn't move), it sends the update to the GUI!
             current_state = (round(crate.x, 3), round(crate.y, 3), round(crate.theta, 3), 
                              crate.state, crate.color, round(crate.pick_reward, 2))
             last_state = self.last_sent_state['crates'].get(cid)
@@ -408,13 +424,12 @@ class ActionManager(Node):
                     'id': cid, 'x': current_state[0], 'y': current_state[1],
                     'theta': current_state[2], 'state': current_state[3], 'color': current_state[4], 
                     'reward': crate.pick_reward,
-                    'path': crate.best_pick_path # <-- SEND THE PATH TO THE GUI
+                    'path': crate.best_pick_path
                 })
                 self.last_sent_state['crates'][cid] = current_state
 
         # 2. Check Pliers for changes
         for pid, plier in self.pliers.items():
-            # Add plier.is_running to the tuple so it triggers an update when it changes!
             current_state = (round(plier.x, 3), round(plier.y, 3), round(plier.theta, 3), plier.state, plier.is_running)
             last_state = self.last_sent_state['pliers'].get(pid)
             
@@ -422,12 +437,29 @@ class ActionManager(Node):
                 updates['pliers'].append({
                     'id': pid, 'x': current_state[0], 'y': current_state[1],
                     'theta': current_state[2], 'state': current_state[3],
-                    'is_running': plier.is_running  # <-- ADD THIS
+                    'is_running': plier.is_running 
                 })
                 self.last_sent_state['pliers'][pid] = current_state
 
-        # 3. Only publish if there is actually something new!
-        if updates['crates'] or updates['pliers']:
+        # 3. --- NEW: Check Zones for changes ---
+        for zid, zone in self.zones.items():
+            # Track changes based on reward (if reward changes, the path likely changed too)
+            # Assuming zone has x, y attributes based on your GUI implementation
+            current_state = (round(zone.x, 3), round(zone.y, 3), round(zone.release_reward, 2))
+            last_state = self.last_sent_state['zones'].get(zid)
+            
+            if current_state != last_state:
+                updates['zones'].append({
+                    'id': zid, 
+                    'x': current_state[0], 
+                    'y': current_state[1],
+                    'reward': zone.release_reward,
+                    'path': zone.best_release_path
+                })
+                self.last_sent_state['zones'][zid] = current_state
+
+        # 4. Only publish if there is actually something new in ANY of the lists!
+        if updates['crates'] or updates['pliers'] or updates['zones']:
             msg = String()
             msg.data = json.dumps(updates)
             self.pub_board_state.publish(msg)
@@ -1224,12 +1256,6 @@ class ActionManager(Node):
         
         # 4. The global angle is simply the robot's angle plus the actuator's angle
         crate.theta = rt + plier.theta
-    
-    def vaccumgripper(self, vg: VACCUMGRIPPER_struct):
-        """Compute the pump action."""
-        if not self.stop:
-            self.pub_command.publish(String(data=f"PINCE {vg.id} {vg.mode} {vg.side}"))
-            time.sleep(0.1)
 
     def led(self, led: LED_struct):
         """Compute the led action."""
@@ -1328,23 +1354,27 @@ class ActionManager(Node):
             stack_ids_only = []
             
             for crate in available_crates:
-                if crate.id not in visited:
-                    # Run a quick BFS to collect all crates connected in this specific row
-                    component = []
-                    queue = [crate.id]
-                    
-                    while queue:
-                        curr = queue.pop(0)
-                        if curr not in visited:
-                            visited.add(curr)
-                            component.append(curr)
-                            # Add all valid neighbors to the queue
-                            queue.extend([neighbor for neighbor in adjacency[curr] if neighbor not in visited])
-                    
-                    # 4. Enforce the Max 4 Rule
-                    # If we found 5 crates in a row, slice it into [4] and [1]
-                    for i in range(0, len(component), 4):
-                        stack_ids_only.append(component[i:i+4])
+                if crate.id in visited:
+                    continue
+    
+                # Run a quick BFS to collect all crates connected in this specific row
+                component = []
+                queue = [crate.id]
+                
+                while queue:
+                    curr = queue.pop(0)
+                    if curr in visited:
+                        continue
+
+                    visited.add(curr)
+                    component.append(curr)
+                    # Add all valid neighbors to the queue
+                    queue.extend([neighbor for neighbor in adjacency[curr] if neighbor not in visited])
+                
+                # 4. Enforce the Max 4 Rule
+                # If we found 5 crates in a row, slice it into [4] and [1]
+                for i in range(0, len(component), 4):
+                    stack_ids_only.append(component[i:i+4])
                         
         return stack_ids_only
 
