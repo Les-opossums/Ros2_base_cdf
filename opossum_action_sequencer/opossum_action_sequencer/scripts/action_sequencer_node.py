@@ -1410,10 +1410,7 @@ class ActionManager(Node):
                         best_release_pos = best_zone.best_release_pos
                         action = "RELEASE"
                     else:
-                        # action = "FINAL_ZONE"
-                        rel_path = best_zone.best_release_path
-                        best_release_pos = best_zone.best_release_pos
-                        action = "RELEASE"
+                        action = "FINAL_ZONE"
                 else:
                     # Find the highest scoring crate
                     best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
@@ -1473,9 +1470,11 @@ class ActionManager(Node):
                         self.get_logger().info("No final zone defined (no color received). Skipping.")
                         time.sleep(1.0)
                         continue
-                    final_pos = Position(self.final_zone["x"], self.final_zone["y"], 0.0)
+
+                self.move_to(Position(self.final_zone["x"], 1.2, 0.0))
+                self.wait_for_motion()
                      
-                self.move_to(final_pos)
+                self.move_to(Position(self.final_zone["x"], self.final_zone["y"], 0.0))
                 self.wait_for_motion()
                  
                 with self.data_lock:
