@@ -279,11 +279,11 @@ class ActionManager(Node):
             callback_group=self.cb_group
         )
         self.pub_timer = self.create_timer(0.2, self.publish_board_state,callback_group=self.cb_group)
-        self.timer_planner = self.create_timer(
-            0.5, 
-            self.continuous_planner_callback, 
-            callback_group=self.cb_group
-        )
+        # self.timer_planner = self.create_timer(
+        #     0.5, 
+        #     self.continuous_planner_callback, 
+        #     callback_group=self.cb_group
+        # )
     def _init_move_timer(self):
         self.move_timer = self.create_timer(
             2,
@@ -1416,7 +1416,7 @@ class ActionManager(Node):
         id_steal = 0
 
         while not self.match_finished:
-            
+            self.continuous_planner_callback()
             action = None
             
             # =================================================================
