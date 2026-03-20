@@ -1466,31 +1466,31 @@ class ActionManager(Node):
             # =================================================================
             # 3. EXECUTE FINAL ZONE FALLBACK
             # =================================================================
-            # elif action == "FINAL_ZONE":
-            #     self.get_logger().info("Cannot find release zone. Going to final zone.")
-            #     with self.data_lock:
-            #         if self.final_zone is None:
-            #             self.get_logger().info("No final zone defined (no color received). Skipping.")
-            #             time.sleep(1.0)
-            #             continue
-            #         final_pos = Position(self.final_zone["x"], self.final_zone["y"], 0.0)
-            #         
-            #     self.move_to(final_pos)
-            #     self.wait_for_motion()
-            #     
-            #     with self.data_lock:
-            #         id_active_pliers_all = {}
-            #         for pid, plier in self.pliers.items():
-            #             if plier.state != -1:
-            #                 id_active_pliers_all[pid] = ["drop", plier.state]
-            #                 
-            #     self.send_plier_cmd(id_active_pliers_all)
-            #     self.wait_for_plier()
-            #     
-            #     with self.data_lock:
-            #         for pl_id in id_active_pliers_all:
-            #             self.pliers[pl_id].state = -1
-            #     continue
+            elif action == "FINAL_ZONE":
+                self.get_logger().info("Cannot find release zone. Going to final zone.")
+                with self.data_lock:
+                    if self.final_zone is None:
+                        self.get_logger().info("No final zone defined (no color received). Skipping.")
+                        time.sleep(1.0)
+                        continue
+                    final_pos = Position(self.final_zone["x"], self.final_zone["y"], 0.0)
+                     
+                self.move_to(final_pos)
+                self.wait_for_motion()
+                 
+                with self.data_lock:
+                    id_active_pliers_all = {}
+                    for pid, plier in self.pliers.items():
+                        if plier.state != -1:
+                            id_active_pliers_all[pid] = ["drop", plier.state]
+                           
+                self.send_plier_cmd(id_active_pliers_all)
+                self.wait_for_plier()
+                
+                with self.data_lock:
+                    for pl_id in id_active_pliers_all:
+                        self.pliers[pl_id].state = -1
+                continue
 
             # =================================================================
             # 4. EXECUTE PICK
