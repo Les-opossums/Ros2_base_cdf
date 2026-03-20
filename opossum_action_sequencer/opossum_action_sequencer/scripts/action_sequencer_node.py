@@ -232,11 +232,6 @@ class ActionManager(Node):
         self.final_zone_mapping = data['final_zone']
 
         # Process objects with cam
-        self.barycentre = None
-        self.centering = False
-        self.list_objects = []
-        self.is_center = False
-        self.try_center = 0
         self.rect = (0.45, 2.55, 0.45, 1.1) if self.board_config == "objects" else (0.45, 0.55, 0.45, 1.1)
 
     def _init_parameters(self) -> None:
@@ -655,29 +650,6 @@ class ActionManager(Node):
         self.send_raw("LED 20 0 0 255")
         self.get_logger().info("Finished staring go back to match.")
 
-    def begin_centering(self):
-        self.centering = True
-        self.list_objects = []
-        self.barycentre = None
-
-    def center_front_stack(self):
-        if self.barycentre is not None:
-            self.try_center = 0
-            self.get_logger().info(f"Barycentre: {self.barycentre}")
-            self.relative_move_to(Position(self.barycentre[0], self.barycentre[1], 3.14159 - self.robot_pos.t))
-            self.wait_for_motion()
-
-            time.sleep(0.25)
-            self.begin_centering()
-            time.sleep(1.0)
-            if self.barycentre is not None:
-                while abs(self.barycentre[0]- 0.22) > 0.005 or abs(self.barycentre[1]) > 0.005 and self.try_center < 4:
-                    self.get_logger().info(f"Barycentre: {self.barycentre}")
-                    self.relative_move_to(Position(self.barycentre[0], self.barycentre[1], 3.14159 - self.robot_pos.t))
-                    self.wait_for_motion()
-                    self.try_center += 1
-                    time.sleep(0.25)
-
     def parameter_event_callback(self, event):
         """Handle the parameters event."""
         
@@ -1043,6 +1015,7 @@ class ActionManager(Node):
                 command = f"MOVE {pos.x} {pos.y} {pos.t}"
             self.pub_command.publish(String(data=command))
             self.pos_obj = Position(x=pos.x, y=pos.y, t=pos.t)
+            # self.get_logger().info(f'Move To {pos.x}, {pos.y}, {pos.t}')
             self.motion_done_event.clear()  # Block the wait
 
     def follow_ennemi(self):
@@ -1407,8 +1380,11 @@ class ActionManager(Node):
                         
         return stack_ids_only
 
+    def centering(self):
+        pass
+
     def smart_moves(self):
-        self.send_raw("VMAX 0.7")
+        self.send_raw("VMAX 0.4")
         self.send_raw("VTMAX 1.5")
         
         activate_check_stack = False
@@ -1434,7 +1410,10 @@ class ActionManager(Node):
                         best_release_pos = best_zone.best_release_pos
                         action = "RELEASE"
                     else:
-                        action = "FINAL_ZONE"
+                        # action = "FINAL_ZONE"
+                        rel_path = best_zone.best_release_path
+                        best_release_pos = best_zone.best_release_pos
+                        action = "RELEASE"
                 else:
                     # Find the highest scoring crate
                     best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
@@ -1487,31 +1466,31 @@ class ActionManager(Node):
             # =================================================================
             # 3. EXECUTE FINAL ZONE FALLBACK
             # =================================================================
-            elif action == "FINAL_ZONE":
-                self.get_logger().info("Cannot find release zone. Going to final zone.")
-                with self.data_lock:
-                    if self.final_zone is None:
-                        self.get_logger().info("No final zone defined (no color received). Skipping.")
-                        time.sleep(1.0)
-                        continue
-                    final_pos = Position(self.final_zone["x"], self.final_zone["y"], 0.0)
-                    
-                self.move_to(final_pos)
-                self.wait_for_motion()
-                
-                with self.data_lock:
-                    id_active_pliers_all = {}
-                    for pid, plier in self.pliers.items():
-                        if plier.state != -1:
-                            id_active_pliers_all[pid] = ["drop", plier.state]
-                            
-                self.send_plier_cmd(id_active_pliers_all)
-                self.wait_for_plier()
-                
-                with self.data_lock:
-                    for pl_id in id_active_pliers_all:
-                        self.pliers[pl_id].state = -1
-                continue
+            # elif action == "FINAL_ZONE":
+            #     self.get_logger().info("Cannot find release zone. Going to final zone.")
+            #     with self.data_lock:
+            #         if self.final_zone is None:
+            #             self.get_logger().info("No final zone defined (no color received). Skipping.")
+            #             time.sleep(1.0)
+            #             continue
+            #         final_pos = Position(self.final_zone["x"], self.final_zone["y"], 0.0)
+            #         
+            #     self.move_to(final_pos)
+            #     self.wait_for_motion()
+            #     
+            #     with self.data_lock:
+            #         id_active_pliers_all = {}
+            #         for pid, plier in self.pliers.items():
+            #             if plier.state != -1:
+            #                 id_active_pliers_all[pid] = ["drop", plier.state]
+            #                 
+            #     self.send_plier_cmd(id_active_pliers_all)
+            #     self.wait_for_plier()
+            #     
+            #     with self.data_lock:
+            #         for pl_id in id_active_pliers_all:
+            #             self.pliers[pl_id].state = -1
+            #     continue
 
             # =================================================================
             # 4. EXECUTE PICK
@@ -1565,6 +1544,7 @@ class ActionManager(Node):
                             self.move_to(Position(wp[0], wp[1], final_robot_theta))
                         self.wait_for_motion()
                 self.stare_and_update()
+                self.centering()
 
                 if activate_check_stack:
                     is_ghost = False
@@ -1579,9 +1559,11 @@ class ActionManager(Node):
 
                 if not activate_check_stack or abs(self.angular_distance(best_camera_theta, final_robot_theta)) > 0.05:
                     self.move_to(Position(entry_point[0], entry_point[1], final_robot_theta))
+                    # self.get_logger().info(f'Entry Point {entry_point[0]}, {entry_point[1]}, {final_robot_theta}')
                     self.wait_for_motion()
 
                 self.move_to(final_pos)
+                # self.get_logger().info(f'Final Pose {final_pos.x}, {final_pos.y}, {final_robot_theta}')
                 self.wait_for_motion()
 
                 with self.data_lock:
