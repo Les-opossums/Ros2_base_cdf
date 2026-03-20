@@ -176,6 +176,7 @@ class ActionManager(Node):
         self.f_zone_x_max = 2.4 + self.robot_radius  # 2.65
         self.f_zone_y_min = 1.55 - self.robot_radius # 1.30
         self.f_zone_y_max = 2.0                      # Capped at top
+        self.final_zone = None
 
     def is_point_safe(self, x, y):
         """Check if a point is within boundaries and outside forbidden zones."""
@@ -228,7 +229,7 @@ class ActionManager(Node):
         for id, zone in data['zones'].items():
             self.zones[id] = ZoneRelease(id, zone['x'], zone['y'], zone['size'])
         
-        self.final_zone = data['final_zone']
+        self.final_zone_mapping = data['final_zone']
 
         # Process objects with cam
         self.barycentre = None
@@ -741,7 +742,7 @@ class ActionManager(Node):
 
     def color_callback(self, msg):
         self.color = 0 if msg.data.lower() == "yellow" else 1
-        self.final_zone = self.final_zone[self.color]
+        self.final_zone = self.final_zone_mapping[self.color]
 
     def feedback_callback(self, msg):
         """Receive the data from Zynq."""
@@ -1489,6 +1490,10 @@ class ActionManager(Node):
             elif action == "FINAL_ZONE":
                 self.get_logger().info("Cannot find release zone. Going to final zone.")
                 with self.data_lock:
+                    if self.final_zone is None:
+                        self.get_logger().info("No final zone defined (no color received). Skipping.")
+                        time.sleep(1.0)
+                        continue
                     final_pos = Position(self.final_zone["x"], self.final_zone["y"], 0.0)
                     
                 self.move_to(final_pos)
@@ -1788,6 +1793,10 @@ class ActionManager(Node):
         r_cx = abs(hl * cos_t) + abs(hw * sin_t)
         r_cy = abs(hl * sin_t) + abs(hw * cos_t)
         
+        if self.final_zone is None:
+            self.get_logger().info(f"Final zone not set. Skipping the check in final zone considering false.")
+            return False
+
         zx = self.final_zone['x']
         zy = self.final_zone['y']
         hz = self.final_zone['size'] / 2.0  # Zone half-size
