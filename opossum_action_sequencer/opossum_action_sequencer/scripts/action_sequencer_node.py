@@ -815,7 +815,7 @@ class ActionManager(Node):
             # A. SCORE ALL PICKUP OPTIONS
             # =================================================================
             # 1. Reset all crate scores to negative infinity
-            for crate in self.haz_crates.values():
+            for crate in list(self.haz_crates.values()):
                 crate.pick_reward = float('-inf')
                 
             current_stacks = self.generate_current_stacks()
@@ -892,7 +892,7 @@ class ActionManager(Node):
             if not self.any_plier_used():
                 return
                 
-            for z_id, zone in self.zones.items():
+            for z_id, zone in list(self.zones.items()):
                 zone.release_reward = float('-inf')
                 
                 # Check if occupied
