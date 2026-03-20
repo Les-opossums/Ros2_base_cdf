@@ -263,7 +263,7 @@ class VisionNode(Node):
                 loc_msg.robot_position.y = float(splitted_data[2])/1000
                 loc_msg.robot_position.z = float(splitted_data[3]) 
                 loc_msg.camera_id = int(splitted_data[4])
-                self.camera_log_pub.publish(loc_msg)
+                # self.camera_log_pub.publish(loc_msg)
             except Exception as e:
                 self.get_logger().warn(
                     f"The splitted data was {splitted_data} and got: {e}"
