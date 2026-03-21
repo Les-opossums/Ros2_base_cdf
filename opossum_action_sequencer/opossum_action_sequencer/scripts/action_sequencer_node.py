@@ -990,10 +990,10 @@ class ActionManager(Node):
             self.get_logger().warn("Stopping script")
             self.stop = True
             self.is_ended = True
-            self.send_raw("BLOCK")
+            self.send_raw("FREE")
             self.end_match_event.set()
             time.sleep(0.1)
-            self.send_raw("BLOCK")
+            self.send_raw("FREE")
             self.script_instance = None
             self.script_thread = None
 

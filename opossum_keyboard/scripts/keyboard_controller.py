@@ -176,9 +176,9 @@ class KeyboardController(Node):
         if self.last_command_sent == "BLOCK":
             return
         cmd_msg = String()
-        cmd_msg.data = "BLOCK"
+        cmd_msg.data = "FREE"
         self.pub_command.publish(cmd_msg)
-        self.last_command_sent = "BLOCK"
+        self.last_command_sent = "FREE"
 
     def _send_move(self, x, y, t) -> None:
         """Send move to motors."""
