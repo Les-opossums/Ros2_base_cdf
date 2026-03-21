@@ -1233,7 +1233,7 @@ class ActionManager(Node):
         pass
 
     def smart_moves(self):
-        self.send_raw("VMAX 0.4")
+        self.send_raw("VMAX 0.8")
         self.send_raw("VTMAX 1.5")
         
         id_steal = 0
