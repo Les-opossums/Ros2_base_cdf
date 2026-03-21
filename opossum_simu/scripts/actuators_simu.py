@@ -97,7 +97,11 @@ class ActuatorsSimu(Node):
             
             # 1. Safely update the initial states
             with self.state_lock:
-                if side == 2:
+                if id == 10 and mode == 0 and side == 0:
+                    for pid in self.states.keys():
+                        if pid.startswith("PINCE"):
+                            self.states[pid] = 2
+                elif side == 2:
                     if mode == 4:
                         self.states[f"PINCE{id * 2}"] = 2
                         self.states[f"PINCE{id * 2 + 1}"] = 3
@@ -133,6 +137,10 @@ class ActuatorsSimu(Node):
                 
             # 4. Safely update the final states after the sleep
             with self.state_lock:
+                if id == 10 and mode == 0 and side == 0:
+                    for pid in self.states.keys():
+                        if pid.startswith("PINCE"):
+                            self.states[pid] = 0
                 if side == 2:
                     self.states[f"PINCE{id * 2}"] = end_mode1
                     self.states[f"PINCE{id * 2 + 1}"] = end_mode2
@@ -146,7 +154,7 @@ class ActuatorsSimu(Node):
             self.pub_change_state.publish(Int64(data=state_vector))
             
             # Format the response with the calculated success values
-            response.response = f"PINCEFEEDBACK,{request_split[1]},{request_split[2]},{succ1},{succ2}"
+            response.response = f"PINCEFEEDBACK,{id},{mode},{succ1},{succ2}"
 
         return response
 

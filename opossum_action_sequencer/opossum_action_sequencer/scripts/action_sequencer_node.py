@@ -757,28 +757,35 @@ class ActionManager(Node):
         elif msg.data.startswith("PINCEFEEDBACK"):
             data = msg.data.split()[1:]
             cmd_id = int(data[0])
-            
-            # Map the two success bits and the two plier objects
-            # v0 = data[2], v1 = data[3]
-            results = [
-                (int(data[2]), self.pliers[cmd_id * 2], "first"),
-                (int(data[3]), self.pliers[cmd_id * 2 + 1], "second")
-            ]
+            if cmd_id == 10:
+                for plier in self.pliers.values():
+                    if plier.is_running:
+                        plier.is_running = False
+                        # crate = self.haz_crates[plier.state]
+                        # crate.state = -1
+                        # plier.state = -1
+            else:
+                # Map the two success bits and the two plier objects
+                # v0 = data[2], v1 = data[3]
+                results = [
+                    (int(data[2]), self.pliers[cmd_id * 2], "first"),
+                    (int(data[3]), self.pliers[cmd_id * 2 + 1], "second")
+                ]
 
-            for success_bit, plier, label in results:
-                # CRITICAL: Only check success IF the plier was actually told to move
-                if plier.is_running:
-                    plier.is_running = False
-                    
-                    # If firmware reports 0 while we expected a success
-                    if not success_bit and plier.state != -1:
-                        crate = self.haz_crates[plier.state]
-                        self.get_logger().warn(f"The {label} plier of ID {cmd_id} failed.")
+                for success_bit, plier, label in results:
+                    # CRITICAL: Only check success IF the plier was actually told to move
+                    if plier.is_running:
+                        plier.is_running = False
                         
-                        # Reset tracking
-                        crate.state = -1
-                        crate.attempts += 1
-                        plier.state = -1
+                        # If firmware reports 0 while we expected a success
+                        if not success_bit and plier.state != -1:
+                            crate = self.haz_crates[plier.state]
+                            self.get_logger().warn(f"The {label} plier of ID {cmd_id} failed.")
+                            
+                            # Reset tracking
+                            crate.state = -1
+                            crate.attempts += 1
+                            plier.state = -1
 
             # Global check to release the event loop
             if not any(pl.is_running for pl in self.pliers.values()):
@@ -986,10 +993,16 @@ class ActionManager(Node):
         self.navigate_path(path, 0.0)
             
         with self.data_lock:
+            self.send_raw("PINCE 10 0 0")
             id_active_pliers_all = {}
-            for pid, plier in self.pliers.items():
-                if plier.state != -1:
-                    id_active_pliers_all[pid] = ["drop", plier.state]
+            for plier in self.pliers.values():
+                if plier.state == -1:
+                    continue
+                crate = self.haz_crates[plier.state]
+                plier.state = -1
+                plier.is_running = True
+                crate.state = -1
+                self.update_crate_pos(plier, crate)
 
         self.send_plier_cmd(id_active_pliers_all, self.haz_crates)
         self.wait_for_plier()
@@ -1025,6 +1038,8 @@ class ActionManager(Node):
         )
 
         list_enn = msg.other_robot_position
+        if len(list_enn) == 0:
+            return
         closer = np.sqrt((list_enn[0].x - msg.robot_position.x) ** 2 + (list_enn[0].y - msg.robot_position.y) ** 2)
         self.x_enn = list_enn[0].x
         self.y_enn = list_enn[0].y
@@ -1275,7 +1290,7 @@ class ActionManager(Node):
         pass
 
     def smart_moves(self):
-        self.send_raw("VMAX 0.8")
+        self.send_raw("VMAX 0.4")
         self.send_raw("VTMAX 1.5")
         
         id_steal = 0
