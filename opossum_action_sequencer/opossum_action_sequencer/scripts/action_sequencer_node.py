@@ -1409,7 +1409,7 @@ class ActionManager(Node):
         self.send_raw("VTMAX 1.5")
         
         activate_check_stack = False
-        steal_poses = [[0.45, 1.1], [2.55, 1.1], [2.55, 0.45], [0.45, 0.45]]
+        steal_poses = [[0.47, 1.1], [2.53, 1.1], [2.53, 0.45], [0.47, 0.45]]
         id_steal = 0
 
         while not self.backstage_sequence:
