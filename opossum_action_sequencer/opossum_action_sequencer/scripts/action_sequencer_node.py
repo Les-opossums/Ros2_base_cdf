@@ -197,6 +197,20 @@ class ActionManager(Node):
             
         return True
 
+    def is_position_fully_safe(self, x, y, ignored_crate_id=None):
+        # 1. Check static forbidden zones (Your existing function)
+        if not self.is_point_safe(x, y):
+            return False
+
+        # 2. Check dynamic crates (New check)
+        # We use 0.33 because: Robot(0.25) + CrateHalfWidth(0.075) + Buffer(0.005)
+        for cid, crate in self.haz_crates.items():
+            if cid == ignored_crate_id or crate.state != -1:
+                continue
+            if math.hypot(x - crate.x, y - crate.y) < 0.25:
+                return False
+        return True
+
     def _init_mapping(self):
         objects_path = os.path.join(
             get_package_share_directory("opossum_bringup"), "config", str(self.year), f"{self.board_config}.yaml"
@@ -276,7 +290,7 @@ class ActionManager(Node):
             callback_group=self.cb_group
         )
         self.timer_backstage = self.create_timer(
-            93.0,
+            92.0,
             self.timer_backstage_callback,
             callback_group=self.cb_group
         )
@@ -525,7 +539,7 @@ class ActionManager(Node):
         self.get_logger().info("Staring... waiting for camera to settle.")
         
         # 1. Wait for physical motion blur to clear
-        time.sleep(0.3) 
+        time.sleep(0.2) 
         
         if time.time() - self.last_camera_timestamp > 0.2:
             return
@@ -775,9 +789,6 @@ class ActionManager(Node):
             return
 
         with self.data_lock:
-            start_pos = (self.robot_pos.x, self.robot_pos.y)
-            x_min, x_max, y_min, y_max = self.rect
-
             # =================================================================
             # A. SCORE ALL PICKUP OPTIONS
             # =================================================================
@@ -828,13 +839,7 @@ class ActionManager(Node):
                     target_pos = (ex, ey)
                     
                     # Check Path
-                    if self.is_direct_path_clear(start_pos, target_pos, target_crate_id=primary_id):
-                        dist = math.hypot(ex - start_pos[0], ey - start_pos[1])
-                        path = [start_pos, target_pos]
-                    else:
-                        path, dist = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
-                        if len(path) >= 2 and not self.is_direct_path_clear(path[-2], target_pos, target_crate_id=primary_id):
-                            dist = float('inf')
+                    path, dist = self.get_best_path(target_pos, target_crate_id=primary_id, allow_critical=False)
 
                     if dist < best_dist:
                         best_dist = dist
@@ -887,13 +892,7 @@ class ActionManager(Node):
                         
                     target_pos = (pos[0], pos[1])
                     
-                    if self.is_direct_path_clear(start_pos, target_pos):
-                        dist = math.hypot(pos[0] - start_pos[0], pos[1] - start_pos[1])
-                        path = [start_pos, target_pos]
-                    else:
-                        path, dist = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
-                        if len(path) >= 2 and not self.is_direct_path_clear(path[-2], target_pos):
-                            dist = float('inf')
+                    path, dist = self.get_best_path(target_pos, allow_critical=False)
                             
                     if dist < best_dist:
                         best_dist = dist
@@ -936,12 +935,19 @@ class ActionManager(Node):
         self.send_raw("VMAX 0.5")
         self.get_logger().info("Cannot find release zone. Going to final zone.")
         
-        self.move_to(Position(self.final_zone["x"], 1.2, 0.0))
-        self.wait_for_motion()
-                
-        self.move_to(Position(self.final_zone["x"], self.final_zone["y"], 0.0))
-        self.get_logger().info(f"Move to: {self.final_zone['x']}, {self.final_zone['y']}")
-        self.wait_for_motion()
+        # self.move_to(Position(self.final_zone["x"], 1.2, 0.0))
+        # self.wait_for_motion()
+        if self.color == 0:
+            e_zone = (0.45, 1.2)
+        elif self.color == 1:
+            e_zone = (1.55, 1.2)
+        else:
+            e_zone = (0.45, 1.1)
+        path, _ = self.get_best_path(e_zone, allow_critical=True)
+        self.navigate_path(path, 0.0)
+
+        path, _ = self.get_best_path((self.final_zone["x"], self.final_zone["y"]), allow_critical=True)
+        self.navigate_path(path, 0.0)
             
         with self.data_lock:
             id_active_pliers_all = {}
@@ -1300,13 +1306,8 @@ class ActionManager(Node):
                     pliers_theta = self.pliers[id_side * 4].theta if id_side is not None else 0.0
                     
                 target_angle = best_release_pos[2] - pliers_theta
-
-                if len(rel_path) > 1:
-                    for wp in rel_path[1:]:
-                        if self.backstage_sequence:
-                            break
-                        self.move_to(Position(wp[0], wp[1], target_angle))
-                        self.wait_for_motion()
+                
+                self.navigate_path(rel_path, target_angle)
                 if self.backstage_sequence:
                     break
                 self.stare_and_update(self.haz_crates)
@@ -1463,98 +1464,15 @@ class ActionManager(Node):
             elif action == "EXPLORE":
                 self.get_logger().info("Nothing to do: Exploring / Stealing...")
                 pos = self.steal_poses[id_steal % len(self.steal_poses)]
+
+                if self.backstage_sequence:
+                    break
                 
-                with self.data_lock:
-                    in_bounds = (self.boundaries[0] + 0.25 < pos[0] < self.boundaries[1] - 0.25 and 
-                                 self.boundaries[2] + 0.25 < pos[1] < self.boundaries[3] - 0.25)
-                
-                if in_bounds:
-                    if self.backstage_sequence:
-                        break
-                    self.move_to(Position(pos[0], pos[1], (id_steal * 2.3998) % (2 * np.pi)))
-                    self.wait_for_motion()
-                    self.stare_and_update(self.haz_crates)
+                path, _ = self.get_best_path((pos[0], pos[1]), allow_critical=True)
+                self.navigate_path(path, (id_steal * 2.3998) % (2 * np.pi))
+                self.stare_and_update(self.haz_crates)
                     
                 id_steal += 1
-                time.sleep(0.1)
-
-    def get_safe_perimeter_path(self, target_pos):
-        """
-        Finds the shortest path along a safe rectangle perimeter to a target.
-        
-        robot_pos: (x, y) tuple of the robot
-        target_pos: (x, y) tuple of the object to grab
-        rect: (x_min, x_max, y_min, y_max) tuple defining the safe perimeter
-        """
-        x_min, x_max, y_min, y_max = self.rect
-        cx, cy = (x_min + x_max) / 2.0, (y_min + y_max) / 2.0  # Center of rect
-        robot_pos = (self.robot_pos.x, self.robot_pos.y) 
-        # 1. Project a point to the nearest edge of the rectangle
-        def project_to_edge(x, y):
-            px = max(x_min, min(x, x_max))
-            py = max(y_min, min(y, y_max))
-            # If strictly inside the rectangle, push it to the nearest edge
-            if x_min < px < x_max and y_min < py < y_max:
-                dists = {
-                    (x_min, py): px - x_min,
-                    (x_max, py): x_max - px,
-                    (px, y_min): py - y_min,
-                    (px, y_max): y_max - py
-                }
-                px, py = min(dists, key=dists.get)
-            return round(px, 4), round(py, 4)
-
-        # 2. Find where Robot ENTERS the ring, and where it DIVES for the object
-        entry = project_to_edge(*robot_pos)
-        dive = project_to_edge(*target_pos)
-
-        # 3. Gather all points on our Ring Road and remove duplicates
-        perimeter_points = [
-            (x_min, y_max), (x_max, y_max), # Top-Left, Top-Right
-            (x_max, y_min), (x_min, y_min), # Bottom-Right, Bottom-Left
-            entry, dive
-        ]
-        perimeter_points = list(set(perimeter_points)) 
-        
-        # 4. The Math Trick: Sort points by their angle from the center!
-        # This perfectly orders them counter-clockwise around the rectangle.
-        perimeter_points.sort(key=lambda p: math.atan2(p[1] - cy, p[0] - cx))
-        
-        i_entry = perimeter_points.index(entry)
-        i_dive = perimeter_points.index(dive)
-        n = len(perimeter_points)
-        
-        # 5. Extract the two possible paths (Clockwise & Counter-Clockwise)
-        path_ccw, path_cw = [], []
-        
-        i = i_entry
-        while True:
-            path_ccw.append(perimeter_points[i])
-            if i == i_dive: break
-            i = (i + 1) % n  # Step forward
-            
-        i = i_entry
-        while True:
-            path_cw.append(perimeter_points[i])
-            if i == i_dive: break
-            i = (i - 1) % n  # Step backward
-
-        # 6. Calculate total distances to pick the shortest one
-        def calc_dist(path):
-            return sum(math.hypot(path[j][0]-path[j-1][0], path[j][1]-path[j-1][1]) for j in range(1, len(path)))
-
-        best_perimeter_path = path_ccw if calc_dist(path_ccw) < calc_dist(path_cw) else path_cw
-
-        # 7. Add the starting robot position and final object position
-        final_path = [robot_pos] + best_perimeter_path + [target_pos]
-        
-        # Clean up redundant points (e.g., if robot is already on the entry point)
-        cleaned_path = []
-        for p in final_path:
-            if not cleaned_path or cleaned_path[-1] != p:
-                cleaned_path.append(p)
-                
-        return cleaned_path, calc_dist(cleaned_path)
 
     def get_mean_pose(self, objects):
         """Calcule la position moyenne (x, y, theta_circulaire) d'une liste d'objets."""
@@ -1821,14 +1739,7 @@ class ActionManager(Node):
         diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi
         return abs(diff)
 
-    def any_plier_side_available(self):
-        for side in range(4):
-            if any(self.pliers[pl_id].state >= 0 for pl_id in range(side * 4, (side + 1) * 4)):
-                continue
-            return True
-        return False
-
-    def get_street_grid_path(self, start, target, x_min, x_max, y_min, y_max):
+    def get_street_grid_path(self, start, target, margin=0.23):
         import heapq
         
         def pt(x, y): return (round(x, 4), round(y, 4))
@@ -1861,7 +1772,7 @@ class ActionManager(Node):
         def add_edge(n1, n2):
             if n1 != n2:
                 # Verify the edge doesn't cut through the forbidden zone
-                if self.is_direct_path_clear(n1, n2):
+                if self.is_direct_path_clear(n1, n2, margin=margin):
                     dist = math.hypot(n1[0]-n2[0], n1[1]-n2[1])
                     edges[n1].append((dist, n2))
                     edges[n2].append((dist, n1))
@@ -1937,6 +1848,67 @@ class ActionManager(Node):
             if math.hypot(crate.x - closest_x, crate.y - closest_y) < margin:
                 return False 
                 
+        return True
+    
+    def get_best_path(self, target_pos, target_crate_id=None, allow_critical=False):
+        """
+        - If allow_critical=False: Returns path ONLY if 0.35m margin is respected.
+        - If allow_critical=True: Tries 0.35m, then 0.23m, then returns direct line 
+        no matter what (Best Effort).
+        """
+        start_pos = (self.robot_pos.x, self.robot_pos.y)
+        IDEAL_MARGIN = 0.25
+        CRITICAL_MARGIN = 0.17
+
+        # --- 1. TRY THE SAFE WAY (0.35m) ---
+        if self.is_direct_path_clear(start_pos, target_pos, target_crate_id, margin=IDEAL_MARGIN):
+            return [start_pos, target_pos], math.hypot(target_pos[0]-start_pos[0], target_pos[1]-start_pos[1])
+
+        path, cost = self.get_street_grid_path(start_pos, target_pos, margin=IDEAL_MARGIN)
+        if path:
+            return path, cost
+
+        # --- 2. IF NOT ALLOWED TO BE RISKY, STOP HERE ---
+        if not allow_critical:
+            return [], float('inf')
+
+        # --- 3. ALLOWED TO BE RISKY: TRY CRITICAL (0.23m) ---
+        self.get_logger().info("Strict path blocked. Attempting Critical Margin.")
+        
+        if self.is_direct_path_clear(start_pos, target_pos, target_crate_id, margin=CRITICAL_MARGIN):
+            return [start_pos, target_pos], math.hypot(target_pos[0]-start_pos[0], target_pos[1]-start_pos[1])
+
+        path, cost = self.get_street_grid_path(start_pos, target_pos, margin=CRITICAL_MARGIN)
+        if path:
+            return path, cost
+        
+        path, cost = self.get_street_grid_path(start_pos, target_pos, margin=0)
+        if path:
+            return path, cost
+
+        # --- 4. ABSOLUTE FALLBACK (Only if allow_critical=True) ---
+        # Even if we might hit a crate, we return the direct line to avoid a 'freeze'
+        self.get_logger().warn("No safe path found even with critical margin. Using direct line.")
+        return [start_pos, target_pos], math.hypot(target_pos[0]-start_pos[0], target_pos[1]-start_pos[1])
+
+    def navigate_path(self, path, angle):
+        """
+        Commands the robot to follow the list of waypoints.
+        Returns True if reached, False if interrupted.
+        """
+        if not path:
+            self.get_logger().error("Navigation failed: Path is empty!")
+            return False
+
+        # Skip the first point if it's the current robot position
+        for i, waypoint in enumerate(path[1:]):
+            self.get_logger().info(f"Navigating to waypoint {i+1}/{len(path)-1}: {waypoint}")
+            
+            # We use your existing movement logic (move_to or similar)
+            # Assuming move_to handles the PID/Rotation/Linear movement
+            self.move_to(Position(x=waypoint[0], y=waypoint[1], t=angle))
+            self.wait_for_motion()
+            
         return True
 
 def main(args=None):
