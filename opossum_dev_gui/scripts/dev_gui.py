@@ -611,14 +611,16 @@ class MapScene(QtWidgets.QGraphicsView):
         reward = zone_data.get('reward', float('-inf'))
         
         if reward > -99999:
-            display_text = f"Zone {zid}\n{reward:.1f}"
+            display_text = f"{reward:.3f}"
+            # display_text = f"Zone {zid}\n{reward:.3f}"
         else:
-            display_text = f"Zone {zid}\n-"
+            display_text = f"---"
+            # display_text = f"Zone {zid}\n-"
             
         # Create the zone if it doesn't exist
         if zid not in self.zone_items:
             # Assume zone is roughly 30x30 cm. Adjust 0.3 if needed.
-            w_px, h_px = self.size_to_scene(0.3, 0.3)
+            w_px, h_px = self.size_to_scene(0.2, 0.2)
             rect = QtWidgets.QGraphicsRectItem(-w_px/2, -h_px/2, w_px, h_px)
             
             # Semi-transparent green background with dashed border

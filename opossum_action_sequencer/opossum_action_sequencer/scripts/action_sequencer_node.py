@@ -79,6 +79,7 @@ class HazCrate:
         self.y = y
         self.theta = t
         self.state = -1
+        self.attempts = 0
         self.color = 2 if rot else -1 # -1 don't know, 0 yellow, 1 blue, 2 rot + 100 in zone
         self.last_seen = None
         self.pick_reward = float('-inf') 
@@ -120,10 +121,8 @@ class ActionManager(Node):
         self.match_time = None
         self.timer_move = None
         self.in_end_zone = False
-        self.end_zone = None
-        self.middle_zone = None
         self.match_finished = False
-        
+        self.backstage_sequence = False
 
         self.x_enn = None
         self.y_enn = None
@@ -264,12 +263,12 @@ class ActionManager(Node):
     def _init_timers(self):
         """Initialize the timers of the node."""
         self.timer_match = self.create_timer(
-            200,
+            100.0,
             self.timer_match_callback,
             callback_group=self.cb_group
         )
         self.timer_backstage = self.create_timer(
-            200,
+            93.0,
             self.timer_backstage_callback,
             callback_group=self.cb_group
         )
@@ -761,15 +760,19 @@ class ActionManager(Node):
             if p0.is_running:
                 p0.is_running = False
                 if not v0 and p0.state != -1:
+                    c0 = self.haz_crates[p0.state]
                     self.get_logger().warn(f"The first plier of ID {id} failed.")
-                    self.haz_crates[p0.state].state = -1
+                    c0.state = -1
+                    c0.attempts += 1
                     p0.state = -1
 
             if p1.is_running:
                 p1.is_running = False
                 if not v1 and p1.state != -1:
+                    c1 = self.haz_crates[p1.state]
                     self.get_logger().warn(f"The second plier of ID {id} failed.")
-                    self.haz_crates[p1.state].state = -1
+                    c1.state = -1
+                    c1.attempts += 1
                     p1.state = -1
 
             if not any(pl.is_running for pl in self.pliers.values()):
@@ -853,7 +856,7 @@ class ActionManager(Node):
                     for cid in stack_ids:
                         if cid in self.haz_crates:
                             crate = self.haz_crates[cid]
-                            crate.pick_reward = reward
+                            crate.pick_reward = reward + (-15) * crate.attempts
                             crate.best_pick_path = best_path
                             crate.use_inverted = best_inv
                             crate.is_part_of_stack = stack_ids
@@ -931,21 +934,32 @@ class ActionManager(Node):
 
     def timer_match_callback(self):
         """Timer callback for match time."""
-        if not self.is_ended:
-            self.pub_end_of_match.publish(Bool(data=True))
-            self.match_finished = True
-            self.get_logger().warn("Match time exceeded")
-            self.stop_script()
+        self.pub_end_of_match.publish(Bool(data=True))
+        self.match_finished = True
+        self.get_logger().warn("Match time exceeded")
+        self.stop_script()
 
     def timer_backstage_callback(self):
-        if self.end_zone is not None and self.middle_zone is not None:
-            if not self.is_ended and not self.in_end_zone:
-                self.get_logger().warn("Abort, go back home")
-                self.send_raw("VMAX 0.5")
-                self.move_to(self.middle_zone)
-                self.wait_for_motion()
-                time.sleep(0.1)
-                self.move_to(self.end_zone)
+        self.backstage_sequence = True
+        self.get_logger().warn("Abort, go back home")
+        self.send_raw("VMAX 0.5")
+        self.get_logger().info("Cannot find release zone. Going to final zone.")
+        
+        self.move_to(Position(self.final_zone["x"], 1.2, 0.0))
+        self.wait_for_motion()
+                
+        self.move_to(Position(self.final_zone["x"], self.final_zone["y"], 0.0))
+        self.get_logger().info(f"Move to: {self.final_zone['x']}, {self.final_zone['y']}")
+        self.wait_for_motion()
+            
+        with self.data_lock:
+            id_active_pliers_all = {}
+            for pid, plier in self.pliers.items():
+                if plier.state != -1:
+                    id_active_pliers_all[pid] = ["drop", plier.state]
+
+        self.send_plier_cmd(id_active_pliers_all)
+        self.wait_for_plier()
 
     def timer_move_callback(self):
         if not self.is_robot_moving and not self.motion_done:
@@ -1391,7 +1405,7 @@ class ActionManager(Node):
         steal_poses = [[0.45, 0.45], [0.45, 1.1], [2.55, 1.1], [2.55, 0.45]]
         id_steal = 0
 
-        while not self.match_finished:
+        while not self.backstage_sequence:
             self.continuous_planner_callback()
             action = None
             
@@ -1436,8 +1450,12 @@ class ActionManager(Node):
 
                 if len(rel_path) > 1:
                     for wp in rel_path[1:]:
+                        if self.backstage_sequence:
+                            break
                         self.move_to(Position(wp[0], wp[1], target_angle))
                         self.wait_for_motion()
+                if self.backstage_sequence:
+                    break
                 self.stare_and_update()
 
                 with self.data_lock:
@@ -1451,7 +1469,8 @@ class ActionManager(Node):
                             id_active_pliers[pid] = ["drop", plier.state]
                         else:
                             id_active_pliers[pid] = ["rev_drop", plier.state]
-
+                if self.backstage_sequence:
+                    break
                 self.send_plier_cmd(id_active_pliers)
                 self.wait_for_plier()
 
@@ -1470,9 +1489,13 @@ class ActionManager(Node):
                         self.get_logger().info("No final zone defined (no color received). Skipping.")
                         time.sleep(1.0)
                         continue
-
+                
+                if self.backstage_sequence:
+                    break
                 self.move_to(Position(self.final_zone["x"], 1.2, 0.0))
                 self.wait_for_motion()
+                if self.backstage_sequence:
+                    break
                      
                 self.move_to(Position(self.final_zone["x"], self.final_zone["y"], 0.0))
                 self.wait_for_motion()
@@ -1482,13 +1505,10 @@ class ActionManager(Node):
                     for pid, plier in self.pliers.items():
                         if plier.state != -1:
                             id_active_pliers_all[pid] = ["drop", plier.state]
-                           
+                if self.backstage_sequence:
+                    break
                 self.send_plier_cmd(id_active_pliers_all)
                 self.wait_for_plier()
-                
-                with self.data_lock:
-                    for pl_id in id_active_pliers_all:
-                        self.pliers[pl_id].state = -1
                 continue
 
             # =================================================================
@@ -1534,14 +1554,18 @@ class ActionManager(Node):
                         if rot < min_rot:
                             min_rot = rot
                             best_camera_theta = req_theta
-
+                            
                 if len(pick_path) > 1:
                     for i, wp in enumerate(pick_path[1:]):
+                        if self.backstage_sequence:
+                            break
                         if activate_check_stack and i == len(pick_path[1:]) - 1:
                             self.move_to(Position(wp[0], wp[1], best_camera_theta))
                         else:
                             self.move_to(Position(wp[0], wp[1], final_robot_theta))
                         self.wait_for_motion()
+                if self.backstage_sequence:
+                    break
                 self.stare_and_update()
                 self.centering()
 
@@ -1557,10 +1581,14 @@ class ActionManager(Node):
                         continue 
 
                 if not activate_check_stack or abs(self.angular_distance(best_camera_theta, final_robot_theta)) > 0.05:
+                    if self.backstage_sequence:
+                        break
                     self.move_to(Position(entry_point[0], entry_point[1], final_robot_theta))
                     # self.get_logger().info(f'Entry Point {entry_point[0]}, {entry_point[1]}, {final_robot_theta}')
                     self.wait_for_motion()
 
+                if self.backstage_sequence:
+                    break
                 self.move_to(final_pos)
                 # self.get_logger().info(f'Final Pose {final_pos.x}, {final_pos.y}, {final_robot_theta}')
                 self.wait_for_motion()
@@ -1598,6 +1626,8 @@ class ActionManager(Node):
                         best_obj_id = target_list[j]
                         dict_sel_pliers[pl_id] = ["pick", best_obj_id]
 
+                if self.backstage_sequence:
+                    break
                 self.send_plier_cmd(dict_sel_pliers)
                 self.wait_for_plier()
                 continue
@@ -1614,6 +1644,8 @@ class ActionManager(Node):
                                  self.boundaries[2] + 0.25 < pos[1] < self.boundaries[3] - 0.25)
                 
                 if in_bounds:
+                    if self.backstage_sequence:
+                        break
                     self.move_to(Position(pos[0], pos[1], (id_steal * 2.3998) % (2 * np.pi)))
                     self.wait_for_motion()
                     self.stare_and_update()
@@ -1924,68 +1956,6 @@ class ActionManager(Node):
             
         return (coeff_dst * val_dst) + (coeff_enn * val_ennemi) + (coeff_center * val_center)
 
-
-    def compute_release_rewards(self):
-        if not self.any_plier_used():
-            return None, None, []
-            
-        max_reward = float('-inf')
-        best_zone_id = None
-        best_pos = None
-        best_path = []
-        
-        start_pos = (self.robot_pos.x, self.robot_pos.y)
-        x_min, x_max, y_min, y_max = self.rect
-
-        with self.data_lock: # Lock data while we check paths
-            for z_id, zone in self.zones.items():
-                if len(self.get_all_points_in_zone(z_id)) > 0:
-                    continue # Zone is occupied
-                
-                x = zone.x
-                y = zone.y
-                distance = 0.26
-                av_poses = [
-                    [x + distance, y, 3.14],
-                    [x - distance, y, 0.0],
-                    [x, y + distance, 4.71],
-                    [x, y - distance, 1.57],
-                ]
-
-                for pos in av_poses:
-                    # Boundary check
-                    if not (self.boundaries[0] + 0.2 < pos[0] < self.boundaries[1] - 0.2 and 
-                            self.boundaries[2] + 0.2 < pos[1] < self.boundaries[3] - 0.2): 
-                        continue
-                        
-                    target_pos = (pos[0], pos[1])
-                    
-                    # 1. Physically check the path to this specific side!
-                    if self.is_direct_path_clear(start_pos, target_pos):
-                        dist = math.hypot(pos[0] - start_pos[0], pos[1] - start_pos[1])
-                        path = [start_pos, target_pos]
-                    else:
-                        path, dist = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
-                        # Security Check: Dive blocked?
-                        if len(path) >= 2 and not self.is_direct_path_clear(path[-2], target_pos):
-                            dist = float('inf')
-                            
-                    # If this side is completely blocked, skip it!
-                    if dist == float('inf'):
-                        continue
-
-                    # 2. Score the position using the ACTUAL path distance
-                    reward = self.compute_release_penality(pos[0], pos[1], dist)
-
-                    # 3. Update the global champion
-                    if reward > max_reward:
-                        max_reward = reward
-                        best_zone_id = z_id
-                        best_pos = pos
-                        best_path = path
-                        
-        return best_zone_id, best_pos, best_path
-
     def compute_pick_penality(self, x, y):
         coeff_center = -1 # -0.005
         coeff_dst = -1
@@ -1998,100 +1968,6 @@ class ActionManager(Node):
         else:
             val_ennemi = 0
         return coeff_dst * val_dst + coeff_enn * val_ennemi + coeff_center * val_center
-
-    def compute_pick_rewards(self):
-        if not self.any_plier_side_available():
-            return None, None, []
-
-        min_total_dist = float('inf')
-        best_target_ids = None  # Replaces best_crate_id and target_stack_id
-        use_inverted_approach = False
-        best_path = []
-        
-        approach_distance = 0.3
-        start_pos = (self.robot_pos.x, self.robot_pos.y)
-        x_min, x_max, y_min, y_max = self.rect
-
-        with self.data_lock:
-            # 1. Grab the freshest stacks right now!
-            # Returns a list of ID lists: e.g., [[1], [2, 3], [4]]
-            current_stacks = self.generate_current_stacks()
-
-            # 2. Iterate through the stacks instead of individual crates
-            for stack_ids in current_stacks:
-                
-                # Fetch the actual crate objects for this stack
-                group_crates = [self.haz_crates[cid] for cid in stack_ids if cid in self.haz_crates]
-                if not group_crates:
-                    continue
-
-                # 3. Security Filters
-                # If ANY crate in this stack is in a safe zone, skip the entire stack
-                skip_stack = False
-                for crate in group_crates:
-                    if self.get_current_zone(crate.x, crate.y, crate.theta) is not None and (crate.color in (-1, self.color, 2)) or self.in_final_zone(crate.x, crate.y, crate.theta):
-                        skip_stack = True
-                        break
-                
-                if skip_stack:
-                    continue
-                
-                # 4. Consolidation (Math works perfectly whether it's 1 crate or 3!)
-                mean_x = np.mean([c.x for c in group_crates])
-                mean_y = np.mean([c.y for c in group_crates])
-                mean_theta = np.arctan2(np.sum([np.sin(c.theta) for c in group_crates]), 
-                                        np.sum([np.cos(c.theta) for c in group_crates]))
-
-                # 5. Calculate Entry Points
-                entries = [
-                    (mean_x - approach_distance * np.cos(mean_theta), mean_y - approach_distance * np.sin(mean_theta), False),
-                    (mean_x + approach_distance * np.cos(mean_theta), mean_y + approach_distance * np.sin(mean_theta), True)
-                ]
-
-                for ex, ey, is_inv in entries:
-                    if not (self.boundaries[0] <= ex <= self.boundaries[1] and self.boundaries[2] <= ey <= self.boundaries[3]):
-                        continue
-                        
-                    target_pos = (ex, ey)
-                    
-                    # Pass the primary crate ID to ignore collisions with the target itself
-                    primary_id = stack_ids[0]
-                    
-                    # 6. Check Path!
-                    if self.is_direct_path_clear(start_pos, target_pos, target_crate_id=primary_id):
-                        dist = math.hypot(ex - start_pos[0], ey - start_pos[1])
-                        path = [start_pos, target_pos]
-                    else:
-                        path, dist = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
-                        # Security Check: Dive blocked?
-                        if len(path) >= 2 and not self.is_direct_path_clear(path[-2], target_pos, target_crate_id=primary_id):
-                            dist = float('inf')
-
-                    # 7. Save the absolute best one
-                    if dist < min_total_dist:
-                        min_total_dist = dist
-                        best_target_ids = stack_ids  # Save the whole list of IDs!
-                        use_inverted_approach = is_inv
-                        best_path = path
-                            
-        return best_target_ids, use_inverted_approach, best_path
-
-    def get_stack_linked(self, target_index):
-        """
-        Vérifie si un indice est présent dans l'une des listes du dictionnaire.
-        
-        Args:
-            stacks_dict (dict): Dictionnaire de listes {stack_id: [indices...]}
-            target_index (int): L'indice à rechercher
-            
-        Returns:
-            int/None: L'ID du stack s'il est trouvé, sinon None.
-        """
-        for stack_id, indices in self.stacks.items():
-            if target_index in indices:
-                return stack_id
-                
-        return None
 
     def get_best_side_pliers_release(self, angle_target):
         max_reward = float('+inf')
@@ -2227,54 +2103,6 @@ class ActionManager(Node):
                     
         return [], float('inf')
 
-    def get_best_pickup_target(self, objects_to_check, x_min, x_max, y_min, y_max, offset_dist=0.23):
-        """
-        Evaluates all objects, checks both entry points, respects boundaries, 
-        and calculates the absolute shortest path.
-        """
-        best_crate_id = None
-        best_path = []
-        min_total_dist = float('inf')
-        best_is_inverted = False
-
-        start_pos = (self.robot_pos.x, self.robot_pos.y)
-
-        for obj in objects_to_check:
-            # 1. Calculate the two entry points (Front and Back)
-            entries = [
-                (obj.x - offset_dist * math.cos(obj.theta), obj.y - offset_dist * math.sin(obj.theta), False), # Standard
-                (obj.x + offset_dist * math.cos(obj.theta), obj.y + offset_dist * math.sin(obj.theta), True)   # Inverted (pi)
-            ]
-            
-            for ex, ey, is_inv in entries:
-                # 2. Filter out entry points that go out of the board limits!
-                if not (self.boundaries[0] <= ex <= self.boundaries[1] and 
-                        self.boundaries[2] <= ey <= self.boundaries[3]):
-                    continue 
-                    
-                target_pos = (ex, ey)
-                
-                # 3. Check if we have a direct straight-line path
-                if self.is_direct_path_clear(start_pos, target_pos, target_crate_id=obj.id):
-                    dist = math.hypot(ex - start_pos[0], ey - start_pos[1])
-                    path = [start_pos, target_pos]
-                else:
-                    # 4. Fallback to the Street Grid path
-                    path, dist = self.get_street_grid_path(start_pos, target_pos, x_min, x_max, y_min, y_max)
-                    
-                    # 5. Security Check: Ensure the final "dive" from the grid to the crate isn't blocked!
-                    if len(path) >= 2 and not self.is_direct_path_clear(path[-2], target_pos, target_crate_id=obj.id):
-                        dist = float('inf') # Blocked by other crates, discard this entry point
-                
-                # 6. Keep the absolute shortest path
-                if dist < min_total_dist:
-                    min_total_dist = dist
-                    best_path = path
-                    best_crate_id = obj.id
-                    best_is_inverted = is_inv
-
-        return best_crate_id, best_path, best_is_inverted, min_total_dist
-
     def is_direct_path_clear(self, start_pos, target_pos, target_crate_id=None, margin=0.23):
         """Checks if the straight line hits crates OR the forbidden zone."""
         x1, y1 = start_pos
@@ -2311,6 +2139,7 @@ class ActionManager(Node):
             closest_x = x1 + t * dx
             closest_y = y1 + t * dy
             
+            # Margin is the robot width + crate width + margin (if necessary)
             if math.hypot(crate.x - closest_x, crate.y - closest_y) < margin:
                 return False 
                 
