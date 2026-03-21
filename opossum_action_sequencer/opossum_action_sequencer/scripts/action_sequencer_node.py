@@ -72,6 +72,10 @@ class HazCrate:
     state: int
     color: int
     last_seen: float
+    pick_reward: float
+    best_pick_path: list
+    use_inverted: bool
+    is_part_of_stack: list
 
     def __init__(self, id, x, y, t, rot = False):
         self.id = id
@@ -93,6 +97,9 @@ class ZoneRelease:
     x: float
     y: float
     size: float
+    release_reward: float
+    best_release_path: list
+    best_release_pos: list
 
     def __init__(self, id, x, y, size):
         self.id = id
@@ -161,7 +168,7 @@ class ActionManager(Node):
         self.camera_angles = [0.0]
 
         # --- NEW: Navigation Constraints ---
-        self.robot_radius = 0.25
+        self.robot_radius = 0.18
         
         # Safe boundaries (shrunk by robot radius):
         self.safe_x_min = 0.0 + self.robot_radius
@@ -1402,7 +1409,7 @@ class ActionManager(Node):
         self.send_raw("VTMAX 1.5")
         
         activate_check_stack = False
-        steal_poses = [[0.45, 0.45], [0.45, 1.1], [2.55, 1.1], [2.55, 0.45]]
+        steal_poses = [[0.45, 1.1], [2.55, 1.1], [2.55, 0.45], [0.45, 0.45]]
         id_steal = 0
 
         while not self.backstage_sequence:
@@ -1427,6 +1434,7 @@ class ActionManager(Node):
                         action = "FINAL_ZONE"
                 else:
                     # Find the highest scoring crate
+                    self.get_logger().info(f"Crate rew: {[c.pick_reward for c in self.haz_crates.values()]}")
                     best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
                     
                     if best_crate and best_crate.pick_reward > float('-inf'):
