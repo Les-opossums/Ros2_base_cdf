@@ -295,17 +295,6 @@ class ActionManager(Node):
             callback_group=self.cb_group
         )
         self.pub_timer = self.create_timer(0.2, self.publish_board_state,callback_group=self.cb_group)
-        # self.timer_planner = self.create_timer(
-        #     0.5, 
-        #     self.continuous_planner_callback, 
-        #     callback_group=self.cb_group
-        # )
-    def _init_move_timer(self):
-        self.move_timer = self.create_timer(
-            2,
-            self.timer_move_callback,
-            callback_group=self.cb_group
-        )
 
     def _reset_move_timer(self):
         """Reset the move timer."""
@@ -793,8 +782,13 @@ class ActionManager(Node):
             # A. SCORE ALL PICKUP OPTIONS
             # =================================================================
             # 1. Reset all crate scores to negative infinity
+
             for crate in list(self.haz_crates.values()):
                 crate.pick_reward = float('-inf')
+
+            if all(any(self.pliers[pid].state != -1 for pid in range(side * 4, (side + 1) * 4)) for side in range(4)):
+                return
+
                 
             current_stacks = self.generate_stacks(self.haz_crates)
             approach_distance = 0.3
@@ -861,12 +855,14 @@ class ActionManager(Node):
             # B. SCORE ALL RELEASE OPTIONS
             # =================================================================
             # 1. Check if we even need to release
+
+            for z_id, zone in list(self.zones.items()):
+                zone.release_reward = float('-inf')
+
             if  all(pl.state == -1 for pl in self.pliers.values()):
                 return
                 
             for z_id, zone in list(self.zones.items()):
-                zone.release_reward = float('-inf')
-                
                 # Check if occupied
                 if len(self.get_all_points_in_zone(z_id, self.haz_crates)) > 0:
                     continue 
@@ -935,8 +931,6 @@ class ActionManager(Node):
         self.send_raw("VMAX 0.5")
         self.get_logger().info("Cannot find release zone. Going to final zone.")
         
-        # self.move_to(Position(self.final_zone["x"], 1.2, 0.0))
-        # self.wait_for_motion()
         if self.color == 0:
             e_zone = (0.45, 1.2)
         elif self.color == 1:
@@ -957,13 +951,6 @@ class ActionManager(Node):
 
         self.send_plier_cmd(id_active_pliers_all, self.haz_crates)
         self.wait_for_plier()
-
-    def timer_move_callback(self):
-        if not self.is_robot_moving and not self.motion_done:
-            self._reset_move_timer()
-            self.get_logger().warn("New Motion timed out.")
-            self.move_to(self.pos_obj)
-            self._init_move_timer()
 
     def run_script_init(self):
         """Run the script initialization."""
@@ -994,14 +981,8 @@ class ActionManager(Node):
             y=msg.robot_position.y,
             t=msg.robot_position.z
         )
-        list_enn = []
-        for rob in msg.other_robot_position:
-            if rob.x > 0.3 and rob.x < 2.7 and rob.y > 0.3 and rob.y < 1.7:
-                list_enn.append(rob)
-        if len(list_enn) == 0:
-            self.x_enn = None
-            self.y_enn = None
-            return
+
+        list_enn = msg.other_robot_position
         closer = np.sqrt((list_enn[0].x - msg.robot_position.x) ** 2 + (list_enn[0].y - msg.robot_position.y) ** 2)
         self.x_enn = list_enn[0].x
         self.y_enn = list_enn[0].y
@@ -1161,12 +1142,6 @@ class ActionManager(Node):
         # 4. The global angle is simply the robot's angle plus the actuator's angle
         crate.theta = rt + plier.theta
 
-    def led(self, led: LED_struct):
-        """Compute the led action."""
-        self.pub_command.publish(String(data=f"LED {led.red} "
-                                             f"{led.green} {led.blue}")
-                                 )
-
     def send_raw(self, raw_command):
         """Send raw commands."""
         if not self.stop:
@@ -1252,7 +1227,6 @@ class ActionManager(Node):
                 # If we found 5 crates in a row, slice it into [4] and [1]
                 for i in range(0, len(component), 4):
                     stack_ids_only.append(component[i:i+4])
-                        
         return stack_ids_only
 
     def centering(self):
@@ -1272,29 +1246,22 @@ class ActionManager(Node):
             # 1. INSTANTLY CHOOSE THE BEST ACTION FROM CACHED SCORES
             # =================================================================
             with self.data_lock:
-                pliers_used = any(pl.state != -1 for pl in self.pliers.values())
+                best_zone = max(self.zones.values(), key=lambda z: z.release_reward, default=None)
+                best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
+                    
+                if best_zone and best_zone.release_reward > float('-inf'):
+                    rel_path = best_zone.best_release_path
+                    best_release_pos = best_zone.best_release_pos
+                    action = "RELEASE"
+                
+                elif best_crate and best_crate.pick_reward > float('-inf'):
+                    pick_crate_ids = best_crate.is_part_of_stack
+                    pick_path = best_crate.best_pick_path
+                    is_inv = best_crate.use_inverted
+                    action = "PICK"
 
-                if pliers_used:
-                    # Find the highest scoring zone
-                    best_zone = max(self.zones.values(), key=lambda z: z.release_reward, default=None)
-                    
-                    if best_zone and best_zone.release_reward > float('-inf'):
-                        rel_path = best_zone.best_release_path
-                        best_release_pos = best_zone.best_release_pos
-                        action = "RELEASE"
-                    else:
-                        action = "FINAL_ZONE"
                 else:
-                    # Find the highest scoring crate
-                    best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
-                    
-                    if best_crate and best_crate.pick_reward > float('-inf'):
-                        pick_crate_ids = best_crate.is_part_of_stack
-                        pick_path = best_crate.best_pick_path
-                        is_inv = best_crate.use_inverted
-                        action = "PICK"
-                    else:
-                        action = "EXPLORE"
+                    action = "EXPLORE"
 
             # =================================================================
             # 2. EXECUTE RELEASE
@@ -1334,38 +1301,6 @@ class ActionManager(Node):
                 continue
 
             # =================================================================
-            # 3. EXECUTE FINAL ZONE FALLBACK
-            # =================================================================
-            elif action == "FINAL_ZONE":
-                self.get_logger().info("Cannot find release zone. Going to final zone.")
-                with self.data_lock:
-                    if self.final_zone is None:
-                        self.get_logger().info("No final zone defined (no color received). Skipping.")
-                        time.sleep(1.0)
-                        continue
-                
-                if self.backstage_sequence:
-                    break
-                self.move_to(Position(self.final_zone["x"], 1.2, 0.0))
-                self.wait_for_motion()
-                if self.backstage_sequence:
-                    break
-                     
-                self.move_to(Position(self.final_zone["x"], self.final_zone["y"], 0.0))
-                self.wait_for_motion()
-                 
-                with self.data_lock:
-                    id_active_pliers_all = {}
-                    for pid, plier in self.pliers.items():
-                        if plier.state != -1:
-                            id_active_pliers_all[pid] = ["drop", plier.state]
-                if self.backstage_sequence:
-                    break
-                self.send_plier_cmd(id_active_pliers_all, self.haz_crates)
-                self.wait_for_plier()
-                continue
-
-            # =================================================================
             # 4. EXECUTE PICK
             # =================================================================
             elif action == "PICK":
@@ -1381,7 +1316,6 @@ class ActionManager(Node):
                 with self.data_lock:
                     target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in pick_crate_ids])
                     pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in selected_pliers_ids])
-                    current_robot_theta = self.robot_pos.t
                 
                 target_angle = target_pos.t + (np.pi if is_inv else 0.0)
                 final_robot_theta = target_angle - pliers_pos.t
