@@ -183,6 +183,7 @@ class ActionManager(Node):
         self.f_zone_y_min = 1.55 - self.robot_radius # 1.30
         self.f_zone_y_max = 2.0                      # Capped at top
         self.final_zone = None
+        self.steal_poses = None
 
     def is_point_safe(self, x, y):
         """Check if a point is within boundaries and outside forbidden zones."""
@@ -721,6 +722,11 @@ class ActionManager(Node):
     def color_callback(self, msg):
         self.color = 0 if msg.data.lower() == "yellow" else 1
         self.final_zone = self.final_zone_mapping[self.color]
+        if self.color == 0:
+            self.steal_poses = [[0.47, 1.1], [2.53, 1.1], [2.53, 0.45], [0.47, 0.45]]
+        if self.color == 1:
+            self.steal_poses = [[2.53, 1.1], [0.47, 1.1], [0.47, 0.45], [2.53, 0.45]]
+
 
     def feedback_callback(self, msg):
         """Receive the data from Zynq."""
@@ -1409,7 +1415,6 @@ class ActionManager(Node):
         self.send_raw("VTMAX 1.5")
         
         activate_check_stack = False
-        steal_poses = [[0.47, 1.1], [2.53, 1.1], [2.53, 0.45], [0.47, 0.45]]
         id_steal = 0
 
         while not self.backstage_sequence:
@@ -1645,7 +1650,7 @@ class ActionManager(Node):
             # =================================================================
             elif action == "EXPLORE":
                 self.get_logger().info("Nothing to do: Exploring / Stealing...")
-                pos = steal_poses[id_steal % len(steal_poses)]
+                pos = self.steal_poses[id_steal % len(self.steal_poses)]
                 
                 with self.data_lock:
                     in_bounds = (self.boundaries[0] + 0.25 < pos[0] < self.boundaries[1] - 0.25 and 
