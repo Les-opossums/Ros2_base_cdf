@@ -513,7 +513,7 @@ class ActionManager(Node):
             return 2  # Rot (Red)
         return -1 # Unknown
 
-    def stare_and_update(self):
+    def stare_and_update(self, crate_dict):
         """Stop, let the camera settle, and process the latest frame in World Coordinates."""
         if self.stop:
             return
@@ -525,7 +525,6 @@ class ActionManager(Node):
         self.get_logger().info("Staring... waiting for camera to settle.")
         
         # 1. Wait for physical motion blur to clear
-        self.send_raw("LED 20 0 255 0")
         time.sleep(0.3) 
         
         if time.time() - self.last_camera_timestamp > 0.2:
@@ -558,24 +557,15 @@ class ActionManager(Node):
         # =====================================================================
         # 4. HUNGARIAN TRACKING LOGIC (Using World Detections)
         # =====================================================================
-        if not self.haz_crates:
-            for det in world_detections:
-                new_id = max(self.haz_crates.keys()) + 1 if self.haz_crates else 0
-                color_val = self._extract_color_from_id(det.id)
-                new_crate = HazCrate(new_id, det.x, det.y, det.theta, rot=(color_val == 2))
-                new_crate.color = color_val
-                new_crate.last_seen = current_time
-                self.haz_crates[new_id] = new_crate
-            return
 
-        crate_ids = list(self.haz_crates.keys())
+        crate_ids = list(crate_dict.keys())
         num_crates = len(crate_ids)
         num_detections = len(world_detections)
         
         cost_matrix = np.zeros((num_crates, num_detections))
 
         for i, cid in enumerate(crate_ids):
-            crate = self.haz_crates[cid]
+            crate = crate_dict[cid]
             for j, det in enumerate(world_detections):
                 # Now we are comparing World to World!
                 dist = math.hypot(crate.x - det.x, crate.y - det.y)
@@ -590,7 +580,7 @@ class ActionManager(Node):
             # max_distance should probably be around 0.10 to 0.15 (10-15cm) to allow for minor camera errors
             if distance <= self.max_distance:
                 cid = crate_ids[crate_idx]
-                matched_crate = self.haz_crates[cid]
+                matched_crate = crate_dict[cid]
                 det = world_detections[det_idx]
 
                 matched_crate.x = det.x
@@ -605,57 +595,47 @@ class ActionManager(Node):
 
         for j, det in enumerate(world_detections):
             if j not in matched_detection_indices:
-                new_id = max(self.haz_crates.keys()) + 1
+                new_id = max(crate_dict.keys()) + 1
                 color_val = self._extract_color_from_id(det.id)
                 new_crate = HazCrate(new_id, det.x, det.y, det.theta, rot=(color_val == 2))
                 new_crate.color = color_val
                 new_crate.last_seen = current_time
-                self.haz_crates[new_id] = new_crate
+                crate_dict[new_id] = new_crate
                 self.get_logger().info(f"Tracking: Discovered new crate! Assigned internal ID: {new_id} at X:{det.x:.2f} Y:{det.y:.2f}")
 
         # =====================================================================
         # 5. GHOST CLEANUP (FOV & Range Verification)
         # =====================================================================
-        ghost_ids = []
-        fov_half = math.radians(65.0 / 2.0) # 65 degrees FOV divided by 2
-        max_range = 0.80 # 80cm limit
+        # ghost_ids = []
+        # fov_half = math.radians(65.0 / 2.0) # 65 degrees FOV divided by 2
+        # max_range = 0.80 # 80cm limit
 
-        for cid, crate in self.haz_crates.items():
-            if crate.last_seen == current_time or crate.state != -1:
-                continue
+        # for cid, crate in self.haz_crates.items():
+        #     if crate.last_seen == current_time or crate.state != -1:
+        #         continue
                 
-            # Distance to crate
-            dist = math.hypot(crate.x - self.robot_pos.x, crate.y - self.robot_pos.y)
+        #     # Distance to crate
+        #     dist = math.hypot(crate.x - self.robot_pos.x, crate.y - self.robot_pos.y)
             
-            # If it is close enough to see...
-            if dist <= max_range:
-                angle_to_crate = math.atan2(crate.y - self.robot_pos.y, crate.x - self.robot_pos.x)
-                is_in_view = False
+        #     # If it is close enough to see...
+        #     if dist <= max_range:
+        #         angle_to_crate = math.atan2(crate.y - self.robot_pos.y, crate.x - self.robot_pos.x)
+        #         is_in_view = False
                 
-                # Check if it falls inside any of our 3 camera cones!
-                for cam_angle in self.camera_angles:
-                    cam_global_angle = self.robot_pos.t + cam_angle
-                    diff = self.angular_distance(angle_to_crate, cam_global_angle)
+        #         # Check if it falls inside any of our 3 camera cones!
+        #         for cam_angle in self.camera_angles:
+        #             cam_global_angle = self.robot_pos.t + cam_angle
+        #             diff = self.angular_distance(angle_to_crate, cam_global_angle)
                     
-                    if diff <= fov_half:
-                        is_in_view = True
-                        break
+        #             if diff <= fov_half:
+        #                 is_in_view = True
+        #                 break
                         
-                if is_in_view:
-                    # Should be perfectly visible, but wasn't detected!
-                    ghost_ids.append(cid)
+        #         if is_in_view:
+        #             # Should be perfectly visible, but wasn't detected!
+        #             ghost_ids.append(cid)
 
-        # Erase the ghosts
-        # for cid in ghost_ids:
-        #     self.get_logger().warn(f"GHOST DETECTED: Crate {cid} missing from expected FOV! Erasing.")
-        #     ghost_crate = self.haz_crates[cid]
-            
-        #     if ghost_crate.state != -1 and ghost_crate.state in self.pliers:
-        #         self.pliers[ghost_crate.state].state = -1
-                    
-        #     del self.haz_crates[cid]
-        self.send_raw("LED 20 0 0 255")
-        self.get_logger().info("Finished staring go back to match.")
+        # self.get_logger().info("Finished staring go back to match.")
 
     def parameter_event_callback(self, event):
         """Handle the parameters event."""
@@ -751,9 +731,6 @@ class ActionManager(Node):
             else:
                 self.pub_au.publish(Bool(data=False))
 
-        elif msg.data.startswith("YELLOWSWITCH"):
-            self.synchro_lidar()
-
         elif msg.data.startswith("BLUESWITCH"):
             self.get_logger().info("Reload Ros")
             os.system('systemctl --user restart launch.service')
@@ -764,30 +741,31 @@ class ActionManager(Node):
 
         elif msg.data.startswith("PINCEFEEDBACK"):
             data = msg.data.split()[1:]
-            id = int(data[0])
-            # action = int(data[1])
-            v0 = int(data[2])
-            v1 = int(data[3])
-            p0 = self.pliers[id * 2]
-            p1 = self.pliers[id * 2 + 1]
-            if p0.is_running:
-                p0.is_running = False
-                if not v0 and p0.state != -1:
-                    c0 = self.haz_crates[p0.state]
-                    self.get_logger().warn(f"The first plier of ID {id} failed.")
-                    c0.state = -1
-                    c0.attempts += 1
-                    p0.state = -1
+            cmd_id = int(data[0])
+            
+            # Map the two success bits and the two plier objects
+            # v0 = data[2], v1 = data[3]
+            results = [
+                (int(data[2]), self.pliers[cmd_id * 2], "first"),
+                (int(data[3]), self.pliers[cmd_id * 2 + 1], "second")
+            ]
 
-            if p1.is_running:
-                p1.is_running = False
-                if not v1 and p1.state != -1:
-                    c1 = self.haz_crates[p1.state]
-                    self.get_logger().warn(f"The second plier of ID {id} failed.")
-                    c1.state = -1
-                    c1.attempts += 1
-                    p1.state = -1
+            for success_bit, plier, label in results:
+                # CRITICAL: Only check success IF the plier was actually told to move
+                if plier.is_running:
+                    plier.is_running = False
+                    
+                    # If firmware reports 0 while we expected a success
+                    if not success_bit and plier.state != -1:
+                        crate = self.haz_crates[plier.state]
+                        self.get_logger().warn(f"The {label} plier of ID {cmd_id} failed.")
+                        
+                        # Reset tracking
+                        crate.state = -1
+                        crate.attempts += 1
+                        plier.state = -1
 
+            # Global check to release the event loop
             if not any(pl.is_running for pl in self.pliers.values()):
                 self.pliers_event.set()
     
@@ -807,7 +785,7 @@ class ActionManager(Node):
             for crate in list(self.haz_crates.values()):
                 crate.pick_reward = float('-inf')
                 
-            current_stacks = self.generate_current_stacks()
+            current_stacks = self.generate_stacks(self.haz_crates)
             approach_distance = 0.3
 
             for stack_ids in current_stacks:
@@ -878,14 +856,14 @@ class ActionManager(Node):
             # B. SCORE ALL RELEASE OPTIONS
             # =================================================================
             # 1. Check if we even need to release
-            if not self.any_plier_used():
+            if  all(pl.state == -1 for pl in self.pliers.values()):
                 return
                 
             for z_id, zone in list(self.zones.items()):
                 zone.release_reward = float('-inf')
                 
                 # Check if occupied
-                if len(self.get_all_points_in_zone(z_id)) > 0:
+                if len(self.get_all_points_in_zone(z_id, self.haz_crates)) > 0:
                     continue 
                 
                 x = zone.x
@@ -971,7 +949,7 @@ class ActionManager(Node):
                 if plier.state != -1:
                     id_active_pliers_all[pid] = ["drop", plier.state]
 
-        self.send_plier_cmd(id_active_pliers_all)
+        self.send_plier_cmd(id_active_pliers_all, self.haz_crates)
         self.wait_for_plier()
 
     def timer_move_callback(self):
@@ -1066,41 +1044,6 @@ class ActionManager(Node):
                     self.send_raw("BLOCK")
                     time.sleep(0.1)
 
-    def relative_move_to(self, delta: Position, seuil=0.1):
-        """Compute the relative move_to action with frame transformation (Robot -> Board)."""
-        if not self.stop:
-            self.timer = None
-            self.seuil = seuil
-            
-            # 1. Récupération de l'angle actuel du robot (en radians)
-            theta = self.robot_pos.t
-            
-            # 2. Rotation du vecteur delta (repère robot) vers le repère plateau
-            # On projette le déplacement relatif selon l'orientation actuelle
-            delta_x_plateau = (delta.x - 0.22) * np.cos(theta) - delta.y * np.sin(theta)
-            delta_y_plateau = (delta.x - 0.22) * np.sin(theta) + delta.y * np.cos(theta)
-            
-            # 3. Calcul de la position cible finale dans le repère plateau
-            pos = Position(
-                x = self.robot_pos.x + delta_x_plateau,
-                y = self.robot_pos.y + delta_y_plateau,
-                t = self.robot_pos.t + delta.t  # L'angle reste une simple addition
-            )
-            
-            self.motion_done = False
-            self.is_robot_moving = True
-            self.is_robot_arrived = False
-            
-            # Petit temps de pause pour laisser le système respirer si nécessaire
-            time.sleep(0.1)
-            
-            # Envoi de la commande
-            self.pub_command.publish(String(data=f"MOVE {pos.x} {pos.y} {pos.t}"))
-            
-            # Mise à jour de l'objectif
-            self.pos_obj = pos
-            self.motion_done_event.clear()
-
     def update_arrival_status(self):
         if not self.stop and self.pos_obj is not None:
             dist = np.sqrt((self.pos_obj.x - self.robot_pos.x)**2 + 
@@ -1123,150 +1066,76 @@ class ActionManager(Node):
         if not self.stop:
             self.pliers_event.wait(timeout=10.0)
 
-    def send_plier_cmd(self, ids: dict):
-        """Compute and send the vacuum gripper command with pair optimization.
-        
-        ids: dict containing the plier ID as key and the assigned action string as value.
-             Example: {2: ["pick", ID crate], 7: ["drop",  ID crate], 8: ["rev_drop", ID crate], 0: "pick"}
-             
-        Modes:
-        1: pick
-        2: drop
-        3: rev_drop
-        4: rev_drop for the first, drop for the second
-        5: drop for the first, rev_drop for the second
-        """
+    def send_plier_cmd(self, ids: dict, crate_dict: dict):
         if self.stop or not ids:
             return
 
         self.pliers_event.clear()
+        action_map = {"pick": 1, "drop": 2, "rev_drop": 3}
         
-        # Map string actions to their base modes
-        action_map = {
-            "pick": 1,
-            "drop": 2,
-            "rev_drop": 3
+        # Special modes for mixed pairs: (Action 0, Action 1) -> Mode ID
+        pair_modes = {
+            ("drop", "rev_drop"): 4,
+            ("rev_drop", "drop"): 5
         }
 
-        # 1. Trier les clés (IDs) pour faciliter le groupement
         sorted_ids = sorted(ids.keys())
-        processed_ids = set()
+        processed = set()
 
-        for current_id in sorted_ids:
-            if current_id in processed_ids:
+        for i in range(len(sorted_ids)):
+            curr_id = sorted_ids[i]
+            if curr_id in processed:
                 continue
 
-            cmd_id = current_id // 2
-            pair_neighbor = current_id + 1
-
-            action1 = ids[current_id][0]
-            plier1 = self.pliers[current_id]
-            crate1 = self.haz_crates[ids[current_id][1]]
-
-            # Vérifier si c'est un ID pair et si son voisin direct est aussi commandé
-            if current_id % 2 == 0 and pair_neighbor in ids:
-                action2 = ids[pair_neighbor][0]
-                plier2 = self.pliers[pair_neighbor]
-                crate2 = self.haz_crates[ids[pair_neighbor][1]]
+            cmd_id = curr_id // 2
+            pair_id = curr_id + 1
+            
+            # Determine if we can run as a PAIR (Mode X 2)
+            if curr_id % 2 == 0 and pair_id in ids:
+                act1, act2 = ids[curr_id][0], ids[pair_id][0]
                 
-                # Cas A : Les deux pinces ont la même action (ex: pick/pick)
-                if action1 == action2:
-                    mode = action_map.get(action1, 1) # Fallback to 1 if unknown string
+                # Find the mode: either they are the same, or they match a special mixed mode
+                mode = None
+                if act1 == act2:
+                    mode = action_map.get(act1)
+                else:
+                    mode = pair_modes.get((act1, act2))
+
+                if mode:
+                    # Execute as Pair
                     self.pub_command.publish(String(data=f"PINCE {cmd_id} {mode} 2"))
-                    if mode == 1:
-                        plier1.state = crate1.id
-                        plier2.state = crate2.id
-                        crate1.state = current_id
-                        crate2.state = pair_neighbor
-                    else:
-                        plier1.state = -1
-                        plier2.state = -1
-                        crate1.state = -1
-                        crate2.state = -1
-                        
-                        # Update pos
-                        self.update_crate_pos(plier1, crate1)
-                        self.update_crate_pos(plier2, crate2)
-
-                        # Update color if needed
-                        if mode == 3:
-                            if crate1.color == 1:
-                                crate1.color = 0
-                            elif crate1.color == 0:
-                                crate1.color = 1
-                            if crate2.color == 1:
-                                crate2.color = 0
-                            elif crate2.color == 0:
-                                crate2.color = 1
-
-                    # Set plier running
-                    plier1.is_running = True
-                    plier2.is_running = True
-
-                    # Remove for next check the ids
-                    processed_ids.add(current_id)
-                    processed_ids.add(pair_neighbor)
+                    self._update_plier_logic(curr_id, ids[curr_id], crate_dict)
+                    self._update_plier_logic(pair_id, ids[pair_id], crate_dict)
+                    processed.update([curr_id, pair_id])
                     continue
-                
-                # Cas B : Combinaison mixte spéciale -> rev_drop(0) et drop(1)
-                elif action1 == "rev_drop" and action2 == "drop":
-                    self.pub_command.publish(String(data=f"PINCE {cmd_id} 5 2"))
-                    plier1.state = -1
-                    plier2.state = -1
-                    crate1.state = -1
-                    crate2.state = -1
-                    self.update_crate_pos(plier1, crate1)
-                    self.update_crate_pos(plier2, crate2)
-                    if crate1.color == 1:
-                        crate1.color = 0
-                    elif crate1.color == 0:
-                        crate1.color = 1
-                    plier1.is_running = True
-                    plier2.is_running = True
-                    processed_ids.add(current_id)
-                    processed_ids.add(pair_neighbor)
-                    continue
-                
-                # Cas C : Combinaison mixte spéciale -> drop(0) et rev_drop(1)
-                elif action1 == "drop" and action2 == "rev_drop":
-                    self.pub_command.publish(String(data=f"PINCE {cmd_id} 4 2"))
-                    plier1.state = -1
-                    plier2.state = -1
-                    crate1.state = -1
-                    crate2.state = -1
-                    self.update_crate_pos(plier1, crate1)
-                    self.update_crate_pos(plier2, crate2)
-                    if crate2.color == 1:
-                        crate2.color = 0
-                    elif crate2.color == 0:
-                        crate2.color = 1
-                    plier1.is_running = True
-                    plier2.is_running = True
-                    processed_ids.add(current_id)
-                    processed_ids.add(pair_neighbor)
-                    continue
-                
-                # Si actions mixtes non supportées par paire (ex: pick + drop),
-                # on laisse le code continuer pour les traiter individuellement.
 
-            # Traitement individuel (ID seul, voisin manquant, ou paire incompatible)
-            mode = action_map.get(action1, 1)
-            side = current_id % 2
+            # Execute Individually
+            act, crate_id = ids[curr_id]
+            mode = action_map.get(act, 1)
+            side = curr_id % 2
             self.pub_command.publish(String(data=f"PINCE {cmd_id} {mode} {side}"))
-            if mode == 1:
-                plier1.state = crate1.id
-                crate1.state = current_id
-            else:
-                plier1.state = -1
-                crate1.state = -1
-                if mode == 3:
-                    if crate1.color == 1:
-                        crate1.color = 0
-                    elif crate1.color == 0:
-                        crate1.color = 1
-                self.update_crate_pos(plier1, crate1)
-            plier1.is_running = True
-            processed_ids.add(current_id)
+            self._update_plier_logic(curr_id, ids[curr_id], crate_dict)
+            processed.add(curr_id)
+
+    def _update_plier_logic(self, plier_id, action_info, crate_dict):
+        """Helper to sync internal state after a command is sent."""
+        action, crate_id = action_info
+        plier = self.pliers[plier_id]
+        crate = crate_dict[crate_id]
+        
+        plier.is_running = True
+
+        if action == "pick":
+            plier.state = crate.id
+            crate.state = plier_id
+        else:
+            # Handling drop / rev_drop
+            plier.state = -1
+            crate.state = -1
+            if action == "rev_drop":
+                crate.color = 1 if crate.color == 0 else 0
+            
+            self.update_crate_pos(plier, crate)
 
     def update_crate_pos(self, plier, crate):
         """Update the position of the crate in the world reference."""
@@ -1292,16 +1161,6 @@ class ActionManager(Node):
                                              f"{led.green} {led.blue}")
                                  )
 
-    def write_log(self, message):
-        """Write logs."""
-        if not self.stop:
-            pass
-
-    def sleep(self, duration):
-        """Sleep for a given duration."""
-        if not self.stop:
-            time.sleep(duration)
-
     def send_raw(self, raw_command):
         """Send raw commands."""
         if not self.stop:
@@ -1311,27 +1170,10 @@ class ActionManager(Node):
     def kalman(self, kalman: bool):
         """Compute the kalman action."""
         if not self.stop:
-            if kalman:
-                self.pub_command.publish(String(data="ENKALMAN 1"))
-            else:
-                self.pub_command.publish(String(data="ENKALMAN 0"))
+            self.pub_command.publish(String(data=f"ENKALMAN {int(kalman)}"))
             time.sleep(0.1)
 
-    def synchro_lidar(self):
-        """Synchronize odom with lidar."""
-        if not self.stop:
-            if self.robot_pos is None:
-                return
-            command = (
-                f"SYNCHROLIDAR {self.lidar_pos.x} "
-                f"{self.lidar_pos.y} {self.lidar_pos.t}"
-            )
-            self.pub_command.publish(String(data=f"{command}"))
-
-    def any_plier_used(self):
-        return any(pl.state != -1 for pl in self.pliers.values())
-
-    def generate_current_stacks(self):
+    def generate_stacks(self, crate_dict):
         """
         Calculates stacks using Geometric Adjacency and Connected Components.
         Rules: Crates must be parallel, aligned lengthwise, side-by-side (~0.05m apart), max 4 per stack.
@@ -1344,7 +1186,7 @@ class ActionManager(Node):
         
         with self.data_lock:
             # 1. Grab only free crates
-            available_crates = [c for c in self.haz_crates.values() if c.state == -1]
+            available_crates = [c for c in crate_dict.values() if c.state == -1]
             
             # 2. Build an Adjacency Graph (Dictionary of connections)
             adjacency = {c.id: [] for c in available_crates}
@@ -1414,7 +1256,6 @@ class ActionManager(Node):
         self.send_raw("VMAX 0.4")
         self.send_raw("VTMAX 1.5")
         
-        activate_check_stack = False
         id_steal = 0
 
         while not self.backstage_sequence:
@@ -1426,7 +1267,7 @@ class ActionManager(Node):
             # =================================================================
             with self.data_lock:
                 pliers_used = any(pl.state != -1 for pl in self.pliers.values())
-                
+
                 if pliers_used:
                     # Find the highest scoring zone
                     best_zone = max(self.zones.values(), key=lambda z: z.release_reward, default=None)
@@ -1439,7 +1280,6 @@ class ActionManager(Node):
                         action = "FINAL_ZONE"
                 else:
                     # Find the highest scoring crate
-                    self.get_logger().info(f"Crate rew: {[c.pick_reward for c in self.haz_crates.values()]}")
                     best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
                     
                     if best_crate and best_crate.pick_reward > float('-inf'):
@@ -1469,7 +1309,7 @@ class ActionManager(Node):
                         self.wait_for_motion()
                 if self.backstage_sequence:
                     break
-                self.stare_and_update()
+                self.stare_and_update(self.haz_crates)
 
                 with self.data_lock:
                     id_active_pliers = {}
@@ -1484,7 +1324,7 @@ class ActionManager(Node):
                             id_active_pliers[pid] = ["rev_drop", plier.state]
                 if self.backstage_sequence:
                     break
-                self.send_plier_cmd(id_active_pliers)
+                self.send_plier_cmd(id_active_pliers, self.haz_crates)
                 self.wait_for_plier()
 
                 with self.data_lock:
@@ -1520,7 +1360,7 @@ class ActionManager(Node):
                             id_active_pliers_all[pid] = ["drop", plier.state]
                 if self.backstage_sequence:
                     break
-                self.send_plier_cmd(id_active_pliers_all)
+                self.send_plier_cmd(id_active_pliers_all, self.haz_crates)
                 self.wait_for_plier()
                 continue
 
@@ -1554,51 +1394,23 @@ class ActionManager(Node):
                 )
 
                 entry_point = pick_path[-1] if len(pick_path) > 0 else (self.robot_pos.x, self.robot_pos.y)
-                angle_to_crate = math.atan2(target_pos.y - entry_point[1], target_pos.x - entry_point[0])
                 
-                if activate_check_stack:
-                    best_camera_theta = current_robot_theta
-                    min_rot = float('inf')
-                    for cam_angle in self.camera_angles:
-                        req_theta = (angle_to_crate - cam_angle) % (2 * math.pi)
-                        if req_theta > math.pi: req_theta -= 2 * math.pi
-                        
-                        rot = self.angular_distance(current_robot_theta, req_theta)
-                        if rot < min_rot:
-                            min_rot = rot
-                            best_camera_theta = req_theta
-                            
                 if len(pick_path) > 1:
                     for i, wp in enumerate(pick_path[1:]):
                         if self.backstage_sequence:
                             break
-                        if activate_check_stack and i == len(pick_path[1:]) - 1:
-                            self.move_to(Position(wp[0], wp[1], best_camera_theta))
-                        else:
-                            self.move_to(Position(wp[0], wp[1], final_robot_theta))
+                        self.move_to(Position(wp[0], wp[1], final_robot_theta))
                         self.wait_for_motion()
                 if self.backstage_sequence:
                     break
-                self.stare_and_update()
+                self.stare_and_update(self.haz_crates)
                 self.centering()
 
-                if activate_check_stack:
-                    is_ghost = False
-                    with self.data_lock:
-                        for cid in pick_crate_ids:
-                            if cid not in self.haz_crates:
-                                is_ghost = True
-                                break
-                    if is_ghost:
-                        self.get_logger().warn("Crate missing after approach! Aborting pick...")
-                        continue 
-
-                if not activate_check_stack or abs(self.angular_distance(best_camera_theta, final_robot_theta)) > 0.05:
-                    if self.backstage_sequence:
-                        break
-                    self.move_to(Position(entry_point[0], entry_point[1], final_robot_theta))
-                    # self.get_logger().info(f'Entry Point {entry_point[0]}, {entry_point[1]}, {final_robot_theta}')
-                    self.wait_for_motion()
+                if self.backstage_sequence:
+                    break
+                self.move_to(Position(entry_point[0], entry_point[1], final_robot_theta))
+                # self.get_logger().info(f'Entry Point {entry_point[0]}, {entry_point[1]}, {final_robot_theta}')
+                self.wait_for_motion()
 
                 if self.backstage_sequence:
                     break
@@ -1641,7 +1453,7 @@ class ActionManager(Node):
 
                 if self.backstage_sequence:
                     break
-                self.send_plier_cmd(dict_sel_pliers)
+                self.send_plier_cmd(dict_sel_pliers, self.haz_crates)
                 self.wait_for_plier()
                 continue
 
@@ -1661,7 +1473,7 @@ class ActionManager(Node):
                         break
                     self.move_to(Position(pos[0], pos[1], (id_steal * 2.3998) % (2 * np.pi)))
                     self.wait_for_motion()
-                    self.stare_and_update()
+                    self.stare_and_update(self.haz_crates)
                     
                 id_steal += 1
                 time.sleep(0.1)
@@ -1855,38 +1667,7 @@ class ActionManager(Node):
         # If we survived all 4 axis checks, they are definitively colliding!
         return True
             
-    def is_any_point_in_zone(self, id_zone):
-        """
-        Checks if any haz_crate is currently sitting inside the specified zone.
-        
-        Args:
-            id_zone: The integer/string ID of the zone in self.zones
-            
-        Returns:
-            True if at least one crate is in the zone, False otherwise.
-        """
-        if id_zone not in self.zones:
-            self.get_logger().warn(f"Zone ID {id_zone} does not exist!")
-            return False
-            
-        # 1. Grab the specific zone object
-        zone = self.zones[id_zone]
-        
-        # 2. Calculate its boundaries once
-        half_size = zone.size / 2.0
-        min_x = zone.x - half_size
-        max_x = zone.x + half_size
-        min_y = zone.y - half_size
-        max_y = zone.y + half_size
-        
-        # 3. Check every crate (We use .values() to get the actual HazCrate objects)
-        for crate in self.haz_crates.values():
-            if (min_x <= crate.x <= max_x) and (min_y <= crate.y <= max_y) and crate.state == -1:
-                return True  # Found one! Exit immediately.
-                
-        return False # Looked at all crates, none were in the zone
-    
-    def get_all_points_in_zone(self, id_zone):
+    def get_all_points_in_zone(self, id_zone, crate_dict):
         """
         Finds all haz_crates that have ANY part inside a specific square zone.
         Uses SAT for precise OBB-AABB collision. Crates are already in global coordinates.
@@ -1907,7 +1688,7 @@ class ActionManager(Node):
         
         # Lock the data so the camera thread doesn't change haz_crates while we iterate!
         with self.data_lock:
-            for c in self.haz_crates.values():
+            for c in crate_dict.values():
                 # Crates are already in global map coordinates, so no transform needed!
                 cx = c.x
                 cy = c.y

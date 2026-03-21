@@ -18,7 +18,6 @@ class Script:
         self.id_mvt = 0
 
     def run(self, node):
-        node.write_log("Script GNAAAAAAAAAAAAAais running...")
 
         # Banderole
         node.smart_moves()

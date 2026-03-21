@@ -163,6 +163,9 @@ class MotorSimu(Node):
         elif request_split[0] == "BLOCK":
             self.ask_for_block = True
 
+        elif request_split[0] == "FREE":
+            self.ask_for_block = True
+
         return response
 
     def _single_handle_accepted_callback(self, goal_handle):
