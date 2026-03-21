@@ -254,6 +254,8 @@ class MapScene(QtWidgets.QGraphicsView):
         self.zone_items = {}
         self.path_items = []
         self.max_paths_to_show = 3
+        self.morbidity_data = {}
+        self.morbidity_items = []
 
         # Create a dropdown menu floating on the View
         self.path_selector = QtWidgets.QComboBox(self)
@@ -498,6 +500,10 @@ class MapScene(QtWidgets.QGraphicsView):
         try:
             full_state = json.loads(json_str)
             
+            if 'morbidity' in full_state: # or full_state
+                self.morbidity_data = full_state['morbidity']
+                self._redraw_morbidity()
+
             for crate in full_state.get('crates', []):
                 self.crate_local_states[crate['id']] = crate 
                 self._update_crate_visual(crate)
@@ -522,6 +528,10 @@ class MapScene(QtWidgets.QGraphicsView):
         try:
             updates = json.loads(json_str)
             
+            if 'morbidity' in updates: # or full_state
+                self.morbidity_data = updates['morbidity']
+                self._redraw_morbidity()
+
             for crate in updates.get('crates', []):
                 self.crate_local_states[crate['id']] = crate
                 self._update_crate_visual(crate)
@@ -715,6 +725,57 @@ class MapScene(QtWidgets.QGraphicsView):
             is_best = (len(drawn_zone_paths) == 0)
             draw_trajectory(zone['path'], green_shades[len(drawn_zone_paths) % 3], is_best)
             drawn_zone_paths.append(zone['path'])
+
+    def _redraw_morbidity(self):
+        """Draw the 'Danger Map' showing why paths are refused."""
+        # 1. Clear old morbidity items
+        for item in self.morbidity_items:
+            if item in self.scene.items():
+                self.scene.removeItem(item)
+        self.morbidity_items = []
+
+        if not self.morbidity_data:
+            return
+
+        # Helper to convert meters to QRectF/Scene coordinates
+        def get_qrect(x, y, w, h):
+            px, py = self.pos_to_scene(x, y + h) # Qt draws from top-left, we calculate from bottom-left
+            pw, ph = self.size_to_scene(w, h)
+            return QtCore.QRectF(px, py, pw, ph)
+
+        # 2. Draw HARD ZONES (Solid Red - Never Cross)
+        red_brush = QtGui.QBrush(QtGui.QColor(255, 0, 0, 60)) # 60/255 opacity
+        for z in self.morbidity_data.get('hard_zones', []):
+            rect_item = QtWidgets.QGraphicsRectItem(get_qrect(z['x'], z['y'], z['w'], z['h']))
+            rect_item.setBrush(red_brush)
+            rect_item.setPen(QtGui.QPen(QtCore.Qt.red, 1))
+            rect_item.setZValue(0.05) # Floor level
+            self.scene.addItem(rect_item)
+            self.morbidity_items.append(rect_item)
+
+        # 3. Draw SAFETY MARGINS (Orange - The Expanded Robot Radius)
+        orange_brush = QtGui.QBrush(QtGui.QColor(255, 165, 0, 40))
+        for z in self.morbidity_data.get('safety_zones', []):
+            rect_item = QtWidgets.QGraphicsRectItem(get_qrect(z['x'], z['y'], z['w'], z['h']))
+            rect_item.setBrush(orange_brush)
+            rect_item.setPen(QtGui.QPen(QtCore.Qt.darkYellow, 1, QtCore.Qt.DashLine))
+            rect_item.setZValue(0.06)
+            self.scene.addItem(rect_item)
+            self.morbidity_items.append(rect_item)
+
+        # 4. Draw CRATE BUBBLES (Blue Circles - Dynamic Obstacles)
+        blue_brush = QtGui.QBrush(QtGui.QColor(0, 0, 255, 35))
+        for b in self.morbidity_data.get('crate_bubbles', []):
+            # pos_to_scene returns center, drawEllipse needs top-left
+            cx, cy = self.pos_to_scene(b['x'], b['y'])
+            r_px, _ = self.size_to_scene(b['radius'], b['radius']) # radius in pixels
+            
+            ellipse_item = QtWidgets.QGraphicsEllipseItem(cx - r_px, cy - r_px, r_px * 2, r_px * 2)
+            ellipse_item.setBrush(blue_brush)
+            ellipse_item.setPen(QtGui.QPen(QtCore.Qt.blue, 1, QtCore.Qt.DotLine))
+            ellipse_item.setZValue(0.07)
+            self.scene.addItem(ellipse_item)
+            self.morbidity_items.append(ellipse_item)
 
 class DraggablePixmapItem(QtWidgets.QGraphicsPixmapItem):
     """Drag items on the Map."""

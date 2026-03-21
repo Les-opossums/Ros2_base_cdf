@@ -424,6 +424,10 @@ class ActionManager(Node):
                     'path': zone.best_release_path
                 })
 
+        # --- NEW: Add the Morbidity data for initialization ---
+        if hasattr(self, 'morbidity_data'):
+            full_state['morbidity'] = self.morbidity_data
+
         # Return it directly in the service response string
         response.success = True
         response.message = json.dumps(full_state)
@@ -441,7 +445,7 @@ class ActionManager(Node):
             return
 
         # --- THE FIX: Add 'zones' to the updates dictionary ---
-        updates = {'crates': [], 'pliers': [], 'zones': []}
+        updates = {'crates': [], 'pliers': [], 'zones': [], 'morbidity': []}
 
         # Ensure 'zones' exists in the last_sent_state dictionary
         if 'zones' not in self.last_sent_state:
@@ -491,9 +495,17 @@ class ActionManager(Node):
                     'path': zone.best_release_path
                 })
                 self.last_sent_state['zones'][zid] = current_state
+        
+        # 4. --- NEW: Check Morbidity Map for changes ---
+        if hasattr(self, 'morbidity_data'):
+            # We compare the current morbidity data to the last one sent
+            # Using a simple comparison of the dict (or a hash if it gets too big)
+            if self.morbidity_data != self.last_sent_state.get('morbidity'):
+                updates['morbidity'] = self.morbidity_data
+                self.last_sent_state['morbidity'] = self.morbidity_data.copy()
 
         # 4. Only publish if there is actually something new in ANY of the lists!
-        if updates['crates'] or updates['pliers'] or updates['zones']:
+        if updates['crates'] or updates['pliers'] or updates['zones'] or updates['morbidity']:
             msg = String()
             msg.data = json.dumps(updates)
             self.pub_board_state.publish(msg)
@@ -778,129 +790,159 @@ class ActionManager(Node):
             return
 
         with self.data_lock:
-            # =================================================================
-            # A. SCORE ALL PICKUP OPTIONS
-            # =================================================================
-            # 1. Reset all crate scores to negative infinity
+            self.update_morbidity_map()
 
-            for crate in list(self.haz_crates.values()):
+            for crate in self.haz_crates.values():
                 crate.pick_reward = float('-inf')
 
             if all(any(self.pliers[pid].state != -1 for pid in range(side * 4, (side + 1) * 4)) for side in range(4)):
                 return
 
-                
-            current_stacks = self.generate_stacks(self.haz_crates)
-            approach_distance = 0.3
+            self.update_pick_reward()
 
-            for stack_ids in current_stacks:
-                group_crates = [self.haz_crates[cid] for cid in stack_ids if cid in self.haz_crates]
-                if not group_crates:
-                    continue
-
-                # Security Filter: If any crate in stack is safe, skip the whole stack
-                skip_stack = False
-                for crate in group_crates:
-                    if (self.get_current_zone(crate.x, crate.y, crate.theta) is not None and crate.color in (-1, self.color, 2)) or self.in_final_zone(crate.x, crate.y, crate.theta):
-                        skip_stack = True
-                        break
-                
-                if skip_stack:
-                    continue
-
-                # Consolidation math
-                mean_x = np.mean([c.x for c in group_crates])
-                mean_y = np.mean([c.y for c in group_crates])
-                mean_theta = np.arctan2(np.sum([np.sin(c.theta) for c in group_crates]), 
-                                        np.sum([np.cos(c.theta) for c in group_crates]))
-
-                # Calculate Entry Points
-                entries = [
-                    (mean_x - approach_distance * np.cos(mean_theta), mean_y - approach_distance * np.sin(mean_theta), False),
-                    (mean_x + approach_distance * np.cos(mean_theta), mean_y + approach_distance * np.sin(mean_theta), True)
-                ]
-
-                best_dist = float('inf')
-                best_path = []
-                best_inv = False
-
-                primary_id = stack_ids[0]
-
-                for ex, ey, is_inv in entries:
-                    if not (self.boundaries[0] <= ex <= self.boundaries[1] and self.boundaries[2] <= ey <= self.boundaries[3]):
-                        continue
-                        
-                    target_pos = (ex, ey)
-                    
-                    # Check Path
-                    path, dist = self.get_best_path(target_pos, target_crate_id=primary_id, allow_critical=False)
-
-                    if dist < best_dist:
-                        best_dist = dist
-                        best_path = path
-                        best_inv = is_inv
-
-                # Write the final score into ALL crates in this stack
-                if best_dist != float('inf'):
-                    reward = self.compute_pick_penality(mean_x, mean_y)
-                    for cid in stack_ids:
-                        if cid in self.haz_crates:
-                            crate = self.haz_crates[cid]
-                            crate.pick_reward = reward + (-15) * crate.attempts
-                            crate.best_pick_path = best_path
-                            crate.use_inverted = best_inv
-                            crate.is_part_of_stack = stack_ids
-
-            # =================================================================
-            # B. SCORE ALL RELEASE OPTIONS
-            # =================================================================
-            # 1. Check if we even need to release
-
-            for z_id, zone in list(self.zones.items()):
+            for zone in self.zones.values():
                 zone.release_reward = float('-inf')
 
             if  all(pl.state == -1 for pl in self.pliers.values()):
                 return
-                
-            for z_id, zone in list(self.zones.items()):
-                # Check if occupied
-                if len(self.get_all_points_in_zone(z_id, self.haz_crates)) > 0:
-                    continue 
-                
-                x = zone.x
-                y = zone.y
-                distance = 0.26
-                av_poses = [
-                    [x + distance, y, 3.14],
-                    [x - distance, y, 0.0],
-                    [x, y + distance, 4.71],
-                    [x, y - distance, 1.57],
-                ]
+            
+            self.update_release_reward()
 
-                best_dist = float('inf')
-                best_path = []
-                best_pos = None
+    def update_pick_reward(self):
+        current_stacks = self.generate_stacks(self.haz_crates)
+        approach_distance = 0.3
 
-                for pos in av_poses:
-                    if not (self.boundaries[0] + 0.2 < pos[0] < self.boundaries[1] - 0.2 and 
-                            self.boundaries[2] + 0.2 < pos[1] < self.boundaries[3] - 0.2): 
-                        continue
-                        
-                    target_pos = (pos[0], pos[1])
+        for stack_ids in current_stacks:
+            group_crates = [self.haz_crates[cid] for cid in stack_ids if cid in self.haz_crates]
+            if not group_crates:
+                continue
+
+            # Security Filter: If any crate in stack is safe, skip the whole stack
+            skip_stack = False
+            for crate in group_crates:
+                if (self.get_current_zone(crate.x, crate.y, crate.theta) is not None and crate.color in (-1, self.color, 2)) or self.in_final_zone(crate.x, crate.y, crate.theta):
+                    skip_stack = True
+                    break
+            
+            if skip_stack:
+                continue
+
+            # Consolidation math
+            mean_x = np.mean([c.x for c in group_crates])
+            mean_y = np.mean([c.y for c in group_crates])
+            mean_theta = np.arctan2(np.sum([np.sin(c.theta) for c in group_crates]), 
+                                    np.sum([np.cos(c.theta) for c in group_crates]))
+
+            # Calculate Entry Points
+            entries = [
+                (mean_x - approach_distance * np.cos(mean_theta), mean_y - approach_distance * np.sin(mean_theta), False),
+                (mean_x + approach_distance * np.cos(mean_theta), mean_y + approach_distance * np.sin(mean_theta), True)
+            ]
+
+            best_dist = float('inf')
+            best_path = []
+            best_inv = False
+
+            primary_id = stack_ids[0]
+
+            for ex, ey, is_inv in entries:
+                if not (self.boundaries[0] <= ex <= self.boundaries[1] and self.boundaries[2] <= ey <= self.boundaries[3]):
+                    continue
                     
-                    path, dist = self.get_best_path(target_pos, allow_critical=False)
-                            
-                    if dist < best_dist:
-                        best_dist = dist
-                        best_path = path
-                        best_pos = pos
+                target_pos = (ex, ey)
+                
+                # Check Path
+                path, dist = self.get_best_path(target_pos, target_crate_id=primary_id, allow_critical=False)
 
-                # Write the final score into the zone
-                if best_dist != float('inf'):
-                    reward = self.compute_release_penality(best_pos[0], best_pos[1], best_dist)
-                    zone.release_reward = reward
-                    zone.best_release_path = best_path
-                    zone.best_release_pos = best_pos
+                if dist < best_dist:
+                    best_dist = dist
+                    best_path = path
+                    best_inv = is_inv
+
+            # Write the final score into ALL crates in this stack
+            if best_dist != float('inf'):
+                reward = self.compute_pick_penality(mean_x, mean_y)
+                for cid in stack_ids:
+                    if cid in self.haz_crates:
+                        crate = self.haz_crates[cid]
+                        crate.pick_reward = reward + (-15) * crate.attempts
+                        crate.best_pick_path = best_path
+                        crate.use_inverted = best_inv
+                        crate.is_part_of_stack = stack_ids
+
+    def update_release_reward(self):
+        distance = 0.26
+        for z_id, zone in list(self.zones.items()):
+            # Check if occupied
+            if len(self.get_all_points_in_zone(z_id, self.haz_crates)) > 0:
+                continue 
+            
+            x = zone.x
+            y = zone.y
+            av_poses = [
+                [x + distance, y, 3.14],
+                [x - distance, y, 0.0],
+                [x, y + distance, 4.71],
+                [x, y - distance, 1.57],
+            ]
+
+            best_dist = float('inf')
+            best_path = []
+            best_pos = None
+
+            for pos in av_poses:
+                if not (self.boundaries[0] + 0.2 < pos[0] < self.boundaries[1] - 0.2 and 
+                        self.boundaries[2] + 0.2 < pos[1] < self.boundaries[3] - 0.2): 
+                    continue
+                    
+                target_pos = (pos[0], pos[1])
+                
+                path, dist = self.get_best_path(target_pos, allow_critical=False)
+                        
+                if dist < best_dist:
+                    best_dist = dist
+                    best_path = path
+                    best_pos = pos
+
+            # Write the final score into the zone
+            if best_dist != float('inf'):
+                reward = self.compute_release_penality(best_pos[0], best_pos[1], best_dist)
+                zone.release_reward = reward
+                zone.best_release_path = best_path
+                zone.best_release_pos = best_pos
+
+    def update_morbidity_map(self):
+        """Call this inside continuous_planner to refresh the 'danger' data."""
+        with self.data_lock:
+            self.morbidity_data = {
+                "hard_zones": [],      # Static boundaries
+                "safety_zones": [],    # Expanded boundaries (0.35m)
+                "crate_bubbles": []    # Dynamic circles around crates
+            }
+
+            # 1. Store the Static Forbidden Zone
+            # Original: (0.6, 1.55) to (2.4, 2.0)
+            self.morbidity_data["hard_zones"].append({
+                "x": 0.6, "y": 1.55, "w": 1.8, "h": 0.45
+            })
+
+            # 2. Store the Expanded 'Minkowski' Zone (where robot center can't go)
+            self.morbidity_data["safety_zones"].append({
+                "x": self.f_zone_x_min, 
+                "y": self.f_zone_y_min, 
+                "w": self.f_zone_x_max - self.f_zone_x_min, 
+                "h": self.f_zone_y_max - self.f_zone_y_min
+            })
+
+            # 3. Store Crate Bubbles (Dynamic)
+            for cid, crate in self.haz_crates.items():
+                if crate.state == -1: # Only floor crates
+                    self.morbidity_data["crate_bubbles"].append({
+                        "id": cid,
+                        "x": crate.x,
+                        "y": crate.y,
+                        "radius": 0.22 # Ideal Margin
+                    })
 
     def robot_data_callback(self, msg: RobotData):
         """Receive the Robot Data from Zynq."""
@@ -1248,17 +1290,19 @@ class ActionManager(Node):
             with self.data_lock:
                 best_zone = max(self.zones.values(), key=lambda z: z.release_reward, default=None)
                 best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
-                    
-                if best_zone and best_zone.release_reward > float('-inf'):
-                    rel_path = best_zone.best_release_path
-                    best_release_pos = best_zone.best_release_pos
-                    action = "RELEASE"
                 
-                elif best_crate and best_crate.pick_reward > float('-inf'):
+                if best_crate and best_crate.pick_reward > float('-inf'):
                     pick_crate_ids = best_crate.is_part_of_stack
                     pick_path = best_crate.best_pick_path
                     is_inv = best_crate.use_inverted
                     action = "PICK"
+                
+                elif best_zone and best_zone.release_reward > float('-inf'):
+                    rel_path = best_zone.best_release_path
+                    best_release_pos = best_zone.best_release_pos
+                    action = "RELEASE"
+                
+                
 
                 else:
                     action = "EXPLORE"
@@ -1791,8 +1835,8 @@ class ActionManager(Node):
         no matter what (Best Effort).
         """
         start_pos = (self.robot_pos.x, self.robot_pos.y)
-        IDEAL_MARGIN = 0.25
-        CRITICAL_MARGIN = 0.17
+        IDEAL_MARGIN = 0.22
+        CRITICAL_MARGIN = 0.13
 
         # --- 1. TRY THE SAFE WAY (0.35m) ---
         if self.is_direct_path_clear(start_pos, target_pos, target_crate_id, margin=IDEAL_MARGIN):
