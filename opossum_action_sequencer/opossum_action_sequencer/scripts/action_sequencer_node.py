@@ -563,6 +563,8 @@ class ActionManager(Node):
             sin_t = math.sin(self.robot_pos.t)
 
             for det in camera_detections:
+                if det.x ** 2 + det.y ** 2 < 0.05 and det.z > 0.17:
+                    continue
                 world_det = SimpleNamespace()
                 world_det.id = det.id
                 world_det.x = self.robot_pos.x + (det.x * cos_t - det.y * sin_t)
