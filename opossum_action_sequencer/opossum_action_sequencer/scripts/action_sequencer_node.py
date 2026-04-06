@@ -140,8 +140,8 @@ class ActionManager(Node):
         self.new_pos = 0
         self.pos_obj = None
         self.max_distance = 0.2
-        self.latest_camera_msg = None
-        self.last_camera_timestamp = time.time()
+        self.latest_camera_msg = {1: None, 2: None, 3: None}
+        self.last_camera_timestamp = {1: time.time(), 2: time.time(), 3: time.time()}
 
         # Action Done
         self.is_robot_moving = False
@@ -165,7 +165,7 @@ class ActionManager(Node):
         self.stop = False
         self.data_lock = threading.RLock()  # <--- Added the 'R'
         # self.camera_angles = [0.0, 2.093333, 4.186666]
-        self.camera_angles = [0.0]
+        # self.camera_angles = [0.0]
 
         # --- NEW: Navigation Constraints ---
         self.robot_radius = 0.18
@@ -515,8 +515,8 @@ class ActionManager(Node):
     # =========================================================================
     def aruco_callback(self, msg: VisionDataFrame):
         """Continuously save the latest camera frame without processing it."""
-        self.latest_camera_msg = msg
-        self.last_camera_timestamp = time.time()
+        self.latest_camera_msg[msg.id] = msg
+        self.last_camera_timestamp[msg.id] = time.time()
 
     def _extract_color_from_id(self, aruco_id: int) -> int:
         """Map ArUco ID to internal color code."""
@@ -542,81 +542,81 @@ class ActionManager(Node):
         # 1. Wait for physical motion blur to clear
         time.sleep(0.2) 
         
-        if time.time() - self.last_camera_timestamp > 0.2:
-            return
+        for key, msg in self.latest_camera_msg.items():
+            if time.time() - self.last_camera_timestamp[key] > 0.2:
+                continue
 
-        # 2. Grab the latest message in the buffer
-        msg = self.latest_camera_msg
-        if msg is None or not msg.object:
-            self.get_logger().info("Stare complete: No objects currently visible.")
-            return
+            # 2. Grab the latest message in the buffer
+            if msg is None or not msg.object:
+                self.get_logger().info(f"Stare complete: No objects currently visible for camera {key}.")
+                continue
 
-        camera_detections = msg.object
-        current_time = time.time()
+            camera_detections = msg.object
+            current_time = time.time()
 
-        # =====================================================================
-        # 3. TRANSFORM DETECTIONS: ROBOT FRAME -> WORLD FRAME
-        # =====================================================================
-        world_detections = []
-        cos_t = math.cos(self.robot_pos.t)
-        sin_t = math.sin(self.robot_pos.t)
+            # =====================================================================
+            # 3. TRANSFORM DETECTIONS: ROBOT FRAME -> WORLD FRAME
+            # =====================================================================
+            world_detections = []
+            cos_t = math.cos(self.robot_pos.t)
+            sin_t = math.sin(self.robot_pos.t)
 
-        for det in camera_detections:
-            world_det = SimpleNamespace()
-            world_det.id = det.id
-            world_det.x = self.robot_pos.x + (det.x * cos_t - det.y * sin_t)
-            world_det.y = self.robot_pos.y + (det.x * sin_t + det.y * cos_t)
-            world_det.theta = self.robot_pos.t + det.theta
-            world_detections.append(world_det)
+            for det in camera_detections:
+                world_det = SimpleNamespace()
+                world_det.id = det.id
+                world_det.x = self.robot_pos.x + (det.x * cos_t - det.y * sin_t)
+                world_det.y = self.robot_pos.y + (det.x * sin_t + det.y * cos_t)
+                world_det.theta = self.robot_pos.t + det.theta
+                world_detections.append(world_det)
 
-        # =====================================================================
-        # 4. HUNGARIAN TRACKING LOGIC (Using World Detections)
-        # =====================================================================
+            # =====================================================================
+            # 4. HUNGARIAN TRACKING LOGIC (Using World Detections)
+            # =====================================================================
 
-        crate_ids = list(crate_dict.keys())
-        num_crates = len(crate_ids)
-        num_detections = len(world_detections)
-        
-        cost_matrix = np.zeros((num_crates, num_detections))
+            crate_ids = list(crate_dict.keys())
+            num_crates = len(crate_ids)
+            num_detections = len(world_detections)
+            
+            cost_matrix = np.zeros((num_crates, num_detections))
 
-        for i, cid in enumerate(crate_ids):
-            crate = crate_dict[cid]
+            for i, cid in enumerate(crate_ids):
+                crate = crate_dict[cid]
+                for j, det in enumerate(world_detections):
+                    # Now we are comparing World to World!
+                    dist = math.hypot(crate.x - det.x, crate.y - det.y)
+                    cost_matrix[i, j] = dist
+
+            crate_indices, detection_indices = linear_sum_assignment(cost_matrix)
+            matched_detection_indices = set()
+
+            for crate_idx, det_idx in zip(crate_indices, detection_indices):
+                distance = cost_matrix[crate_idx, det_idx]
+
+                # max_distance should probably be around 0.10 to 0.15 (10-15cm) to allow for minor camera errors
+                if distance <= self.max_distance:
+                    cid = crate_ids[crate_idx]
+                    matched_crate = crate_dict[cid]
+                    det = world_detections[det_idx]
+
+                    matched_crate.x = det.x
+                    matched_crate.y = det.y
+                    matched_crate.theta = det.theta
+                    matched_crate.last_seen = current_time
+                    matched_crate.color = self._extract_color_from_id(det.id)
+
+                    # if matched_crate.color in [-1, 2]:
+
+                    matched_detection_indices.add(det_idx)
+
             for j, det in enumerate(world_detections):
-                # Now we are comparing World to World!
-                dist = math.hypot(crate.x - det.x, crate.y - det.y)
-                cost_matrix[i, j] = dist
-
-        crate_indices, detection_indices = linear_sum_assignment(cost_matrix)
-        matched_detection_indices = set()
-
-        for crate_idx, det_idx in zip(crate_indices, detection_indices):
-            distance = cost_matrix[crate_idx, det_idx]
-
-            # max_distance should probably be around 0.10 to 0.15 (10-15cm) to allow for minor camera errors
-            if distance <= self.max_distance:
-                cid = crate_ids[crate_idx]
-                matched_crate = crate_dict[cid]
-                det = world_detections[det_idx]
-
-                matched_crate.x = det.x
-                matched_crate.y = det.y
-                matched_crate.theta = det.theta
-                matched_crate.last_seen = current_time
-                matched_crate.color = self._extract_color_from_id(det.id)
-
-                # if matched_crate.color in [-1, 2]:
-
-                matched_detection_indices.add(det_idx)
-
-        for j, det in enumerate(world_detections):
-            if j not in matched_detection_indices:
-                new_id = max(crate_dict.keys()) + 1
-                color_val = self._extract_color_from_id(det.id)
-                new_crate = HazCrate(new_id, det.x, det.y, det.theta, rot=(color_val == 2))
-                new_crate.color = color_val
-                new_crate.last_seen = current_time
-                crate_dict[new_id] = new_crate
-                self.get_logger().info(f"Tracking: Discovered new crate! Assigned internal ID: {new_id} at X:{det.x:.2f} Y:{det.y:.2f}")
+                if j not in matched_detection_indices:
+                    new_id = max(crate_dict.keys()) + 1
+                    color_val = self._extract_color_from_id(det.id)
+                    new_crate = HazCrate(new_id, det.x, det.y, det.theta, rot=(color_val == 2))
+                    new_crate.color = color_val
+                    new_crate.last_seen = current_time
+                    crate_dict[new_id] = new_crate
+                    self.get_logger().info(f"Tracking: Discovered new crate! Assigned internal ID: {new_id} at X:{det.x:.2f} Y:{det.y:.2f}")
 
         # =====================================================================
         # 5. GHOST CLEANUP (FOV & Range Verification)
