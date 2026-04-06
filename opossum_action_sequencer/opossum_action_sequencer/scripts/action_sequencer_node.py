@@ -1443,14 +1443,14 @@ class ActionManager(Node):
 
                 if self.backstage_sequence:
                     break
-                self.move_to(Position(entry_point[0], entry_point[1], final_robot_theta))
+                self.send_raw("ENKALMAN 0 0")
+                # self.move_to(Position(entry_point[0], entry_point[1], final_robot_theta))
                 # self.get_logger().info(f'Entry Point {entry_point[0]}, {entry_point[1]}, {final_robot_theta}')
-                self.wait_for_motion()
+                # self.wait_for_motion()
 
                 if self.backstage_sequence:
                     break
 
-                self.send_raw("ENKALMAN 0 0")
                 self.move_to(final_pos)
                 # self.get_logger().info(f'Final Pose {final_pos.x}, {final_pos.y}, {final_robot_theta}')
                 self.wait_for_motion()
