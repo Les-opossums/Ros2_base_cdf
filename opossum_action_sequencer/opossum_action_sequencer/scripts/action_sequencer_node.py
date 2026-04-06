@@ -818,7 +818,7 @@ class ActionManager(Node):
 
     def update_pick_reward(self):
         current_stacks = self.generate_stacks(self.haz_crates)
-        approach_distance = 0.3
+        approach_distance = 0.26
 
         for stack_ids in current_stacks:
             group_crates = [self.haz_crates[cid] for cid in stack_ids if cid in self.haz_crates]
