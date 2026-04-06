@@ -1303,9 +1303,13 @@ class ActionManager(Node):
         for _ in range(10):
             self.send_raw("PINCE 2 1 2")
             self.send_raw("PINCE 3 1 2")
+            self.send_raw("PINCE 4 1 2")
+            self.send_raw("PINCE 5 1 2")
             time.sleep(5)
             self.send_raw("PINCE 2 2 2")
             self.send_raw("PINCE 3 2 2")
+            self.send_raw("PINCE 4 1 2")
+            self.send_raw("PINCE 5 1 2")
             time.sleep(5)
 
     def test_script2(self):

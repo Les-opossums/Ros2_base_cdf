@@ -12,4 +12,4 @@ import threading
 
 class Script():
     def run(self, node):
-        node.test_script3()
+        node.test_script1()
