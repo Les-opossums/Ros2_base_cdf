@@ -1289,7 +1289,16 @@ class ActionManager(Node):
 
     def centering(self):
         pass
-
+    
+    def test_script(self):
+        for _ in range(10):
+            self.send_raw("PINCE 0 1 2")
+            self.send_raw("PINCE 1 1 2")
+            time.sleep(5)
+            self.send_raw("PINCE 0 2 2")
+            self.send_raw("PINCE 1 2 2")
+            time.sleep(5)
+        
     def smart_moves(self):
         self.send_raw("VMAX 0.4")
         self.send_raw("VTMAX 1.5")
