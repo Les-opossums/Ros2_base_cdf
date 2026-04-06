@@ -1461,9 +1461,10 @@ class ActionManager(Node):
                 if self.backstage_sequence:
                     break
                 
-                path, _ = self.get_best_path((pos[0], pos[1]), allow_critical=True)
-                self.navigate_path(path, (id_steal * 2.3998) % (2 * np.pi))
-                self.stare_and_update(self.haz_crates)
+                if self.is_point_safe(pos[0], pos[1]):
+                    path, _ = self.get_best_path((pos[0], pos[1]), allow_critical=True)
+                    self.navigate_path(path, (id_steal * 2.3998) % (2 * np.pi))
+                    self.stare_and_update(self.haz_crates)
                     
                 id_steal += 1
 
