@@ -171,10 +171,10 @@ class ActionManager(Node):
         self.robot_radius = 0.18
         
         # Safe boundaries (shrunk by robot radius):
-        self.safe_x_min = 0.0 + self.robot_radius
-        self.safe_x_max = 3.0 - self.robot_radius
-        self.safe_y_min = 0.0 + self.robot_radius
-        self.safe_y_max = 2.0 - self.robot_radius
+        self.safe_x_min = self.boundaries[0] + self.robot_radius
+        self.safe_x_max = self.boundaries[1] - self.robot_radius
+        self.safe_y_min = self.boundaries[2] + self.robot_radius
+        self.safe_y_max = self.boundaries[3] - self.robot_radius
         
         # Forbidden Zone (Real: x=[0.6, 2.4], y=[1.55, 2.0])
         # Expanded Forbidden Zone (grown by robot radius):
@@ -266,7 +266,7 @@ class ActionManager(Node):
             ],
         )
 
-        self.boundaries = self.year = (
+        self.boundaries = (
             self.get_parameter("boundaries")
             .get_parameter_value()
             .double_array_value
@@ -853,7 +853,7 @@ class ActionManager(Node):
             primary_id = stack_ids[0]
 
             for ex, ey, is_inv in entries:
-                if not (self.boundaries[0] <= ex <= self.boundaries[1] and self.boundaries[2] <= ey <= self.boundaries[3]):
+                if not (self.boundaries[0] + self.robot_radius <= ex <= self.boundaries[1] - self.robot_radius and self.boundaries[2] + self.robot_radius <= ey <= self.boundaries[3] - self.robot_radius):
                     continue
                     
                 target_pos = (ex, ey)
@@ -898,8 +898,8 @@ class ActionManager(Node):
             best_pos = None
 
             for pos in av_poses:
-                if not (self.boundaries[0] + 0.2 < pos[0] < self.boundaries[1] - 0.2 and 
-                        self.boundaries[2] + 0.2 < pos[1] < self.boundaries[3] - 0.2): 
+                if not (self.boundaries[0] + self.robot_radius < pos[0] < self.boundaries[1] - self.robot_radius and 
+                        self.boundaries[2] + self.robot_radius < pos[1] < self.boundaries[3] - self.robot_radius): 
                     continue
                     
                 target_pos = (pos[0], pos[1])
