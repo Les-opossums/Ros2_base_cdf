@@ -540,7 +540,7 @@ class ActionManager(Node):
         self.get_logger().info("Staring... waiting for camera to settle.")
         
         # 1. Wait for physical motion blur to clear
-        time.sleep(0.2) 
+        time.sleep(2.5) 
         
         for key, msg in self.latest_camera_msg.items():
             if time.time() - self.last_camera_timestamp[key] > 0.2:
