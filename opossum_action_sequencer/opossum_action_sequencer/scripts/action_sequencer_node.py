@@ -1333,8 +1333,10 @@ class ActionManager(Node):
     def smart_moves(self):
         self.send_raw("VMAX 0.4")
         self.send_raw("VTMAX 1.5")
-        
+
         id_steal = 0
+
+        self.send_raw("ENKALMAN 0 0")
 
         while not self.backstage_sequence:
             self.continuous_planner_callback()
