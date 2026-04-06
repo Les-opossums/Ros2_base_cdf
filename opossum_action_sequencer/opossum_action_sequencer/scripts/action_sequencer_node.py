@@ -515,8 +515,9 @@ class ActionManager(Node):
     # =========================================================================
     def aruco_callback(self, msg: VisionDataFrame):
         """Continuously save the latest camera frame without processing it."""
-        self.latest_camera_msg[msg.id] = msg
-        self.last_camera_timestamp[msg.id] = time.time()
+        if msg.id == 1:
+            self.latest_camera_msg[msg.id] = msg
+            self.last_camera_timestamp[msg.id] = time.time()
 
     def _extract_color_from_id(self, aruco_id: int) -> int:
         """Map ArUco ID to internal color code."""
@@ -540,8 +541,8 @@ class ActionManager(Node):
         self.get_logger().info("Staring... waiting for camera to settle.")
         
         # 1. Wait for physical motion blur to clear
-        time.sleep(2.5) 
-        
+        time.sleep(3.0)
+
         for key, msg in self.latest_camera_msg.items():
             if time.time() - self.last_camera_timestamp[key] > 0.2:
                 continue
