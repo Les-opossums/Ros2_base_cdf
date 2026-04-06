@@ -1336,8 +1336,6 @@ class ActionManager(Node):
 
         id_steal = 0
 
-        self.send_raw("ENKALMAN 0 0")
-
         while not self.backstage_sequence:
             self.continuous_planner_callback()
             action = None
@@ -1451,9 +1449,12 @@ class ActionManager(Node):
 
                 if self.backstage_sequence:
                     break
+
+                self.send_raw("ENKALMAN 0 0")
                 self.move_to(final_pos)
                 # self.get_logger().info(f'Final Pose {final_pos.x}, {final_pos.y}, {final_robot_theta}')
                 self.wait_for_motion()
+                self.send_raw("ENKALMAN 1 1")
 
                 with self.data_lock:
                     robot_x, robot_y, robot_t = final_pos.x, final_pos.y, final_pos.t
