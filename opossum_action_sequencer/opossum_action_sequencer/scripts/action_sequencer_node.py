@@ -801,24 +801,29 @@ class ActionManager(Node):
         if self.stop or not hasattr(self, 'haz_crates') or getattr(self, 'robot_pos', None) is None:
             return
 
+        max_pliers = 2
         with self.data_lock:
             self.update_morbidity_map()
 
+            # Reset rewards
             for crate in self.haz_crates.values():
                 crate.pick_reward = float('-inf')
-
-            if all(any(self.pliers[pid].state != -1 for pid in range(side * 4, (side + 1) * 4)) for side in range(4)):
-                return
-
-            self.update_pick_reward()
-
+            
             for zone in self.zones.values():
                 zone.release_reward = float('-inf')
 
-            if  all(pl.state == -1 for pl in self.pliers.values()):
-                return
+            # Compute the amount of pliers active
+            pliers_active = 0
+            for side in range(4):
+                if any(self.pliers[pid].state != -1 for pid in range(side * 4, (side + 1) * 4)):
+                    pliers_active += 1
             
-            self.update_release_reward()
+            # Check if more than 2
+            if pliers_active <= max_pliers:
+                self.update_pick_reward()
+
+            if  not all(pl.state == -1 for pl in self.pliers.values()):
+                self.update_release_reward()
 
     def update_pick_reward(self):
         current_stacks = self.generate_stacks(self.haz_crates)
@@ -1352,16 +1357,16 @@ class ActionManager(Node):
                 best_zone = max(self.zones.values(), key=lambda z: z.release_reward, default=None)
                 best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
 
-                if best_zone and best_zone.release_reward > float('-inf'):
-                    rel_path = best_zone.best_release_path
-                    best_release_pos = best_zone.best_release_pos
-                    action = "RELEASE"     
-
-                elif best_crate and best_crate.pick_reward > float('-inf'):
+                if best_crate and best_crate.pick_reward > float('-inf'):
                     pick_crate_ids = best_crate.is_part_of_stack
                     pick_path = best_crate.best_pick_path
                     is_inv = best_crate.use_inverted
                     action = "PICK"
+                
+                elif best_zone and best_zone.release_reward > float('-inf'):
+                    rel_path = best_zone.best_release_path
+                    best_release_pos = best_zone.best_release_pos
+                    action = "RELEASE"     
                 
                 else:
                     action = "EXPLORE"
