@@ -260,7 +260,7 @@ class ActionManager(Node):
         self.declare_parameters(
             namespace="",
             parameters=[
-                ("board_config", "small_objects"),
+                ("board_config", "objects"),
                 ("year", 2026),
                 ("boundaries", [0.0, 3.0, 0.0, 2.0]),
             ],
@@ -541,7 +541,7 @@ class ActionManager(Node):
         self.get_logger().info("Staring... waiting for camera to settle.")
         
         # 1. Wait for physical motion blur to clear
-        time.sleep(3.0)
+        time.sleep(1.0)
 
         for key, msg in self.latest_camera_msg.items():
             if time.time() - self.last_camera_timestamp[key] > 0.2:
@@ -1333,7 +1333,7 @@ class ActionManager(Node):
             time.sleep(5)
 
     def smart_moves(self):
-        self.send_raw("VMAX 0.4")
+        self.send_raw("VMAX 0.7")
         self.send_raw("VTMAX 1.5")
 
         id_steal = 0
@@ -1348,20 +1348,18 @@ class ActionManager(Node):
             with self.data_lock:
                 best_zone = max(self.zones.values(), key=lambda z: z.release_reward, default=None)
                 best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
-                
-                if best_crate and best_crate.pick_reward > float('-inf'):
+
+                if best_zone and best_zone.release_reward > float('-inf'):
+                    rel_path = best_zone.best_release_path
+                    best_release_pos = best_zone.best_release_pos
+                    action = "RELEASE"     
+
+                elif best_crate and best_crate.pick_reward > float('-inf'):
                     pick_crate_ids = best_crate.is_part_of_stack
                     pick_path = best_crate.best_pick_path
                     is_inv = best_crate.use_inverted
                     action = "PICK"
                 
-                elif best_zone and best_zone.release_reward > float('-inf'):
-                    rel_path = best_zone.best_release_path
-                    best_release_pos = best_zone.best_release_pos
-                    action = "RELEASE"
-                
-                
-
                 else:
                     action = "EXPLORE"
 
@@ -1695,7 +1693,7 @@ class ActionManager(Node):
         """Calculates the score of a specific release pose using actual path distance."""
         coeff_center = 1 
         coeff_dst = -1
-        coeff_enn = -5 
+        coeff_enn = 2
         
         val_center = (1.5 - px) ** 2 + (1 - py) ** 2
         # Use the TRUE path distance, not just a straight line guess!
@@ -1711,7 +1709,7 @@ class ActionManager(Node):
     def compute_pick_penality(self, x, y):
         coeff_center = -1 # -0.005
         coeff_dst = -1
-        coeff_enn = -4 # 0.05
+        coeff_enn = 2 # 0.05
         # coeef_end = -0.0001
         val_center = (1.5 - x) ** 2 + (1 - y) ** 2
         val_dst = (self.robot_pos.x - x) ** 2 + (self.robot_pos.y - y) ** 2

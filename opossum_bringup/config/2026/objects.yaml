@@ -150,31 +150,31 @@ map:
 actuators:
   # RIGHT SIDE (0 rad) - Matches Drawing
   # Index 0 is Top, Index 3 is Bottom
-  0: { type: vaccum_gripper, name: vaccum_gripper0, x: 0.25,  y: 0.075, t: 0.0,  size: 0.02 }
-  1: { type: vaccum_gripper, name: vaccum_gripper1, x: 0.25,  y: 0.025, t: 0.0,  size: 0.02 }
-  2: { type: vaccum_gripper, name: vaccum_gripper2, x: 0.25,  y: -0.025, t: 0.0, size: 0.02 }
-  3: { type: vaccum_gripper, name: vaccum_gripper3, x: 0.25,  y: -0.075, t: 0.0, size: 0.02 }
+  0: { type: vaccum_gripper, name: vaccum_gripper0, x: 0.23,  y: 0.075, t: 0.0,  size: 0.02 }
+  1: { type: vaccum_gripper, name: vaccum_gripper1, x: 0.23,  y: 0.025, t: 0.0,  size: 0.02 }
+  2: { type: vaccum_gripper, name: vaccum_gripper2, x: 0.23,  y: -0.025, t: 0.0, size: 0.02 }
+  3: { type: vaccum_gripper, name: vaccum_gripper3, x: 0.23,  y: -0.075, t: 0.0, size: 0.02 }
 
   # BOTTOM SIDE (4.71 rad / 270°) - Fixed to be Right-to-Left
   # Index 4 is Right, Index 7 is Left
-  4: { type: vaccum_gripper, name: vaccum_gripper4, x: 0.075,  y: -0.25, t: 4.71, size: 0.02 }
-  5: { type: vaccum_gripper, name: vaccum_gripper5, x: 0.025,  y: -0.25, t: 4.71, size: 0.02 }
-  6: { type: vaccum_gripper, name: vaccum_gripper6, x: -0.025, y: -0.25, t: 4.71, size: 0.02 }
-  7: { type: vaccum_gripper, name: vaccum_gripper7, x: -0.075, y: -0.25, t: 4.71, size: 0.02 }
+  4: { type: vaccum_gripper, name: vaccum_gripper4, x: 0.075,  y: -0.23, t: 4.71, size: 0.02 }
+  5: { type: vaccum_gripper, name: vaccum_gripper5, x: 0.025,  y: -0.23, t: 4.71, size: 0.02 }
+  6: { type: vaccum_gripper, name: vaccum_gripper6, x: -0.025, y: -0.23, t: 4.71, size: 0.02 }
+  7: { type: vaccum_gripper, name: vaccum_gripper7, x: -0.075, y: -0.23, t: 4.71, size: 0.02 }
 
   # LEFT SIDE (3.14 rad / 180°) - Fixed to be Bottom-to-Top
   # Index 8 is Bottom, Index 11 is Top
-  8:  { type: vaccum_gripper, name: vaccum_gripper8, x: -0.25, y: -0.075, t: 3.14, size: 0.02 }
-  9:  { type: vaccum_gripper, name: vaccum_gripper9, x: -0.25, y: -0.025, t: 3.14, size: 0.02 }
-  10: { type: vaccum_gripper, name: vaccum_gripper10, x: -0.25, y: 0.025,  t: 3.14, size: 0.02 }
-  11: { type: vaccum_gripper, name: vaccum_gripper11, x: -0.25, y: 0.075,  t: 3.14, size: 0.02 }
+  8:  { type: vaccum_gripper, name: vaccum_gripper8, x: -0.23, y: -0.075, t: 3.14, size: 0.02 }
+  9:  { type: vaccum_gripper, name: vaccum_gripper9, x: -0.23, y: -0.025, t: 3.14, size: 0.02 }
+  10: { type: vaccum_gripper, name: vaccum_gripper10, x: -0.23, y: 0.025,  t: 3.14, size: 0.02 }
+  11: { type: vaccum_gripper, name: vaccum_gripper11, x: -0.23, y: 0.075,  t: 3.14, size: 0.02 }
 
   # TOP SIDE (1.57 rad / 90°) - Fixed to be Left-to-Right
   # Index 12 is Left, Index 15 is Right
-  12: { type: vaccum_gripper, name: vaccum_gripper12, x: -0.075, y: 0.25, t: 1.57, size: 0.02 }
-  13: { type: vaccum_gripper, name: vaccum_gripper13, x: -0.025, y: 0.25, t: 1.57, size: 0.02 }
-  14: { type: vaccum_gripper, name: vaccum_gripper14, x: 0.025,  y: 0.25, t: 1.57, size: 0.02 }
-  15: { type: vaccum_gripper, name: vaccum_gripper15, x: 0.075,  y: 0.25, t: 1.57, size: 0.02 }
+  12: { type: vaccum_gripper, name: vaccum_gripper12, x: -0.075, y: 0.23, t: 1.57, size: 0.02 }
+  13: { type: vaccum_gripper, name: vaccum_gripper13, x: -0.025, y: 0.23, t: 1.57, size: 0.02 }
+  14: { type: vaccum_gripper, name: vaccum_gripper14, x: 0.025,  y: 0.23, t: 1.57, size: 0.02 }
+  15: { type: vaccum_gripper, name: vaccum_gripper15, x: 0.075,  y: 0.23, t: 1.57, size: 0.02 }
 
 actuators_type:
   vaccum_gripper:
@@ -229,9 +229,9 @@ zones:
 final_zone:
   0:
     x: 0.3
-    y: 1.625
+    y: 1.72
     size: 0.5
   1:
     x: 2.7
-    y: 1.625
+    y: 1.72
     size: 0.5

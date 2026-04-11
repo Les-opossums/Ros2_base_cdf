@@ -1,17 +1,17 @@
 main_robot:
   action_sequencer_node:
     ros__parameters:
-      boundaries: [0.0, 1.0, 0.0, 2.0]
-      # boundaries: [0.0, 3.0, 0.0, 2.0]
-      board_config: small_objects
-      # board_config: objects
+      # boundaries: [0.0, 1.0, 0.0, 2.0]
+      boundaries: [0.0, 3.0, 0.0, 2.0]
+      # board_config: small_objects
+      board_config: objects
       year: 2026
 
 second_robot:
   action_sequencer_node:
     ros__parameters:
-      boundaries: [0.0, 1.0, 0.0, 2.0]
-      # boundaries: [0.0, 3.0, 0.0, 2.0]
-      board_config: small_objects
-      # board_config: objects
+      # boundaries: [0.0, 1.0, 0.0, 2.0]
+      boundaries: [0.0, 3.0, 0.0, 2.0]
+      # board_config: small_objects
+      board_config: objects
       year: 2026
