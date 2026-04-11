@@ -1333,7 +1333,7 @@ class ActionManager(Node):
             time.sleep(5)
 
     def smart_moves(self):
-        self.send_raw("VMAX 0.7")
+        self.send_raw("VMAX 1.0")
         self.send_raw("VTMAX 1.5")
 
         id_steal = 0
@@ -1443,7 +1443,7 @@ class ActionManager(Node):
 
                 if self.backstage_sequence:
                     break
-                self.send_raw("ENKALMAN 0 0")
+                # self.send_raw("ENKALMAN 0 0")
                 # self.move_to(Position(entry_point[0], entry_point[1], final_robot_theta))
                 # self.get_logger().info(f'Entry Point {entry_point[0]}, {entry_point[1]}, {final_robot_theta}')
                 # self.wait_for_motion()
@@ -1454,7 +1454,7 @@ class ActionManager(Node):
                 self.move_to(final_pos)
                 # self.get_logger().info(f'Final Pose {final_pos.x}, {final_pos.y}, {final_robot_theta}')
                 self.wait_for_motion()
-                self.send_raw("ENKALMAN 1 1")
+                # self.send_raw("ENKALMAN 1 1")
 
                 with self.data_lock:
                     robot_x, robot_y, robot_t = final_pos.x, final_pos.y, final_pos.t
@@ -1693,7 +1693,7 @@ class ActionManager(Node):
         """Calculates the score of a specific release pose using actual path distance."""
         coeff_center = 1 
         coeff_dst = -1
-        coeff_enn = 2
+        coeff_enn = 0.2
         
         val_center = (1.5 - px) ** 2 + (1 - py) ** 2
         # Use the TRUE path distance, not just a straight line guess!
@@ -1709,7 +1709,7 @@ class ActionManager(Node):
     def compute_pick_penality(self, x, y):
         coeff_center = -1 # -0.005
         coeff_dst = -1
-        coeff_enn = 2 # 0.05
+        coeff_enn = 0.2 # 0.05
         # coeef_end = -0.0001
         val_center = (1.5 - x) ** 2 + (1 - y) ** 2
         val_dst = (self.robot_pos.x - x) ** 2 + (self.robot_pos.y - y) ** 2
