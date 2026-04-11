@@ -515,7 +515,7 @@ class ActionManager(Node):
     # =========================================================================
     def aruco_callback(self, msg: VisionDataFrame):
         """Continuously save the latest camera frame without processing it."""
-        if msg.id == 1:
+        if msg.id == 1 or msg.id == 2:
             self.latest_camera_msg[msg.id] = msg
             self.last_camera_timestamp[msg.id] = time.time()
 
@@ -564,6 +564,8 @@ class ActionManager(Node):
 
             for det in camera_detections:
                 if det.x ** 2 + det.y ** 2 < 0.05 and det.z > 0.17:
+                    continue
+                if det.x ** 2 + det.y ** 2 > 0.8:
                     continue
                 world_det = SimpleNamespace()
                 world_det.id = det.id
