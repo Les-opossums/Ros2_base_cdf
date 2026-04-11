@@ -565,7 +565,7 @@ class ActionManager(Node):
             for det in camera_detections:
                 if det.x ** 2 + det.y ** 2 < 0.05 and det.z > 0.17:
                     continue
-                if det.x ** 2 + det.y ** 2 > 0.8:
+                if det.x ** 2 + det.y ** 2 > 0.6 ** 2:
                     continue
                 world_det = SimpleNamespace()
                 world_det.id = det.id
@@ -946,7 +946,7 @@ class ActionManager(Node):
                 "h": self.f_zone_y_max - self.f_zone_y_min
             })
 
-            # 3. Store Crate Bubbles (Dynamic)
+            # 3. Store Crate Bubbles (Dynamic)s
             for cid, crate in self.haz_crates.items():
                 if crate.state == -1: # Only floor crates
                     self.morbidity_data["crate_bubbles"].append({
@@ -982,7 +982,7 @@ class ActionManager(Node):
     def timer_backstage_callback(self):
         self.backstage_sequence = True
         self.get_logger().warn("Abort, go back home")
-        self.send_raw("VMAX 0.5")
+        self.send_raw("VMAX 1.5")
         self.get_logger().info("Cannot find release zone. Going to final zone.")
         
         if self.color == 0:
@@ -1335,12 +1335,13 @@ class ActionManager(Node):
             time.sleep(5)
 
     def smart_moves(self):
-        self.send_raw("VMAX 1.0")
-        self.send_raw("VTMAX 1.5")
-
+        # self.send_raw("VMAX 1.5")
+        # self.send_raw("VTMAX 1.5")
         id_steal = 0
 
         while not self.backstage_sequence:
+            self.send_raw("VMAX 1.5")
+            self.send_raw("VTMAX 2.0")
             self.continuous_planner_callback()
             action = None
             
