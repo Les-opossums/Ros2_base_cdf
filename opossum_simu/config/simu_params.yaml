@@ -4,8 +4,10 @@ position_sender_node:
     short_motor_srv: short_motor
     update_position_topic: update_position
     update_period: 0.1
-    # config_yaml: small_objects.yaml
     year: 2026
+    board_config: objects
+    error_precision: 0.04 # m
+    prob_no_stack: 0.1 # scale 1
 
 main_robot:
   zynq_simu_node:
@@ -20,7 +22,6 @@ main_robot:
       real_position_topic: real_position
       short_motor_srv: short_motor
       random_moves: False
-      # boundaries:  [0.0, 1.0, 0.0, 2.0]
       boundaries: [0.0, 3.0, 0.0, 2.0]
       compute_period: 0.1
       angular_velocity: 1.0
@@ -48,6 +49,10 @@ main_robot:
     ros__parameters:
       board_config: objects
       year: 2026
+
+  actuators_simu_node:
+    ros__parameters:
+      prob_failure_take: 0.1
 
 second_robot:
   zynq_simu_node:
@@ -89,3 +94,7 @@ second_robot:
     ros__parameters:
       year: 2026
       board_config: objects
+  
+  actuators_simu_node:
+    ros__parameters:
+      prob_failure_take: 0.1

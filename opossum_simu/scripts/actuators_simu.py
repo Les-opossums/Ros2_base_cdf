@@ -34,12 +34,15 @@ class ActuatorsSimu(Node):
 
     def _init_parameters(self) -> None:
         """Init parameters of the node."""
-        # self.declare_parameters(
-        #     namespace="",
-        #     parameters=[
-        #         ("short_motor_srv", rclpy.Parameter.Type.STRING),
-        #     ],
-        # )
+        self.declare_parameters(
+            namespace="",
+            parameters=[
+                ("prob_failure_take", 0.1),
+            ],
+        )
+        self.prob_failure_take = (
+            self.get_parameter("prob_failure_take").get_parameter_value().double_value
+        )
         self.time_pliers_move = 1.5
         self.blocking = False
         if self.blocking:
@@ -123,8 +126,8 @@ class ActuatorsSimu(Node):
             
             # 3. Simulate success/failure (80% chance of success)
             # If the side is acting, roll the dice. If not, it defaults to 0.
-            succ1 = 1 if (side in [0, 2] and random.random() < 0.8) else 0
-            succ2 = 1 if (side in [1, 2] and random.random() < 0.8) else 0
+            succ1 = 1 if (side in [0, 2] and random.random() < 1 - self.prob_failure_take) else 0
+            succ2 = 1 if (side in [1, 2] and random.random() < 1 - self.prob_failure_take) else 0
                 
             # Determine the final state based on the mode and whether it succeeded
             if mode == 1:

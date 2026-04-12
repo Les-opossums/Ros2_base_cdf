@@ -45,6 +45,8 @@ class PositionSender(Node):
                 ("update_position_topic", rclpy.Parameter.Type.STRING),
                 ("board_config", "small_objects"),
                 ("year", 2026),
+                ("prob_no_stack", 0.1),
+                ("error_precision", 0.04),
             ],
         )
 
@@ -53,6 +55,12 @@ class PositionSender(Node):
         )
         self.update_period = (
             self.get_parameter("update_period").get_parameter_value().double_value
+        )
+        self.prob_no_stack = (
+            self.get_parameter("prob_no_stack").get_parameter_value().double_value
+        )
+        self.error_precision = (
+            self.get_parameter("error_precision").get_parameter_value().double_value
         )
         self.year = self.get_parameter("year").get_parameter_value().integer_value
         self.board_config = self.get_parameter("board_config").get_parameter_value().string_value
@@ -94,12 +102,12 @@ class PositionSender(Node):
         self.objects = {}
         # Iterate over all map objects
         for obj in data['map'].values():
-            skip_stack = random.uniform(0.0, 1.0) > 0.7
+            skip_stack = random.uniform(0.0, 1.0) > 1.0 - self.prob_no_stack
             if skip_stack:
                 continue
-            obj_x = obj['x'] + random.uniform(-0.04, 0.04)
-            obj_y = obj['y'] + random.uniform(-0.04, 0.04)
-            obj_t = obj['t'] + random.uniform(-0.02, 0.02)
+            obj_x = obj['x'] + random.uniform(-self.error_precision, self.error_precision)
+            obj_y = obj['y'] + random.uniform(-self.error_precision, self.error_precision)
+            obj_t = obj['t'] + random.uniform(-self.error_precision / 2, self.error_precision / 2)
             cos_ = np.cos(obj_t)
             sin_ = np.sin(obj_t)
             if obj['type'] == "full_haz_stack_crates" and obj['shape'] == "clean":
