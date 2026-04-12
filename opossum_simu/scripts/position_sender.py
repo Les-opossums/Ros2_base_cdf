@@ -94,8 +94,11 @@ class PositionSender(Node):
         self.objects = {}
         # Iterate over all map objects
         for obj in data['map'].values():
-            cos_ = np.cos(obj['t'])
-            sin_ = np.sin(obj['t'])
+            obj_x = obj['x'] + random.uniform(-0.04, 0.04)
+            obj_y = obj['y'] + random.uniform(-0.04, 0.04)
+            obj_t = obj['t'] + random.uniform(-0.02, 0.02)
+            cos_ = np.cos(obj_t)
+            sin_ = np.sin(obj_t)
             if obj['type'] == "full_haz_stack_crates" and obj['shape'] == "clean":
                 order = ["yellow", "yellow", "blue", "blue"]
                 random.shuffle(order)
@@ -105,10 +108,14 @@ class PositionSender(Node):
             else:
                 order = ["rot", "rot", "rot", "rot"]
             for ind, element in element_types[obj['type']].items():
-                
-                x = obj['x'] + element['x'] * cos_ - element['y'] * sin_
-                y = obj['y'] + element['x'] * sin_ + element['y'] * cos_
-                t = obj['t'] + element['t']
+                if obj['type'] in ("full_haz_stack_crates", "half_haz_stack_crates"):
+                    x = obj_x + element['x'] * cos_ - element['y'] * sin_
+                    y = obj_y + element['x'] * sin_ + element['y'] * cos_
+                    t = obj_t + element['t']
+                else:
+                    x = obj_x + element['x'] * cos_ - element['y'] * sin_
+                    y = obj_y + element['x'] * sin_ + element['y'] * cos_
+                    t = obj_t + element['t']
                 elem = Objects()
                 elem.id = nb_objects
                 elem.state = "free"
