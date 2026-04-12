@@ -7,11 +7,26 @@
 import rclpy
 from rclpy.node import Node
 import numpy as np
+import os
+import yaml
 
 # Import des messages
 from rclpy.executors import ExternalShutdownException
 from opossum_msgs.msg import GlobalView, VisionDataFrame, VisionData
+from ament_index_python.packages import get_package_share_directory
+from dataclasses import dataclass
+@dataclass
+class Camera:
+    id: int
+    angle: float
+    cone_range: float
+    distance_range: float
 
+    def __init__(self, id, angle, cone_range = 1.2, distance_range = 1.2):
+        self.id = id
+        self.angle = angle
+        self.cone_range = cone_range
+        self.distance_range = distance_range
 class HazCrate:
     id: int
     x: float
@@ -43,29 +58,25 @@ class CameraSimulation(Node):
         self.declare_parameters(
             namespace="",
             parameters=[
-                ("camera_angles", rclpy.Parameter.Type.DOUBLE_ARRAY),
-                ("radius", rclpy.Parameter.Type.DOUBLE_ARRAY),
-                ("cone_range", rclpy.Parameter.Type.DOUBLE_ARRAY),
+                ("board_config", rclpy.Parameter.Type.STRING),
+                ("year", rclpy.Parameter.Type.INTEGER),
             ],
         )
         self._init_main_parameters()
 
     def _init_main_parameters(self: Node) -> None:
-        self.radius = (
-            self.get_parameter("radius")
-            .get_parameter_value()
-            .double_array_value
+        self.year = self.get_parameter("year").get_parameter_value().integer_value
+        self.board_config = self.get_parameter("board_config").get_parameter_value().string_value
+        objects_path = os.path.join(
+            get_package_share_directory("opossum_bringup"), "config", str(self.year), f"{self.board_config}.yaml"
         )
-        self.camera_angles = (
-            self.get_parameter("camera_angles")
-            .get_parameter_value()
-            .double_array_value
-        )
-        self.cone_range = (
-            self.get_parameter("cone_range")
-            .get_parameter_value()
-            .double_array_value
-        )
+
+        data = yaml.safe_load(open(objects_path, "r"))
+        # Get the poition of the pumps on the robot
+        cameras = data['cameras']
+        self.cameras = {}
+        for k, v in cameras.items():
+            self.cameras[k] = Camera(id=k, angle=v["angle"], cone_range=v["cone_range"], distance_range=v["distance_range"])
         self.haz_crates = {}
         self._init_publishers()
         self._init_subscribers()
@@ -104,20 +115,21 @@ class CameraSimulation(Node):
     def _publish_objects(self, msg) -> None:
         """Simule la détection des caméras et publie les objets dans le repère Robot."""
         self._update(msg)
-        global_msg = VisionDataFrame()
         
         # Position et angle actuel du robot (World)
         rx, ry = self.position[0][0], self.position[1][0]
         r_theta = self.angle
 
         # Parcourir chaque caméra définie par tes paramètres
-        for cam_idx, cam_angle_robot in enumerate(self.camera_angles):
-            radius_max = self.radius[cam_idx]
-            half_cone = self.cone_range[cam_idx] / 2.0
-            
+        for cam_idx, cam in self.cameras.items():
+            global_msg = VisionDataFrame()
+            global_msg.id = cam_idx
+            radius_max = cam.distance_range
+            half_cone = cam.cone_range / 2.0
+
             # Angle absolu de la caméra dans le monde
             # cam_angle_robot est l'angle de la caméra PAR RAPPORT au robot
-            cam_world_angle = r_theta + cam_angle_robot
+            cam_world_angle = r_theta + cam.angle
 
             for obj_id, crate in self.haz_crates.items():
                 
@@ -159,7 +171,7 @@ class CameraSimulation(Node):
                     obj_msg.id = crate.color
                     global_msg.object.append(obj_msg)
 
-        self.pub_cam.publish(global_msg)
+            self.pub_cam.publish(global_msg)
         
 
 

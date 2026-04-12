@@ -1282,7 +1282,7 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
 
         # GUI for each robot
         self.page_name_box = QtWidgets.QComboBox()
-        self.page_name_box.addItems(["General View"] + [name for name in self.gui_node.robot_names])
+        self.page_name_box.addItems([name for name in self.gui_node.robot_names] + ["General View"])
         self.robot_pages = {
             name: MainRobotPage(name, self) for name in self.gui_node.robot_names
         }

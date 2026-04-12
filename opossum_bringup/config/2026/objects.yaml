@@ -184,6 +184,20 @@ actuators_type:
     take:
       - can
 
+cameras:
+  1:
+    angle: 0.0 # rad
+    cone_range: 1.2 # rad
+    distance_range: 1.2 # m
+  2:
+    angle: 4.71 # rad
+    cone_range: 1.2 # rad
+    distance_range: 1.2 # m
+  3:
+    angle: 3.14 # rad
+    cone_range: 1.2 # rad
+    distance_range: 1.2 # m
+
 zones:
   0:
     x: 0.1
