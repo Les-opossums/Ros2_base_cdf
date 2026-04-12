@@ -27,7 +27,8 @@ from opossum_action_sequencer.utils import (
 )
 
 import threading
-from threading import Event
+from threading import Lock, Event, Thread
+
 import time
 import os
 import json
@@ -189,6 +190,10 @@ class ActionManager(Node):
         self.end_match_event.set()
         self.stop = False
         self.data_lock = threading.RLock()  # <--- Added the 'R'
+        self._thread = Thread(target=self._run_loop, daemon=True)
+        self.global_sm = GlobalSM.NOP
+        self._lock_gsm = Lock()
+        self._stop_event = Event()
         # self.camera_angles = [0.0, 2.093333, 4.186666]
         # self.camera_angles = [0.0]
 
@@ -1432,29 +1437,27 @@ class ActionManager(Node):
         """Run the threaded loop."""
         period = 1.0 / self.loop_frequency
         while not self._stop_event.is_set():
-            start_time = time()
+            start_time = time.time()
 
             try:
                 self.main_loop()
             except Exception as e:
                 print(f"🔥 Error in PliersSystem loop: {e}")
                 import traceback
-
                 traceback.print_exc()
 
             # Sleep to maintain frequency
-            elapsed = time() - start_time
+            elapsed = time.time() - start_time
             sleep_time = period - elapsed
             if sleep_time > 0:
                 time.sleep(sleep_time)
             else:
-                print(
-                    f"Warning! Loop duration for pliers took more than expected: {elapsed}"
-                )
+                print(f"Warning! Loop duration for pliers took more than expected: {elapsed:.3f}s")
 
     def main_loop(self):
         """Run main loop logic."""
         global_sm = self.get_global_sm()
+        
         if global_sm != self.last_global_sm:
             self.sub_sm = GlobalSM.NOP  # Same value as all init
             self.last_global_sm = global_sm
@@ -1465,38 +1468,283 @@ class ActionManager(Node):
             self.set_global_sm(req_sm)
             self.payload = payload
 
+        # Block SM progression if the robot is currently moving
         if not self.motion_done:
             return
 
         match global_sm:
             case GlobalSM.NOP:
                 pass
-
             case GlobalSM.EXPLORE:
                 self.explore_sm()
-
             case GlobalSM.PICK:
                 self.pick_sm()
-
             case GlobalSM.RELEASE:
                 self.release_sm()
-
             case GlobalSM.GOHOME:
                 self.go_home_sm()
-
             case _:
                 print(f"Unknown State: {global_sm}")
 
+    # =========================================================================
+    # SELECT STRATEGY
+    # =========================================================================
+    def select_strategy(self):
+        """Plan all the options and their rewards."""
+        self.continuous_planner_callback()
+
+        with self.data_lock:
+            best_zone = max(self.zones.values(), key=lambda z: z.release_reward, default=None)
+            best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
+            
+            if best_crate and best_crate.pick_reward > float('-inf'):
+                return GlobalSM.PICK, {
+                    "crate_ids": best_crate.is_part_of_stack, 
+                    "path": best_crate.best_pick_path, 
+                    "inv": best_crate.use_inverted
+                }
+            
+            elif best_zone and best_zone.release_reward > float('-inf'):
+                return GlobalSM.RELEASE, {
+                    "path": best_zone.best_release_path, 
+                    "best_pos": best_zone.best_release_pos
+                }
+            
+            # Initialize id_steal if it doesn't exist yet
+            if not hasattr(self, 'id_steal'): self.id_steal = 0
+            
+            pos = self.steal_poses[self.id_steal % len(self.steal_poses)]
+            path, _ = self.get_best_path((pos[0], pos[1]), allow_critical=True)
+            
+            return GlobalSM.EXPLORE, {"path": path}
+
+    # =========================================================================
+    # PICK STATE MACHINE (Updated with dynamic camera logic)
+    # =========================================================================
+    def pick_sm(self):
+        match self.sub_sm:
+            case GlobalSM.NOP:
+                self.get_logger().info("Initiating Pick Sequence...")
+                self.sub_sm = PickSM.PICK_NAV
+            
+            case PickSM.PICK_NAV:
+                with self.data_lock:
+                    pliers_config = self.get_best_side_pliers(len(self.payload["crate_ids"]))
+
+                if not pliers_config:
+                    self.get_logger().warn("Target found but no pliers available. Aborting.")
+                    self.sub_sm = PickSM.PICK_FAILED
+                    return
+                
+                selected_pliers_ids = pliers_config[0]
+                self.payload["selected_pliers_ids"] = selected_pliers_ids
+
+                if not self.payload["path"]:
+                    self.sub_sm = PickSM.PICK_LOOK
+                else:
+                    with self.data_lock:
+                        target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["crate_ids"]])
+                        pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in selected_pliers_ids])
+                    
+                    target_angle = target_pos.t + (np.pi if self.payload["inv"] else 0.0)
+                    final_robot_theta = target_angle - pliers_pos.t
+
+                    next_point = self.payload["path"].pop(0)
+                    self.move_to(Position(x=next_point[0], y=next_point[1], t=final_robot_theta))
+
+            case PickSM.PICK_LOOK:
+                # 1. Identify which camera is facing the stack
+                with self.data_lock:
+                    pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in self.payload["selected_pliers_ids"]])
+                
+                id_side = None
+                for cam in self.cameras.values():
+                    # Assuming a helper function are_angles_close exists in your utils
+                    if self.are_angles_close(pliers_pos.t, cam.angle, tolerance=0.2):
+                        id_side = cam.id
+                        break
+                
+                self.get_logger().info(f"Using camera {id_side} for final confirmation.")
+                
+                # 2. Stare & get a snapshot specifically for this camera
+                target_view_crates = self.stare_and_update(self.haz_crates, camera_target=id_side)
+                
+                self.payload["id_side"] = id_side
+                self.payload["target_view_crates"] = target_view_crates
+                
+                self.sub_sm = PickSM.PICK_CENTERING
+                self.count = 0
+
+            case PickSM.PICK_CENTERING:
+                if self.count > 0:
+                    self.sub_sm = PickSM.PICK_PICK
+                    self.count = 0
+                else:
+                    id_side = self.payload.get("id_side")
+                    target_view_crates = self.payload.get("target_view_crates", [])
+
+                    if id_side is not None:
+                        # 3. Generate stacks ONLY from what that specific camera sees right now
+                        temp_dict = {c.id: c for c in target_view_crates}
+                        fresh_stacks = self.generate_stacks(temp_dict)
+
+                        if not fresh_stacks:
+                            self.get_logger().warn("Stack vanished or broke geometry. Aborting pick.")
+                            self.sub_sm = PickSM.PICK_FAILED
+                            return
+
+                        # 4. Pick the best/closest stack from the fresh detections
+                        best_stack_ids = fresh_stacks[0] 
+                        
+                        with self.data_lock:
+                            actual_stack_crates = [self.haz_crates[tid] for tid in best_stack_ids]
+                            target_pos = self.get_mean_pose(actual_stack_crates)
+                            
+                            # Shift pliers configuration to match the new size of the stack
+                            sel_pl_ids = self.payload["selected_pliers_ids"]
+                            new_pliers_selected = list(range(sel_pl_ids[0], sel_pl_ids[0] + len(best_stack_ids)))
+                            pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in new_pliers_selected])
+
+                            self.payload["final_pick_crate_ids"] = best_stack_ids
+                            self.payload["final_selected_pliers_ids"] = new_pliers_selected
+
+                        # 5. RE-CALCULATE Final Alignment dynamically
+                        target_angle = target_pos.t + (np.pi if self.payload["inv"] else 0.0)
+                        final_robot_theta = target_angle - pliers_pos.t
+                        x_off, y_off = self.rotate_point(pliers_pos.x, pliers_pos.y, final_robot_theta)
+
+                        final_pos = Position(target_pos.x - x_off, target_pos.y - y_off, final_robot_theta)
+                        self.payload["final_pos"] = final_pos
+
+                        # 6. Final precise move
+                        self.move_to(final_pos)
+                        self.count += 1
+                    else:
+                        self.get_logger().warn("Camera mapping failed. Aborting pick.")
+                        self.sub_sm = PickSM.PICK_FAILED
+
+            case PickSM.PICK_PICK:
+                if self.count > 0:
+                    self.sub_sm = PickSM.PICK_DONE
+                    self.count = 0
+                else:
+                    final_pos = self.payload["final_pos"]
+                    selected_pliers = self.payload["final_selected_pliers_ids"]
+                    pick_targets = self.payload["final_pick_crate_ids"]
+
+                    with self.data_lock:
+                        robot_x, robot_y, robot_t = final_pos.x, final_pos.y, final_pos.t
+                        pliers_in_map = {}
+                        
+                        # Project pliers into world space
+                        for pl_id in selected_pliers:
+                            p_local = self.pliers[pl_id]
+                            rx, ry = self.rotate_point(p_local.x, p_local.y, robot_t)
+                            pliers_in_map[pl_id] = (robot_x + rx, robot_y + ry)
+
+                        remaining_targets = [tid for tid in pick_targets if tid in self.haz_crates]
+                        
+                        if not remaining_targets:
+                            self.get_logger().warn("All targets vanished during approach! Aborting.")
+                            self.sub_sm = PickSM.PICK_FAILED
+                            return 
+
+                        # Hungarian Assignment for optimal grip mapping
+                        plier_list = list(pliers_in_map.keys())
+                        target_list = list(remaining_targets)
+                        cost_matrix = np.zeros((len(plier_list), len(target_list)))
+                        
+                        for i, pl_id in enumerate(plier_list):
+                            px, py = pliers_in_map[pl_id]
+                            for j, obj_id in enumerate(target_list):
+                                cx, cy = self.haz_crates[obj_id].x, self.haz_crates[obj_id].y
+                                cost_matrix[i, j] = (cx - px)**2 + (cy - py)**2
+
+                        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+                        dict_sel_pliers = {}
+                        for i, j in zip(row_ind, col_ind):
+                            pl_id, best_obj_id = plier_list[i], target_list[j]
+                            dict_sel_pliers[pl_id] = ["pick", best_obj_id]
+
+                    self.send_plier_cmd(dict_sel_pliers, self.haz_crates)
+                    self.count += 1
+
+            case PickSM.PICK_DONE | PickSM.PICK_FAILED:
+                self.set_global_sm(GlobalSM.NOP)
+                self.sub_sm = GlobalSM.NOP
+
+    # =========================================================================
+    # RELEASE STATE MACHINE (Converted to pure SM architecture)
+    # =========================================================================
+    def release_sm(self):
+        match self.sub_sm:
+            case GlobalSM.NOP:
+                self.get_logger().info(f"Executing RELEASE at {self.payload['best_pos']}")
+                self.sub_sm = ReleaseSM.RELEASE_NAV
+                
+            case ReleaseSM.RELEASE_NAV:
+                if not self.payload["path"]:
+                    self.sub_sm = ReleaseSM.RELEASE_LOOK
+                else:
+                    best_pos = self.payload["best_pos"]
+                    with self.data_lock:
+                        id_side = self.get_best_side_pliers_release(best_pos[2])
+                        pliers_theta = self.pliers[id_side * 4].theta if id_side is not None else 0.0
+                    
+                    self.payload["id_side"] = id_side
+                    target_angle = best_pos[2] - pliers_theta
+                    
+                    next_point = self.payload["path"].pop(0)
+                    self.move_to(Position(x=next_point[0], y=next_point[1], t=target_angle))
+
+            case ReleaseSM.RELEASE_LOOK:
+                self.stare_and_update(self.haz_crates)
+                self.sub_sm = ReleaseSM.RELEASE_DROP
+                self.count = 0
+
+            case ReleaseSM.RELEASE_DROP:
+                if self.count > 0:
+                    self.sub_sm = ReleaseSM.RELEASE_DONE
+                    self.count = 0
+                else:
+                    id_side = self.payload.get("id_side")
+                    
+                    with self.data_lock:
+                        id_active_pliers = {}
+                        for pid, plier in self.pliers.items():
+                            if plier.state == -1 or pid // 4 != id_side:
+                                continue
+                            
+                            crate = self.haz_crates[plier.state]
+                            if crate.color in (-1, 2) or crate.color == self.color:
+                                id_active_pliers[pid] = ["drop", plier.state]
+                            else:
+                                id_active_pliers[pid] = ["rev_drop", plier.state]
+                        
+                        # Clear holding state natively
+                        for pl_id in id_active_pliers:
+                            self.pliers[pl_id].state = -1
+
+                    self.send_plier_cmd(id_active_pliers, self.haz_crates)
+                    self.count += 1
+                    
+            case ReleaseSM.RELEASE_DONE:
+                self.set_global_sm(GlobalSM.NOP)
+                self.sub_sm = GlobalSM.NOP
+
+    # =========================================================================
+    # EXPLORE STATE MACHINE
+    # =========================================================================
     def explore_sm(self):
         match self.sub_sm:
-            case GlobalSM.NOP: # Equivalent to ExploreSM.EXPLORE_INIT
-                self.get_logger().info(f"Nothing to do: Exploring / Stealing...")
+            case GlobalSM.NOP:
+                self.get_logger().info("Nothing to do: Exploring / Stealing...")
                 self.sub_sm = ExploreSM.EXPLORE_NAV
             
             case ExploreSM.EXPLORE_NAV:
                 if not self.payload["path"]:
                     self.sub_sm = ExploreSM.EXPLORE_LOOK
-                
                 else:
                     next_point = self.payload["path"].pop(0)
                     self.move_to(Position(x=next_point[0], y=next_point[1], t=(self.id_steal * 2.3998) % (2 * np.pi)))
@@ -1506,182 +1754,9 @@ class ActionManager(Node):
                 self.sub_sm = ExploreSM.EXPLORE_DONE
 
             case ExploreSM.EXPLORE_DONE:
-                self.set_global_sm(GlobalSM.NOP)
-                self.sub_sm = GlobalSM.NOP
                 self.id_steal += 1
-
-    def pick_sm(self):
-        match self.sub_sm:
-            case GlobalSM.NOP: # Equivalent to ExploreSM.EXPLORE_INIT
-                self.get_logger().info(f"Pick SM...")
-                self.sub_sm = PickSM.PICK_NAV
-            
-            case PickSM.PICK_NAV:
-                if not self.payload["path"]:
-                    self.sub_sm = PickSM.PICK_LOOK
-                
-                else:
-                    
-                    with self.data_lock:
-                        pliers_config = self.get_best_side_pliers(len(self.payload["crate_ids"]))
-
-                    if not pliers_config:
-                        self.get_logger().warn("Target found but no pliers available. Switching to Release.")
-                        self.sub_sm = PickSM.PICK_FAILED
-                    
-                    with self.data_lock:
-                        target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["crate_ids"]])
-                        pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in pliers_config[0]])
-                    
-                    target_angle = target_pos.t + (np.pi if self.payload["inv"] else 0.0)
-                    final_robot_theta = target_angle - pliers_pos.t
-
-                    next_point = self.payload["path"].pop(0)
-                    self.move_to(Position(x=next_point[0], y=next_point[1], t=final_robot_theta))
-
-            case PickSM.PICK_LOOK:
-                self.stare_and_update(self.haz_crates)
-                self.sub_sm = PickSM.PICK_CENTERING
-                self.count = 0
-
-            case PickSM.PICK_CENTERING:
-                # IT should be a function centering
-                # self.centering()
-                if self.count > 0:
-                    self.sub_sm = PickSM.PICK_PICK
-                    self.count = 0
-                else:
-                    with self.data_lock:
-                        pliers_config = self.get_best_side_pliers(len(self.payload["crate_ids"]))
-
-                    if not pliers_config:
-                        self.get_logger().warn("Target found but no pliers available. Switching to Release.")
-                        self.sub_sm = PickSM.PICK_FAILED
-                    
-                    with self.data_lock:
-                        target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["crate_ids"]])
-                        pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in pliers_config[0]])
-                    
-                    target_angle = target_pos.t + (np.pi if self.payload["inv"] else 0.0)
-                    
-                    x_offset, y_offset = self.rotate_point(pliers_pos.x, pliers_pos.y, final_robot_theta)
-                    
-                    final_pos = Position(
-                        target_pos.x - x_offset,
-                        target_pos.y - y_offset,
-                        final_robot_theta
-                    )
-
-                    self.move_to(final_pos)
-                    self.count += 1
-                    # self.get_logger().info(f'Final Pose {final_pos.x}, {final_pos.y}, {final_robot_theta}')
-
-            case PickSM.PICK_PICK:
-                if self.count > 0:
-                    self.sub_sm = PickSM.PICK_DONE
-                    self.count = 0
-                else:
-                    with self.data_lock:
-                        robot_x, robot_y, robot_t = final_pos.x, final_pos.y, final_pos.t
-                        pliers_in_map = {}
-                        for pl_id in pliers_config[0]:
-                            p_local = self.pliers[pl_id]
-                            rx, ry = self.rotate_point(p_local.x, p_local.y, robot_t)
-                            pliers_in_map[pl_id] = (robot_x + rx, robot_y + ry)
-
-                        remaining_targets = [tid for tid in self.payload["crate_ids"] if tid in self.haz_crates]
-                        
-                        if not remaining_targets:
-                            self.get_logger().warn("All targets vanished during approach! Aborting.")
-                            return
-
-                        plier_list = list(pliers_in_map.keys())
-                        target_list = list(remaining_targets)
-                        cost_matrix = np.zeros((len(plier_list), len(target_list)))
-                        
-                        for i, pl_id in enumerate(plier_list):
-                            px, py = pliers_in_map[pl_id]
-                            for j, obj_id in enumerate(target_list):
-                                cx = self.haz_crates[obj_id].x
-                                cy = self.haz_crates[obj_id].y
-                                cost_matrix[i, j] = (cx - px)**2 + (cy - py)**2
-
-                        row_ind, col_ind = linear_sum_assignment(cost_matrix)
-
-                        dict_sel_pliers = {}
-                        for i, j in zip(row_ind, col_ind):
-                            pl_id = plier_list[i]
-                            best_obj_id = target_list[j]
-                            dict_sel_pliers[pl_id] = ["pick", best_obj_id]
-
-                    self.send_plier_cmd(dict_sel_pliers, self.haz_crates)
-                    self.count += 1
-
-            case PickSM.PICK_DONE:
                 self.set_global_sm(GlobalSM.NOP)
                 self.sub_sm = GlobalSM.NOP
-
-            case PickSM.PICK_FAILED:
-                self.set_global_sm(GlobalSM.NOP)
-                self.sub_sm = GlobalSM.NOP
-
-    def release_sm(self):
-        best_pos = self.payload["best_pos"]
-        path = self.payload["path"]
-        self.get_logger().info(f"Executing RELEASE at {best_pos}")
-        with self.data_lock:
-            id_side = self.get_best_side_pliers_release(best_pos[2])
-            pliers_theta = self.pliers[id_side * 4].theta if id_side is not None else 0.0
-            
-        target_angle = best_pos[2] - pliers_theta
-        
-        self.navigate_path(path, target_angle)
-        self.stare_and_update(self.haz_crates)
-
-        with self.data_lock:
-            id_active_pliers = {}
-            for pid, plier in self.pliers.items():
-                if plier.state == -1 or pid // 4 != id_side:
-                    continue
-                
-                crate = self.haz_crates[plier.state]
-                if crate.color in (-1, 2) or crate.color == self.color:
-                    id_active_pliers[pid] = ["drop", plier.state]
-                else:
-                    id_active_pliers[pid] = ["rev_drop", plier.state]
-        self.send_plier_cmd(id_active_pliers, self.haz_crates)
-        self.wait_for_plier()
-
-        with self.data_lock:
-            for pl_id in id_active_pliers:
-                self.pliers[pl_id].state = -1
-
-    def go_home_sm(self, path):
-        pass
-    
-    def select_strategy(self):
-        # Plan all the options and their rewards.
-        self.continuous_planner_callback()
-
-        with self.data_lock:
-            best_zone = max(self.zones.values(), key=lambda z: z.release_reward, default=None)
-            best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
-            
-            if best_crate and best_crate.pick_reward > float('-inf'):
-                pick_crate_ids = best_crate.is_part_of_stack
-                pick_path = best_crate.best_pick_path
-                is_inv = best_crate.use_inverted
-                return GlobalSM.PICK, {"crate_ids": pick_crate_ids, "path": pick_path, "inv": is_inv}
-            
-            elif best_zone and best_zone.release_reward > float('-inf'):
-                rel_path = best_zone.best_release_path
-                best_release_pos = best_zone.best_release_pos
-                return GlobalSM.RELEASE, {"path": rel_path, "best_pos": best_release_pos}
-            
-            pos = self.steal_poses[self.id_steal % len(self.steal_poses)]
-            path, _ = self.get_best_path((pos[0], pos[1]), allow_critical=True)
-            
-            return GlobalSM.EXPLORE, {"path": path}
 
     def smart_moves(self):
         # self.send_raw("VMAX 1.5")
@@ -1780,8 +1855,6 @@ class ActionManager(Node):
                     final_robot_theta
                 )
 
-                entry_point = pick_path[-1] if len(pick_path) > 0 else (self.robot_pos.x, self.robot_pos.y)
-                
                 if len(pick_path) > 1:
                     for i, wp in enumerate(pick_path[1:]):
                         if self.backstage_sequence:
