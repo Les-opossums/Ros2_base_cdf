@@ -17,7 +17,8 @@ class PickSM(IntEnum):
 
     PICK_INIT = auto()
     PICK_NAV = auto()
-    PICK_LOOK = auto()
+    PICK_STARE = auto()
+    PICK_UPDATE = auto()
     PICK_CENTERING = auto()
     PICK_PICK = auto()
     PICK_DONE = auto()
@@ -27,7 +28,9 @@ class ReleaseSM(IntEnum):
     """Reset State Machine of the system."""
 
     RELEASE_INIT = auto()
-    RELEASE_ASK_RELEASE = auto()
+    RELEASE_NAV = auto()
+    RELEASE_LOOK = auto()
+    RELEASE_DROP = auto()
     RELEASE_DONE = auto()
     RELEASE_FAILED = auto()
 
@@ -44,7 +47,8 @@ class ExploreSM(IntEnum):
 
     EXPLORE_INIT = auto()
     EXPLORE_NAV = auto()
-    EXPLORE_LOOK = auto()
+    EXPLORE_STARE = auto()
+    EXPLORE_UPDATE = auto()
     EXPLORE_DONE = auto()   
 
 
