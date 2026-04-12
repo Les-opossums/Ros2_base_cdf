@@ -1469,6 +1469,7 @@ class ActionManager(Node):
             req_sm, payload = self.select_strategy()
             self.set_global_sm(req_sm)
             self.payload = payload
+            self.get_logger().info(f"Here: {self.payload}, req SM: {req_sm}")
 
         # Block SM progression if the robot is currently moving
         if not self.motion_done:
