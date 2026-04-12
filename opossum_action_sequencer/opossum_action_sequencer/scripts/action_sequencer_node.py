@@ -192,6 +192,7 @@ class ActionManager(Node):
         self.data_lock = threading.RLock()  # <--- Added the 'R'
         self._thread = Thread(target=self._run_loop, daemon=True)
         self.global_sm = GlobalSM.NOP
+        self.last_global_sm = GlobalSM.NOP
         self._lock_gsm = Lock()
         self._stop_event = Event()
         # self.camera_angles = [0.0, 2.093333, 4.186666]
@@ -1435,7 +1436,8 @@ class ActionManager(Node):
 
     def _run_loop(self):
         """Run the threaded loop."""
-        period = 1.0 / self.loop_frequency
+        period = 1.0 / 2.0
+        # period = 1.0 / self.loop_frequency
         while not self._stop_event.is_set():
             start_time = time.time()
 

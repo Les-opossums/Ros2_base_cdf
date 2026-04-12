@@ -20,4 +20,5 @@ class Script:
     def run(self, node):
 
         # Banderole
-        node.smart_moves()
+        # node.smart_moves()
+        node.start_state_machine()
