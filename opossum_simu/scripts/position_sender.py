@@ -94,6 +94,9 @@ class PositionSender(Node):
         self.objects = {}
         # Iterate over all map objects
         for obj in data['map'].values():
+            skip_stack = random.uniform(0.0, 1.0) > 0.9
+            if skip_stack:
+                continue
             obj_x = obj['x'] + random.uniform(-0.04, 0.04)
             obj_y = obj['y'] + random.uniform(-0.04, 0.04)
             obj_t = obj['t'] + random.uniform(-0.02, 0.02)

@@ -39,7 +39,12 @@ import os
 import json
 from dataclasses import dataclass
 from ament_index_python.packages import get_package_share_directory
+import numpy as np
 
+def are_angles_close(angle1, angle2, tolerance=0.01):
+    # This trick naturally handles the circle wrap-around
+    diff = np.angle(np.exp(1j * (angle1 - angle2)))
+    return abs(diff) <= tolerance
 @dataclass
 class Plier:
     """Pliers Class."""
@@ -157,7 +162,7 @@ class ActionManager(Node):
         self.new_pos = 0
         self.pos_obj = None
         self.max_distance = 0.2
-        self.cameras = {1: Camera(1, 0.0), 2: Camera(2, np.pi / 2), 3: Camera(3, np.pi)}
+        self.cameras = {1: Camera(1, 0.0), 2: Camera(2, 4.71), 3: Camera(3, 3.14)}
         self.latest_camera_msg = {1: None, 2: None, 3: None}
         self.last_camera_timestamp = {1: time.time(), 2: time.time(), 3: time.time()}
 
@@ -546,137 +551,6 @@ class ActionManager(Node):
             return 2  # Rot (Red)
         return -1 # Unknown
 
-    # def stare_and_update(self, crate_dict, camera_target):
-    #     """Stop, let the camera settle, and process the latest frame in World Coordinates."""
-    #     if self.stop:
-    #         return
-
-    #     if getattr(self, 'robot_pos', None) is None:
-    #         self.get_logger().warn("Stare failed: Robot position unknown.")
-    #         return
-
-    #     self.get_logger().info("Staring... waiting for camera to settle.")
-        
-    #     # 1. Wait for physical motion blur to clear
-    #     time.sleep(0.5)
-
-    #     current_time = time.time()
-    #     crates_seen_by_target = []
-    #     ids_seen_this_tick = set()
-        
-    #     for key, cameras in self.cameras.items():
-    #         msg = cameras.last_msg
-    #         if time.time() - cameras.last_timestamp > 0.4:
-    #             continue
-
-    #         # 2. Grab the latest message in the buffer
-    #         if msg is None or not msg.object:
-    #             self.get_logger().info(f"Stare complete: No objects currently visible for camera {key}.")
-    #             continue
-
-    #         camera_detections = msg.object
-            
-    #         # =====================================================================
-    #         # 3. TRANSFORM DETECTIONS: ROBOT FRAME -> WORLD FRAME
-    #         # =====================================================================
-    #         world_detections = []
-    #         cos_t = math.cos(self.robot_pos.t)
-    #         sin_t = math.sin(self.robot_pos.t)
-
-    #         for det in camera_detections:
-    #             if det.x ** 2 + det.y ** 2 < 0.05 and det.z > 0.17:
-    #                 continue
-    #             if det.x ** 2 + det.y ** 2 > 0.6 ** 2:
-    #                 continue
-    #             world_det = SimpleNamespace()
-    #             world_det.id = det.id
-    #             world_det.x = self.robot_pos.x + (det.x * cos_t - det.y * sin_t)
-    #             world_det.y = self.robot_pos.y + (det.x * sin_t + det.y * cos_t)
-    #             world_det.theta = self.robot_pos.t + det.theta
-    #             world_detections.append(world_det)
-
-    #         # =====================================================================
-    #         # 4. HUNGARIAN TRACKING LOGIC (Using World Detections)
-    #         # =====================================================================
-
-    #          # --- 2. Hungarian Matching (Global Update) ---
-    #         crate_ids = list(crate_dict.keys())
-    #         if crate_ids and current_frame_world_dets:
-    #             costs = np.array([[math.hypot(crate_dict[cid].x - d.x, crate_dict[cid].y - d.y) 
-    #                             for d in current_frame_world_dets] for cid in crate_ids])
-    #             row_ind, col_ind = linear_sum_assignment(costs)
-                
-    #             for r, c in zip(row_ind, col_ind):
-    #                 if costs[r, c] < 0.15: # 15cm threshold
-    #                     cid = crate_ids[r]
-    #                     det = current_frame_world_dets[c]
-    #                     crate_dict[cid].x, crate_dict[cid].y = det.x, det.y
-    #                     crate_dict[cid].theta = det.theta
-    #                     crate_dict[cid].last_seen = current_time
-    #                     ids_seen_this_tick.add(cid)
-    #                     if key == camera_target:
-    #                         crates_seen_by_target.append(crate_dict[cid])
-
-    #         crate_ids = list(crate_dict.keys())
-    #         num_crates = len(crate_ids)
-    #         num_detections = len(world_detections)
-            
-    #         cost_matrix = np.zeros((num_crates, num_detections))
-
-    #         for i, cid in enumerate(crate_ids):
-    #             crate = crate_dict[cid]
-    #             for j, det in enumerate(world_detections):
-    #                 # Now we are comparing World to World!
-    #                 dist = math.hypot(crate.x - det.x, crate.y - det.y)
-    #                 cost_matrix[i, j] = dist
-
-    #         crate_indices, detection_indices = linear_sum_assignment(cost_matrix)
-    #         matched_detection_indices = set()
-
-    #         for crate_idx, det_idx in zip(crate_indices, detection_indices):
-    #             distance = cost_matrix[crate_idx, det_idx]
-
-    #             # max_distance should probably be around 0.10 to 0.15 (10-15cm) to allow for minor camera errors
-    #             if distance <= self.max_distance:
-    #                 cid = crate_ids[crate_idx]
-    #                 matched_crate = crate_dict[cid]
-    #                 det = world_detections[det_idx]
-
-    #                 matched_crate.x = det.x
-    #                 matched_crate.y = det.y
-    #                 matched_crate.theta = det.theta
-    #                 matched_crate.last_seen = current_time
-    #                 matched_crate.color = self._extract_color_from_id(det.id)
-
-    #                 # if matched_crate.color in [-1, 2]:
-
-    #                 matched_detection_indices.add(det_idx)
-
-    #         for j, det in enumerate(world_detections):
-    #             if j not in matched_detection_indices:
-    #                 new_id = max(crate_dict.keys()) + 1
-    #                 color_val = self._extract_color_from_id(det.id)
-    #                 new_crate = HazCrate(new_id, det.x, det.y, det.theta, rot=(color_val == 2))
-    #                 new_crate.color = color_val
-    #                 new_crate.last_seen = current_time
-    #                 crate_dict[new_id] = new_crate
-    #                 self.get_logger().info(f"Tracking: Discovered new crate! Assigned internal ID: {new_id} at X:{det.x:.2f} Y:{det.y:.2f}")
-
-    #     if camera_target is not None:
-    #         to_delete = []
-    #         for cid, crate in crate_dict.items():
-    #             if crate.state != -1: continue # Don't delete what we are holding
-                
-    #             # If the crate was supposedly in front of the target camera but not seen
-    #             dist = math.hypot(crate.x - self.robot_pos.x, crate.y - self.robot_pos.y)
-    #             if dist < 0.5 and cid not in ids_seen_this_tick:
-    #                 # Basic FOV check: is it in front of this specific camera?
-    #                 # (You can add your camera_angles check here)
-    #                 to_delete.append(cid)
-            
-    #         for cid in to_delete:
-    #             del crate_dict[cid]
-
     def stare_and_update(self, crate_dict, camera_target=None):
         """
         Stop, let the camera settle, and process the latest frame in World Coordinates.
@@ -692,7 +566,7 @@ class ActionManager(Node):
         self.get_logger().info(f"Staring... focusing on camera {camera_target}")
         
         # 1. Wait for physical motion blur to clear
-        time.sleep(0.5)
+        time.sleep(1.0)
 
         current_time = time.time()
         crates_seen_by_target = []
@@ -1614,16 +1488,56 @@ class ActionManager(Node):
                         self.wait_for_motion()
                 if self.backstage_sequence:
                     break
-                self.stare_and_update(self.haz_crates)
+                
+                id_side = None
+                for cam in self.cameras.values():
+                    if are_angles_close(pliers_pos.t, cam.angle):
+                        id_side = cam.id
+                        break
+                
+                self.get_logger().info(f"Using camera {id_side}")
+                target_view_crates = self.stare_and_update(self.haz_crates, camera_target=id_side)
 
-                if self.backstage_sequence:
-                    break
+                if id_side is not None:
+                    # 3. Generate stacks ONLY from what that camera sees
+                    # We pass a temporary dict to your existing function
+                    temp_dict = {c.id: c for c in target_view_crates}
+                    fresh_stacks = self.generate_stacks(temp_dict)
 
-                if self.backstage_sequence:
-                    break
+                    if not fresh_stacks:
+                        self.get_logger().warn("Stack vanished or broke geometry. Aborting pick.")
+                        continue
 
+                    # 4. Pick the best/closest stack from the fresh detections
+                    # Since they are side-by-side, we take the mean of the best stack
+                    best_stack_ids = fresh_stacks[0] # Or sort by proximity
+                    
+                    with self.data_lock:
+                        actual_stack_crates = [self.haz_crates[tid] for tid in best_stack_ids]
+                        target_pos = self.get_mean_pose(actual_stack_crates)
+                        new_pliers_selected = list(range(selected_pliers_ids[0], selected_pliers_ids[0] + len(best_stack_ids)))
+                        pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in new_pliers_selected])
+
+                    # 5. RE-CALCULATE Final Alignment
+                    target_angle = target_pos.t + (np.pi if is_inv else 0.0)
+                    final_robot_theta = target_angle - pliers_pos.t
+                    x_off, y_off = self.rotate_point(pliers_pos.x, pliers_pos.y, final_robot_theta)
+
+                    final_pos = Position(target_pos.x - x_off, target_pos.y - y_off, final_robot_theta)
+
+                    if self.backstage_sequence:
+                        break
+
+                # 6. Final precise move
                 self.move_to(final_pos)
                 self.wait_for_motion()
+
+                # Now proceed to close the pliers
+                # ...
+                # self.stare_and_update(self.haz_crates)
+                
+                # self.move_to(final_pos)
+                # self.wait_for_motion()
 
                 with self.data_lock:
                     robot_x, robot_y, robot_t = final_pos.x, final_pos.y, final_pos.t
