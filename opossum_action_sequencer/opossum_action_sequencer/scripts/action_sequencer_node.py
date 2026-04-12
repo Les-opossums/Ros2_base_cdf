@@ -463,18 +463,29 @@ class ActionManager(Node):
 
     def publish_board_state(self):
         """Publish only the crates, pliers, and zones that have changed."""
-        # Make sure we have the required attributes
         if not hasattr(self, 'haz_crates') or not hasattr(self, 'pliers') or not hasattr(self, 'zones'):
             return
 
-        # --- THE FIX: Add 'zones' to the updates dictionary ---
-        updates = {'crates': [], 'pliers': [], 'zones': [], 'morbidity': []}
+        # --- ADD 'deleted_crates' to updates ---
+        updates = {'crates': [], 'pliers': [], 'zones': [], 'morbidity': [], 'deleted_crates': []}
 
-        # Ensure 'zones' exists in the last_sent_state dictionary
         if 'zones' not in self.last_sent_state:
             self.last_sent_state['zones'] = {}
+        if 'crates' not in self.last_sent_state:
+            self.last_sent_state['crates'] = {}
 
-        # 1. Check Crates for changes
+        # ==========================================
+        # 1. CHECK FOR DELETED CRATES (NEW LOGIC)
+        # ==========================================
+        current_crate_ids = set(self.haz_crates.keys())
+        last_crate_ids = set(self.last_sent_state['crates'].keys())
+        
+        # If an ID is in our last sent state, but no longer in the map, it was deleted!
+        for cid in last_crate_ids - current_crate_ids:
+            updates['deleted_crates'].append(cid)
+            del self.last_sent_state['crates'][cid] # Remove it from history
+
+        # 2. Check Crates for changes
         for cid, crate in self.haz_crates.items():
             current_state = (round(crate.x, 3), round(crate.y, 3), round(crate.theta, 3), 
                              crate.state, crate.color, round(crate.pick_reward, 2))
@@ -528,7 +539,7 @@ class ActionManager(Node):
                 self.last_sent_state['morbidity'] = self.morbidity_data.copy()
 
         # 4. Only publish if there is actually something new in ANY of the lists!
-        if updates['crates'] or updates['pliers'] or updates['zones'] or updates['morbidity']:
+        if updates['crates'] or updates['pliers'] or updates['zones'] or updates['morbidity'] or updates['deleted_crates']:
             msg = String()
             msg.data = json.dumps(updates)
             self.pub_board_state.publish(msg)
@@ -771,7 +782,6 @@ class ActionManager(Node):
             self.steal_poses = [[0.47, 1.1], [2.53, 1.1], [2.53, 0.45], [0.47, 0.45]]
         if self.color == 1:
             self.steal_poses = [[2.53, 1.1], [0.47, 1.1], [0.47, 0.45], [2.53, 0.45]]
-
 
     def feedback_callback(self, msg):
         """Receive the data from Zynq."""

@@ -500,6 +500,12 @@ class MapScene(QtWidgets.QGraphicsView):
         try:
             full_state = json.loads(json_str)
             
+            # --- CLEAR EXISTING CRATES TO AVOID GHOSTS ---
+            for cid, item in self.crate_items.items():
+                self.scene.removeItem(item)
+            self.crate_items.clear()
+            self.crate_local_states.clear()
+            
             if 'morbidity' in full_state: # or full_state
                 self.morbidity_data = full_state['morbidity']
                 self._redraw_morbidity()
@@ -528,10 +534,26 @@ class MapScene(QtWidgets.QGraphicsView):
         try:
             updates = json.loads(json_str)
             
-            if 'morbidity' in updates: # or full_state
+            if 'morbidity' in updates:
                 self.morbidity_data = updates['morbidity']
                 self._redraw_morbidity()
 
+            # ==========================================
+            # 1. PROCESS DELETED CRATES (NEW LOGIC)
+            # ==========================================
+            for cid in updates.get('deleted_crates', []):
+                # Remove from data tracking
+                if cid in self.crate_local_states:
+                    del self.crate_local_states[cid]
+                
+                # Remove from the visual map!
+                if cid in self.crate_items:
+                    item = self.crate_items.pop(cid)
+                    self.scene.removeItem(item)
+
+            # ==========================================
+            # 2. Process New/Updated Elements
+            # ==========================================
             for crate in updates.get('crates', []):
                 self.crate_local_states[crate['id']] = crate
                 self._update_crate_visual(crate)
@@ -539,7 +561,6 @@ class MapScene(QtWidgets.QGraphicsView):
             for plier in updates.get('pliers', []):
                 self.plier_local_states[plier['id']] = plier
                 
-            # --- NEW: Process Zones ---
             for zone in updates.get('zones', []):
                 self.zone_local_states[zone['id']] = zone
                 self._update_zone_visual(zone)
