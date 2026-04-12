@@ -42,6 +42,7 @@ from opossum_action_sequencer.scripts.StateMachine import (
     ReleaseSM,
     GoHomeSM,
     ExploreSM,
+    StopSM,
 )
 def are_angles_close(angle1, angle2, tolerance=0.01):
     # This trick naturally handles the circle wrap-around
@@ -149,7 +150,6 @@ class ActionManager(Node):
         self.ready = False
         self.is_started = False
         self.is_ended = False
-        self.match_time = None
         self.timer_move = None
         self.in_end_zone = False
         self.match_finished = False
@@ -179,6 +179,7 @@ class ActionManager(Node):
         self.pliers_done = True
         self.color = None
         self._init_mapping()
+        self.arrived_home = False
 
         # Process
         self.motion_done_event = Event()
@@ -304,16 +305,6 @@ class ActionManager(Node):
 
     def _init_timers(self):
         """Initialize the timers of the node."""
-        self.timer_match = self.create_timer(
-            100.0,
-            self.timer_match_callback,
-            callback_group=self.cb_group
-        )
-        self.timer_backstage = self.create_timer(
-            92.0,
-            self.timer_backstage_callback,
-            callback_group=self.cb_group
-        )
         self.pub_timer = self.create_timer(0.2, self.publish_board_state,callback_group=self.cb_group)
 
     def _init_publishers(self):
@@ -786,7 +777,6 @@ class ActionManager(Node):
         if msg.data.startswith("LEASH") and self.ready and not self.is_started:
             self._init_timers()
             self.is_started = True
-            self.match_time = time.time()
             self.script_instance = self.script_class()
             self.script_thread = threading.Thread(
                 target=self.script_instance.run, args=(self,)
@@ -1029,46 +1019,6 @@ class ActionManager(Node):
             if self.is_robot_arrived and is_stopped:
                 self.motion_done = True
                 self.motion_done_event.set() # C'est ça qui débloque wait_for_motion
-
-    def timer_match_callback(self):
-        """Timer callback for match time."""
-        self.pub_end_of_match.publish(Bool(data=True))
-        self.match_finished = True
-        self.get_logger().warn("Match time exceeded")
-        self.stop_script()
-
-    def timer_backstage_callback(self):
-        self.backstage_sequence = True
-        self.get_logger().warn("Abort, go back home")
-        self.send_raw("VMAX 1.5")
-        self.get_logger().info("Cannot find release zone. Going to final zone.")
-        
-        if self.color == 0:
-            e_zone = (0.45, 1.2)
-        elif self.color == 1:
-            e_zone = (1.55, 1.2)
-        else:
-            e_zone = (0.45, 1.1)
-        path, _ = self.get_best_path(e_zone, allow_critical=True)
-        self.navigate_path(path, 0.0)
-
-        path, _ = self.get_best_path((self.final_zone["x"], self.final_zone["y"]), allow_critical=True)
-        self.navigate_path(path, 0.0)
-            
-        with self.data_lock:
-            self.send_raw("PINCE 10 0 0")
-            id_active_pliers_all = {}
-            for plier in self.pliers.values():
-                if plier.state == -1:
-                    continue
-                crate = self.haz_crates[plier.state]
-                plier.state = -1
-                plier.is_running = True
-                crate.state = -1
-                self.update_crate_pos(plier, crate)
-
-        self.send_plier_cmd(id_active_pliers_all, self.haz_crates)
-        self.wait_for_plier()
 
     def run_script_init(self):
         """Run the script initialization."""
@@ -1400,13 +1350,15 @@ class ActionManager(Node):
     def _run_loop(self):
         """Run the threaded loop."""
         period = 1.0 / self.loop_frequency
+        self.start_match_time = time.time()
         # period = 1.0 / self.loop_frequency
+        self.send_raw("VMAX 1.5")
+        self.send_raw("VTMAX 2.0")
+
         while not self._stop_event.is_set():
-            start_time = time.time()
+            start_local_time = time.time()
 
             try:
-                self.send_raw("VMAX 1.5")
-                self.send_raw("VTMAX 2.0")
                 self.main_loop()
             except Exception as e:
                 print(f"🔥 Error in PliersSystem loop: {e}")
@@ -1414,7 +1366,7 @@ class ActionManager(Node):
                 traceback.print_exc()
 
             # Sleep to maintain frequency
-            elapsed = time.time() - start_time
+            elapsed = time.time() - start_local_time
             sleep_time = period - elapsed
             if sleep_time > 0:
                 time.sleep(sleep_time)
@@ -1423,15 +1375,39 @@ class ActionManager(Node):
 
     def main_loop(self):
         """Run main loop logic."""
-        
-        if self.global_sm == GlobalSM.NOP:
+        if time.time() - self.start_match_time > 100.0:
+            if self.global_sm not in (GlobalSM.STOP, GlobalSM.NOP):
+                self.get_logger().warn("Stop sequence active! Overriding to STOP.")
+                self.global_sm = GlobalSM.STOP
+                self.sub_sm = GlobalSM.NOP
+
+        elif time.time() - self.start_match_time > 90.0: 
+            if self.global_sm != GlobalSM.GOHOME and not self.arrived_home:
+                self.get_logger().warn("Backstage sequence active! Overriding to GOHOME.")
+                self.global_sm = GlobalSM.GOHOME
+                self.sub_sm = GlobalSM.NOP
+            
+                # Calculate paths for the payload as requested
+                if self.color == 0:
+                    e_zone = (0.45, 1.2)
+                elif self.color == 1:
+                    e_zone = (1.55, 1.2)
+                else:
+                    e_zone = (0.45, 1.1)
+                    
+                path_e, _ = self.get_best_path(e_zone, allow_critical=True)
+                path_final, _ = self.get_best_path((self.final_zone["x"], self.final_zone["y"]), allow_critical=True)
+                
+                self.payload = {"path": path_e}
+
+        elif self.global_sm == GlobalSM.NOP:
             req_sm, payload = self.select_strategy()
             self.global_sm = req_sm
             self.payload = payload
 
         # Leave space to backstage sequence
-        if self.backstage_sequence:
-            return
+        # if self.backstage_sequence:
+        #     return
 
         # Block SM progression if the robot is currently moving
         if not self.motion_done or not self.pliers_done:
@@ -1453,6 +1429,8 @@ class ActionManager(Node):
                 self.release_sm()
             case GlobalSM.GOHOME:
                 self.go_home_sm()
+            case GlobalSM.STOP:
+                self.stop_sm()
             case _:
                 print(f"Unknown State: {self.global_sm}")
 
@@ -1729,6 +1707,65 @@ class ActionManager(Node):
 
             case ExploreSM.EXPLORE_DONE:
                 self.id_steal += 1
+                self.global_sm = GlobalSM.NOP
+                self.sub_sm = GlobalSM.NOP
+
+    # =========================================================================
+    # GO HOME STATE MACHINE
+    # =========================================================================
+    def go_home_sm(self):
+        match self.sub_sm:
+            case GlobalSM.NOP:
+                self.get_logger().info("Executing Go Home Sequence...")
+                self.send_raw("VMAX 1.5")
+                self.sub_sm = GoHomeSM.GOHOME_NAV_E_ZONE
+
+            case GoHomeSM.GOHOME_NAV_E_ZONE:
+                if not self.payload["path"]:
+                    self.sub_sm = GoHomeSM.GOHOME_NAV_FINAL
+                    self.payload["final_path"], _ = self.get_best_path((self.final_zone["x"], self.final_zone["y"]), allow_critical=True)
+                else:
+                    next_point = self.payload["path"].pop(0)
+                    self.move_to(Position(x=next_point[0], y=next_point[1], t=0.0))
+
+            case GoHomeSM.GOHOME_NAV_FINAL:
+                if not self.payload["final_path"]:
+                    self.sub_sm = GoHomeSM.GOHOME_DROP
+                else:
+                    next_point = self.payload["final_path"].pop(0)
+                    self.move_to(Position(x=next_point[0], y=next_point[1], t=0.0))
+
+            case GoHomeSM.GOHOME_DROP:
+                self.get_logger().info("Dropping all crates.")
+                with self.data_lock:
+                    self.send_raw("PINCE 10 0 0")
+                    for plier in self.pliers.values():
+                        if plier.state == -1:
+                            continue
+                        
+                        crate = self.haz_crates[plier.state]
+                        plier.state = -1
+                        plier.is_running = True
+                        crate.state = -1
+                        self.update_crate_pos(plier, crate)
+                
+                self.sub_sm = GoHomeSM.GOHOME_DONE
+                
+            case GoHomeSM.GOHOME_DONE:
+                self.global_sm = GlobalSM.NOP
+                self.sub_sm = GlobalSM.NOP
+                self.arrived_home = True
+
+    def stop_sm(self):
+        match self.sub_sm:
+            case GlobalSM.NOP:
+                self.get_logger().info("Executing Go Home Sequence...")
+                self.sub_sm = StopSM.STOP_STOP
+
+            case StopSM.STOP_STOP:
+                self.send_raw("FREE")
+
+            case StopSM.STOP_DONE:
                 self.global_sm = GlobalSM.NOP
                 self.sub_sm = GlobalSM.NOP
 

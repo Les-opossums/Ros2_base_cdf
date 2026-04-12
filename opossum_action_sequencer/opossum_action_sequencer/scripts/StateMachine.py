@@ -10,6 +10,7 @@ class GlobalSM(IntEnum):
     RELEASE = auto()
     EXPLORE = auto()
     GOHOME = auto()
+    STOP = auto()
 
 
 class PickSM(IntEnum):
@@ -38,7 +39,9 @@ class GoHomeSM(IntEnum):
     """Reset State Machine of the system."""
 
     GOHOME_INIT = auto()
-    GOHOME_ASK_GOHOME = auto()
+    GOHOME_NAV_E_ZONE = auto()
+    GOHOME_NAV_FINAL = auto()
+    GOHOME_DROP = auto()
     GOHOME_DONE = auto()
     GOHOME_FAILED = auto()
 
@@ -51,6 +54,12 @@ class ExploreSM(IntEnum):
     EXPLORE_UPDATE = auto()
     EXPLORE_DONE = auto()   
 
+class StopSM(IntEnum):
+    """Stop State Machine of the system."""
+
+    STOP_INIT = auto()
+    STOP_STOP = auto()
+    STOP_DONE = auto()
 
 # 1. Map Global States to their corresponding Sub-State Classes
 _SUB_STATE_MAP = {
