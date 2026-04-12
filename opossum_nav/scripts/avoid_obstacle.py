@@ -247,7 +247,7 @@ class ObstacleAvoider(Node):
             last_obs_detected = self.obstacle_detected
             self.obstacle_detected = self.detect_obstacle(lidar_range)
             if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
-                self._send_vmax(0.4)
+                self._send_vmax(1.2)
                 self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
                 return
             if self.obstacle_detected:

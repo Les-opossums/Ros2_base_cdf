@@ -2,12 +2,8 @@
 # -*- coding: utf-8 -*-
 """Action Sequencer Node."""
 
-# TODO: Remove ghosts (review does not seem to work)
-# TODO: Review the path finder, sometimes the robot goes above known stacks
 # TODO: optimize angles for take / release, sometimes does the whoel turn (but dont take in in the cost, just after)
-# TODO add a go back to zone before the end
 # TODO better handle the cross with an ennemy
-# TODO: Associate each plier with a camera.
 # Actions for pliers
 # 0: free, 1: picking, 2: dropping, 3: reverting
 
@@ -28,8 +24,6 @@ import yaml
 import numpy as np
 from opossum_action_sequencer.utils import (
     Position,
-    VACCUMGRIPPER_struct,
-    LED_struct,
 )
 
 import threading
@@ -171,6 +165,7 @@ class ActionManager(Node):
         self.is_robot_arrived = False
         self.is_pump_top_on = False
         self.is_pump_bottom_on = False
+        self.obstacle_detected = False
         self.robot_pos = None
         self.motion_done = True
         self.color = None
@@ -399,6 +394,14 @@ class ActionManager(Node):
             callback_group=self.cb_group
         )
 
+        self.obstacle_detected_sub = self.create_subscription(
+            Bool,
+            "obstacle_detected",
+            self.obstacle_detected_callback,
+            10,
+            callback_group=self.cb_group
+        )
+
         self.robot_data_sub = self.create_subscription(
             RobotData,
             "robot_data",
@@ -551,6 +554,10 @@ class ActionManager(Node):
         """Continuously save the latest camera frame without processing it."""
         self.cameras[msg.id].last_msg = msg
         self.cameras[msg.id].last_timestamp = time.time()
+
+    def obstacle_detected_callback(self, msg):
+        """Continuously save the latest camera frame without processing it."""
+        self.obstacle_detected = bool(msg.data)
 
     def _extract_color_from_id(self, aruco_id: int) -> int:
         """Map ArUco ID to internal color code."""
