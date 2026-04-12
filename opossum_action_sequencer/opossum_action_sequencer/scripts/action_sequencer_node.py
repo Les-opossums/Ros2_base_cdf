@@ -231,20 +231,6 @@ class ActionManager(Node):
             
         return True
 
-    def is_position_fully_safe(self, x, y, ignored_crate_id=None):
-        # 1. Check static forbidden zones (Your existing function)
-        if not self.is_point_safe(x, y):
-            return False
-
-        # 2. Check dynamic crates (New check)
-        # We use 0.33 because: Robot(0.25) + CrateHalfWidth(0.075) + Buffer(0.005)
-        for cid, crate in self.haz_crates.items():
-            if cid == ignored_crate_id or crate.state != -1:
-                continue
-            if math.hypot(x - crate.x, y - crate.y) < 0.25:
-                return False
-        return True
-
     def _init_mapping(self):
         objects_path = os.path.join(
             get_package_share_directory("opossum_bringup"), "config", str(self.year), f"{self.board_config}.yaml"
@@ -329,12 +315,6 @@ class ActionManager(Node):
             callback_group=self.cb_group
         )
         self.pub_timer = self.create_timer(0.2, self.publish_board_state,callback_group=self.cb_group)
-
-    def _reset_move_timer(self):
-        """Reset the move timer."""
-        if self.move_timer is not None:
-            self.move_timer.cancel()
-            self.move_timer = None
 
     def _init_publishers(self):
         """Initialize the publishers of the node."""
@@ -1289,12 +1269,6 @@ class ActionManager(Node):
             self.pub_command.publish(String(data=raw_command))
             time.sleep(0.1)
 
-    def kalman(self, kalman: bool):
-        """Compute the kalman action."""
-        if not self.stop:
-            self.pub_command.publish(String(data=f"ENKALMAN {int(kalman)}"))
-            time.sleep(0.1)
-
     def generate_stacks(self, crate_dict):
         """
         Calculates stacks using Geometric Adjacency and Connected Components.
@@ -1410,16 +1384,6 @@ class ActionManager(Node):
             self.send_raw("PINCE 7 2 2")
             time.sleep(5)
 
-    def get_global_sm(self):
-        """Get global state machine."""
-        with self._lock_gsm:
-            return self.global_sm
-
-    def set_global_sm(self, global_sm):
-        """Set global state machine."""
-        with self._lock_gsm:
-            self.global_sm = global_sm
-
     def start_state_machine(self):
         """Start the background control loop."""
         if not self._thread.is_alive():
@@ -1431,7 +1395,7 @@ class ActionManager(Node):
         self._stop_event.set()
         if self._thread.is_alive():
             self._thread.join()
-        self.set_global_sm(GlobalSM.NOP)
+        self.global_sm = GlobalSM.NOP
 
     def _run_loop(self):
         """Run the threaded loop."""
@@ -1459,18 +1423,26 @@ class ActionManager(Node):
 
     def main_loop(self):
         """Run main loop logic."""
-        global_sm = self.get_global_sm()
         
-        if global_sm == GlobalSM.NOP:
+        if self.global_sm == GlobalSM.NOP:
             req_sm, payload = self.select_strategy()
-            self.set_global_sm(req_sm)
+            self.global_sm = req_sm
             self.payload = payload
+
+        # Leave space to backstage sequence
+        if self.backstage_sequence:
+            return
 
         # Block SM progression if the robot is currently moving
         if not self.motion_done or not self.pliers_done:
             return
 
-        match global_sm:
+        if self.obstacle_detected:
+            self.get_logger().info(f"Obstacle detected by {self.get_namespace()}. Recomputing...")
+            self.global_sm = GlobalSM.NOP
+            return
+
+        match self.global_sm:
             case GlobalSM.NOP:
                 pass
             case GlobalSM.EXPLORE:
@@ -1482,7 +1454,7 @@ class ActionManager(Node):
             case GlobalSM.GOHOME:
                 self.go_home_sm()
             case _:
-                print(f"Unknown State: {global_sm}")
+                print(f"Unknown State: {self.global_sm}")
 
     # =========================================================================
     # SELECT STRATEGY
@@ -1669,7 +1641,7 @@ class ActionManager(Node):
                 self.sub_sm = PickSM.PICK_DONE
 
             case PickSM.PICK_DONE | PickSM.PICK_FAILED:
-                self.set_global_sm(GlobalSM.NOP)
+                self.global_sm = GlobalSM.NOP
                 self.sub_sm = GlobalSM.NOP
 
     # =========================================================================
@@ -1723,7 +1695,7 @@ class ActionManager(Node):
 
             case ReleaseSM.RELEASE_DONE:
                 self.get_logger().info(f"New3")
-                self.set_global_sm(GlobalSM.NOP)
+                self.global_sm = GlobalSM.NOP
                 self.sub_sm = GlobalSM.NOP
 
     # =========================================================================
@@ -1757,7 +1729,7 @@ class ActionManager(Node):
 
             case ExploreSM.EXPLORE_DONE:
                 self.id_steal += 1
-                self.set_global_sm(GlobalSM.NOP)
+                self.global_sm = GlobalSM.NOP
                 self.sub_sm = GlobalSM.NOP
 
     def smart_moves(self):
