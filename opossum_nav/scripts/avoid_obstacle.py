@@ -247,10 +247,7 @@ class ObstacleAvoider(Node):
             last_obs_detected = self.obstacle_detected
             self.obstacle_detected = self.detect_obstacle(lidar_range)
             if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
-<<<<<<< Updated upstream
                 self._send_vmax(1.2)
-=======
->>>>>>> Stashed changes
                 self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
                 return
             if self.obstacle_detected:
@@ -486,19 +483,10 @@ class ObstacleAvoider(Node):
         
     def _find_new_path(self) -> None:
         """Try to find a new path."""
-<<<<<<< Updated upstream
-=======
-        v_rg = [
-            self.goal_position.x - self.robot_position.x,
-            self.goal_position.y - self.robot_position.y,
-        ]
-
->>>>>>> Stashed changes
         closest_obstacle = self._find_closest_obstacle()
         if closest_obstacle is None:
             self._send_block()
             return False
-<<<<<<< Updated upstream
         if self._obstacle_on_goal(closest_obstacle):
             pass
             # self.get_logger().info("Obstacle difficult goal we re fucked")
@@ -508,8 +496,6 @@ class ObstacleAvoider(Node):
             self.goal_position.x - self.robot_position.x,
             self.goal_position.y - self.robot_position.y,
         ]
-=======
->>>>>>> Stashed changes
         v_ro = [
             closest_obstacle.x - self.robot_position.x,
             closest_obstacle.y - self.robot_position.y,
@@ -518,13 +504,6 @@ class ObstacleAvoider(Node):
             # self.get_logger().info("Path is now clear, resuming to goal.")
             self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
             return False
-<<<<<<< Updated upstream
-=======
-        if not self._is_obstacle_blocking(v_rg, v_ro, closest_obstacle, self.thickness / 2):
-            self.get_logger().info("Path is now clear, resuming to goal.")
-            self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.theta)
-            return False
->>>>>>> Stashed changes
         cross_product = 1 if v_rg[0] * v_ro[1] - v_rg[1] * v_ro[0] > 0 else -1
         pos = self._check_ways(closest_obstacle, cross_product, v_rg, v_ro)
         if pos is not None:
