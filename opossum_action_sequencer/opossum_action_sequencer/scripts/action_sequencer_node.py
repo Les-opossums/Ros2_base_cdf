@@ -35,6 +35,13 @@ from dataclasses import dataclass
 from ament_index_python.packages import get_package_share_directory
 import numpy as np
 
+from opossum_action_sequencer.scripts.StateMachine import (
+    GlobalSM,
+    PickSM,
+    ReleaseSM,
+    GoHomeSM,
+    ExploreSM,
+)
 def are_angles_close(angle1, angle2, tolerance=0.01):
     # This trick naturally handles the circle wrap-around
     diff = np.angle(np.exp(1j * (angle1 - angle2)))
@@ -1397,6 +1404,284 @@ class ActionManager(Node):
             self.send_raw("PINCE 6 2 2")
             self.send_raw("PINCE 7 2 2")
             time.sleep(5)
+
+    def get_global_sm(self):
+        """Get global state machine."""
+        with self._lock_gsm:
+            return self.global_sm
+
+    def set_global_sm(self, global_sm):
+        """Set global state machine."""
+        with self._lock_gsm:
+            self.global_sm = global_sm
+
+    def start_state_machine(self):
+        """Start the background control loop."""
+        if not self._thread.is_alive():
+            self._stop_event.clear()
+            self._thread.start()
+
+    def stop_state_machine(self):
+        """Stop the background control loop."""
+        self._stop_event.set()
+        if self._thread.is_alive():
+            self._thread.join()
+        self.set_global_sm(GlobalSM.NOP)
+
+    def _run_loop(self):
+        """Run the threaded loop."""
+        period = 1.0 / self.loop_frequency
+        while not self._stop_event.is_set():
+            start_time = time()
+
+            try:
+                self.main_loop()
+            except Exception as e:
+                print(f"🔥 Error in PliersSystem loop: {e}")
+                import traceback
+
+                traceback.print_exc()
+
+            # Sleep to maintain frequency
+            elapsed = time() - start_time
+            sleep_time = period - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+            else:
+                print(
+                    f"Warning! Loop duration for pliers took more than expected: {elapsed}"
+                )
+
+    def main_loop(self):
+        """Run main loop logic."""
+        global_sm = self.get_global_sm()
+        if global_sm != self.last_global_sm:
+            self.sub_sm = GlobalSM.NOP  # Same value as all init
+            self.last_global_sm = global_sm
+            self.payload = None
+
+        if global_sm == GlobalSM.NOP:
+            req_sm, payload = self.select_strategy()
+            self.set_global_sm(req_sm)
+            self.payload = payload
+
+        if not self.motion_done:
+            return
+
+        match global_sm:
+            case GlobalSM.NOP:
+                pass
+
+            case GlobalSM.EXPLORE:
+                self.explore_sm()
+
+            case GlobalSM.PICK:
+                self.pick_sm()
+
+            case GlobalSM.RELEASE:
+                self.release_sm()
+
+            case GlobalSM.GOHOME:
+                self.go_home_sm()
+
+            case _:
+                print(f"Unknown State: {global_sm}")
+
+    def explore_sm(self):
+        match self.sub_sm:
+            case GlobalSM.NOP: # Equivalent to ExploreSM.EXPLORE_INIT
+                self.get_logger().info(f"Nothing to do: Exploring / Stealing...")
+                self.sub_sm = ExploreSM.EXPLORE_NAV
+            
+            case ExploreSM.EXPLORE_NAV:
+                if not self.payload["path"]:
+                    self.sub_sm = ExploreSM.EXPLORE_LOOK
+                
+                else:
+                    next_point = self.payload["path"].pop(0)
+                    self.move_to(Position(x=next_point[0], y=next_point[1], t=(self.id_steal * 2.3998) % (2 * np.pi)))
+
+            case ExploreSM.EXPLORE_LOOK:
+                self.stare_and_update(self.haz_crates)
+                self.sub_sm = ExploreSM.EXPLORE_DONE
+
+            case ExploreSM.EXPLORE_DONE:
+                self.set_global_sm(GlobalSM.NOP)
+                self.sub_sm = GlobalSM.NOP
+                self.id_steal += 1
+
+    def pick_sm(self):
+        match self.sub_sm:
+            case GlobalSM.NOP: # Equivalent to ExploreSM.EXPLORE_INIT
+                self.get_logger().info(f"Pick SM...")
+                self.sub_sm = PickSM.PICK_NAV
+            
+            case PickSM.PICK_NAV:
+                if not self.payload["path"]:
+                    self.sub_sm = PickSM.PICK_LOOK
+                
+                else:
+                    
+                    with self.data_lock:
+                        pliers_config = self.get_best_side_pliers(len(self.payload["crate_ids"]))
+
+                    if not pliers_config:
+                        self.get_logger().warn("Target found but no pliers available. Switching to Release.")
+                        self.sub_sm = PickSM.PICK_FAILED
+                    
+                    with self.data_lock:
+                        target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["crate_ids"]])
+                        pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in pliers_config[0]])
+                    
+                    target_angle = target_pos.t + (np.pi if self.payload["inv"] else 0.0)
+                    final_robot_theta = target_angle - pliers_pos.t
+
+                    next_point = self.payload["path"].pop(0)
+                    self.move_to(Position(x=next_point[0], y=next_point[1], t=final_robot_theta))
+
+            case PickSM.PICK_LOOK:
+                self.stare_and_update(self.haz_crates)
+                self.sub_sm = PickSM.PICK_CENTERING
+                self.count = 0
+
+            case PickSM.PICK_CENTERING:
+                # IT should be a function centering
+                # self.centering()
+                if self.count > 0:
+                    self.sub_sm = PickSM.PICK_PICK
+                    self.count = 0
+                else:
+                    with self.data_lock:
+                        pliers_config = self.get_best_side_pliers(len(self.payload["crate_ids"]))
+
+                    if not pliers_config:
+                        self.get_logger().warn("Target found but no pliers available. Switching to Release.")
+                        self.sub_sm = PickSM.PICK_FAILED
+                    
+                    with self.data_lock:
+                        target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["crate_ids"]])
+                        pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in pliers_config[0]])
+                    
+                    target_angle = target_pos.t + (np.pi if self.payload["inv"] else 0.0)
+                    
+                    x_offset, y_offset = self.rotate_point(pliers_pos.x, pliers_pos.y, final_robot_theta)
+                    
+                    final_pos = Position(
+                        target_pos.x - x_offset,
+                        target_pos.y - y_offset,
+                        final_robot_theta
+                    )
+
+                    self.move_to(final_pos)
+                    self.count += 1
+                    # self.get_logger().info(f'Final Pose {final_pos.x}, {final_pos.y}, {final_robot_theta}')
+
+            case PickSM.PICK_PICK:
+                if self.count > 0:
+                    self.sub_sm = PickSM.PICK_DONE
+                    self.count = 0
+                else:
+                    with self.data_lock:
+                        robot_x, robot_y, robot_t = final_pos.x, final_pos.y, final_pos.t
+                        pliers_in_map = {}
+                        for pl_id in pliers_config[0]:
+                            p_local = self.pliers[pl_id]
+                            rx, ry = self.rotate_point(p_local.x, p_local.y, robot_t)
+                            pliers_in_map[pl_id] = (robot_x + rx, robot_y + ry)
+
+                        remaining_targets = [tid for tid in self.payload["crate_ids"] if tid in self.haz_crates]
+                        
+                        if not remaining_targets:
+                            self.get_logger().warn("All targets vanished during approach! Aborting.")
+                            return
+
+                        plier_list = list(pliers_in_map.keys())
+                        target_list = list(remaining_targets)
+                        cost_matrix = np.zeros((len(plier_list), len(target_list)))
+                        
+                        for i, pl_id in enumerate(plier_list):
+                            px, py = pliers_in_map[pl_id]
+                            for j, obj_id in enumerate(target_list):
+                                cx = self.haz_crates[obj_id].x
+                                cy = self.haz_crates[obj_id].y
+                                cost_matrix[i, j] = (cx - px)**2 + (cy - py)**2
+
+                        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+                        dict_sel_pliers = {}
+                        for i, j in zip(row_ind, col_ind):
+                            pl_id = plier_list[i]
+                            best_obj_id = target_list[j]
+                            dict_sel_pliers[pl_id] = ["pick", best_obj_id]
+
+                    self.send_plier_cmd(dict_sel_pliers, self.haz_crates)
+                    self.count += 1
+
+            case PickSM.PICK_DONE:
+                self.set_global_sm(GlobalSM.NOP)
+                self.sub_sm = GlobalSM.NOP
+
+            case PickSM.PICK_FAILED:
+                self.set_global_sm(GlobalSM.NOP)
+                self.sub_sm = GlobalSM.NOP
+
+    def release_sm(self):
+        best_pos = self.payload["best_pos"]
+        path = self.payload["path"]
+        self.get_logger().info(f"Executing RELEASE at {best_pos}")
+        with self.data_lock:
+            id_side = self.get_best_side_pliers_release(best_pos[2])
+            pliers_theta = self.pliers[id_side * 4].theta if id_side is not None else 0.0
+            
+        target_angle = best_pos[2] - pliers_theta
+        
+        self.navigate_path(path, target_angle)
+        self.stare_and_update(self.haz_crates)
+
+        with self.data_lock:
+            id_active_pliers = {}
+            for pid, plier in self.pliers.items():
+                if plier.state == -1 or pid // 4 != id_side:
+                    continue
+                
+                crate = self.haz_crates[plier.state]
+                if crate.color in (-1, 2) or crate.color == self.color:
+                    id_active_pliers[pid] = ["drop", plier.state]
+                else:
+                    id_active_pliers[pid] = ["rev_drop", plier.state]
+        self.send_plier_cmd(id_active_pliers, self.haz_crates)
+        self.wait_for_plier()
+
+        with self.data_lock:
+            for pl_id in id_active_pliers:
+                self.pliers[pl_id].state = -1
+
+    def go_home_sm(self, path):
+        pass
+    
+    def select_strategy(self):
+        # Plan all the options and their rewards.
+        self.continuous_planner_callback()
+
+        with self.data_lock:
+            best_zone = max(self.zones.values(), key=lambda z: z.release_reward, default=None)
+            best_crate = max(self.haz_crates.values(), key=lambda c: c.pick_reward, default=None)
+            
+            if best_crate and best_crate.pick_reward > float('-inf'):
+                pick_crate_ids = best_crate.is_part_of_stack
+                pick_path = best_crate.best_pick_path
+                is_inv = best_crate.use_inverted
+                return GlobalSM.PICK, {"crate_ids": pick_crate_ids, "path": pick_path, "inv": is_inv}
+            
+            elif best_zone and best_zone.release_reward > float('-inf'):
+                rel_path = best_zone.best_release_path
+                best_release_pos = best_zone.best_release_pos
+                return GlobalSM.RELEASE, {"path": rel_path, "best_pos": best_release_pos}
+            
+            pos = self.steal_poses[self.id_steal % len(self.steal_poses)]
+            path, _ = self.get_best_path((pos[0], pos[1]), allow_critical=True)
+            
+            return GlobalSM.EXPLORE, {"path": path}
 
     def smart_moves(self):
         # self.send_raw("VMAX 1.5")
