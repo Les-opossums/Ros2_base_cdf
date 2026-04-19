@@ -132,7 +132,7 @@ class ZynqSimulation(Node):
     def process_action(self, name, args):
         """Execute the requested action asynchronously."""
         if (
-            name in ("GETODOM", "SPEED", "MAPASSERV", "BLOCK", "VMAX", "VTMAX")
+            name in ("GETODOM", "SPEED", "MAPASSERV", "BLOCK", "VMAX", "VTMAX", "FREE")
         ):
             self.send_short_cmd("motors", name, args)
         elif (

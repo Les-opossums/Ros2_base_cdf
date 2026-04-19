@@ -43,8 +43,10 @@ class PositionSender(Node):
                 ("short_motor_srv", rclpy.Parameter.Type.STRING),
                 ("update_period", rclpy.Parameter.Type.DOUBLE),
                 ("update_position_topic", rclpy.Parameter.Type.STRING),
-                ("config_yaml", "small_objects.yaml"),
+                ("board_config", "small_objects"),
                 ("year", 2026),
+                ("prob_no_stack", 0.1),
+                ("error_precision", 0.04),
             ],
         )
 
@@ -54,10 +56,16 @@ class PositionSender(Node):
         self.update_period = (
             self.get_parameter("update_period").get_parameter_value().double_value
         )
+        self.prob_no_stack = (
+            self.get_parameter("prob_no_stack").get_parameter_value().double_value
+        )
+        self.error_precision = (
+            self.get_parameter("error_precision").get_parameter_value().double_value
+        )
         self.year = self.get_parameter("year").get_parameter_value().integer_value
-        self.config_yaml = self.get_parameter("config_yaml").get_parameter_value().string_value
+        self.board_config = self.get_parameter("board_config").get_parameter_value().string_value
         objects_path = os.path.join(
-            get_package_share_directory("opossum_bringup"), "config", str(self.year), self.config_yaml
+            get_package_share_directory("opossum_bringup"), "config", str(self.year), f"{self.board_config}.yaml"
         )
         self.modified_objects = []
 
@@ -94,8 +102,14 @@ class PositionSender(Node):
         self.objects = {}
         # Iterate over all map objects
         for obj in data['map'].values():
-            cos_ = np.cos(obj['t'])
-            sin_ = np.sin(obj['t'])
+            skip_stack = random.uniform(0.0, 1.0) > 1.0 - self.prob_no_stack
+            if skip_stack:
+                continue
+            obj_x = obj['x'] + random.uniform(-self.error_precision, self.error_precision)
+            obj_y = obj['y'] + random.uniform(-self.error_precision, self.error_precision)
+            obj_t = obj['t'] + random.uniform(-self.error_precision / 2, self.error_precision / 2)
+            cos_ = np.cos(obj_t)
+            sin_ = np.sin(obj_t)
             if obj['type'] == "full_haz_stack_crates" and obj['shape'] == "clean":
                 order = ["yellow", "yellow", "blue", "blue"]
                 random.shuffle(order)
@@ -105,10 +119,14 @@ class PositionSender(Node):
             else:
                 order = ["rot", "rot", "rot", "rot"]
             for ind, element in element_types[obj['type']].items():
-                
-                x = obj['x'] + element['x'] * cos_ - element['y'] * sin_
-                y = obj['y'] + element['x'] * sin_ + element['y'] * cos_
-                t = obj['t'] + element['t']
+                if obj['type'] in ("full_haz_stack_crates", "half_haz_stack_crates"):
+                    x = obj_x + element['x'] * cos_ - element['y'] * sin_
+                    y = obj_y + element['x'] * sin_ + element['y'] * cos_
+                    t = obj_t + element['t']
+                else:
+                    x = obj_x + element['x'] * cos_ - element['y'] * sin_
+                    y = obj_y + element['x'] * sin_ + element['y'] * cos_
+                    t = obj_t + element['t']
                 elem = Objects()
                 elem.id = nb_objects
                 elem.state = "free"
@@ -172,7 +190,7 @@ class PositionSender(Node):
             if result[k] in (0, 2, 3) and act.state != 'free':
                 if act.state not in ('running', 'keeping') :
                     # The state of an object is "free_color" or "free_rot", we want to keep the color information when the object is released
-                    if result[k] == 2: # dropping, so we need to update the color of the object to the one of the robot
+                    if result[k] in (0, 2): # dropping, so we need to update the color of the object to the one of the robot
                         self.objects[int(act.state)].state = 'free' + "*" + self.objects[int(act.state)].state.split("*")[-1]
                     elif result[k] == 3: # picking, so we need to update the color of the object to the inverse of the one of the robot
                         self.objects[int(act.state)].state = 'free' + "*" + self.inv_colors[self.objects[int(act.state)].state.split("*")[-1]]
@@ -230,7 +248,6 @@ class PositionSender(Node):
                 self.modified_objects.append(obj_taken.id)
                 
             elif act.state == 'running':
-                # 2. The actuator is actively trying to pick something up.
                 # Save it in a list so we can run the Hungarian algorithm on all of them at once.
                 running_actuators.append((act, x_, y_, theta_))
 

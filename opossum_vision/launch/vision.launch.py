@@ -1,4 +1,4 @@
-"""Launch the vision system and emulator."""
+"""Launch the vision system for multiple cameras and robots."""
 
 import os
 from launch import LaunchDescription
@@ -7,56 +7,46 @@ from launch.substitutions import PathJoinSubstitution, LaunchConfiguration
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 
-
 def launch_setup(context, *args, **kwargs):
     nodes = []
 
-    # 1. Récupération des noms de robots (argument ligne de commande)
+    # 1. Récupération des noms de robots depuis l'argument
     robot_names_str = LaunchConfiguration("robot_names").perform(context)
     robot_names_list = [name.strip() for name in robot_names_str.split(",") if name.strip()]
 
-    # 2. Chemin vers le fichier YAML
-    # Remplacez 'opossum_vision' par le nom exact de votre package
+    # 2. Chemin vers le fichier YAML de configuration
     param_file = PathJoinSubstitution(
         [FindPackageShare("opossum_vision"), "config", "vision_params.yaml"]
     )
 
-    # 3. Lancement des nœuds par robot (Vision)
-    for robot in robot_names_list:
-        node_vision = Node(
-            package="opossum_vision",
-            executable="vision_node.py", # Nom défini dans setup.py
-            name="vision_node",       # Le nom du noeud (doit matcher le YAML)
-            namespace=robot,          # EX: main_robot
-            output="screen",
-            parameters=[param_file],  # Charge les params depuis le YAML
-            # On ajoute un remapping si besoin pour être sûr des topics
-            # remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')] 
-        )
-        nodes.append(node_vision)
+    # 3. Noms des caméras à lancer par robot
+    # Ils détermineront le nom du noeud et iront chercher le bloc correspondant dans le YAML
+    cameras = ["one", "two", "three"]
 
-    # 4. Lancement de l'Émulateur (Unique, global)
-    # L'émulateur n'est pas lié à un robot spécifique dans cet exemple,
-    # il simule le hardware connecté au PC.
-    # for robot in robot_names_list:
-    #     node_emulator = Node(
-    #         package="opossum_vision",
-    #         executable="vision_emulator_node.py",
-    #         name="vision_emulator_node",
-    #         namespace=robot,
-    #         output="screen",
-    #         parameters=[param_file] # Il ira chercher les params globaux (/**)
-    #     )
-    #     nodes.append(node_emulator)
+    # 4. Lancement des nœuds par robot et par caméra
+    for robot in robot_names_list:
+        for cam in cameras:
+            # Le nom sera "vision_node_left", "vision_node_right", "vision_node_back"
+            node_name = f"vision_node_{cam}" 
+            
+            node_vision = Node(
+                package="opossum_vision",
+                executable="vision_node.py", # Nom tel que défini dans setup.py
+                name=node_name,              # Crucial : Doit matcher la clé du YAML
+                namespace=robot,             # Ex: /main_robot
+                output="screen",
+                parameters=[param_file],     # Charge le YAML complet
+                # Optionnel: Remapping si on veut tout forcer dans un seul topic
+                # remappings=[('aruco_loc', '/aruco_loc_global')] 
+            )
+            nodes.append(node_vision)
 
     return nodes
-
 
 def generate_launch_description():
     
     robot_names_arg = DeclareLaunchArgument(
         "robot_names",
-        #default_value="main_robot, second_robot", # Valeur par défaut correspondant au YAML
         default_value="main_robot",
         description="Liste des robots séparés par des virgules",
     )

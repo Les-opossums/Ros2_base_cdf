@@ -1,42 +1,70 @@
+# --- Configuration pour le Robot Principal ---
 main_robot:
-  vision_node:
+  vision_node_one: # Doit correspondre à f"vision_node_{cam}" dans le launch
     ros__parameters:
+      simulation: false
+      port: '/dev/ttyACM0'  # Penser à mettre une règle udev (ex: /dev/ttyCAM_LEFT)
+      baudrate: 115200
+      camera_id: 1
+      
+      # Paramètres communs conservés
       rcv_comm_topic: zync_raspi
       send_comm_topic: raspi_zync
       comm_state_topic: comm_state
-      simulation: false
-
       asserv_topic: asserv
       robot_data_topic: robot_data
       goal_position_topic: goal_position
-
-      cards_name: ["cam"]
       command_topic: command
       feedback_command_topic: feedback_command
-      frequency: 20.
-      cards:
-        cam:
-          port: '/dev/ttyACM0'
-          baudrate: 115200
 
+  vision_node_two:
+    ros__parameters:
+      simulation: false
+      port: '/dev/ttyACM1'
+      baudrate: 115200
+      camera_id: 2
+      # Paramètres communs...
+      rcv_comm_topic: zync_raspi
+      asserv_topic: asserv
+      command_topic: command
+
+  vision_node_three:
+    ros__parameters:
+      simulation: false
+      port: '/dev/ttyACM2'
+      baudrate: 115200
+      camera_id: 3
+      # Paramètres communs...
+      rcv_comm_topic: zync_raspi
+      asserv_topic: asserv
+      command_topic: command
+
+
+# --- Configuration pour un second robot potentiel ---
 second_robot:
-  vision_node:
+  vision_node_one:
     ros__parameters:
-      rcv_comm_topic: zync_raspi
-      send_comm_topic: raspi_zync
-      comm_state_topic: comm_state
       simulation: false
-
+      port: '/dev/ttyACM0'
+      baudrate: 115200
+      camera_id: 1
+      rcv_comm_topic: zync_raspi
       asserv_topic: asserv
-      robot_data_topic: robot_data
-      goal_position_topic: goal_position
 
-      cards_name: ["cam"]
-      command_topic: command
-      feedback_command_topic: feedback_command
-      frequency: 20.
-      cards:
-        cam:
-          port: '/dev/ttyACM0'
-          baudrate: 115200
+  vision_node_two:
+    ros__parameters:
+      simulation: false
+      port: '/dev/ttyACM1'
+      baudrate: 115200
+      camera_id: 2
+      rcv_comm_topic: zync_raspi
+      asserv_topic: asserv
 
+  vision_node_three:
+    ros__parameters:
+      simulation: false
+      port: '/dev/ttyACM2'
+      baudrate: 115200
+      camera_id: 3
+      rcv_comm_topic: zync_raspi
+      asserv_topic: asserv

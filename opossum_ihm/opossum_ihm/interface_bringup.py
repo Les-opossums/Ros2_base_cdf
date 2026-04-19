@@ -55,7 +55,7 @@ class LaunchSelectorApp:
 
         # 2. Redémarrer le user service systemd
         # Notez l'ajout de "--user" et le retrait de "sudo"
-        commande = ["systemctl", "--user", "restart", "launch.service"]
+        commande = ["systemctl", "--user", "start", "launch.service"]
         
         self.root.withdraw() # Cache la fenêtre
         subprocess.run(commande) # Lance la commande

@@ -32,7 +32,6 @@ class LidarSimulation(Node):
                 ("scan_topic", rclpy.Parameter.Type.STRING),
                 ("update_position_topic", rclpy.Parameter.Type.STRING),
                 ("color_service", rclpy.Parameter.Type.STRING),
-                ("color_topic", rclpy.Parameter.Type.STRING),
                 ("default_color", rclpy.Parameter.Type.STRING),
                 ("available_colors", rclpy.Parameter.Type.STRING_ARRAY),
                 ("use_lidar_points", rclpy.Parameter.Type.BOOL),
@@ -50,13 +49,11 @@ class LidarSimulation(Node):
             .get_parameter_value()
             .string_array_value
         )
+
         if self.get_parameter("enable_wait_color").get_parameter_value().bool_value:
-            self.color_topic = (
-                self.get_parameter("color_topic").get_parameter_value().string_value
-            )
             _ = self.create_subscription(
                 String,
-                self.color_topic,
+                "init_team_color",
                 self._init_color_callback,
                 10,
             )
@@ -113,11 +110,8 @@ class LidarSimulation(Node):
 
     def _init_services(self) -> None:
         """Initialize services."""
-        self.color_service_name = (
-            self.get_parameter("color_service").get_parameter_value().string_value
-        )
         self.color_service = self.create_service(
-            Trigger, self.color_service_name, self._set_color
+            Trigger, "init_team_color", self._set_color
         )
 
     def _set_color(self, request, response) -> Trigger.Response:
@@ -129,25 +123,14 @@ class LidarSimulation(Node):
     def _init_publishers(self) -> None:
         """Initialize publishers."""
         if self.use_lidar_points:
-            self.scan_topic = (
-                self.get_parameter("scan_topic").get_parameter_value().string_value
-            )
-            self.pub_scan = self.create_publisher(LaserScan, self.scan_topic, 10)
+            self.pub_scan = self.create_publisher(LaserScan, "scan", 10)
         else:
-            self.object_topic = (
-                self.get_parameter("object_topic").get_parameter_value().string_value
-            )
-            self.pub_object = self.create_publisher(Obstacles, self.object_topic, 10)
+            self.pub_object = self.create_publisher(Obstacles, "raw_obstacles", 10)
 
     def _init_subscribers(self) -> None:
         """Initialize subscribers."""
-        self.update_position_topic = (
-            self.get_parameter("update_position_topic")
-            .get_parameter_value()
-            .string_value
-        )
         self.sub_real_position = self.create_subscription(
-            PositionMap, self.update_position_topic, self._publish_objects, 10
+            PositionMap, "update_position", self._publish_objects, 10
         )
 
     def _update(self, msg) -> None:

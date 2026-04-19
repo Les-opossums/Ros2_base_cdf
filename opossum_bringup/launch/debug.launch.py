@@ -36,7 +36,11 @@ def generate_launch_description():
         namespace=namespace,
         executable="action_sequencer_node.py",
         name="action_sequencer_node",
-        parameters=[{}],
+        parameters=[{
+            "board_config": "objects",
+            "year": 2026,
+            "boundaries": [0.0, 3.0, 0.0, 2.0],
+        }],
     )
 
     param_com_path = PathJoinSubstitution(
@@ -112,11 +116,27 @@ def generate_launch_description():
     )
     param_vision = ParameterFile(param_vision_path, allow_substs=True)
 
-    node_vision = Node(
+    node_vision_one = Node(
         namespace=namespace,
         package="opossum_vision",
         executable="vision_node.py",
-        name="vision_node",
+        name="vision_node_one",  # ATTENTION: Doit matcher le YAML !
+        parameters=[param_vision],
+    )
+
+    node_vision_two = Node(
+        namespace=namespace,
+        package="opossum_vision",
+        executable="vision_node.py",
+        name="vision_node_two", # ATTENTION: Doit matcher le YAML !
+        parameters=[param_vision],
+    )
+
+    node_vision_three = Node(
+        namespace=namespace,
+        package="opossum_vision",
+        executable="vision_node.py",
+        name="vision_node_three",  # ATTENTION: Doit matcher le YAML !
         parameters=[param_vision],
     )
 
@@ -129,6 +149,8 @@ def generate_launch_description():
     ld.add_action(node_beacon_detector)
     ld.add_action(node_obstacle_extractor)
     ld.add_action(node_avoid_obstacle)
-    ld.add_action(node_vision)
+    ld.add_action(node_vision_one)
+    ld.add_action(node_vision_two)
+    ld.add_action(node_vision_three)  
 
     return ld

@@ -114,7 +114,7 @@ class IhmNode(Node):
         )
         self.robot_data_sub = self.create_subscription(
             RobotData,
-            robot_data_topic,
+            "robot_data",
             self.robot_data_callback,
             1
         )

@@ -13,6 +13,9 @@ def launch_setup(context, *args, **kwargs):
     robot_names_str = LaunchConfiguration("robot_names").perform(context)
     robot_names_list = [name.strip() for name in robot_names_str.split(",")]
 
+    board_config = LaunchConfiguration("board_config").perform(context)
+    board_config = board_config.lower()
+
     param_file = PathJoinSubstitution(
         [FindPackageShare("opossum_simu"), "config", "simu_params.yaml"]
     )
@@ -21,7 +24,7 @@ def launch_setup(context, *args, **kwargs):
         package="opossum_simu",
         executable="position_sender.py",
         name="position_sender_node",
-        parameters=[param_file, {"robot_names": robot_names_list}],
+        parameters=[param_file, {"robot_names": robot_names_list, "board_config": board_config}],
     )
     nodes.append(node_position_sender)
 
@@ -82,4 +85,8 @@ def generate_launch_description():
         description="Set all the simulated robots",
     )
 
-    return LaunchDescription([robot_names_arg, OpaqueFunction(function=launch_setup)])
+    board_config_arg = DeclareLaunchArgument(
+        "board_config", default_value="objects", description="Get the good board to play"
+    )
+
+    return LaunchDescription([robot_names_arg, board_config_arg, OpaqueFunction(function=launch_setup)])

@@ -13,7 +13,7 @@ import math
 from PyQt5 import QtWidgets, QtGui, QtCore
 from ament_index_python.packages import get_package_share_directory
 import os
-from opossum_msgs.msg import LidarLoc, GlobalView
+from opossum_msgs.msg import LidarLoc, GlobalView, RobotData
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 import functools
@@ -56,6 +56,7 @@ class NodeGUI(Node):
         self.simulation = (
             self.get_parameter("simulation").get_parameter_value().bool_value
         )
+        self.msg_lidar = None
 
     def _init_publishers(self):
         """Initialize subscribers of the node."""
@@ -88,9 +89,16 @@ class NodeGUI(Node):
             self.create_subscription(
                 LidarLoc,
                 name + "/" + position_topic,
-                functools.partial(self.position_callback, name=name),
+                functools.partial(self.update_lidar_data, name=name),
                 10,
             )
+            if not self.parent.use_only_lidar_points:
+                self.create_subscription(
+                    RobotData,
+                    name + "/" + "robot_data",
+                    functools.partial(self.position_callback, name=name),
+                    10,
+                )
             self.create_subscription(
                 String,
                 f"{name}/board_state_updates",
@@ -137,9 +145,25 @@ class NodeGUI(Node):
     def global_view_callback(self, msg):
         self.parent.update_global_view(msg)
 
+    def update_lidar_data(self, msg, name):
+        """Update the lidar data."""
+        self.msg_lidar = msg
+        if self.parent.use_only_lidar_points:
+            self.parent.update_robot_position(msg, name)
+        if self.parent.use_ghost_lidar_points:
+            self.parent.update_ghost_position(msg, name)
+
     def position_callback(self, msg, name):
         """Receive the last known information and display it."""
-        self.parent.update_robot_position(msg, name)
+        new_msg = LidarLoc()
+        new_msg.robot_position.x = msg.x
+        new_msg.robot_position.y = msg.y
+        new_msg.robot_position.z = msg.theta
+        if self.msg_lidar is not None:  
+            new_msg.other_robot_position = self.msg_lidar.other_robot_position
+            new_msg.balises = self.msg_lidar.balises
+
+        self.parent.update_robot_position(new_msg, name)
 
     def check_asserv_callback(self, msg, name):
         """Check if an interesting data is received."""
@@ -195,6 +219,17 @@ class MapScene(QtWidgets.QGraphicsView):
         self.icon_width = icon_rect.width()
         self.icon_height = icon_rect.height()
         self.icon_item.setPos(5, 5)  # Position initiale
+        self.icon_item.setZValue(0.2) # Ensure main robot is always on top
+
+        # --- NEW: GHOST ROBOT ADDITION ---
+        # is_movable=False so you don't accidentally drag the ghost!
+        self.ghost_item = DraggablePixmapItem(self.icon_pixmap, is_movable=False)
+        self.ghost_item.setScale(1.15)   # <-- NEW: Makes it exactly 15% larger!
+        self.ghost_item.setOpacity(0.4)  # 40% opaque (0.0 is invisible, 1.0 is solid)
+        self.ghost_item.setZValue(0.1)   # Sit just below the main robot
+        self.scene.addItem(self.ghost_item)
+        # ---------------------------------
+        
         m_pixmap = QtGui.QPixmap(self.mad_icon).scaled(
             50, 50, QtCore.Qt.KeepAspectRatio
         )
@@ -210,7 +245,37 @@ class MapScene(QtWidgets.QGraphicsView):
         self.robot_global_x = 0.0
         self.robot_global_y = 0.0
         self.robot_global_theta = 0.0
+        
         self.plier_local_states = {}
+        self.crate_local_states = {}
+        
+        # --- NEW: Zone variables and Path selector ---
+        self.zone_local_states = {}
+        self.zone_items = {}
+        self.path_items = []
+        self.max_paths_to_show = 3
+        self.morbidity_data = {}
+        self.morbidity_items = []
+
+        # Create a dropdown menu floating on the View
+        self.path_selector = QtWidgets.QComboBox(self)
+        self.path_selector.addItems(["0 paths", "1 path", "2 paths", "3 paths"])
+        self.path_selector.setCurrentIndex(3) # Default to showing 3
+        self.path_selector.move(10, 10) # Position in the top-left corner
+        self.path_selector.setStyleSheet("background-color: white; font-weight: bold;")
+        self.path_selector.currentIndexChanged.connect(self.set_max_paths)
+
+    # --- NEW METHOD: Triggered by the dropdown ---
+    def set_max_paths(self, index):
+        """Update how many paths to show based on dropdown selection."""
+        self.max_paths_to_show = index
+        self._redraw_paths()
+
+    # --- ADD THIS NEW METHOD ANYWHERE INSIDE MapScene ---
+    def set_ghost_visibility(self, visible: bool):
+        """Instantly hide or show the ghost item on the map."""
+        if hasattr(self, 'ghost_item'):
+            self.ghost_item.setVisible(visible)
 
     def local_to_global(self, local_x, local_y, local_t):
         """Converts robot-frame coordinates to world-frame coordinates."""
@@ -247,7 +312,6 @@ class MapScene(QtWidgets.QGraphicsView):
             )
 
             if pid not in self.plier_items:
-                # Create the 3cm circle if it doesn't exist
                 r_px, _ = self.size_to_scene(0.03, 0.03)
                 circle = QtWidgets.QGraphicsEllipseItem(-r_px/2, -r_px/2, r_px, r_px)
                 circle.setPen(QtGui.QPen(QtCore.Qt.black))
@@ -261,10 +325,84 @@ class MapScene(QtWidgets.QGraphicsView):
             item.setPos(px, py)
             item.setRotation(90 - (gt * 180 / math.pi)) 
 
-            # Update Color (Green if holding something, White if empty)
+            # Update Color: Purple if running, Green if holding, White if free
+            is_running = plier_data.get('is_running', False)
             state = plier_data.get('state', -1)
-            brush_color = QtGui.QColor(0, 255, 0) if state >= 0 else QtGui.QColor(255, 255, 255)
+            
+            if is_running:
+                brush_color = QtGui.QColor(170, 0, 255) # Purple
+            elif state >= 0:
+                brush_color = QtGui.QColor(0, 255, 0)   # Green
+            else:
+                brush_color = QtGui.QColor(255, 255, 255) # White
+                
             item.setBrush(QtGui.QBrush(brush_color))
+
+    def _update_plier_visual(self, plier_data):
+        pid = plier_data['id']
+        gx, gy, gt = self.local_to_global(
+            plier_data['x'], plier_data['y'], plier_data['theta']
+        )
+
+        if pid not in self.plier_items:
+            r_px, _ = self.size_to_scene(0.03, 0.03)
+            circle = QtWidgets.QGraphicsEllipseItem(-r_px/2, -r_px/2, r_px, r_px)
+            circle.setPen(QtGui.QPen(QtCore.Qt.black))
+            circle.setZValue(2.0)
+            self.scene.addItem(circle)
+            self.plier_items[pid] = circle
+
+        item = self.plier_items[pid]
+        px, py = self.pos_to_scene(gx, gy)
+        
+        item.setPos(px, py)
+        item.setRotation(90 - (gt * 180 / math.pi))
+
+        # Update Color: Purple if running, Green if holding, White if free
+        is_running = plier_data.get('is_running', False)
+        state = plier_data.get('state', -1)
+        
+        if is_running:
+            brush_color = QtGui.QColor(170, 0, 255) # Purple
+        elif state >= 0:
+            brush_color = QtGui.QColor(0, 255, 0)   # Green
+        else:
+            brush_color = QtGui.QColor(255, 255, 255) # White
+            
+        item.setBrush(QtGui.QBrush(brush_color))
+
+    def _redraw_crates(self):
+        """Continuously update the position and visuals of crates being carried or targeted."""
+        if not hasattr(self, 'crate_local_states') or not hasattr(self, 'plier_local_states'):
+            return
+
+        for cid, crate_data in self.crate_local_states.items():
+            plier_id = crate_data.get('state', -1)
+            item = self.crate_items.get(cid)
+            
+            if not item:
+                continue
+
+            # If the crate is linked to a plier
+            if plier_id != -1 and plier_id in self.plier_local_states:
+                plier_data = self.plier_local_states[plier_id]
+                
+                # 1. Move the crate to perfectly track the plier
+                gx, gy, gt = self.local_to_global(
+                    plier_data['x'], plier_data['y'], plier_data['theta']
+                )
+                px, py = self.pos_to_scene(gx, gy)
+                item.setPos(px, py)
+                item.setRotation(90 - (gt * 180 / math.pi))
+
+                # 2. Apply "Held" Visuals
+                item.setOpacity(0.5)  # 50% transparent as long as it is linked to a plier
+                item.setPen(QtGui.QPen(QtCore.Qt.black)) # Keep the normal solid black outline
+                    
+            else:
+                # 3. Apply "Free" Visuals (Crate is sitting on the board)
+                item.setOpacity(1.0) # Full opacity
+                item.setPen(QtGui.QPen(QtCore.Qt.black)) # Normal black outline
 
     @QtCore.pyqtSlot(LidarLoc)
     def update_map_position(self, msg):
@@ -304,6 +442,30 @@ class MapScene(QtWidgets.QGraphicsView):
             old_item = self.ennemis_items.pop()
             self.scene.removeItem(old_item)
         self._redraw_pliers()
+        self._redraw_crates()
+        self._redraw_paths()
+
+    @QtCore.pyqtSlot(LidarLoc)
+    def update_ghost_position(self, msg):
+        """Update the position of the ghost in the map."""
+        # Only update if the item exists
+        if not hasattr(self, 'ghost_item'):
+            return
+
+        map_rect = self.map_item.boundingRect()
+        width = map_rect.width()
+        height = map_rect.height()
+        
+        # Calculate position using the exact same math as the main robot
+        posx = width * msg.robot_position.x / 3.0 - self.icon_width / 2.0
+        posy = height * (1.0 - msg.robot_position.y / 2.0) - self.icon_height / 2.0
+        
+        new_pos = QtCore.QPointF(posx, posy)
+        self.ghost_item.setPos(new_pos)
+        
+        # Calculate and set rotation
+        new_rotation = -msg.robot_position.z * 180.0 / pi
+        self.ghost_item.setRotation(new_rotation)
 
     def pos_to_scene(self, x, y):
         """Convert real (x,y) meters to scene pixels."""
@@ -326,18 +488,43 @@ class MapScene(QtWidgets.QGraphicsView):
     #     height = map_rect.height()
     #     return width * x / 3.0, height * (1 - y / 2.0)
 
-    # --- NEW: State Applicators ---
+    def resizeEvent(self, event):
+        """Make the map dynamically adjust when the window is resized."""
+        super().resizeEvent(event)
+        # Force the view to keep the map item fully visible and scaled
+        if hasattr(self, 'map_item'):
+            self.fitInView(self.map_item, QtCore.Qt.KeepAspectRatio)
+
     def apply_full_state(self, json_str):
         """Initialize the whole board."""
         try:
             full_state = json.loads(json_str)
-            for crate in full_state.get('crates', []):
-                self._update_crate_visual(crate)
             
-            # --- UPDATED: Save local state and trigger redraw ---
+            # --- CLEAR EXISTING CRATES TO AVOID GHOSTS ---
+            for cid, item in self.crate_items.items():
+                self.scene.removeItem(item)
+            self.crate_items.clear()
+            self.crate_local_states.clear()
+            
+            if 'morbidity' in full_state: # or full_state
+                self.morbidity_data = full_state['morbidity']
+                self._redraw_morbidity()
+
+            for crate in full_state.get('crates', []):
+                self.crate_local_states[crate['id']] = crate 
+                self._update_crate_visual(crate)
+                
             for plier in full_state.get('pliers', []):
                 self.plier_local_states[plier['id']] = plier
+                
+            # --- NEW: Process Zones ---
+            for zone in full_state.get('zones', []):
+                self.zone_local_states[zone['id']] = zone
+                self._update_zone_visual(zone)
+
             self._redraw_pliers()
+            self._redraw_crates()
+            self._redraw_paths()
             
         except Exception as e:
             print(f"Error parsing full state: {e}")
@@ -346,70 +533,270 @@ class MapScene(QtWidgets.QGraphicsView):
         """Update only the changed elements."""
         try:
             updates = json.loads(json_str)
+            
+            if 'morbidity' in updates:
+                self.morbidity_data = updates['morbidity']
+                self._redraw_morbidity()
+
+            # ==========================================
+            # 1. PROCESS DELETED CRATES (NEW LOGIC)
+            # ==========================================
+            for cid in updates.get('deleted_crates', []):
+                # Remove from data tracking
+                if cid in self.crate_local_states:
+                    del self.crate_local_states[cid]
+                
+                # Remove from the visual map!
+                if cid in self.crate_items:
+                    item = self.crate_items.pop(cid)
+                    self.scene.removeItem(item)
+
+            # ==========================================
+            # 2. Process New/Updated Elements
+            # ==========================================
             for crate in updates.get('crates', []):
+                self.crate_local_states[crate['id']] = crate
                 self._update_crate_visual(crate)
                 
-            # --- UPDATED: Save local state and trigger redraw ---
             for plier in updates.get('pliers', []):
                 self.plier_local_states[plier['id']] = plier
+                
+            for zone in updates.get('zones', []):
+                self.zone_local_states[zone['id']] = zone
+                self._update_zone_visual(zone)
+
             self._redraw_pliers()
+            self._redraw_crates()
+            self._redraw_paths()
             
         except Exception as e:
             print(f"Error parsing update state: {e}")
 
     def _update_crate_visual(self, crate_data):
-        # Crates are now correctly World Frame! No math needed here.
         cid = crate_data['id']
-        
+        reward = crate_data.get('reward', float('-inf'))
+
+        # 1. Format the text to show ONLY the Score
+        if reward > -99999:
+            display_text = f"{reward:.2f}"
+        else:
+            display_text = "-"
+
+        # 2. Create the crate if it doesn't exist yet
         if cid not in self.crate_items:
             w_px, h_px = self.size_to_scene(0.05, 0.15)
             rect = QtWidgets.QGraphicsRectItem(-w_px/2, -h_px/2, w_px, h_px) 
             rect.setPen(QtGui.QPen(QtCore.Qt.black))
             rect.setZValue(1.0)
+            
+            # Add the Text Item
+            text_item = QtWidgets.QGraphicsSimpleTextItem(display_text, rect)
+            font = QtGui.QFont("Arial", 10, QtGui.QFont.Bold) # Larger font since it's just one line
+            text_item.setFont(font)
+            
             self.scene.addItem(rect)
             self.crate_items[cid] = rect
 
+        # 3. Update Position and Rotation
         item = self.crate_items[cid]
         px, py = self.pos_to_scene(crate_data['x'], crate_data['y'])
-        
         item.setPos(px, py)
         item.setRotation(90 - (crate_data['theta'] * 180 / math.pi))
 
-        # Color mapping: 0=Yellow, 1=Blue, 2=Red
+        # 4. Color mapping
         color_val = crate_data.get('color', -1)
-        if color_val == 0: color = QtGui.QColor(255, 255, 0)
-        elif color_val == 1: color = QtGui.QColor(0, 0, 255)
-        elif color_val == 2: color = QtGui.QColor(255, 0, 0)
-        else: color = QtGui.QColor(150, 150, 150)
+        text_color = QtCore.Qt.white # Default text color
+
+        if color_val == 0: 
+            color = QtGui.QColor(255, 255, 0)
+            text_color = QtCore.Qt.black # Yellow needs black text to be readable
+        elif color_val == 1: 
+            color = QtGui.QColor(0, 0, 255)
+        elif color_val == 2: 
+            color = QtGui.QColor(255, 0, 0)
+        else: 
+            color = QtGui.QColor(150, 150, 150)
+            text_color = QtCore.Qt.black
+            
         item.setBrush(QtGui.QBrush(color))
-
-    def _update_plier_visual(self, plier_data):
-        pid = plier_data['id']
         
-        # 1. Transform from local Robot frame to global Map frame
-        gx, gy, gt = self.local_to_global(
-            plier_data['x'], plier_data['y'], plier_data['theta']
-        )
+        # 5. --- THE FIX: Dynamically update, ROTATE, and Center the Text ---
+        for child in item.childItems():
+            if isinstance(child, QtWidgets.QGraphicsSimpleTextItem):
+                child.setText(display_text)
+                child.setBrush(QtGui.QBrush(text_color))
+                
+                # Setup rotation around the exact center of the text bounding box
+                text_rect = child.boundingRect()
+                child.setTransformOriginPoint(text_rect.width() / 2, text_rect.height() / 2)
+                
+                # Rotate it 90 degrees!
+                child.setRotation(90) 
+                
+                # Center the rotated text item perfectly inside the crate
+                child.setPos(-text_rect.width() / 2, -text_rect.height() / 2)
 
-        if pid not in self.plier_items:
-            # Pliers are small, let's say 3cm (0.03m) circles
-            r_px, _ = self.size_to_scene(0.03, 0.03)
-            circle = QtWidgets.QGraphicsEllipseItem(-r_px/2, -r_px/2, r_px, r_px)
-            circle.setPen(QtGui.QPen(QtCore.Qt.black))
-            self.scene.addItem(circle)
-            self.plier_items[pid] = circle
-
-        item = self.plier_items[pid]
-        px, py = self.pos_to_scene(gx, gy)
+    def _update_zone_visual(self, zone_data):
+        """Draw or update the release zones with their rewards."""
+        zid = zone_data['id']
+        reward = zone_data.get('reward', float('-inf'))
         
+        if reward > -99999:
+            display_text = f"{reward:.3f}"
+            # display_text = f"Zone {zid}\n{reward:.3f}"
+        else:
+            display_text = f"---"
+            # display_text = f"Zone {zid}\n-"
+            
+        # Create the zone if it doesn't exist
+        if zid not in self.zone_items:
+            # Assume zone is roughly 30x30 cm. Adjust 0.3 if needed.
+            w_px, h_px = self.size_to_scene(0.2, 0.2)
+            rect = QtWidgets.QGraphicsRectItem(-w_px/2, -h_px/2, w_px, h_px)
+            
+            # Semi-transparent green background with dashed border
+            rect.setBrush(QtGui.QBrush(QtGui.QColor(0, 255, 0, 40))) 
+            rect.setPen(QtGui.QPen(QtCore.Qt.darkGreen, 2, QtCore.Qt.DashLine))
+            rect.setZValue(0.1) # Keep it on the floor
+            
+            # Add reward text
+            text_item = QtWidgets.QGraphicsSimpleTextItem(display_text, rect)
+            text_item.setFont(QtGui.QFont("Arial", 9, QtGui.QFont.Bold))
+            text_item.setBrush(QtGui.QBrush(QtCore.Qt.black))
+            
+            self.scene.addItem(rect)
+            self.zone_items[zid] = rect
+
+        item = self.zone_items[zid]
+        px, py = self.pos_to_scene(zone_data['x'], zone_data['y'])
         item.setPos(px, py)
         
-        # --- THE FIX ---
-        item.setRotation(90 - (gt * 180 / math.pi))
+        # Update text and keep it centered
+        for child in item.childItems():
+            if isinstance(child, QtWidgets.QGraphicsSimpleTextItem):
+                child.setText(display_text)
+                r = child.boundingRect()
+                child.setPos(-r.width()/2, -r.height()/2)
 
-        state = plier_data.get('state', -1)
-        brush_color = QtGui.QColor(0, 255, 0) if state >= 0 else QtGui.QColor(255, 255, 255)
-        item.setBrush(QtGui.QBrush(brush_color))
+    def _redraw_paths(self):
+        """Draw top N paths for both Picking (Crates) and Releasing (Zones)."""
+        # 1. Clear old paths from the screen
+        for item in getattr(self, 'path_items', []):
+            if item in self.scene.items():
+                self.scene.removeItem(item)
+        self.path_items = []
+
+        # If user selected "0 paths", stop here.
+        if self.max_paths_to_show == 0:
+            return
+
+        # 2. Get valid crates and zones, and sort them highest to lowest score
+        valid_crates = [c for c in self.crate_local_states.values() if c.get('reward', float('-inf')) > -99999 and 'path' in c]
+        valid_crates.sort(key=lambda c: c['reward'], reverse=True)
+
+        valid_zones = [z for z in getattr(self, 'zone_local_states', {}).values() if z.get('reward', float('-inf')) > -99999 and 'path' in z]
+        valid_zones.sort(key=lambda z: z['reward'], reverse=True)
+
+        # 3. Helper function to draw a line
+        def draw_trajectory(path_pts, color, is_first):
+            if not path_pts or len(path_pts) < 2: 
+                return
+            qpath = QtGui.QPainterPath()
+            sx, sy = self.pos_to_scene(path_pts[0][0], path_pts[0][1])
+            qpath.moveTo(sx, sy)
+            for pt in path_pts[1:]:
+                px, py = self.pos_to_scene(pt[0], pt[1])
+                qpath.lineTo(px, py)
+            
+            item = QtWidgets.QGraphicsPathItem(qpath)
+            pen = QtGui.QPen(color)
+            # Make the best path 6px thick, others 3px thick
+            pen.setWidth(6 if is_first else 3)
+            pen.setStyle(QtCore.Qt.DashLine)
+            item.setPen(pen)
+            item.setZValue(0.8) # Above floor, below crates
+            self.scene.addItem(item)
+            self.path_items.append(item)
+
+        # 4. Draw Top N Picking Paths (Shades of Blue)
+        blue_shades = [QtGui.QColor(0, 0, 255, 200), QtGui.QColor(0, 150, 255, 200), QtGui.QColor(100, 200, 255, 200)]
+        drawn_crate_paths = []
+        for crate in valid_crates:
+            if len(drawn_crate_paths) >= self.max_paths_to_show: 
+                break
+            
+            # Prevent drawing the exact same path twice for crates in the same stack
+            if crate['path'] in drawn_crate_paths: 
+                continue
+            
+            is_best = (len(drawn_crate_paths) == 0)
+            draw_trajectory(crate['path'], blue_shades[len(drawn_crate_paths) % 3], is_best)
+            drawn_crate_paths.append(crate['path'])
+
+        # 5. Draw Top N Release Paths (Shades of Green)
+        green_shades = [QtGui.QColor(0, 255, 0, 200), QtGui.QColor(150, 255, 0, 200), QtGui.QColor(200, 255, 100, 200)]
+        drawn_zone_paths = []
+        for zone in valid_zones:
+            if len(drawn_zone_paths) >= self.max_paths_to_show: 
+                break
+            
+            if zone['path'] in drawn_zone_paths: 
+                continue
+                
+            is_best = (len(drawn_zone_paths) == 0)
+            draw_trajectory(zone['path'], green_shades[len(drawn_zone_paths) % 3], is_best)
+            drawn_zone_paths.append(zone['path'])
+
+    def _redraw_morbidity(self):
+        """Draw the 'Danger Map' showing why paths are refused."""
+        # 1. Clear old morbidity items
+        for item in self.morbidity_items:
+            if item in self.scene.items():
+                self.scene.removeItem(item)
+        self.morbidity_items = []
+
+        if not self.morbidity_data:
+            return
+
+        # Helper to convert meters to QRectF/Scene coordinates
+        def get_qrect(x, y, w, h):
+            px, py = self.pos_to_scene(x, y + h) # Qt draws from top-left, we calculate from bottom-left
+            pw, ph = self.size_to_scene(w, h)
+            return QtCore.QRectF(px, py, pw, ph)
+
+        # 2. Draw HARD ZONES (Solid Red - Never Cross)
+        red_brush = QtGui.QBrush(QtGui.QColor(255, 0, 0, 60)) # 60/255 opacity
+        for z in self.morbidity_data.get('hard_zones', []):
+            rect_item = QtWidgets.QGraphicsRectItem(get_qrect(z['x'], z['y'], z['w'], z['h']))
+            rect_item.setBrush(red_brush)
+            rect_item.setPen(QtGui.QPen(QtCore.Qt.red, 1))
+            rect_item.setZValue(0.05) # Floor level
+            self.scene.addItem(rect_item)
+            self.morbidity_items.append(rect_item)
+
+        # 3. Draw SAFETY MARGINS (Orange - The Expanded Robot Radius)
+        orange_brush = QtGui.QBrush(QtGui.QColor(255, 165, 0, 40))
+        for z in self.morbidity_data.get('safety_zones', []):
+            rect_item = QtWidgets.QGraphicsRectItem(get_qrect(z['x'], z['y'], z['w'], z['h']))
+            rect_item.setBrush(orange_brush)
+            rect_item.setPen(QtGui.QPen(QtCore.Qt.darkYellow, 1, QtCore.Qt.DashLine))
+            rect_item.setZValue(0.06)
+            self.scene.addItem(rect_item)
+            self.morbidity_items.append(rect_item)
+
+        # 4. Draw CRATE BUBBLES (Blue Circles - Dynamic Obstacles)
+        blue_brush = QtGui.QBrush(QtGui.QColor(0, 0, 255, 35))
+        for b in self.morbidity_data.get('crate_bubbles', []):
+            # pos_to_scene returns center, drawEllipse needs top-left
+            cx, cy = self.pos_to_scene(b['x'], b['y'])
+            r_px, _ = self.size_to_scene(b['radius'], b['radius']) # radius in pixels
+            
+            ellipse_item = QtWidgets.QGraphicsEllipseItem(cx - r_px, cy - r_px, r_px * 2, r_px * 2)
+            ellipse_item.setBrush(blue_brush)
+            ellipse_item.setPen(QtGui.QPen(QtCore.Qt.blue, 1, QtCore.Qt.DotLine))
+            ellipse_item.setZValue(0.07)
+            self.scene.addItem(ellipse_item)
+            self.morbidity_items.append(ellipse_item)
 
 class DraggablePixmapItem(QtWidgets.QGraphicsPixmapItem):
     """Drag items on the Map."""
@@ -466,6 +853,10 @@ class GlobalViewPage(QtWidgets.QWidget):
     def update_map_position(self, msg):
         """Update the map of the robots."""
         self.map_scene.update_map_position(msg)
+
+    def update_ghost_position(self, msg):
+        """Update the map of the robots."""
+        self.map_scene.update_ghost_position(msg)
 
     def send_command(self, command):
         """Send command to ROS."""
@@ -610,6 +1001,10 @@ class MotorsPage(QtWidgets.QWidget):
     def update_map_position(self, msg):
         """Update the map of the robots."""
         self.map_scene.update_map_position(msg)
+    
+    def update_ghost_position(self, msg):
+        """Update the map of the robots."""
+        self.map_scene.update_ghost_position(msg)
 
 
 class AsservPage(QtWidgets.QWidget):
@@ -726,10 +1121,17 @@ class MainRobotPage(QtWidgets.QWidget):
         """Change the page."""
         self.stackedWidgets.setCurrentIndex(index)
 
+    def update_ghost_position(self, msg):
+        if self.parent.use_ghost_lidar_points:
+            self.component_pages["GlobalView"].update_ghost_position(msg)
+            self.component_pages["GlobalView"].update_ghost_position(msg)
+
     def update_robot_position(self, msg):
         """Update robot position in every layout."""
         self.component_pages["GlobalView"].update_map_position(msg)
+        self.component_pages["GlobalView"].update_map_position(msg)
         self.component_pages["GlobalView"].update_text_position(msg)
+        self.component_pages["Motors"].update_map_position(msg)
         self.component_pages["Motors"].update_map_position(msg)
         self.component_pages["Motors"].update_text_position(msg)
 
@@ -739,6 +1141,14 @@ class MainRobotPage(QtWidgets.QWidget):
         
     def init_board_state(self, json_str):
         self.component_pages["GlobalView"].map_scene.apply_full_state(json_str)
+
+    # --- ADD THIS NEW METHOD ANYWHERE INSIDE MainRobotPage ---
+    def set_ghost_visibility(self, visible: bool):
+        """Pass the visibility toggle down to all map scenes."""
+        if "GlobalView" in self.component_pages:
+            self.component_pages["GlobalView"].map_scene.set_ghost_visibility(visible)
+        if "Motors" in self.component_pages:
+            self.component_pages["Motors"].map_scene.set_ghost_visibility(visible)
 
 class GeneralViewPage(QtWidgets.QGraphicsView):
     def __init__(self, robot_names, parent):
@@ -873,18 +1283,27 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
 
     def __init__(self):
         super().__init__()
-        # Set main characteristics
         self.setWindowTitle("Orchestrator GUI")
         self.setGeometry(0, 0, 600, 800)
 
-        # ROS connection
+        # 1. Initialize variables
+        self.use_only_lidar_points = False
+        self.use_ghost_lidar_points = True  # Default to ON
+        if self.use_only_lidar_points:
+            self.use_ghost_lidar_points = False
+
         self.gui_node = NodeGUI(self)
         self.leash_button = QtWidgets.QPushButton("Send all LEASH")
         self.leash_button.clicked.connect(self.send_leashes)
 
+        # 2. --- NEW: Create the Checkbox ---
+        self.ghost_checkbox = QtWidgets.QCheckBox("Show Lidar Ghost (Debug)")
+        self.ghost_checkbox.setChecked(self.use_ghost_lidar_points)
+        self.ghost_checkbox.stateChanged.connect(self.toggle_ghost)
+
         # GUI for each robot
         self.page_name_box = QtWidgets.QComboBox()
-        self.page_name_box.addItems(["General View"] + [name for name in self.gui_node.robot_names])
+        self.page_name_box.addItems([name for name in self.gui_node.robot_names] + ["General View"])
         self.robot_pages = {
             name: MainRobotPage(name, self) for name in self.gui_node.robot_names
         }
@@ -895,10 +1314,12 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         
         self.page_name_box.currentIndexChanged.connect(self.change_page)
 
+        # 3. Add it to your layout
         central_widget = QtWidgets.QWidget()
         self.setCentralWidget(central_widget)
         self.layout = QtWidgets.QVBoxLayout(central_widget)
         self.layout.addWidget(self.leash_button)
+        self.layout.addWidget(self.ghost_checkbox) # <-- NEW: Add to screen
         self.layout.addWidget(self.page_name_box)
         self.layout.addWidget(self.stackedWidgets)
 
@@ -906,9 +1327,25 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         self.call_update_global()
         self.fetch_initial_states()
 
+    def toggle_ghost(self, state):
+        """Triggered when the user clicks the checkbox."""
+        is_visible = (state == QtCore.Qt.Checked)
+        
+        # 1. Update the variable so NodeGUI starts/stops passing Lidar data
+        self.use_ghost_lidar_points = is_visible
+        
+        # 2. Force the graphics items to hide/show immediately
+        for name, page in self.robot_pages.items():
+            if isinstance(page, MainRobotPage):
+                page.set_ghost_visibility(is_visible)
+
     def update_robot_position(self, msg, name):
         """Update the position of the robot."""
         self.robot_pages[name].update_robot_position(msg)
+
+    def update_ghost_position(self, msg, name):
+        """Update the position of the ghost."""
+        self.robot_pages[name].update_ghost_position(msg)
 
     def update_global_view(self, msg):
         self.robot_pages['General View'].update_global_view(msg)

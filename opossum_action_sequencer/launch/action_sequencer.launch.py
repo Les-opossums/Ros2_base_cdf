@@ -12,6 +12,8 @@ def launch_setup(context, *args, **kwargs):
     nodes = []
     robot_names_str = LaunchConfiguration("robot_names").perform(context)
     robot_names_list = [name.strip() for name in robot_names_str.split(",")]
+    board_config = LaunchConfiguration("board_config").perform(context)
+    board_config = board_config.lower()
 
     param_file = PathJoinSubstitution(
         [FindPackageShare("opossum_action_sequencer"), "config", "action_sequencer_params.yaml"]
@@ -23,7 +25,7 @@ def launch_setup(context, *args, **kwargs):
             namespace=robot,
             executable="action_sequencer_node.py",
             name="action_sequencer_node",
-            parameters=[param_file],
+            parameters=[param_file, {"board_config": board_config}],
         )
 
         nodes.append(node_action_sequencer)
@@ -38,4 +40,8 @@ def generate_launch_description():
         description="Set all the simulated robots",
     )
 
-    return LaunchDescription([robot_names_arg, OpaqueFunction(function=launch_setup)])
+    board_config_arg = DeclareLaunchArgument(
+        "board_config", default_value="object", description="Get the good board to play"
+    )
+
+    return LaunchDescription([robot_names_arg, board_config_arg, OpaqueFunction(function=launch_setup)])

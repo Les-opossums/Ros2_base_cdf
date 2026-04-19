@@ -59,7 +59,8 @@ class ObstacleAvoider(Node):
         self.enable_new_path_default = (
             self.get_parameter("enable_new_path").get_parameter_value().bool_value
         )
-        self.enable_new_path = self.enable_new_path_default
+        self.enable_new_path = False
+        # self.enable_new_path = self.enable_new_path_default
         self.obstacle_detection_distance_default = (
             self.get_parameter("obstacle_detection_distance")
             .get_parameter_value()
@@ -131,7 +132,7 @@ class ObstacleAvoider(Node):
             self.get_parameter("goal_position_topic").get_parameter_value().string_value
         )
         self.sub_robot_data = self.create_subscription(
-            RobotData, robot_data_topic, self.robot_data_callback, 10
+            RobotData, "robot_data", self.robot_data_callback, 10
         )
         self.sub_scan = self.create_subscription(
             LaserScan, scan_topic, self.scan_callback, 10
@@ -205,10 +206,10 @@ class ObstacleAvoider(Node):
             self.in_avoid = False
             if msg.detection_mode == -1:
                 self.enable_detection = self.enable_detection_default
-                self.enable_new_path = self.enable_new_path_default
+                # self.enable_new_path = self.enable_new_path_default
             else:
                 self.enable_detection = msg.detection_mode > 0
-                self.enable_new_path = msg.detection_mode > 1
+                # self.enable_new_path = msg.detection_mode > 1
             if (
                 abs(msg.obstacle_detection_distance - self.obstacle_detection_distance)
                 < 0.01
@@ -237,8 +238,10 @@ class ObstacleAvoider(Node):
 
         if not self.enable_detection:
             return
+
         if self.in_avoid:
             self.in_avoid = self._find_new_path()
+
         else:
             lidar_range = (
                 msg.ranges[-self.index_correction :]
@@ -247,9 +250,10 @@ class ObstacleAvoider(Node):
             last_obs_detected = self.obstacle_detected
             self.obstacle_detected = self.detect_obstacle(lidar_range)
             if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
-                self._send_vmax(0.4)
+                self._send_vmax(1.2)
                 self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
                 return
+
             if self.obstacle_detected:
                 if (
                     self.enable_new_path
@@ -464,9 +468,9 @@ class ObstacleAvoider(Node):
         # if self.last_command_sent == "BLOCK":
             # return
         cmd_msg = String()
-        cmd_msg.data = "BLOCK"
+        cmd_msg.data = "FREE"
         self.pub_command.publish(cmd_msg)
-        self.last_command_sent = "BLOCK"
+        self.last_command_sent = "FREE"
 
     def _send_move(self, x, y, t) -> None:
         """Send move to motors."""

@@ -55,7 +55,7 @@ class KeyboardController(Node):
             self.get_parameter("robot_data_topic").get_parameter_value().string_value
         )
         self.sub_robot_data = self.create_subscription(
-            RobotData, self.robot_data_topic, self.robot_data_callback, 10
+            RobotData, "robot_data", self.robot_data_callback, 10
         )
         self.sub_au = self.create_subscription(
             Bool, "/main_robot/au", self.update_au, 10
@@ -176,9 +176,9 @@ class KeyboardController(Node):
         if self.last_command_sent == "BLOCK":
             return
         cmd_msg = String()
-        cmd_msg.data = "BLOCK"
+        cmd_msg.data = "FREE"
         self.pub_command.publish(cmd_msg)
-        self.last_command_sent = "BLOCK"
+        self.last_command_sent = "FREE"
 
     def _send_move(self, x, y, t) -> None:
         """Send move to motors."""
