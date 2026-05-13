@@ -226,13 +226,16 @@ private:
             try {
                 // Read up to the newline character
                 std::string line = serial_card->readline(65536, "\n");
-                
                 if (!line.empty()) {
-                    // LOG 1: Print the absolute raw string including hidden characters
-                    RCLCPP_INFO(this->get_logger(), "[RAW RX %s]: '%s'", name.c_str(), line.c_str());
-
-                    // Remove trailing newline, carriage return, and whitespace
-                    line.erase(line.find_last_not_of(" \n\r\t") + 1);
+                    // 1. Trouver le premier vrai caractère (Left Trim)
+                    size_t start = line.find_first_not_of(" \n\r\t");
+                    if (start == std::string::npos) {
+                        line = ""; // La ligne ne contenait que des espaces
+                    } else {
+                        line = line.substr(start);
+                        // 2. Nettoyer la fin (Right Trim)
+                        line.erase(line.find_last_not_of(" \n\r\t") + 1);
+                    }
                     
                     if (!line.empty()) {
                         handle_received_line(line);
@@ -264,7 +267,7 @@ private:
     }
 
     void send_card(const std_msgs::msg::String::SharedPtr msg, const std::string& name) {
-        RCLCPP_INFO(this->get_logger(), "HW RX on %s: '%s'", name.c_str(), msg->data.c_str());
+        // RCLCPP_INFO(this->get_logger(), "HW RX on %s: '%s'", name.c_str(), msg->data.c_str());
 
         if (!enable_send_) {
             RCLCPP_WARN(this->get_logger(), "HW IGNORED: enable_send_ is FALSE");
@@ -277,7 +280,7 @@ private:
                 // 1. Add \r\n just in case the hardware parser requires it
                 std::string hardware_cmd = out + "\r\n"; 
                 
-                RCLCPP_INFO(this->get_logger(), "HW SERIAL WRITE: '%s'", out.c_str());
+                // RCLCPP_INFO(this->get_logger(), "HW SERIAL WRITE: '%s'", out.c_str());
                 
                 // 2. Write the data
                 cards_[name].serial_port->write(hardware_cmd);
