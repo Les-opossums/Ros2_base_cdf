@@ -69,6 +69,9 @@ private:
     rclcpp::CallbackGroup::SharedPtr mutex_clb_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_comm_topic_;
     std::map<std::string, rclcpp::Subscription<std_msgs::msg::String>::SharedPtr> sub_command_map_;
+    std::string buffer_simu_rcv_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_command_simu_;
+    rclcpp::TimerBase::SharedPtr read_timer_;
 
     // Serial & Threading
     struct CardInfo {
@@ -100,7 +103,24 @@ private:
         std::string cmd_topic = this->get_parameter("command_topic").as_string();
 
         if (simulation_) {
-            // Setup simulation subscribers (omitted for brevity, follows similar pattern to below)
+            std::string rcv_topic = this->get_parameter("rcv_comm_topic").as_string();
+            
+            // 1. Subscribe to simulated Zynq data
+            sub_comm_topic_ = this->create_subscription<std_msgs::msg::String>(
+                rcv_topic, 10, std::bind(&Communication::save_in_buffer, this, std::placeholders::_1));
+
+            // 2. Subscribe to incoming commands
+            sub_command_simu_ = this->create_subscription<std_msgs::msg::String>(
+                cmd_topic, 10, std::bind(&Communication::send_card_simu, this, std::placeholders::_1));
+
+            // 3. Create the reading timer based on the frequency parameter
+            double freq = this->get_parameter("frequency").as_double();
+            auto timer_period = std::chrono::duration<double>(1.0 / freq);
+            
+            read_timer_ = this->create_wall_timer(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(timer_period),
+                std::bind(&Communication::read_card_simu, this),
+                mutex_clb_);
         } else {
             std::vector<std::string> cards_name = this->get_parameter("cards_name").as_string_array();
             for (const auto& name : cards_name) {
@@ -147,6 +167,44 @@ private:
 
             RCLCPP_WARN(this->get_logger(), "Retrying to connect the '%s' card in 1s", name.c_str());
             std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    }
+
+    // --- SIMULATION METHODS ---
+
+    void save_in_buffer(const std_msgs::msg::String::SharedPtr msg) {
+        // Simulate the Zynq sending data
+        buffer_simu_rcv_ += msg->data;
+    }
+
+    void read_card_simu() {
+        // Look at the result of the command send in simulation
+        if (buffer_simu_rcv_.empty()) return;
+
+        std::istringstream stream(buffer_simu_rcv_);
+        std::string line;
+        
+        // Split buffer by newline and process each line
+        while (std::getline(stream, line)) {
+            // Remove carriage returns if they exist
+            line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
+            if (!line.empty()) {
+                handle_received_line(line);
+            }
+        }
+        // Clear buffer after reading
+        buffer_simu_rcv_ = ""; 
+    }
+
+    void send_card_simu(const std_msgs::msg::String::SharedPtr msg) {
+        // Send to the card the command in simulation
+        if (!enable_send_) return;
+        
+        std::string out = process_data_send(msg->data);
+        if (!out.empty()) {
+            auto out_msg = std_msgs::msg::String();
+            out_msg.data = out;
+            pub_comm_->publish(out_msg);
         }
     }
 
