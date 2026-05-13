@@ -1497,8 +1497,7 @@ class ActionManager(Node):
         self.start_match_time = time.time()
         self.send_raw("VMAX 1.5")
         self.send_raw("VTMAX 3.0")
-        self.move_to(Position(x=self.entry_zone[0], y=self.entry_zone[1]))
-        self.get_logger().info(f"1st move to: {time.time() - self.start_match_time}")
+        self.move_to(Position(x=self.entry_zone[0], y=self.entry_zone[1], t=self.robot_pos.t))
         while not self._stop_event.is_set():
             start_local_time = time.time()
             try:
