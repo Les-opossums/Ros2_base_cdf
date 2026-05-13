@@ -268,7 +268,9 @@ class ActionManager(Node):
         # Il faut réinstancier l'objet Thread pour le prochain start_state_machine().
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
 
-        config_file = "/home/opossum/robot_ws/src/utils/match_params.yaml"
+        config_file = os.path.join(
+            get_package_share_directory("opossum_bringup"), "config", "match_params.yaml"
+        )
 
         data = yaml.safe_load(open(config_file, "r"))
 
