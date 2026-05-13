@@ -178,7 +178,8 @@ class PositionSender(Node):
         result = decode_state(msg.data, len(self.actuators[name]))
         for k in self.actuators[name].keys():
             act = self.actuators[name][k]
-            act.state_int = result[k]
+            act.state_int = result[k] if result[k] not in (7, 8) else 0
+            # act.state_int = result[k]
             # 0: free, 1: picking, 2: dropping, 3: reverting, 4: keep up
             if result[k] in (0, 2, 3) and act.state != 'free':
                 if act.state not in ('running', 'keeping') :
