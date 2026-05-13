@@ -213,10 +213,9 @@ class ActionManager(Node):
         self.init_match()
 
     def gaussienne(self, t):
-        sigma = 5
+        sigma = 10
         center = self.match_time / 2
-        minimum = -5
-        return self.amp_gauss * np.exp(-((t - center)**2) / (2 * sigma**2)) + minimum
+        return self.amp_gauss * np.exp(-((t - center)**2) / (2 * sigma**2)) - self.amp_gauss / 2
 
     @property
     def coeff_release(self):
