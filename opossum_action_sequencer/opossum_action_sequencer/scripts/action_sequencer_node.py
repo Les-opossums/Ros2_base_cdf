@@ -176,6 +176,7 @@ class ActionManager(Node):
         self.color = None
         self.last_time_pliers = time.time()
         self.last_time_move = time.time()
+        self.last_time_move_sex = time.time()
         self.last_enemy_detected = time.time() - 20.0
 
         # Process
@@ -905,6 +906,7 @@ class ActionManager(Node):
         elif msg.data.strip() == "Pos,done":
             self.motion_done = True
             self.motion_done_event.set()
+            self.move_sex_count -= 1
         
         elif msg.data.strip() == "Break,done":
             self.break_engage = True
@@ -1211,7 +1213,7 @@ class ActionManager(Node):
             self.is_robot_arrived = False
             time.sleep(0.1)
             if pos.t == None:
-                pos.t = self.nearest_great_angle(self.pos_obj.t)
+                pos.t = self.nearest_great_angle(self.robot_pos.t)
             if params is not None:
                 command = f"MOVE {pos.x} {pos.y} {pos.t} {' '.join(params)}"
             else:
@@ -1221,6 +1223,15 @@ class ActionManager(Node):
             self.motion_done_event.clear()  # Block the wait
             self.motion_done = False
             self.last_time_move = time.time()
+
+    def move_sex(self, poses):
+        self.last_time_move_sex = time.time()
+        for pos in poses:
+            if pos.t == None:
+                pos.t = self.nearest_great_angle(self.robot_pos.t)
+            command = f"MOVESEX {pos.x} {pos.y} {pos.t}"
+            self.move_sex_count += 1
+            self.pub_command.publish(String(data=command))
 
     def nearest_great_angle(self, current):
         """Helper to find the nearest angle to 0, pi/2, pi, 3pi/2."""
@@ -1517,6 +1528,7 @@ class ActionManager(Node):
     def main_loop(self):
         """Run main loop logic."""
         if self.break_engage:
+            self.move_sex_count = 0
             self.break_engage = False
             self.motion_done = True
             self.pliers_done = True
@@ -1558,7 +1570,12 @@ class ActionManager(Node):
             self.get_logger().info(f"Timeout movement, restarting by soft")
             self.motion_done = True
 
-        if (not self.motion_done or not self.pliers_done) and self.global_sm != GlobalSM.STOP: # or time.time() - self.last_enemy_detected < 5.0:
+        if not self.move_sex_count > 0 and time.time() - self.last_time_move_sex >  5.0:
+            self.get_logger().info(f"Timeout movement, restarting by soft")
+            self.move_sex_count -= 1
+            self.last_time_move_sex = time.time()
+
+        if (not self.motion_done or not self.pliers_done or self.move_sex_count > 0) and self.global_sm != GlobalSM.STOP: # or time.time() - self.last_enemy_detected < 5.0:
             return
         
         if time.time() - self.start_match_time > 85.0:
