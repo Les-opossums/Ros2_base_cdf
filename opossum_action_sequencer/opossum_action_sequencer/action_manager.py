@@ -8,7 +8,7 @@ class Version:
 
 
 class Position:
-    def __init__(self, x=0, y=0, t=0):
+    def __init__(self, x=None, y=None, t=None):
         self.x = x
         self.y = y
         self.t = t

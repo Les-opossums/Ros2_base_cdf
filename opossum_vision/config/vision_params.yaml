@@ -3,7 +3,7 @@ main_robot:
   vision_node_one: # Doit correspondre à f"vision_node_{cam}" dans le launch
     ros__parameters:
       simulation: false
-      port: '/dev/ttyACM0'  # Penser à mettre une règle udev (ex: /dev/ttyCAM_LEFT)
+      port: '/dev/jevois_cam1'  # Penser à mettre une règle udev (ex: /dev/ttyCAM_LEFT)
       baudrate: 115200
       camera_id: 1
       
@@ -20,7 +20,7 @@ main_robot:
   vision_node_two:
     ros__parameters:
       simulation: false
-      port: '/dev/ttyACM1'
+      port: '/dev/jevois_cam2'
       baudrate: 115200
       camera_id: 2
       # Paramètres communs...
@@ -31,7 +31,7 @@ main_robot:
   vision_node_three:
     ros__parameters:
       simulation: false
-      port: '/dev/ttyACM2'
+      port: '/dev/jevois_cam3'
       baudrate: 115200
       camera_id: 3
       # Paramètres communs...
@@ -45,7 +45,7 @@ second_robot:
   vision_node_one:
     ros__parameters:
       simulation: false
-      port: '/dev/ttyACM0'
+      port: '/dev/jevois_cam1'
       baudrate: 115200
       camera_id: 1
       rcv_comm_topic: zync_raspi
@@ -54,7 +54,7 @@ second_robot:
   vision_node_two:
     ros__parameters:
       simulation: false
-      port: '/dev/ttyACM1'
+      port: '/dev/jevois_cam2'
       baudrate: 115200
       camera_id: 2
       rcv_comm_topic: zync_raspi
@@ -63,7 +63,7 @@ second_robot:
   vision_node_three:
     ros__parameters:
       simulation: false
-      port: '/dev/ttyACM2'
+      port: '/dev/jevois_cam3'
       baudrate: 115200
       camera_id: 3
       rcv_comm_topic: zync_raspi

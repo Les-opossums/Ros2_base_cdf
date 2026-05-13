@@ -9,10 +9,10 @@ main_robot:
       command_topic: command
       obstacle_detected_topic: obstacle_detected
       visualization_topic: visualization_limit
-      obstacle_detection_distance: 0.5
+      obstacle_detection_distance: 0.72
       detection_mode: rectangle
       cone_range: 60.0 # deg
-      thickness: 0.6
+      thickness: 0.5
       # boundaries:  [0.0, 1.0, 0.0, 2.0]
       boundaries: [0.0, 3.0, 0.0, 2.0]
       boundary_limit_detection: 0.05
@@ -31,10 +31,10 @@ second_robot:
       command_topic: command
       obstacle_detected_topic: obstacle_detected
       visualization_topic: visualization_limit
-      obstacle_detection_distance: 0.5
+      obstacle_detection_distance: 0.6
       detection_mode: rectangle
       cone_range: 60.0 # deg
-      thickness: 0.6
+      thickness: 0.45
       # boundaries:  [0.0, 1.0, 0.0, 2.0]
       boundaries: [0.0, 3.0, 0.0, 2.0]
       boundary_limit_detection: 0.05

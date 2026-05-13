@@ -119,23 +119,16 @@ class PositionSender(Node):
             else:
                 order = ["rot", "rot", "rot", "rot"]
             for ind, element in element_types[obj['type']].items():
-                if obj['type'] in ("full_haz_stack_crates", "half_haz_stack_crates"):
-                    x = obj_x + element['x'] * cos_ - element['y'] * sin_
-                    y = obj_y + element['x'] * sin_ + element['y'] * cos_
-                    t = obj_t + element['t']
-                else:
-                    x = obj_x + element['x'] * cos_ - element['y'] * sin_
-                    y = obj_y + element['x'] * sin_ + element['y'] * cos_
-                    t = obj_t + element['t']
+                add_angle = np.pi if random.uniform(0.0, 1.0) > 0.5 else 0.0
                 elem = Objects()
                 elem.id = nb_objects
                 elem.state = "free"
                 if obj['type'] in ("full_haz_stack_crates", "half_haz_stack_crates"):
                     elem.state += "*" + order[ind]
                 elem.type = element['type']
-                elem.x = x
-                elem.y = y
-                elem.theta = t
+                elem.x = obj_x + element['x'] * cos_ - element['y'] * sin_
+                elem.y = obj_y + element['x'] * sin_ + element['y'] * cos_
+                elem.theta = obj_t + element['t'] + add_angle
                 self.objects[elem.id] = elem
                 self.modified_objects.append(elem.id)
                 nb_objects += 1

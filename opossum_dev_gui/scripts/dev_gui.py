@@ -56,7 +56,7 @@ class NodeGUI(Node):
         self.simulation = (
             self.get_parameter("simulation").get_parameter_value().bool_value
         )
-        self.msg_lidar = None
+        self.msg_lidar = {name: None for name in self.robot_names}
 
     def _init_publishers(self):
         """Initialize subscribers of the node."""
@@ -92,36 +92,18 @@ class NodeGUI(Node):
                 functools.partial(self.update_lidar_data, name=name),
                 10,
             )
-            if not self.parent.use_only_lidar_points:
-                self.create_subscription(
-                    RobotData,
-                    name + "/" + "robot_data",
-                    functools.partial(self.position_callback, name=name),
-                    10,
-                )
+            self.create_subscription(
+                RobotData,
+                name + "/" + "robot_data",
+                functools.partial(self.position_callback, name=name),
+                10,
+            )
             self.create_subscription(
                 String,
                 f"{name}/board_state_updates",
                 functools.partial(self.board_state_callback, name=name),
                 10
             )
-        if self.set_asserv:
-            asserv_topic = (
-                self.get_parameter("asserv_topic").get_parameter_value().string_value
-            )
-            for name in self.robot_names:
-                self.create_subscription(
-                    String,
-                    name + "/" + asserv_topic + "/pos",
-                    functools.partial(self.check_asserv_callback, name=name),
-                    10,
-                )
-                self.create_subscription(
-                    String,
-                    name + "/" + asserv_topic + "/vel",
-                    functools.partial(self.check_asserv_callback, name=name),
-                    10,
-                )
 
     def board_state_callback(self, msg, name):
         """Pass the delta JSON to the interface."""
@@ -147,9 +129,7 @@ class NodeGUI(Node):
 
     def update_lidar_data(self, msg, name):
         """Update the lidar data."""
-        self.msg_lidar = msg
-        if self.parent.use_only_lidar_points:
-            self.parent.update_robot_position(msg, name)
+        self.msg_lidar[name] = msg
         if self.parent.use_ghost_lidar_points:
             self.parent.update_ghost_position(msg, name)
 
@@ -159,15 +139,10 @@ class NodeGUI(Node):
         new_msg.robot_position.x = msg.x
         new_msg.robot_position.y = msg.y
         new_msg.robot_position.z = msg.theta
-        if self.msg_lidar is not None:  
-            new_msg.other_robot_position = self.msg_lidar.other_robot_position
-            new_msg.balises = self.msg_lidar.balises
+        if self.msg_lidar[name] is not None:  
+            new_msg.other_robot_position = self.msg_lidar[name].other_robot_position
 
         self.parent.update_robot_position(new_msg, name)
-
-    def check_asserv_callback(self, msg, name):
-        """Check if an interesting data is received."""
-        self.parent.update_robot_position(msg, name)
 
     def request_full_board_state(self, name):
         """Async request for the initial massive map dump."""
@@ -406,10 +381,10 @@ class MapScene(QtWidgets.QGraphicsView):
 
     @QtCore.pyqtSlot(LidarLoc)
     def update_map_position(self, msg):
+        """Update the robot position."""
         self.robot_global_x = msg.robot_position.x
         self.robot_global_y = msg.robot_position.y
         self.robot_global_theta = msg.robot_position.z
-        """Update the robot position."""
         map_rect = self.map_item.boundingRect()
         width = map_rect.width()
         height = map_rect.height()
@@ -1287,11 +1262,7 @@ class OrchestratorGUI(QtWidgets.QMainWindow):
         self.setGeometry(0, 0, 600, 800)
 
         # 1. Initialize variables
-        self.use_only_lidar_points = False
         self.use_ghost_lidar_points = True  # Default to ON
-        if self.use_only_lidar_points:
-            self.use_ghost_lidar_points = False
-
         self.gui_node = NodeGUI(self)
         self.leash_button = QtWidgets.QPushButton("Send all LEASH")
         self.leash_button.clicked.connect(self.send_leashes)

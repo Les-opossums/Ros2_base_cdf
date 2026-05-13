@@ -249,7 +249,8 @@ class ObstacleAvoider(Node):
             )
             last_obs_detected = self.obstacle_detected
             self.obstacle_detected = self.detect_obstacle(lidar_range)
-            if not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
+            # Evitement dynamique
+            if self.obstacle_detected and not self.obstacle_detected and last_obs_detected != self.obstacle_detected and self.goal_position is not None:
                 self._send_vmax(1.2)
                 self._send_move(self.goal_position.x, self.goal_position.y, self.goal_position.z)
                 return
@@ -273,7 +274,7 @@ class ObstacleAvoider(Node):
         """Detect if there is an obstacle depending on the option."""
         if self.robot_data is None:
             return self._detect_obstacle_full(lidar_range)
-        elif self.robot_data.vlin < 0.01 and not self.obstacle_detected:
+        elif self.robot_data.vlin < 0.01: # and not self.obstacle_detected:
             self.publish_visualization("full")
             return False
         elif self.detection_mode == "full":
@@ -468,9 +469,9 @@ class ObstacleAvoider(Node):
         # if self.last_command_sent == "BLOCK":
             # return
         cmd_msg = String()
-        cmd_msg.data = "FREE"
+        cmd_msg.data = "BLOCK"
         self.pub_command.publish(cmd_msg)
-        self.last_command_sent = "FREE"
+        self.last_command_sent = "BLOCK"
 
     def _send_move(self, x, y, t) -> None:
         """Send move to motors."""

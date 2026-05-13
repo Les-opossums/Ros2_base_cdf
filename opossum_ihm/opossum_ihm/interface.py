@@ -1,648 +1,158 @@
-import tkinter as tk
-from tkinter import messagebox
-from PIL import Image, ImageTk
 import os
+import math
 import subprocess
-from itertools import count, cycle
 from ament_index_python.packages import get_package_share_directory
-from rclpy.logging import get_logger
 
+from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                             QPushButton, QLabel, QMessageBox, 
+                             QStackedWidget, QDialog, QSizePolicy)
+from PyQt5.QtCore import pyqtSignal, Qt, QTimer
+from PyQt5.QtGui import QFont, QMovie
 
-class ColorChoiceApp:
-    def __init__(self, name, au_state):
-        self.name = name
-        self.reload = False
-        self.root = tk.Tk()
-        self.root.title(f"[{self.name}] Choose your color")
+class GifPopup(QDialog):
+    def __init__(self, gif_path, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog | Qt.WindowStaysOnTopHint)
+        self.setStyleSheet("background-color: black;") 
+        layout = QVBoxLayout(self); layout.setContentsMargins(0, 0, 0, 0)
+        self.label = QLabel(self); self.label.setAlignment(Qt.AlignCenter); layout.addWidget(self.label)
+        self.movie = QMovie(gif_path); self.label.setMovie(self.movie); self.movie.start()
+        QTimer.singleShot(3000, self.accept)
 
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-        if screen_width == 480 and screen_height == 800:
-            # Plein écran
-            self.root.attributes("-fullscreen", True)
-        else:
-            self.root.geometry("480x800")
-        self.label = tk.Label(self.root, text="Choose a color:")
-        self.label.pack(pady=10)
+class ConfigPage(QWidget):
+    request_param_update = pyqtSignal(str, int)
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
 
-        if au_state:
-            self.root.configure(bg="red")
-
-        self.button_yellow = tk.Button(
-            self.root,
-            text="Yellow",
-            bg="yellow",
-            command=lambda: self.chs_clr("yellow"),
-            width=40,
-            height=15,
-        )
-        self.button_yellow.pack(padx=20)
-
-        self.button_blue = tk.Button(
-            self.root,
-            text="Blue",
-            bg="blue",
-            command=lambda: self.chs_clr("blue"),
-            width=40,
-            height=15,
-        )
-        self.button_blue.pack(padx=20)
-
-        self.selected_color = None
-
-        self.button_reload = tk.Button(
-            self.root,
-            text="Reload",
-            bg="red",
-            command=self.reload_ihm,
-            width=10,
-            height=5,
-        )
-        self.button_reload.pack(pady=25)
-
-        # Bouton pour quitter
-        # self.button_quit = tk.Button(self.root,
-        #                              text="Quit",
-        #                              command=self.root.destroy,
-        #                              width=10,
-        #                              height=5,
-        #                              )
-        # self.button_quit.pack(pady=20)
-        self.root.mainloop()
-
-    def chs_clr(self, color):
-        self.selected_color = color
-        self.root.destroy()
-
-    def reload_ihm(self):
-        self.root.destroy()
-        self.reload = True
-
-
-class ImageApp:
-    def __init__(self, name, selected_color):
-        self.name = name
-        self.reload = False
-        self.selected_script = 0
-        self.selected_color = selected_color
-
-        self.root = tk.Tk()
-        self.root.title(f"[{self.name}] Choose your script")
-        self.root.configure(bg=selected_color)
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-
-        if screen_width == 480 and screen_height == 800:
-            # Plein écran
-            self.root.attributes("-fullscreen", True)
-        else:
-            self.root.geometry("480x800")
-        self.color = selected_color
-        plateau_path = os.path.join(
-            get_package_share_directory("opossum_ihm"),
-            "images",
-            "map.png",
-        )
-        self.img = Image.open(plateau_path)
-        # Pivoter l'image de 90° dans le sens des aiguilles d'une montre
-        self.img = self.img.rotate(90, expand=True)
-        # Dimensions de la fenêtre
-        window_width = 480
-        window_height = 800
-        # Dimensions de l'image après la rotation
-        img_width, img_height = self.img.size
-        # Calculer les facteurs de redimensionnement
-        width_factor = window_width / img_width
-        height_factor = window_height / img_height
-        # Choisir le plus petit facteur pour conserver le ratio
-        scale_factor = min(width_factor, height_factor) * 0.9
-        # Redimensionner l'image en maintenant le ratio
-        new_width = int(img_width * scale_factor)
-        new_height = int(img_height * scale_factor)
-        # Redimensionner l'image
-        self.img = self.img.resize((new_width, new_height))
-        # Convertir l'image en format compatible avec Tkinter
-        self.tk_img = ImageTk.PhotoImage(self.img)
-        # Créer un canevas pour afficher l'image
-        self.canvas = tk.Canvas(self.root, width=new_width, height=new_height)
-        self.canvas.pack()
-        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.tk_img)
-        self.script_zones = {
-            1: (0, 515, 105, 620),
-            2: (190, 545, 300, 650),
-            3: (330, 330, 480, 450),
-            4: (330, 210, 480, 320),
-            5: (190, 0, 300, 110),
-            6: (0, 30, 105, 140),
-            7: (200, 400, 305, 505),
-            9: (200, 280, 280, 360),
-            11: (0, 150, 105, 300),
-            12: (0, 310, 105, 460),
-        }
-        self.zone_rects = {}
-
-        for script_num, (x1, y1, x2, y2) in self.script_zones.items():
-            rect = self.canvas.create_rectangle(x1, y1, x2, y2, fill="grey",
-                                                outline="black"
-                                                )
-            text = self.canvas.create_text((x1 + x2) // 2, (y1 + y2) // 2,
-                                           text=str(script_num),
-                                           fill="white",
-                                           font=("Helvetica", 20, "bold")
-                                           )
-            self.zone_rects[script_num] = (rect, text)
-        # Bind pour obtenir les coordonnées du clic
-        self.canvas.bind("<Button-1>", self.get_coordinates)
-        # Label pour afficher les coordonnées
-        self.label = tk.Label(self.root, text=f"Color: {self.color}")
-        self.label.pack(pady=10)
-
-        self.button_reload = tk.Button(
-            self.root,
-            text="Reload",
-            bg="red",
-            command=self.reload_ihm,
-            height=5,
-            width=10
-        )
-        self.button_reload.pack(padx=0, pady=10)
-        self.button_reload.place(x=100, y=700)
-
-        # Bouton pour quitter
-        self.button_valid = tk.Button(
-            self.root,
-            text="Valid",
-            bg="green",
-            command=self.verify_selection,
-            height=5,
-            width=10
-        )
-        self.button_valid.pack(padx=20, pady=10)
-        self.button_valid.place(x=300, y=700)
-        self.root.mainloop()
-
-    def get_coordinates(self, event):
-        x, y = event.x, event.y
-        print(f"Couleur choisie: {self.color}, Coordonnées: ({x}, {y})")
-
-        selected = 0
-        for script_num, (x1, y1, x2, y2) in self.script_zones.items():
-            if x1 <= x <= x2 and y1 <= y <= y2:
-                selected = script_num
-                break
-
-        self.selected_script = selected
-
-        # Update colors of all zones
-        for script_num, (rect_id, _) in self.zone_rects.items():
-            color = "green" if script_num == self.selected_script else "grey"
-            self.canvas.itemconfig(rect_id, fill=color)
-
-        self.label.config(text=f"Script:{self.selected_script} | x={x}, y={y}")
-
-    def reload_ihm(self):
-        self.root.destroy()
-        self.reload = True
-
-    def verify_selection(self):
-        if self.selected_script == 0:
-            self.show_temp_popup("Please select a script!")
-        elif self.selected_script % 2 == 0 and self.color == "yellow":
-            self.show_temp_popup("Invalid color for this script!")
-        elif self.selected_script % 2 != 0 and self.color == "blue":
-            self.show_temp_popup("Invalid color for this script!")
-        else:
-            self.root.destroy()
-
-    def show_temp_popup(self, message):
-        popup = tk.Toplevel(self.root)
-        popup.title("Warning")
-        popup.geometry("250x100")
-        popup.configure(bg="white")
-        popup.transient(self.root)  # lie le popup à la fenêtre principale
-        popup.grab_set()  # empêche l'interaction avec la fenêtre principale
-
-        label = tk.Label(popup, text=message, bg="white",
-                         fg="red", font=("Helvetica", 12, "bold"))
-        label.pack(expand=True, padx=10, pady=10)
-
-        # Ferme automatiquement la fenêtre après 1000 ms
-        self.root.after(1000, popup.destroy)
-
-
-class ValidationApp:
-    def __init__(self, name, color, script):
-        self.name = name
-        self.color = color
-        self.script = script
-        self.reload = False
-        self.launched_init = False
-
-        # Initialisation de la fenêtre principale
-        self.root = tk.Tk()
-        self.root.title(f"[{self.name}] Validation")
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-        if screen_width == 480 and screen_height == 800:
-            # Plein écran
-            self.root.attributes("-fullscreen", True)
-        else:
-            self.root.geometry("480x800")
-        self.root.configure(bg="white")  # Couleur de fond
-
-        # Création des widgets
-        self.create_widgets()
-
-        # Lancer la boucle principale
-        self.root.mainloop()
-
-    def create_widgets(self):
-        # Titre
-        title_label = tk.Label(
-            self.root,
-            text="Validation details",
-            font=("Arial", 16, "bold"),
-            bg="white",
-            fg="black",
-        )
-        title_label.pack(pady=10)
-
-        # Affichage de la couleur
-        color_label = tk.Label(
-            self.root,
-            text=f"Color : {self.color}",
-            font=("Arial", 14),
-            bg=self.color,  # Utilisation de la couleur fournie
-            fg="white" if self.color.lower() != "white" else "black",
-            width=30,  # Largeur fixe
-            anchor="w",  # Alignement à gauche
-            padx=10,
-        )
-        color_label.pack(pady=5)
-
-        # Affichage du script
-        script_label = tk.Label(
-            self.root,
-            text=f"Script : {self.script}",
-            font=("Arial", 14),
-            bg="white",
-            fg="black",
-            anchor="w",
-            padx=10,
-        )
-        script_label.pack(pady=5)
-
-        # Bouton de validation
-        validate_button = tk.Button(self.root,
-                                    text="Valid",
-                                    command=self.on_validate,
-                                    bg="green",
-                                    height=5,
-                                    width=10
-                                    )
-        validate_button.pack(pady=10)
-
-        script_init_button = tk.Button(self.root,
-                                       text="Init",
-                                       command=self.launch_init,
-                                       bg="yellow",
-                                       height=5,
-                                       width=10
-                                       )
-        script_init_button.pack(pady=10)
-
-        reload_button = tk.Button(self.root,
-                                  text="Reload",
-                                  command=self.on_reload,
-                                  bg="red",
-                                  height=5,
-                                  width=10
-                                  )
-        reload_button.pack(pady=20)
-
-    def on_validate(self):
-        print("Validation done.")
-        self.root.destroy()
-
-    def launch_init(self):
-        self.launched_init = True
-        self.root.destroy()
-
-    def on_reload(self):
-        self.reload = True
-        self.root.destroy()
-
-
-class ScoreApp:
-    def __init__(self, name, color):
-        self.name = name
-        self.root = tk.Tk()
-        self.root.title(f"[{self.name}] Score")
-        self.color = color
-        self.score = 0
-        self.is_match = False
-        self.is_au = False
-        self.comm_state = True
-        self.lidar_pos_x = 0.
-        self.lidar_pos_y = 0.
-        self.lidar_pos_z = 0.
-        self.robot_data_x = 0.
-        self.robot_data_y = 0.
-        self.robot_data_t = 0.
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-        if screen_width == 480 and screen_height == 800:
-            # Plein écran
-            self.root.attributes("-fullscreen", True)
-        else:
-            self.root.geometry("480x800")
-        self.root.configure(bg=self.color)  # Couleur de fond
-        # Création de la frame
-        self.create_frame()
-
-    def create_frame(self):
-        frame = tk.Frame(self.root, bg="lightgray", relief="solid", bd=2)
-        frame.pack(expand=True, fill="both", padx=20, pady=20)
-
-        self.display_score = tk.StringVar()
-        self.display_score.set("0")
-        self.position_zynq = tk.StringVar()
-        self.position_zynq.set(f" ZYNQ "
-                              f" X: {self.robot_data_x:.2f} "
-                              f" Y: {self.robot_data_y:.2f} "
-                              f" T: {self.robot_data_t:.2f} "
-                              )
-        self.position_lidar = tk.StringVar()
-        self.position_lidar.set(f" LIDAR "
-                               f" X: {self.lidar_pos_x:.2f} "
-                               f" Y: {self.lidar_pos_y:.2f} "
-                               f" T: {self.lidar_pos_z:.2f} "
-                               )
-
-        self.restart_service_button = tk.Button(
-            frame,
-            text="Restart Service",
-            command=self.restart_launch_service,
-            bg="orange",
-            fg="black",
-            font=("Arial", 14, "bold"),
-            height=5,
-            width=20
-        )
-        self.restart_service_button.pack(side="bottom", pady=20)
-
-        self.zero_label = tk.Label(
-            frame,
-            textvariable=self.display_score,
-            font=("Arial", 120, "bold"),
-            bg="lightgray",
-            fg="black",
-        )
-        self.zero_label.pack(expand=True)
-
-        self.position_zynq_label = tk.Label(
-            frame,
-            textvariable=self.position_zynq,
-            font=("Arial", 20),
-            bg="lightgray",
-            fg="black",
-            anchor="n"
-        )
-        self.position_zynq_label.pack(side="top", pady=10)
-
-        self.position_lidar_label = tk.Label(
-            frame,
-            textvariable=self.position_lidar,
-            font=("Arial", 20),
-            bg="lightgray",
-            fg="black",
-            anchor="s"
-        )
-        self.position_lidar_label.pack(side="bottom", pady=10)
-
-    def update_au(self, au, comm_state):
-        self.is_au = au
-        if au:
-            self.root.configure(bg="red")
-            # if self.is_match:
-        elif not comm_state:
-            self.root.configure(bg="orange")
-        else:
-            self.root.configure(bg=self.color)
-
-    def update_gif(self):
-        if self.is_au:
-            root = tk.Toplevel(self.root)
-            gif_path = os.path.join(
-                get_package_share_directory("opossum_ihm"),
-                "images",
-                "boulette.gif",
-            )
-            lbl = ImageLabel(root)
-            lbl.pack()
-            lbl.load(gif_path)
-            root.after(3000, root.destroy)
-            root.mainloop()
-        self.root.after(500, self.update_gif)
-
-    def update_score(self, score):
-        """Met à jour le score toutes les 500ms"""
-        # self.score = score  # Incrémentation du score
-        # logger = get_logger("opossum_ihm")
-        # logger.info(f"Score: {self.score}")
-        self.display_score.set(str(score))  # Mise à jour du texte
-        self.zero_label.update_idletasks()
-
-    def update_position(self, x_lidar, y_lidar, t_lidar, x_zynq, y_zynq, t_zynq):
-        """Met à jour la position toutes les 500ms"""
-        if x_lidar is None:
-            self.position_lidar.set(
-                "LIDAR "
-                " X: --:--"
-                " Y: --:--"
-                " T: --:--"
-            )
-        else:
-            self.position_lidar.set(
-                f" LIDAR "
-                f" X: {x_lidar:.2f}"
-                f" Y: {y_lidar:.2f}"
-                f" T: {t_lidar:.2f}"
-            )
-        self.position_lidar_label.update_idletasks()
-
-        if x_zynq is None:
-            self.position_zynq.set(
-                " ZYNQ "
-                " X: --:--"
-                " Y: --:--"
-                " T: --:--"
-            )
-        else:
-            self.position_zynq.set(
-                f" ZYNQ "
-                f" X: {x_zynq:.2f}"
-                f" Y: {y_zynq:.2f}"
-                f" T: {t_zynq:.2f}"
-            )
-        self.position_zynq_label.update_idletasks()
-
-    def restart_launch_service(self):
-        """Affiche un pop-up custom et exécute la commande bash pour redémarrer le service."""
-        logger = get_logger("opossum_ihm")
-
-        # --- 1. Création du pop-up sur mesure ---
-        popup = tk.Toplevel(self.root)
-        popup.title("Confirmation")
-        popup.geometry("400x250")
-        popup.configure(bg="white")
+    def init_ui(self):
+        layout = QVBoxLayout(self); layout.setSpacing(15); layout.setContentsMargins(20, 20, 20, 20)
+        title = QLabel("Choix de la Stratégie"); title.setFont(QFont("Arial", 22, QFont.Bold)); title.setAlignment(Qt.AlignCenter); layout.addWidget(title)
         
-        # Rend la fenêtre modale (empêche de cliquer sur la fenêtre principale derrière)
-        popup.transient(self.root)
-        popup.grab_set()
+        font_btn = QFont("Arial", 18, QFont.Bold)
 
-        # Variable pour stocker le choix de l'utilisateur
-        confirmation = False
+        # Liste des boutons à générer en "Grands"
+        buttons_data = [
+            ("MATCH JAUNE", "#FFD700", "black", "yellow", 11),
+            ("MATCH BLEU", "#0000FF", "white", "blue", 12),
+            ("HOMOLOGATION JAUNE", "#B8860B", "white", "yellow", 1),
+            ("HOMOLOGATION BLEU", "#000080", "white", "blue", 2)
+        ]
 
-        # Fonctions liées aux boutons
-        def on_yes():
-            nonlocal confirmation
-            confirmation = True
-            popup.destroy()
+        for text, bg, fg, color, script in buttons_data:
+            btn = QPushButton(text)
+            btn.setFont(font_btn)
+            btn.setStyleSheet(f"background-color: {bg}; color: {fg}; border: 3px solid black; border-radius: 10px;")
+            # Cette ligne rend les boutons GRANDS (remplissent l'espace vertical)
+            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            btn.clicked.connect(lambda checked, c=color, s=script, n=text: self.launch(c, s, n))
+            layout.addWidget(btn)
 
-        def on_no():
-            nonlocal confirmation
-            confirmation = False
-            popup.destroy()
+    def launch(self, color, script, name):
+        reply = QMessageBox.question(self, 'Confirmation', f"Valider : {name} ?", QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.request_param_update.emit(color, script)
 
-        # --- 2. Design du pop-up ---
-        lbl = tk.Label(
-            popup, 
-            text="Restart ROS 2 ?", 
-            bg="white", 
-            fg="black",
-            font=("Arial", 16, "bold")
-        )
-        lbl.pack(pady=30)
+class MatchPage(QWidget):
+    request_restart_match = pyqtSignal()
+    def __init__(self):
+        super().__init__()
+        self.team_color = "lightgray"; self.is_au = False; self.comm_state = True; self.is_match = False
+        self.position_mismatch = False; self.positions = {}; self.current_score = 0; self.match_time = 0
+        
+        self.buf_zynq = "ZYNQ - X: --.-- Y: --.-- T: --.--"
+        self.buf_lidar = "LIDAR - X: --.-- Y: --.-- T: --.--"
+        self.buf_cams = {1: "X: --.-- Y: --.--", 2: "X: --.-- Y: --.--", 3: "X: --.-- Y: --.--"}
 
-        # Conteneur pour aligner les boutons côte à côte
-        btn_frame = tk.Frame(popup, bg="white")
-        btn_frame.pack(expand=True, fill="both", padx=20, pady=10)
+        self.init_ui()
 
-        # Gros bouton OUI
-        btn_yes = tk.Button(
-            btn_frame, 
-            text="YES", 
-            command=on_yes, 
-            bg="green", 
-            fg="white", 
-            font=("Arial", 20, "bold"),
-            width=8, 
-            height=2
-        )
-        btn_yes.pack(side="left", expand=True, padx=10)
+        # Rafraîchissement GUI bridé à 5 Hz (200ms) pour économiser le CPU
+        self.gui_timer = QTimer(self); self.gui_timer.timeout.connect(self.refresh_gui_elements); self.gui_timer.start(200) 
+        self.chrono_timer = QTimer(self); self.chrono_timer.timeout.connect(self.tick_chrono)
 
-        # Gros bouton NON
-        btn_no = tk.Button(
-            btn_frame, 
-            text="NO", 
-            command=on_no, 
-            bg="red", 
-            fg="white", 
-            font=("Arial", 20, "bold"),
-            width=8, 
-            height=2
-        )
-        btn_no.pack(side="right", expand=True, padx=10)
+    def init_ui(self):
+        l = QVBoxLayout(self)
+        self.lbl_score = QLabel("0"); self.lbl_score.setFont(QFont("Arial", 90, QFont.Bold)); self.lbl_score.setAlignment(Qt.AlignCenter); l.addWidget(self.lbl_score, stretch=1)
+        f_main = QFont("Arial", 18, QFont.Bold)
+        self.lbl_zynq = QLabel(); self.lbl_zynq.setFont(f_main); self.lbl_zynq.setAlignment(Qt.AlignCenter); l.addWidget(self.lbl_zynq)
+        self.lbl_lidar = QLabel(); self.lbl_lidar.setFont(f_main); self.lbl_lidar.setAlignment(Qt.AlignCenter); l.addWidget(self.lbl_lidar)
+        f_cam = QFont("Arial", 15, QFont.Bold)
+        self.cam_labels = {}
+        for i in range(1, 4):
+            lbl = QLabel(); lbl.setFont(f_cam); lbl.setAlignment(Qt.AlignCenter); l.addWidget(lbl); self.cam_labels[i] = lbl
+        l.addSpacing(20)
+        btn_l = QHBoxLayout(); btn_l.setSpacing(10)
+        b_res = QPushButton("Restart\nMatch"); b_res.setStyleSheet("background-color: #3498db; color: white; font-weight: bold; height: 80px; border-radius: 10px;"); b_res.clicked.connect(self.trigger_restart_match)
+        b_srv = QPushButton("Restart\nService"); b_srv.setStyleSheet("background-color: orange; color: black; font-weight: bold; height: 80px; border-radius: 10px;"); b_srv.clicked.connect(self.restart_service)
+        btn_l.addWidget(b_res); btn_l.addWidget(b_srv); l.addLayout(btn_l)
 
-        # --- 3. Attente de la réponse ---
-        self.root.wait_window(popup)
-
-        # --- 4. Traitement du choix ---
-        if confirmation:
-            try:
-                logger.info("Redémarrage de launch.service...")
-                subprocess.run(['systemctl', '--user', 'restart', 'launch.service'], check=True)
-               
-            except subprocess.CalledProcessError as e:
-                logger.error(f"Erreur : {e.returncode}.")
-                # Tu pourras aussi remplacer ça par un popup custom d'erreur plus tard
-                messagebox.showerror("Erreur", f"(Code: {e.returncode})")
-            except FileNotFoundError:
-                logger.error("Erreur : 'systemctl' est introuvable.")
+    def refresh_gui_elements(self):
+        if self.is_match:
+            self.lbl_score.setText(f"{self.match_time} s\n")
         else:
-            logger.info("Redémarrage annulé.")
+            self.lbl_score.setText(str(self.current_score))
+            self.lbl_zynq.setText(self.buf_zynq); self.lbl_lidar.setText(self.buf_lidar)
+            for i in range(1, 4): self.cam_labels[i].setText(f"CAM {i} - {self.buf_cams[i]}")
+            self.check_positions()
 
-class ImageLabel(tk.Label):
-    """
-    A Label that displays images, and plays them if they are gifs
-    :im: A PIL Image instance or a string filename
-    """
-    def load(self, im):
-        if isinstance(im, str):
-            im = Image.open(im)
-        frames = []
+    def tick_chrono(self): self.match_time += 1
 
-        try:
-            for i in count(1):
-                frames.append(ImageTk.PhotoImage(im.copy()))
-                im.seek(i)
-        except EOFError:
-            pass
-        self.frames = cycle(frames)
+    def set_match_state(self, command):
+        if command == "LEASH":
+            self.is_match = True; self.match_time = 0
+            if not self.chrono_timer.isActive(): self.chrono_timer.start(1000) 
+            self.update_background()
+        elif command == "STOP": self.chrono_timer.stop()
 
-        try:
-            self.delay = im.info["duration"]
-        except Exception:
-            self.delay = 100
+    def update_score(self, s): self.current_score = s
+    def update_lidar(self, x, y, t):
+        if not self.is_match:
+            self.buf_lidar = f"LIDAR - X: {x:.2f}  Y: {y:.2f}  T: {t:.2f}"
+            self.positions['lidar'] = (x, y)
 
-        if len(frames) == 1:
-            self.config(image=next(self.frames))
-        else:
-            self.next_frame()
+    def update_zynq(self, x, y, t):
+        if not self.is_match:
+            self.buf_zynq = f"ZYNQ - X: {x:.2f}  Y: {y:.2f}  T: {t:.2f}"
+            self.positions['zynq'] = (x, y)
 
-    def unload(self):
-        self.config(image=None)
-        self.frames = None
+    def update_camera(self, i, x, y, t):
+        if not self.is_match:
+            self.buf_cams[i] = f"X: {x:.2f}  Y: {y:.2f}  T: {t:.2f}"
+            self.positions[f'cam{i}'] = (x, y)
 
-    def next_frame(self):
-        if self.frames:
-            self.config(image=next(self.frames))
-            self.after(self.delay, self.next_frame)
+    def check_positions(self):
+        v = list(self.positions.values())
+        if len(v) < 2 or self.is_match: return
+        mm = any(math.hypot(v[i][0]-v[j][0], v[i][1]-v[j][1]) > 0.10 for i in range(len(v)) for j in range(i+1, len(v)))
+        if self.position_mismatch != mm: self.position_mismatch = mm; self.update_background()
 
+    def update_background(self):
+        if self.is_au: self.setStyleSheet("background-color: red;")
+        elif not self.comm_state or (self.position_mismatch and not self.is_match): self.setStyleSheet("background-color: orange;")
+        else: self.setStyleSheet(f"background-color: {self.team_color};")
 
-class GUI:
-    def __init__(self, name):
-        self.name = name
-        self.reload = False
-        self.launched_init = False
-        self.initialized = False
+    def set_au_state(self, au):
+        if au and not self.is_au:
+            gif = os.path.join(get_package_share_directory("opossum_ihm"), "images", "boulette.gif")
+            if os.path.exists(gif): GifPopup(gif, self).show()
+        self.is_au = au; self.update_background()
 
-    def run_color(self, au_state):
-        self.color_app = ColorChoiceApp(self.name, au_state)
-        self.reload = self.color_app.reload
+    def set_comm_state(self, s): self.comm_state = s; self.update_background()
 
-    def get_color(self):
-        return self.color_app.selected_color
+    def trigger_restart_match(self):
+        if QMessageBox.question(self, 'Confirmation', "Reset le Match ?", QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
+            self.request_restart_match.emit(); self.chrono_timer.stop(); self.match_time = 0; self.is_match = False 
 
-    def run_script(self):
-        assert self.color_app.selected_color is not None
-        self.img_app = ImageApp(self.name, self.color_app.selected_color)
-        self.reload = self.img_app.reload
+    def restart_service(self):
+        if QMessageBox.question(self, 'Confirmation', "Restart ROS 2 ?", QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
+            try: subprocess.run(['systemctl', '--user', 'restart', 'launch.service'], check=True)
+            except: pass
 
-    def get_script(self):
-        return self.img_app.selected_script
-
-    def run_validation(self):
-        assert self.color_app.selected_color is not None
-        assert self.img_app.selected_script is not None
-        self.validation_app = ValidationApp(
-            self.name, 
-            self.color_app.selected_color,
-            self.img_app.selected_script
-        )
-        self.reload = self.validation_app.reload
-        self.launched_init = self.validation_app.launched_init
-
-    def run_score(self):
-        self.score_app = ScoreApp(self.name, self.color_app.selected_color)
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__(); self.resize(480, 800)
+        self.sw = QStackedWidget(); self.setCentralWidget(self.sw)
+        self.page_config = ConfigPage(); self.page_match = MatchPage()
+        self.sw.addWidget(self.page_config); self.sw.addWidget(self.page_match)
+    def go_to_match_page(self, color):
+        self.page_match.team_color = color; self.page_match.update_background(); self.sw.setCurrentIndex(1)

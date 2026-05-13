@@ -6,6 +6,7 @@ main_robot:
       # board_config: small_objects
       board_config: objects
       year: 2026
+      service_reset_match: reset_match
 
 second_robot:
   action_sequencer_node:
@@ -15,3 +16,4 @@ second_robot:
       # board_config: small_objects
       board_config: objects
       year: 2026
+      service_reset_match: reset_match

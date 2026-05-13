@@ -9,10 +9,12 @@ import time
 # Assurez-vous que l'import fonctionne selon votre structure
 try:
     from opossum_msgs.msg import VisionData, VisionDataFrame, CameraLoc
+    from std_msgs.msg import String
 except ImportError:
     class VisionData: pass
     class VisionDataFrame: pass
     class CameraLoc: pass
+    class String: pass
 
 class SingleVisionNode(Node):
     def __init__(self):
@@ -31,8 +33,9 @@ class SingleVisionNode(Node):
         
         # 2. Initialisation des Publishers
         self.aruco_pub = self.create_publisher(VisionDataFrame, 'aruco_loc', 10)
-        self.camera_log_pub = self.create_publisher(CameraLoc, 'camera_loc', 10)
-        
+        self.pub_command = self.create_publisher(String, "command", 10)
+        self.camera_loc_pub = self.create_publisher(CameraLoc, 'camera_loc', 10)
+
         # 3. Démarrage
         self.is_running = True
         self.serial_card = None
@@ -121,16 +124,30 @@ class SingleVisionNode(Node):
 
             self.aruco_pub.publish(vision_frame_msg)
 
-        elif splitted_data[0] == "LOC" and len(splitted_data) == 5: 
-            try:
-                loc_msg = CameraLoc()
-                loc_msg.robot_position.x = float(splitted_data[1]) / 1000.0
-                loc_msg.robot_position.y = float(splitted_data[2]) / 1000.0
-                loc_msg.robot_position.z = float(splitted_data[3]) 
-                loc_msg.camera_id = int(splitted_data[4])
-                self.camera_log_pub.publish(loc_msg)
-            except Exception as e:
-                self.get_logger().warn(f"Erreur parsing LOC: {e}")
+        # elif splitted_data[0] == "ROBOTPOS" and len(splitted_data) == 9: 
+        #     try:
+        #         loc_msg = CameraLoc()
+        #         loc_msg.camera_id = int(splitted_data[1])
+        #         loc_msg.robot_position.x = float(splitted_data[2])
+        #         loc_msg.robot_position.y = float(splitted_data[3])
+        #         loc_msg.robot_position.z = float(splitted_data[4]) 
+        #         loc_msg.latency = int(splitted_data[5])
+        #         loc_msg.noise.x = float(splitted_data[6])
+        #         loc_msg.noise.y = float(splitted_data[7])
+        #         loc_msg.noise.z = float(splitted_data[8]) 
+        #         self.pub_command.publish(
+        #             String(data=f"SETCAMERA{loc_msg.camera_id}" +
+        #             f" {loc_msg.robot_position.x}" +
+        #             f" {loc_msg.robot_position.y}" +
+        #             f" {loc_msg.robot_position.z}" +
+        #             f" {loc_msg.latency}" +
+        #             f" {loc_msg.noise.x}" +
+        #             f" {loc_msg.noise.y}" +
+        #             f" {loc_msg.noise.z} \n")                    
+        #             )
+        #         self.camera_loc_pub.publish(loc_msg)
+        #     except Exception as e:
+        #         self.get_logger().warn(f"Erreur parsing LOC: {e}")
 
         elif splitted_data[0] == "ERROR":
             self.get_logger().error(f"Erreur de la carte: {data}")
@@ -141,7 +158,6 @@ class SingleVisionNode(Node):
             return None
 
         vd = VisionData()
-        vd.name = "" 
         
         try:
             vd.id = int(tokens[0])
@@ -149,15 +165,6 @@ class SingleVisionNode(Node):
             vd.y = float(tokens[2]) / 1000.0
             vd.z = float(tokens[3]) / 1000.0
             vd.theta = float(tokens[4]) * 3.14159265 / 180.0 + 3.14156 / 2 
-            
-            if len(tokens) >= 8:
-                vd.in_stack = int(float(tokens[5])) 
-                vd.stack_id = int(float(tokens[6]))
-                vd.in_center = float(tokens[7])
-            else:
-                vd.in_stack = 0
-                vd.stack_id = 0
-                vd.in_center = 0.0
 
         except ValueError as e:
             self.get_logger().warn(f"Erreur de conversion tag: {e}")

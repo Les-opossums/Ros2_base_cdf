@@ -6,8 +6,9 @@ main_robot:
       robot_data_topic: robot_data
       score_topic: score
       au_topic: au
-      enable_timer_topic: enable_timer
+      feedback_command_topic: feedback_command
       comm_state_topic: comm_state
+      service_reset_match: reset_match
 
   param_server_node:
     ros__parameters:
@@ -23,9 +24,10 @@ second_robot:
       robot_data_topic: robot_data
       score_topic: score
       au_topic: au
-      enable_timer_topic: enable_timer
+      feedback_command_topic: feedback_command
       comm_state_topic: comm_state
-
+      service_reset_match: reset_match
+      
   param_server_node:
     ros__parameters:
       team_color: blue

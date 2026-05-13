@@ -202,43 +202,43 @@ zones:
   0:
     x: 0.1
     y: 0.8
-    size: 0.2
+    size: 0.25
   1:
     x: 0.7
     y: 0.1
-    size: 0.2
+    size: 0.25
   2:
     x: 0.8
     y: 0.8
-    size: 0.2
+    size: 0.25
   3:
     x: 1.25
     y: 1.45
-    size: 0.2
+    size: 0.25
   4:
     x: 1.5
     y: 0.8
-    size: 0.2
+    size: 0.25
   5:
     x: 1.5
     y: 0.1
-    size: 0.2
+    size: 0.25
   6:
     x: 2.9
     y: 0.8
-    size: 0.2
+    size: 0.25
   7:
     x: 2.3
     y: 0.1
-    size: 0.2
+    size: 0.25
   8:
     x: 2.2
     y: 0.8
-    size: 0.2
+    size: 0.25
   9:
     x: 1.75
     y: 1.45
-    size: 0.2
+    size: 0.25
     
 final_zone:
   0:

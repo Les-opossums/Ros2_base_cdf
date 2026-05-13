@@ -11,10 +11,26 @@ class GlobalSM(IntEnum):
     EXPLORE = auto()
     GOHOME = auto()
     STOP = auto()
+    FINISH = auto()
+    CURSOR = auto()
+    GOBOARD = auto()
 
+class GoBoardSM(IntEnum):
+    """GoBoard State Machine."""
+    GO_BOARD_INIT = auto()
+    GO_BOARD_NAV = auto()
+    GO_BOARD_DONE = auto()
 
+class CursorSM(IntEnum):
+    """Cursor State Machine."""
+    CURSOR_INIT = auto()
+    CURSOR_NAV = auto()
+    CURSOR_APPROACH_DOWN = auto()
+    CURSOR_CURSOR = auto()
+    CURSOR_LEAVE_UP = auto()
+    CURSOR_DONE = auto()
 class PickSM(IntEnum):
-    """Reset State Machine of the system."""
+    """Pick State Machine of the system."""
 
     PICK_INIT = auto()
     PICK_NAV = auto()
@@ -24,9 +40,10 @@ class PickSM(IntEnum):
     PICK_PICK = auto()
     PICK_DONE = auto()
     PICK_FAILED = auto()
+    PICK_RETRY = auto()
 
 class ReleaseSM(IntEnum):
-    """Reset State Machine of the system."""
+    """Release State Machine of the system."""
 
     RELEASE_INIT = auto()
     RELEASE_NAV = auto()
@@ -36,7 +53,7 @@ class ReleaseSM(IntEnum):
     RELEASE_FAILED = auto()
 
 class GoHomeSM(IntEnum):
-    """Reset State Machine of the system."""
+    """Go Home State Machine of the system."""
 
     GOHOME_INIT = auto()
     GOHOME_NAV_E_ZONE = auto()
@@ -46,7 +63,7 @@ class GoHomeSM(IntEnum):
     GOHOME_FAILED = auto()
 
 class ExploreSM(IntEnum):
-    """Reset State Machine of the system."""
+    """Explore State Machine of the system."""
 
     EXPLORE_INIT = auto()
     EXPLORE_NAV = auto()

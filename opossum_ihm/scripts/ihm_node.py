@@ -1,237 +1,160 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import sys
+import os
+
+# --- FIX POUR UBUNTU / WAYLAND / SNAP ---
+os.environ["QT_QPA_PLATFORM"] = "xcb"
+os.environ["QT_QPA_PLATFORMTHEME"] = ""
+if "GTK_PATH" in os.environ:
+    del os.environ["GTK_PATH"]
+# ----------------------------------------
 
 import rclpy
 from rclpy.node import Node
-from opossum_msgs.srv import Init
-from opossum_ihm.interface import GUI
+from rclpy.executors import MultiThreadedExecutor
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QThread, pyqtSignal
+
+from opossum_ihm.interface import MainWindow
 from opossum_msgs.msg import LidarLoc, RobotData
+from opossum_msgs.srv import Init
+from std_srvs.srv import Trigger 
 from std_msgs.msg import Int32, Bool, String
-import threading
-import time
 
-
-class IhmNode(Node):
+class RosNode(Node):
     def __init__(self):
         super().__init__("ihm_node")
-        self._init_parameters()
-        self._init_publishers()
-        self._init_subscribers()
+        self.param_client = self.create_client(Init, "set_parameters")
+        self.reset_match_client = self.create_client(Trigger, "reset_match")
+        self.pub_color = self.create_publisher(String, "init_team_color", 10)
 
-        # Initialisation de l'interface graphique
-        self.gui = GUI(self.name)
-        self.logic_thread = threading.Thread(target=self.main_logic,
-                                             daemon=True)
-        self.logic_thread.start()
+    def publish_color(self, color):
+        msg = String()
+        msg.data = color
+        self.pub_color.publish(msg)
 
-    def _init_parameters(self):
-        self.declare_parameters(
-            namespace="",
-            parameters=[
-                ("color_topic", "init_team_color"),
-                ("position_topic", "position_out"),
-                ("score_topic", "score"),
-                ("au_topic", "au"),
-                ("enable_timer_topic", "enable_timer"),
-                ("comm_state_topic", "comm_state"),
-                ("robot_data_topic", "robot_data")
-            ]
-        )
-        self.current_score = 0
-        self.clr = 'blue'
-        self.scr = 0
-        self.ready_plot_pos = False
-        self.score = 0
-        self.debug = False
-        self.au = False
-        self.comm_state = True
-        self.lidar_x, self.lidar_y, self.lidar_t = None, None, None
-        self.robot_data_x, self.robot_data_y, self.robot_data_t = None, None, None
-        name = self.get_namespace()
-        self.name = name[1:] if name[0] == "/" else name 
+    def send_parameters(self, color, script):
+        if not self.param_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().warn("Service set_parameters non disponible")
+            return
+        req = Init.Request()
+        req.team_color = color
+        req.script_number = script
+        self.param_client.call_async(req)
 
-    def _init_publishers(self):
-        color_topic = (
-            self.get_parameter("color_topic").get_parameter_value().string_value
-        )
-        self.pub_color_topic = self.create_publisher(String, color_topic, 10)
+class RosThread(QThread):
+    sig_score = pyqtSignal(int)
+    sig_lidar = pyqtSignal(float, float, float)
+    sig_zynq = pyqtSignal(float, float, float)
+    sig_au = pyqtSignal(bool)
+    sig_comm_state = pyqtSignal(bool)
+    sig_feedback_command = pyqtSignal(str) 
+    sig_camera = pyqtSignal(int, float, float, float) 
 
-    def _init_subscribers(self):
-        """Initialise les abonnements aux topics ROS 2."""
+    def run(self):
+        rclpy.init()
+        self.node = RosNode()
         
-        score_topic = (
-            self.get_parameter("score_topic").get_parameter_value().string_value
-        )
+        # Abonnements avec lambdas corrigées (m.data, m.robot_position, etc.)
+        self.node.create_subscription(Int32, "score", lambda m: self.sig_score.emit(m.data), 10)
+        self.node.create_subscription(Bool, "au", lambda m: self.sig_au.emit(m.data), 10)
+        self.node.create_subscription(Bool, "comm_state", lambda m: self.sig_comm_state.emit(m.data), 10)
+        self.node.create_subscription(String, "feedback_command", lambda m: self.sig_feedback_command.emit(m.data), 10)
+        self.node.create_subscription(String, "command", self.cb_cam, 10)
         
-        au_topic = (
-            self.get_parameter("au_topic").get_parameter_value().string_value
-        )
+        self.node.create_subscription(LidarLoc, "position_out", lambda m: self.sig_lidar.emit(m.robot_position.x, m.robot_position.y, m.robot_position.z), 1)
+        self.node.create_subscription(RobotData, "robot_data", lambda m: self.sig_zynq.emit(m.x, m.y, m.theta), 1)
 
-        enable_timer_topic = (
-            self.get_parameter("enable_timer_topic").get_parameter_value().string_value
-        )
+        executor = MultiThreadedExecutor()
+        executor.add_node(self.node)
+        executor.spin()
 
-        comm_state_topic = (
-            self.get_parameter("comm_state_topic").get_parameter_value().string_value
-        )
+    def cb_cam(self, msg):
+        d = msg.data.strip().split()
+        if d and d[0].startswith("SETCAMERA"):
+            try:
+                cam_id = int(d[0].replace("SETCAMERA", ""))
+                self.sig_camera.emit(cam_id, float(d[1]), float(d[2]), float(d[3]))
+            except:
+                pass
 
-        position_topic = (
-            self.get_parameter("position_topic").get_parameter_value().string_value
-        )
-
-        robot_data_topic = (
-            self.get_parameter("robot_data_topic").get_parameter_value().string_value
-        )
-
-        self.sub_score = self.create_subscription(
-            Int32,
-            score_topic,
-            self.score_callback,
-            10
-        )
-        self.sub_au = self.create_subscription(
-            Bool,
-            au_topic,
-            self.au_callback,
-            10
-        )
-        self.sub_enable_timer = self.create_subscription(
-            Bool,
-            enable_timer_topic,
-            self.enable_timer_callback,
-            10
-        )
-        self.sub_comm_state = self.create_subscription(
-            Bool,
-            comm_state_topic,
-            self.comm_state_callback,
-            10
-        )
-        self.lidar_loc_sub = self.create_subscription(
-            LidarLoc,
-            position_topic,
-            self.lidar_loc_callback,
-            1
-        )
-        self.robot_data_sub = self.create_subscription(
-            RobotData,
-            "robot_data",
-            self.robot_data_callback,
-            1
-        )
-
-    def main_logic(self):
-        """Logique principale pour interagir avec l'utilisateur."""
-        while True:
-            self.gui.reload = False
-            self.update_parameters()
-            time.sleep(0.2)
-            self.gui.run_color(self.au)
-            if self.gui.reload:
-                continue
-
-            self.clr = self.gui.get_color()
-            self.pub_color_topic.publish(String(data=self.clr))
-
-            self.gui.run_script()
-            if self.gui.reload:
-                continue
-
-            self.scr = self.gui.get_script()
-
-            self.update_parameters()
-
-            self.gui.run_validation()
-            if self.gui.reload:
-                continue
-            elif self.gui.launched_init:
-                self.debug = self.gui.launched_init
-                self.update_parameters()
-                self.debug = False
-                self.update_parameters()
-                continue
-            else:
-                self.update_parameters()
-                break
-
-        self.gui.run_score()
-        self.timer = self.create_timer(0.5, self.update_values)
-        self.gui.score_app.update_gif()
-        self.gui.score_app.root.mainloop()
-
-    def update_values(self):
-        self.gui.score_app.update_score(self.score)
-        self.gui.score_app.update_au(self.au, self.comm_state)
-        if self.lidar_x is not None and self.robot_data_x is not None:
-            self.gui.score_app.update_position(self.lidar_x, 
-                                               self.lidar_y, 
-                                               self.lidar_t,
-                                               self.robot_data_x,
-                                               self.robot_data_y,
-                                               self.robot_data_t)
-
-    def update_parameters(self):
-        """Met à jour les paramètres via un service ROS 2."""
-        client = self.create_client(Init, "set_parameters")
-        while not client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().warn("Waiting for 'set_parameters' service...")
-
-        request = Init.Request()
-        request.team_color = self.clr
-        request.script_number = self.scr
-        request.current_score = self.current_score
-        request.debug_mode = self.debug
-
-        future = client.call_async(request)
-        future.add_done_callback(self.handle_service_response)
-
-    def handle_service_response(self, future):
-        """Gère la réponse du service asynchrone."""
-        try:
-            response = future.result()
-        except Exception as e:
-            self.get_logger().error(f"Service call failed: {e}")
-
-    def score_callback(self, msg):
-        """Callback pour le topic 'score'."""
-        self.score += msg.data
-
-    def au_callback(self, msg):
-        """Callback pour le topic 'au'."""
-        self.au = msg.data
-
-    def enable_timer_callback(self, msg):
-        """Callback pour le topic 'enable_timer'."""
-        if self.gui.initialized:
-            self.gui.score_app.is_match = msg.data
-
-    def comm_state_callback(self, msg):
-        """Callback pour le topic 'comm_state'."""
-        self.comm_state = msg.data
-
-    def lidar_loc_callback(self, msg: LidarLoc):
-        """Receive Lidar location."""
-        self.lidar_x = msg.robot_position.x
-        self.lidar_y = msg.robot_position.y
-        self.lidar_t = msg.robot_position.z
-
-    def robot_data_callback(self, msg: RobotData):
-        """Receive robot data."""
-        self.robot_data_x = msg.x
-        self.robot_data_y = msg.y
-        self.robot_data_t = msg.theta
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = IhmNode()
-
-    try:
-        rclpy.spin(node)  # Gestion des messages ROS 2
-    except KeyboardInterrupt:
-        pass
-    finally:
+    def stop(self):
+        if hasattr(self, 'node'):
+            self.node.destroy_node()
         rclpy.shutdown()
-        node.get_logger().info("Shutting down IHM Node")
+        self.quit()
+        self.wait()
 
+def main():
+    app = QApplication(sys.argv)
+
+    # --- STYLE GLOBAL (Spécial tactile : pop-ups et boutons géants) ---
+    app.setStyleSheet("""
+        QMessageBox {
+            background-color: #F0F0F0;
+        }
+        /* Style du texte des messages d'alerte */
+        QMessageBox QLabel {
+            font-size: 24px;
+            font-weight: bold;
+            color: black;
+            min-width: 420px; 
+            margin: 20px;
+        }
+        /* Style des boutons des pop-ups (Yes/No/OK) */
+        QMessageBox QPushButton {
+            font-size: 22px;
+            font-weight: bold;
+            min-width: 180px;
+            min-height: 100px; /* Boutons très hauts pour le tactile */
+            border-radius: 12px;
+            border: 2px solid #333333;
+            background-color: #DDDDDD;
+            margin: 10px;
+        }
+        QMessageBox QPushButton:pressed {
+            background-color: #999999;
+        }
+        /* Style général des boutons de l'IHM (Restart Match/Service) */
+        QPushButton {
+            font-size: 18px;
+            font-weight: bold;
+        }
+    """)
+
+    ros_thread = RosThread()
+    ros_thread.start()
+    
+    window = MainWindow()
+
+    # Branchements ROS -> IHM
+    ros_thread.sig_score.connect(window.page_match.update_score)
+    ros_thread.sig_lidar.connect(window.page_match.update_lidar)
+    ros_thread.sig_zynq.connect(window.page_match.update_zynq)
+    ros_thread.sig_au.connect(window.page_match.set_au_state)
+    ros_thread.sig_comm_state.connect(window.page_match.set_comm_state)
+    ros_thread.sig_feedback_command.connect(window.page_match.set_match_state)
+    ros_thread.sig_camera.connect(window.page_match.update_camera)
+
+    # Branchements IHM -> ROS
+    window.page_match.request_restart_match.connect(
+        lambda: ros_thread.node.reset_match_client.call_async(Trigger.Request()) if ros_thread.node else None
+    )
+    
+    window.page_config.request_param_update.connect(
+        lambda c, s: [
+            ros_thread.node.publish_color(c), 
+            ros_thread.node.send_parameters(c, s), 
+            window.go_to_match_page(c)
+        ]
+    )
+
+    window.show()
+
+    app.aboutToQuit.connect(ros_thread.stop)
+    sys.exit(app.exec_())
 
 if __name__ == "__main__":
     main()

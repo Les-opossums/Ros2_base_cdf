@@ -12,4 +12,15 @@ import threading
 
 class Script():
     def run(self, node):
-        node.test_script()
+        start_match_time = time.time()
+        node.send_raw("VMAX 1.0")
+        node.move_to(Position(2.7, 0.9), seuil=0.05)
+        node.wait_for_motion()
+
+        while time.time() - start_match_time < 85:
+            node.move_to(Position(2.5, 1.3), seuil=0.05)
+            node.wait_for_motion()
+
+            if time.time() - start_match_time < 85:
+                node.move_to(Position(2.5, 0.3), seuil=0.05)
+                node.wait_for_motion()

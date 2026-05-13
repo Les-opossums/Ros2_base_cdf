@@ -1,2 +1,4 @@
-geometry_msgs/Point robot_position
 int32 camera_id
+geometry_msgs/Point robot_position
+int32 latency
+geometry_msgs/Point noise
