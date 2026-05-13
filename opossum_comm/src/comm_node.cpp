@@ -250,7 +250,7 @@ private:
 
     void handle_received_line(const std::string& data) {
         // LOG 2: What does the data look like after we stripped the \n and \r?
-        // RCLCPP_INFO(this->get_logger(), "[CLEANED RX]: '%s'", data.c_str());
+        RCLCPP_INFO(this->get_logger(), "[CLEANED RX]: '%s'", data.c_str());
 
         // WARNING: If the first character is not a letter (e.g., it's a space or number), it gets dropped here!
         if (data.empty() || !std::isalpha(data[0])) {
