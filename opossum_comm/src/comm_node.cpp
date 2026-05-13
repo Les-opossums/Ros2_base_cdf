@@ -218,14 +218,22 @@ private:
 
     void serial_read_worker(std::string name) {
         auto serial_card = cards_[name].serial_port;
-        serial_card->setTimeout(serial::Timeout::max(), 1000, 0, 1000, 0); // Blocking read with timeout
+        serial_card->setTimeout(serial::Timeout::max(), 1000, 0, 1000, 0); // 1 sec timeout
+
+        RCLCPP_INFO(this->get_logger(), "Thread listening on %s started.", name.c_str());
 
         while (rclcpp::ok()) {
             try {
+                // Read up to the newline character
                 std::string line = serial_card->readline(65536, "\n");
+                
                 if (!line.empty()) {
-                    // Remove trailing newline/whitespace
+                    // LOG 1: Print the absolute raw string including hidden characters
+                    RCLCPP_INFO(this->get_logger(), "[RAW RX %s]: '%s'", name.c_str(), line.c_str());
+
+                    // Remove trailing newline, carriage return, and whitespace
                     line.erase(line.find_last_not_of(" \n\r\t") + 1);
+                    
                     if (!line.empty()) {
                         handle_received_line(line);
                     }
@@ -238,7 +246,14 @@ private:
     }
 
     void handle_received_line(const std::string& data) {
-        if (data.empty() || !std::isalpha(data[0])) return;
+        // LOG 2: What does the data look like after we stripped the \n and \r?
+        RCLCPP_INFO(this->get_logger(), "[CLEANED RX]: '%s'", data.c_str());
+
+        // WARNING: If the first character is not a letter (e.g., it's a space or number), it gets dropped here!
+        if (data.empty() || !std::isalpha(data[0])) {
+            RCLCPP_WARN(this->get_logger(), "[DROPPED]: Message did not start with a letter.");
+            return;
+        }
 
         if (data.find("GREENSWITCH") != 0 && data.find("ROBOTDATA") != 0 && data.find("ERROR") != 0) {
             auto msg = std_msgs::msg::String();
@@ -249,12 +264,27 @@ private:
     }
 
     void send_card(const std_msgs::msg::String::SharedPtr msg, const std::string& name) {
-        if (!enable_send_) return;
+        RCLCPP_INFO(this->get_logger(), "HW RX on %s: '%s'", name.c_str(), msg->data.c_str());
+
+        if (!enable_send_) {
+            RCLCPP_WARN(this->get_logger(), "HW IGNORED: enable_send_ is FALSE");
+            return;
+        }
 
         std::string out = process_data_send(msg->data);
         if (!out.empty()) {
             try {
-                cards_[name].serial_port->write(out + "\n");
+                // 1. Add \r\n just in case the hardware parser requires it
+                std::string hardware_cmd = out + "\r\n"; 
+                
+                RCLCPP_INFO(this->get_logger(), "HW SERIAL WRITE: '%s'", out.c_str());
+                
+                // 2. Write the data
+                cards_[name].serial_port->write(hardware_cmd);
+                
+                // 3. FORCE the port to send it immediately
+                cards_[name].serial_port->flush(); 
+                
             } catch (std::exception& e) {
                 RCLCPP_ERROR(this->get_logger(), "Failed to write to card %s: %s", name.c_str(), e.what());
             }
