@@ -195,7 +195,7 @@ class ActionManager(Node):
                             [0.65, 0.49], [0.90, 0.49], [1.20, 0.49], [1.50, 0.49], [1.80, 0.49], [2.10, 0.49], [2.35, 0.49],]
 
         # --- NEW: Navigation Constraints ---
-        self.robot_radius = 0.25
+        self.robot_radius = 0.2
         self.classic_margin = 0.3
         self.critical_margin = 0.15
 
@@ -220,7 +220,8 @@ class ActionManager(Node):
 
     @property
     def coeff_release(self):
-        return -self.gaussienne(time.time() - self.start_match_time)
+        add_end = 500 if self.release_end else 0
+        return -self.gaussienne(time.time() - self.start_match_time) + add_end
 
     @property
     def coeff_pick(self):
@@ -246,6 +247,7 @@ class ActionManager(Node):
             self.obstacle_detected = False
             self.cursor_done = False
             self.activate_cursor = False
+            self.release_end = False
             
             # 3. Libérer les événements de synchronisation
             self.motion_done = True
@@ -1561,6 +1563,10 @@ class ActionManager(Node):
         if (not self.motion_done or not self.pliers_done) and self.global_sm != GlobalSM.STOP: # or time.time() - self.last_enemy_detected < 5.0:
             return
         
+        if time.time() - self.start_match_time > 85.0:
+            self.send_raw("VMAX 0.3")
+            self.release_end = True
+
         match self.global_sm:
             case GlobalSM.NOP:
                 pass
