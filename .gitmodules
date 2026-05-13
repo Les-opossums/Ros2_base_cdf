@@ -1,3 +1,6 @@
 [submodule "opossum_msgs/resources"]
 	path = opossum_msgs/resources
 	url = git@github.com:Les-opossums/com_config_table.git
+[submodule "serial-ros2"]
+	path = serial-ros2
+	url = https://github.com/RoverRobotics-forks/serial-ros2.git
