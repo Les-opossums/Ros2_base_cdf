@@ -275,7 +275,6 @@ class ObstacleAvoider(Node):
         if self.robot_data is None:
             return self._detect_obstacle_full(lidar_range)
         elif self.robot_data.vlin < 0.01: # and not self.obstacle_detected:
-            self.publish_visualization("full")
             return False
         elif self.detection_mode == "full":
             return self._detect_obstacle_full(lidar_range)
@@ -303,8 +302,6 @@ class ObstacleAvoider(Node):
 
     def _detect_obstacle_full(self, lidar_range: list) -> bool:
         """Detect obstacles around robot."""
-        if self.display_all:
-            self.publish_visualization("full")
         try:
             if self.robot_data is None or not self.enable_boundary_check:
                 for dist in lidar_range:
@@ -357,8 +354,6 @@ class ObstacleAvoider(Node):
                     index_middle_angle + self.cone_range_index // 2,
                 )
             )
-        if self.display_all:
-            self.publish_visualization("cone", angle_range)
         try:
             if not self.enable_boundary_check:
                 for i in angle_range:
@@ -378,6 +373,15 @@ class ObstacleAvoider(Node):
 
     def _detect_obstacle_rectangle(self, lidar_range: list) -> bool:
         """Detect obstacles in the rectangle in front."""
+        if self.robot_data.vlin > 1.0:
+            index = 2
+        elif self.robot_data.vlin > 0.7:
+            index = 1
+        else:
+            index = 0
+
+        sec_dst = self.security_dst[index]
+
         if self.ptheta is not None and self.robot_data.vlin < 0.001:
             theta = self.ptheta
         else:
@@ -400,17 +404,15 @@ class ObstacleAvoider(Node):
                     index_middle_angle + self.len_scan // 4,
                 )
             )
-        angle_range = angle_range[: len(self.security_dst)]
-        if self.display_all:
-            self.publish_visualization("rectangle", angle_range)
+        angle_range = angle_range[: len(sec_dst)]
         try:
             if not self.enable_boundary_check:
                 for i in range(len(angle_range)):
-                    if lidar_range[angle_range[i]] < self.security_dst[i]:
+                    if lidar_range[angle_range[i]] < sec_dst[i]:
                         return True
                 return False
             for i in range(len(angle_range)):
-                if lidar_range[angle_range[i]] < self.security_dst[i]:
+                if lidar_range[angle_range[i]] < sec_dst[i]:
                     if self._check_in_boundaries(
                         angle_range[i], lidar_range[angle_range[i]]
                     ):
@@ -422,19 +424,26 @@ class ObstacleAvoider(Node):
                                    f"len_scan: {self.len_scan}")
         return False
 
-    def _compute_security_rectangle_distances(self) -> None:
+    def _compute_specific_rectangle(self, distance) -> None:
         """Compute the security distance if rectangle."""
         x = self.thickness_default / 2
-        y = self.obstacle_detection_distance
+        y = distance
         theta = np.arctan(y / x)
         limit_incr = int(theta / self.angle_increment)
-        self.security_dst = []
+        security_distance = []
         for i in range(limit_incr):
-            self.security_dst.append(x / np.cos(i * self.angle_increment))
+            security_distance.append(x / np.cos(i * self.angle_increment))
         for i in range(limit_incr, self.len_scan // 4):
-            self.security_dst.append(y / np.sin(i * self.angle_increment))
-        inv_list = self.security_dst[::-1]
-        self.security_dst += inv_list
+            security_distance.append(y / np.sin(i * self.angle_increment))
+        return security_distance + security_distance[::-1]
+
+    def _compute_security_rectangle_distances(self) -> None:
+        """Compute the security distance if rectangle."""
+        self.security_dst = {
+            0: self._compute_specific_rectangle(0.6),
+            1: self._compute_specific_rectangle(0.72),
+            2: self._compute_specific_rectangle(0.85),
+        }
 
     def _find_closest_obstacle(self) -> None:
         """Find the closest obstacle to avoid it."""
@@ -637,10 +646,17 @@ class ObstacleAvoider(Node):
             num_points = 100
             angle_final = angle_range[-1] + 1 + self.len_scan if angle_range[-1] + 1 < angle_range[0] else angle_range[-1] + 1
             incr = (angle_final - angle_range[0]) // num_points
+            if self.robot_data.vlin > 1.0:
+                index = 2
+            elif self.robot_data.vlin > 0.7:
+                index = 1
+            else:
+                index = 0
+            sec_dst = self.security_dst[index] 
             for ind, i in enumerate(range(angle_range[0], angle_final, incr)):
                 angle = 2 * np.pi * i / self.len_scan
-                x = self.security_dst[ind * incr] * np.cos(angle)
-                y = self.security_dst[ind * incr] * np.sin(angle)
+                x = sec_dst[ind * incr] * np.cos(angle)
+                y = sec_dst[ind * incr] * np.sin(angle)
                 marker.points.append(Point(x=x, y=y, z=0.0))
         self.pub_visualization.publish(marker)
 
