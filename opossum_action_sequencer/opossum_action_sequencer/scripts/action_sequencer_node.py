@@ -1696,6 +1696,7 @@ class ActionManager(Node):
                     # OPTIMISATION : Trouver la face qui nécessite le moins de rotation
                     with self.data_lock:
                         target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["crate_ids"]])
+                        self.payload["target_pos"] = target_pos
                         self.payload["close_cursor"] = self.in_cursor_zone(target_pos.x, target_pos.y)
 
                         best_side_ids = available_sides[0]
@@ -1776,32 +1777,24 @@ class ActionManager(Node):
                             if cid in self.haz_crates
                         ]
 
-                    if original_crates:
-                        # Centroïde du stack original planifié
-                        target_cx = np.mean([c.x for c in original_crates])
-                        target_cy = np.mean([c.y for c in original_crates])
+                    tp = self.payload["target_pos"]
 
-                        # Fonction locale pour calculer la distance d'un stack
-                        def calculate_stack_distance(stack):
-                            return math.hypot(
-                                np.mean([temp_dict[sid].x for sid in stack]) - target_cx,
-                                np.mean([temp_dict[sid].y for sid in stack]) - target_cy,
-                            )
+                    # Fonction locale pour calculer la distance d'un stack
+                    def calculate_stack_distance(stack):
+                        return math.hypot(
+                            np.mean([temp_dict[sid].x for sid in stack]) - tp.x,
+                            np.mean([temp_dict[sid].y for sid in stack]) - tp.y,
+                        )
 
-                        # Choisir le stack frais dont le centroïde est le plus proche
-                        best_stack_ids = min(fresh_stacks, key=calculate_stack_distance)
-                        self.get_logger().info(f"Distance to stack found: {calculate_stack_distance(best_stack_ids)}")
+                    # Choisir le stack frais dont le centroïde est le plus proche
+                    best_stack_ids = min(fresh_stacks, key=calculate_stack_distance)
+                    self.get_logger().info(f"Distance to stack found: {calculate_stack_distance(best_stack_ids)}")
 
-                        # Vérifier si la distance du meilleur stack est > 0.5m
-                        if calculate_stack_distance(best_stack_ids) > 0.2:
-                            self.get_logger().debug("Stack moved too far (>0.5m). Aborting pick.")
-                            self.sub_sm = PickSM.PICK_FAILED
-                            return
-
-                    else:
-                        # Fallback : plus d'infos sur la cible, on prend le premier
-                        self.get_logger().warn("Cibles originales introuvables. Fallback sur fresh_stacks[0].")
-                        best_stack_ids = fresh_stacks[0] 
+                    # Vérifier si la distance du meilleur stack est > 0.5m
+                    if calculate_stack_distance(best_stack_ids) > 0.2:
+                        self.get_logger().debug("Stack moved too far (>0.5m). Aborting pick.")
+                        self.sub_sm = PickSM.PICK_FAILED
+                        return
                     
                     with self.data_lock:
                         actual_stack_crates = [self.haz_crates[tid] for tid in best_stack_ids]
