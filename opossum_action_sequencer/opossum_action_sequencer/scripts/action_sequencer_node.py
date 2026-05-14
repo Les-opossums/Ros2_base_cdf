@@ -154,7 +154,7 @@ class ActionManager(Node):
         self.ready = False
 
         self.enemy_pos = None
-        self.time_stare = 0.25 # s
+        self.time_stare = 0.15 # s
 
         self.pos_obj = None
         self.max_distance = 0.2
