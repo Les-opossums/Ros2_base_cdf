@@ -1981,6 +1981,7 @@ class ActionManager(Node):
 
             case ReleaseSM.RELEASE_DONE:
                 if self.payload["id_zone"] == self.zone_cursor_release_id:
+                    self.get_logger().info(f"Now blocking the cursor action")
                     self.cursor_end_done = True
                 self.global_sm = GlobalSM.NOP
                 self.sub_sm = GlobalSM.NOP
