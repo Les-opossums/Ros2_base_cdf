@@ -185,7 +185,8 @@ class ActionManager(Node):
         self._lock_gsm = Lock()
         self._stop_event = Event()
         self.loop_frequency = 10.0
-        self.zone_cursor = [1.1, 0.175]
+        self.zone_cursor_pick = [1.1, 0.175]
+        self.zone_cursor_release_id = 1
         self.entry_zone = [0.5, 1.1]
         self.cursor_in = [1.35, 0.2, 1.54]
         self.cursor_out = [0.73, 0.2, 1.54]
@@ -876,7 +877,8 @@ class ActionManager(Node):
             self.entry_zone[0] = self.boundaries[1] - self.entry_zone[0] 
             self.cursor_in[0] = self.boundaries[1] - self.cursor_in[0]
             self.cursor_out[0] = self.boundaries[1] - self.cursor_out[0]
-            self.zone_cursor[0] = self.boundaries[1] - self.zone_cursor[0]
+            self.zone_cursor_pick[0] = self.boundaries[1] - self.zone_cursor_pick[0]
+            self.zone_cursor_release_id = 7
             self.pince_cursor = 5
 
     def feedback_callback(self, msg):
@@ -1091,9 +1093,14 @@ class ActionManager(Node):
                     best_pos = pos
                     best_critical = critical_level
 
+            penality_cursor = 0
+            if z_id == self.zone_cursor_release_id:
+                cpc = self.coeff_penalty_cursor * (0.7 * self.match_time - (time.time() - self.start_match_time))
+                penality_cursor = - cpc if cpc > 0 else 0
+
             # Write the final score into the zone
             if best_dist != float('inf'):
-                reward = self.compute_release_penality(best_pos[0], best_pos[1], best_dist, best_critical)
+                reward = self.compute_release_penality(best_pos[0], best_pos[1], best_dist, best_critical, penality_cursor)
                 zone.release_reward = reward
                 zone.best_release_path = best_path
                 zone.best_release_pos = best_pos
@@ -1544,7 +1551,6 @@ class ActionManager(Node):
                 self.payload = {"path": path_e}
         
         elif self.global_sm == GlobalSM.NOP:
-            self.get_logger().info(f"BEGIN: {self.cursor_begin_done}, END: {self.cursor_end_done}")
             if self.cursor_begin_done and not self.cursor_end_done:
                 self.cursor_end_done = True
                 self.send_raw(f"PINCE {self.pince_cursor} 8 0 0")
@@ -1632,7 +1638,8 @@ class ActionManager(Node):
                 else:
                     release_dict = {
                         "path": best_zone.best_release_path[1:], 
-                        "best_pos": best_zone.best_release_pos
+                        "best_pos": best_zone.best_release_pos,
+                        "id_zone": best_zone.id,
                     }
                     self.get_logger().info(f"Select RELEASE COMP with: {release_dict}")
                     return GlobalSM.RELEASE, release_dict
@@ -1649,7 +1656,8 @@ class ActionManager(Node):
             elif release_available:
                 release_dict = {
                     "path": best_zone.best_release_path[1:], 
-                    "best_pos": best_zone.best_release_pos
+                    "best_pos": best_zone.best_release_pos,
+                    "id_zone": best_zone.id,
                 }
                 self.get_logger().info(f"Select RELEASE with: {release_dict}")
                 return GlobalSM.RELEASE, release_dict   
@@ -1971,6 +1979,8 @@ class ActionManager(Node):
                 self.sub_sm = ReleaseSM.RELEASE_DONE
 
             case ReleaseSM.RELEASE_DONE:
+                if self.payload["id_zone"] == self.zone_cursor_release_id:
+                    self.cursor_end_done = True
                 self.global_sm = GlobalSM.NOP
                 self.sub_sm = GlobalSM.NOP
 
@@ -2255,8 +2265,8 @@ class ActionManager(Node):
         Checks if ANY part of a rotated crate (0.15m x 0.05m) is inside the zone.
         Uses the Separating Axis Theorem (SAT) for OBB-AABB collision.
         """
-        zx = self.zone_cursor[0]
-        zy = self.zone_cursor[1]
+        zx = self.zone_cursor_pick[0]
+        zy = self.zone_cursor_pick[1]
         hz = 0.125  # Zone half-size
         
         # --- Axis 1 & 2: Global X and Y (The Zone's flat edges) ---
@@ -2337,7 +2347,7 @@ class ActionManager(Node):
         ry = x * sin_t + y * cos_t
         return rx, ry
 
-    def compute_release_penality(self, px, py, path_distance, critical_level):
+    def compute_release_penality(self, px, py, path_distance, critical_level, penalty_cursor):
         """Calculates the score of a specific release pose using actual path distance."""
         
         val_center = (1.5 - px) ** 2 + (1 - py) ** 2
@@ -2356,7 +2366,8 @@ class ActionManager(Node):
             self.coeff_release_enn * val_ennemi + 
             self.coeff_release_center * val_center + 
             self.coeff_critical_level * critical_level +
-            self.coeff_far_zone * val_enn_zone
+            self.coeff_far_zone * val_enn_zone +
+            penalty_cursor
         )
 
     def compute_pick_penality(self, x, y, num_crates, path_distance, critical_level, balance):
