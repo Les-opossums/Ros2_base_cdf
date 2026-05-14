@@ -8,5 +8,6 @@ coeff_pick_center: 0.2 # Distance to the center
 coeff_pick_dst: -1 # Distance to the stack
 coeff_pick_enn: 2 # Distance to enemy
 coeff_critical_level: -5 # Path more critical -> level high
-coeff_pick_balance: 30 # If more blau than yellow in a zone
-coeff_pick_num: 5 # Number of stacks
+coeff_pick_balance: 5 # If more blau than yellow in a zone
+coeff_pick_num: 15 # Number of stacks
+coeff_far_zone: 30 # Coeff far zone

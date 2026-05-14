@@ -288,6 +288,8 @@ class ActionManager(Node):
         self.coeff_pick_balance = data["coeff_pick_balance"] # If more blau than yellow in a zone
         self.coeff_pick_num = data["coeff_pick_num"] # Number of stacks
         self.amp_gauss = data["amp_gauss"] # Gauss amp
+        self.coeff_far_zone = data["coeff_far_zone"] # Coeff far zone
+        self.end_far_zone = False # Coeff far zone
         self.get_logger().info("Match (ré)initialisé avec succès. En attente du LEASH...")    
 
     def is_point_safe(self, x, y):
@@ -1524,6 +1526,8 @@ class ActionManager(Node):
             self.global_sm = GlobalSM.NOP
             self.sub_sm = GlobalSM.NOP
 
+        if time.time() - self.start_match_time > self.match_time * 3 / 4:
+            self.end_far_zone = True
         if time.time() - self.start_match_time > self.match_time - 0.2:
             if self.global_sm not in (GlobalSM.STOP, GlobalSM.FINISH):
                 self.get_logger().warn("Stop sequence active! Overriding to STOP.")
@@ -2330,6 +2334,7 @@ class ActionManager(Node):
         """Calculates the score of a specific release pose using actual path distance."""
         
         val_center = (1.5 - px) ** 2 + (1 - py) ** 2
+        val_enn_zone = abs(self.boundaries[self.color] - px) * int(self.end_far_zone)
         # Use the TRUE path distance, not just a straight line guess!
         val_dst = path_distance**2 
         
@@ -2343,11 +2348,13 @@ class ActionManager(Node):
             self.coeff_release_dst * val_dst + 
             self.coeff_release_enn * val_ennemi + 
             self.coeff_release_center * val_center + 
-            self.coeff_critical_level * critical_level
+            self.coeff_critical_level * critical_level +
+            self.coeff_far_zone * val_enn_zone
         )
 
     def compute_pick_penality(self, x, y, num_crates, path_distance, critical_level, balance):
         val_center = (1.5 - x) ** 2 + (1 - y) ** 2
+        val_enn_zone = abs(self.boundaries[self.color] - x) * int(self.end_far_zone)
         val_dst = path_distance ** 2
         if self.enemy_pos is not None:
             val_ennemi = (self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y) ** 2
@@ -2360,7 +2367,8 @@ class ActionManager(Node):
             self.coeff_pick_enn * val_ennemi + 
             self.coeff_pick_center * val_center + 
             self.coeff_pick_num * num_crates + 
-            self.coeff_critical_level * critical_level
+            self.coeff_critical_level * critical_level +
+            self.coeff_far_zone * val_enn_zone
         )
 
     def get_best_side_pliers_release(self, angle_target):
