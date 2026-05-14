@@ -1,4 +1,4 @@
-match_time: 100.0 # s
+match_time: 400.0 # s
 amp_gauss: 100 # Gauss amplitude
 coeff_release_center: 0.2 # Distance to center
 coeff_release_dst: -1 # Distance to zone

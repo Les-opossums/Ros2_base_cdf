@@ -1510,7 +1510,7 @@ class ActionManager(Node):
         """Run the threaded loop."""
         period = 1.0 / self.loop_frequency
         self.start_match_time = time.time()
-        self.send_raw("VMAX 1.5")
+        self.send_raw("VMAX 0.2")
         self.send_raw("VTMAX 3.0")
         self.move_to(Position(x=self.entry_zone[0], y=self.entry_zone[1], t=self.robot_pos.t))
         while not self._stop_event.is_set():
@@ -1754,6 +1754,7 @@ class ActionManager(Node):
 
             case PickSM.PICK_UPDATE:
                 # 1. Identify which camera is facing the stack
+                self.get_logger().info(f"Pick update...")
                 self.activate_cursor = not self.cursor_end_done and self.payload["close_cursor"]
 
                 with self.data_lock:
@@ -1843,6 +1844,7 @@ class ActionManager(Node):
                 self.sub_sm = PickSM.PICK_CENTERING
 
             case PickSM.PICK_CENTERING:
+                self.get_logger().info(f"Pick centering...")
                 if not self.payload["final_path"]:
                     self.sub_sm = PickSM.PICK_PICK
                 else:
@@ -1856,6 +1858,7 @@ class ActionManager(Node):
                     self.move_to(Position(x=next_point[0], y=next_point[1], t=final_robot_theta))
 
             case PickSM.PICK_PICK:
+                self.get_logger().info(f"Pick pick...")
                 final_pos = self.payload["final_pos"]
                 selected_pliers = self.payload["final_selected_pliers_ids"]
                 pick_targets = self.payload["final_pick_crate_ids"]
