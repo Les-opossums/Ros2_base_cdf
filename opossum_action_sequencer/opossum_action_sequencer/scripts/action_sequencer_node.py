@@ -1512,7 +1512,7 @@ class ActionManager(Node):
         """Run the threaded loop."""
         period = 1.0 / self.loop_frequency
         self.start_match_time = time.time()
-        self.send_raw("VMAX 1.5")
+        self.send_raw("VMAX 0.2")
         self.send_raw("VTMAX 3.0")
         self.move_to(Position(x=self.entry_zone[0], y=self.entry_zone[1], t=self.robot_pos.t))
         while not self._stop_event.is_set():
@@ -2360,13 +2360,18 @@ class ActionManager(Node):
 
     def compute_release_penality(self, px, py, path_distance, critical_level, penalty_cursor):
         """Calculates the score of a specific release pose using actual path distance."""
-        
-        val_center = 1 / (1.5 - px) ** 2
+        dst_center = (1.5 - px) ** 2
+        dst_center = dst_center if dst_center < 0.1 else 0.1 
+        val_center = 1 / dst_center
         val_enn_zone = abs(self.boundaries[self.color] - px) * int(self.end_far_zone)
-        val_dst = 1 / path_distance ** 2
+        pd = path_distance ** 2
+        pd = pd if pd < 0.1 else 0.1 
+        val_dst = 1 / pd
         
         if self.enemy_pos is not None:
-            val_ennemi = 1 / ((self.enemy_pos.x - px) ** 2 + (self.enemy_pos.y - py) ** 2)
+            enn_dst = (self.enemy_pos.x - px) ** 2 + (self.enemy_pos.y - py) ** 2
+            enn_dst = enn_dst if enn_dst < 0.1 else 0.1 
+            val_ennemi = 1 / enn_dst
         else:
             val_ennemi = 0
             
@@ -2381,12 +2386,18 @@ class ActionManager(Node):
         )
 
     def compute_pick_penality(self, x, y, num_crates, path_distance, critical_level, balance):
-        val_center = 1 / (1.5 - x) ** 2
+        dst_center = (1.5 - x) ** 2
+        dst_center = dst_center if dst_center < 0.1 else 0.1 
+        val_center = 1 / dst_center
         val_enn_zone = abs(self.boundaries[self.color] - x) * int(self.end_far_zone)
-        val_dst = 1 / path_distance ** 2
+        pd = path_distance ** 2
+        pd = pd if pd < 0.1 else 0.1
+        val_dst = 1 / pd
 
         if self.enemy_pos is not None:
-            val_ennemi = 1 / ((self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y) ** 2)
+            enn_dst = (self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y) ** 2
+            enn_dst = enn_dst if enn_dst < 0.1 else 0.1 
+            val_ennemi = 1 / enn_dst
         else:
             val_ennemi = 0
 
