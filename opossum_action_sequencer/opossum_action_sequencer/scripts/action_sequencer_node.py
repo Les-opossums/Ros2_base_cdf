@@ -304,7 +304,14 @@ class ActionManager(Node):
         # 2. Check forbidden zone
         if self.f_zone_y_min <= y:
             return False
-            
+        
+        if self.enemy_pos is None:
+            return True
+
+        #Adding enemy check
+        if (self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y ) ** 2 < self.robot_radius ** 2:
+            return False
+ 
         return True
 
     def _init_mapping(self):
@@ -795,10 +802,7 @@ class ActionManager(Node):
                     if crate.state != -1: 
                         continue # Do not delete crates currently held in pliers
                     
-                    # Is it close enough to be seen?
-                    dist = math.hypot(crate.x - self.robot_pos.x, crate.y - self.robot_pos.y)
-                    
-                    if dist <= max_range and cid not in ids_seen_this_tick:
+                    if (crate.x - self.robot_pos.x) ** 2 + (crate.y - self.robot_pos.y) ** 2 <= max_range ** 2 and cid not in ids_seen_this_tick:
                         angle_to_crate = math.atan2(crate.y - self.robot_pos.y, crate.x - self.robot_pos.x)
                         
                         # Check if the crate falls inside the target camera's cone
@@ -1039,7 +1043,7 @@ class ActionManager(Node):
             best_critical = 5
 
             for ex, ey, is_inv in entries:
-                if not (self.boundaries[0] + self.robot_radius <= ex <= self.boundaries[1] - self.robot_radius and self.boundaries[2] + self.robot_radius <= ey <= self.boundaries[3] - self.robot_radius):
+                if not self.is_point_safe(ex, ey) or not self.is_point_safe(mean_x, mean_y):
                     continue
                     
                 target_pos = (ex, ey)
@@ -1194,9 +1198,6 @@ class ActionManager(Node):
         )
 
         list_enn = msg.other_robot_position
-        if len(list_enn) == 0:
-            self.enemy_pos = None
-            return
         
         list_ennemis = []
         for enn in list_enn:
@@ -2363,7 +2364,7 @@ class ActionManager(Node):
         val_center = (1.5 - px) ** 2 + (1 - py) ** 2
         val_enn_zone = abs(self.boundaries[self.color] - px) * int(self.end_far_zone)
         # Use the TRUE path distance, not just a straight line guess!
-        val_dst = path_distance**2 
+        val_dst = path_distance**2
         
         if self.enemy_pos is not None:
             val_ennemi = (self.enemy_pos.x - px) ** 2 + (self.enemy_pos.y - py) ** 2
