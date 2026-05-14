@@ -1752,12 +1752,12 @@ class ActionManager(Node):
                 self.payload["retries"] = 0
             
             case PickSM.PICK_NAV:
+                poses = []
+                for nav in self.payload["path"]:
+                    poses.append(Position(x=nav[0], y=nav[1], t=self.payload["final_robot_theta"]))
+                self.move_sex(poses)
                 self.get_logger().info(f"Payload nav {self.payload['path']}...")
-                if not self.payload["path"]:
-                    self.sub_sm = PickSM.PICK_STARE
-                else:
-                    next_point = self.payload["path"].pop(0)
-                    self.move_to(Position(x=next_point[0], y=next_point[1], t=self.payload["final_robot_theta"]))
+                self.sub_sm = PickSM.PICK_STARE
 
             case PickSM.PICK_STARE:
                 if self.count > int(self.time_stare * self.loop_frequency):
@@ -1852,17 +1852,16 @@ class ActionManager(Node):
                 self.sub_sm = PickSM.PICK_CENTERING
 
             case PickSM.PICK_CENTERING:
-                if not self.payload["final_path"]:
-                    self.sub_sm = PickSM.PICK_PICK
-                else:
-                    with self.data_lock:
-                        target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["final_pick_crate_ids"]])
-                        pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in self.payload["final_selected_pliers_ids"]])
-                    target_angle = mean_angle_mod_pi([self.haz_crates[pid].theta for pid in self.payload["final_pick_crate_ids"]])
-                    final_robot_theta = target_angle - pliers_pos.t + (np.pi if self.payload["inv"] else 0.0)
-
-                    next_point = self.payload["final_path"].pop(0)
-                    self.move_to(Position(x=next_point[0], y=next_point[1], t=final_robot_theta))
+                poses = []
+                with self.data_lock:
+                    target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["final_pick_crate_ids"]])
+                    pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in self.payload["final_selected_pliers_ids"]])
+                target_angle = mean_angle_mod_pi([self.haz_crates[pid].theta for pid in self.payload["final_pick_crate_ids"]])
+                final_robot_theta = target_angle - pliers_pos.t + (np.pi if self.payload["inv"] else 0.0)
+                for nav in self.payload["final_path"]:
+                    poses.append(Position(x=nav[0], y=nav[1], t=final_robot_theta))
+                self.move_sex(poses)
+                self.sub_sm = PickSM.PICK_PICK
 
             case PickSM.PICK_PICK:
                 final_pos = self.payload["final_pos"]
@@ -1959,19 +1958,19 @@ class ActionManager(Node):
                 self.sub_sm = ReleaseSM.RELEASE_NAV
                 
             case ReleaseSM.RELEASE_NAV:
-                if not self.payload["path"]:
-                    self.sub_sm = ReleaseSM.RELEASE_DROP
-                else:
-                    best_pos = self.payload["best_pos"]
-                    with self.data_lock:
-                        id_side = self.get_best_side_pliers_release(best_pos[2])
-                        pliers_theta = self.pliers[id_side * 4].theta if id_side is not None else 0.0
-                    
-                    self.payload["id_side"] = id_side
-                    target_angle = best_pos[2] - pliers_theta
-                    
-                    next_point = self.payload["path"].pop(0)
-                    self.move_to(Position(x=next_point[0], y=next_point[1], t=target_angle))
+                poses = []
+                best_pos = self.payload["best_pos"]
+                with self.data_lock:
+                    id_side = self.get_best_side_pliers_release(best_pos[2])
+                    pliers_theta = self.pliers[id_side * 4].theta if id_side is not None else 0.0
+                
+                self.payload["id_side"] = id_side
+                target_angle = best_pos[2] - pliers_theta
+                for nav in self.payload["path"]:
+                    poses.append(Position(x=nav[0], y=nav[1], t=target_angle))
+                self.move_sex(poses)
+                self.get_logger().info(f"Payload nav {self.payload['path']}...")
+                self.sub_sm = ReleaseSM.RELEASE_DROP
 
             case ReleaseSM.RELEASE_DROP:
                 id_side = self.payload.get("id_side")
