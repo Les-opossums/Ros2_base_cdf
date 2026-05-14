@@ -292,7 +292,7 @@ class ActionManager(Node):
         self.amp_gauss = data["amp_gauss"] # Gauss amp
         self.coeff_far_zone = data["coeff_far_zone"] # Coeff far zone
         self.end_far_zone = False # Coeff far zone
-        coeff_penalty_cursor = 15.0
+        self.coeff_penalty_cursor = 15.0
         self.get_logger().info("Match (ré)initialisé avec succès. En attente du LEASH...")    
 
     def is_point_safe(self, x, y):
