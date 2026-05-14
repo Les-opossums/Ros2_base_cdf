@@ -197,8 +197,8 @@ class ActionManager(Node):
 
         # --- NEW: Navigation Constraints ---
         self.robot_radius = 0.2
-        self.classic_margin = 0.3
-        self.critical_margin = 0.15
+        self.classic_margin = 0.23
+        self.critical_margin = 0.12
 
         # Safe boundaries (shrunk by robot radius):
         self.safe_x_min = self.boundaries[0] + self.robot_radius
@@ -1024,8 +1024,7 @@ class ActionManager(Node):
             # Consolidation math
             mean_x = np.mean([c.x for c in group_crates])
             mean_y = np.mean([c.y for c in group_crates])
-            mean_theta = np.arctan2(np.sum([np.sin(c.theta) for c in group_crates]), 
-                                    np.sum([np.cos(c.theta) for c in group_crates]))
+            mean_theta = mean_angle_mod_pi([c.theta for c in group_crates])
 
             # Calculate Entry Points
             entries = [
