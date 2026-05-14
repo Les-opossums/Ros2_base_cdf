@@ -23,8 +23,8 @@ def launch_setup(context, *args, **kwargs):
         node_communication = Node(
             namespace=robot,
             package="opossum_comm",
-            executable="comm.py",
-            # executable="comm_node",
+            # executable="comm.py",
+            executable="comm_node",
             name="comm_node",
             parameters=[param_file, {"simulation": simulation}],
         )

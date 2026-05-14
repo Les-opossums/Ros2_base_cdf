@@ -13,6 +13,9 @@
 #include <map>
 #include <memory>
 #include <atomic>
+#include <algorithm> // Pour std::remove
+#include <cctype>    // Pour std::isalpha
+#include <clocale>   // <--- AJOUT POUR LA LOCALE (Fix std::stod)
 
 class Communication : public rclcpp::Node {
 public:
@@ -31,9 +34,6 @@ public:
 
         simulation_ = this->get_parameter("simulation").as_bool();
         
-        // Note: The python code loaded YAMLs here but never used them in the provided snippet. 
-        // We omit them for performance, but you can add yaml-cpp if needed.
-
         init_publishers();
         init_subscribers();
 
@@ -105,15 +105,12 @@ private:
         if (simulation_) {
             std::string rcv_topic = this->get_parameter("rcv_comm_topic").as_string();
             
-            // 1. Subscribe to simulated Zynq data
             sub_comm_topic_ = this->create_subscription<std_msgs::msg::String>(
                 rcv_topic, 10, std::bind(&Communication::save_in_buffer, this, std::placeholders::_1));
 
-            // 2. Subscribe to incoming commands
             sub_command_simu_ = this->create_subscription<std_msgs::msg::String>(
                 cmd_topic, 10, std::bind(&Communication::send_card_simu, this, std::placeholders::_1));
 
-            // 3. Create the reading timer based on the frequency parameter
             double freq = this->get_parameter("frequency").as_double();
             auto timer_period = std::chrono::duration<double>(1.0 / freq);
             
@@ -124,17 +121,14 @@ private:
         } else {
             std::vector<std::string> cards_name = this->get_parameter("cards_name").as_string_array();
             for (const auto& name : cards_name) {
-                // Initialize parameters for each card
                 this->declare_parameter<std::string>("cards." + name + ".port", "/dev/ttyZynq");
                 this->declare_parameter<int>("cards." + name + ".baudrate", 115200);
                 
                 cards_[name].port = this->get_parameter("cards." + name + ".port").as_string();
                 cards_[name].baudrate = this->get_parameter("cards." + name + ".baudrate").as_int();
                 
-                // Initialize hardware
                 init_card(name);
 
-                // Create subscriber binding the specific card name
                 auto sub_cb = [this, name](const std_msgs::msg::String::SharedPtr msg) {
                     this->send_card(msg, name);
                 };
@@ -173,31 +167,25 @@ private:
     // --- SIMULATION METHODS ---
 
     void save_in_buffer(const std_msgs::msg::String::SharedPtr msg) {
-        // Simulate the Zynq sending data
         buffer_simu_rcv_ += msg->data;
     }
 
     void read_card_simu() {
-        // Look at the result of the command send in simulation
         if (buffer_simu_rcv_.empty()) return;
 
         std::istringstream stream(buffer_simu_rcv_);
         std::string line;
         
-        // Split buffer by newline and process each line
         while (std::getline(stream, line)) {
-            // Remove carriage returns if they exist
             line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
             if (!line.empty()) {
                 handle_received_line(line);
             }
         }
-        // Clear buffer after reading
         buffer_simu_rcv_ = ""; 
     }
 
     void send_card_simu(const std_msgs::msg::String::SharedPtr msg) {
-        // Send to the card the command in simulation
         if (!enable_send_) return;
         
         std::string out = process_data_send(msg->data);
@@ -218,13 +206,10 @@ private:
 
     void serial_read_worker(std::string name) {
         auto serial_card = cards_[name].serial_port;
-        serial_card->setTimeout(serial::Timeout::max(), 1000, 0, 1000, 0); // 1 sec timeout
-
-        RCLCPP_INFO(this->get_logger(), "Thread listening on %s started.", name.c_str());
+        serial_card->setTimeout(serial::Timeout::max(), 1000, 0, 1000, 0); // Blocking read with timeout
 
         while (rclcpp::ok()) {
             try {
-                // Read up to the newline character
                 std::string line = serial_card->readline(65536, "\n");
                 if (!line.empty()) {
                     // 1. Trouver le premier vrai caractère (Left Trim)
@@ -249,14 +234,7 @@ private:
     }
 
     void handle_received_line(const std::string& data) {
-        // LOG 2: What does the data look like after we stripped the \n and \r?
-        RCLCPP_INFO(this->get_logger(), "[CLEANED RX]: '%s'", data.c_str());
-
-        // WARNING: If the first character is not a letter (e.g., it's a space or number), it gets dropped here!
-        if (data.empty() || !std::isalpha(data[0])) {
-            RCLCPP_WARN(this->get_logger(), "[DROPPED]: Message did not start with a letter.");
-            return;
-        }
+        if (data.empty() || !std::isalpha(data[0])) return;
 
         if (data.find("GREENSWITCH") != 0 && data.find("ROBOTDATA") != 0 && data.find("ERROR") != 0) {
             auto msg = std_msgs::msg::String();
@@ -267,27 +245,12 @@ private:
     }
 
     void send_card(const std_msgs::msg::String::SharedPtr msg, const std::string& name) {
-        // RCLCPP_INFO(this->get_logger(), "HW RX on %s: '%s'", name.c_str(), msg->data.c_str());
-
-        if (!enable_send_) {
-            RCLCPP_WARN(this->get_logger(), "HW IGNORED: enable_send_ is FALSE");
-            return;
-        }
+        if (!enable_send_) return;
 
         std::string out = process_data_send(msg->data);
         if (!out.empty()) {
             try {
-                // 1. Add \r\n just in case the hardware parser requires it
-                std::string hardware_cmd = out + "\r\n"; 
-                
-                // RCLCPP_INFO(this->get_logger(), "HW SERIAL WRITE: '%s'", out.c_str());
-                
-                // 2. Write the data
-                cards_[name].serial_port->write(hardware_cmd);
-                
-                // 3. FORCE the port to send it immediately
-                cards_[name].serial_port->flush(); 
-                
+                cards_[name].serial_port->write(out + "\n");
             } catch (std::exception& e) {
                 RCLCPP_ERROR(this->get_logger(), "Failed to write to card %s: %s", name.c_str(), e.what());
             }
@@ -306,10 +269,20 @@ private:
         return tokens;
     }
 
+    // Outil pour limiter le nombre de décimales (évite de surcharger la Zynq)
+    std::string limit_decimals(const std::string& token, int max_decimals = 3) {
+        size_t dot_pos = token.find('.');
+        if (dot_pos != std::string::npos && token.length() > dot_pos + 1 + max_decimals) {
+            return token.substr(0, dot_pos + 1 + max_decimals);
+        }
+        return token;
+    }
+
     std::string process_data_send(std::string data) {
         auto splitted_data = split(data);
         if (splitted_data.empty()) return "";
 
+        // 1. Publication de goal_position (Ne plantera plus grâce au fix de la locale)
         if (splitted_data[0] == "MOVE" && splitted_data.size() == 4) {
             try {
                 auto goal_pos = opossum_msgs::msg::GoalDetection();
@@ -319,15 +292,22 @@ private:
                 goal_pos.detection_mode = -1;
                 goal_pos.obstacle_detection_distance = 0.5;
                 pub_goal_position_->publish(goal_pos);
-                
-                return splitted_data[0] + " " + splitted_data[1] + " " + splitted_data[2] + " " + splitted_data[3];
             } catch (const std::exception& e) {
                 RCLCPP_WARN(this->get_logger(), "GREGOIRE SEND GOOD COMMAND: %s", e.what());
             }
-        } else if (splitted_data[0] == "MOVE" && splitted_data.size() == 5) {
-            return splitted_data[0] + " " + splitted_data[1] + " " + splitted_data[2] + " " + splitted_data[3];
         }
-        return data;
+
+        // 2. Reconstruction propre et tronquée de la chaîne pour la Zynq
+        std::string out_msg = splitted_data[0]; 
+        
+        // Gère l'exception du MOVE à 5 arguments
+        size_t arg_count = (splitted_data[0] == "MOVE" && splitted_data.size() == 5) ? 4 : splitted_data.size();
+
+        for (size_t i = 1; i < arg_count; ++i) {
+            out_msg += " " + limit_decimals(splitted_data[i], 3); // On force 3 décimales
+        }
+        
+        return out_msg;
     }
 
     void process_data_rcv(const std::string& data) {
@@ -361,6 +341,10 @@ private:
 };
 
 int main(int argc, char** argv) {
+    // --- CORRECTION MAJEURE: FIXE LA LOCALE POUR STD::STOD ---
+    // Indispensable si l'OS est en français pour que C++ lise "1.23" et non "1,23"
+    std::setlocale(LC_NUMERIC, "C"); 
+    
     rclcpp::init(argc, argv);
     auto node = std::make_shared<Communication>();
     

@@ -154,7 +154,7 @@ class ActionManager(Node):
         self.ready = False
 
         self.enemy_pos = None
-        self.time_stare = 0.25 # s
+        self.time_stare = 0.15 # s
 
         self.pos_obj = None
         self.max_distance = 0.2
@@ -186,7 +186,8 @@ class ActionManager(Node):
         self._lock_gsm = Lock()
         self._stop_event = Event()
         self.loop_frequency = 10.0
-        self.zone_cursor = [1.1, 0.175]
+        self.zone_cursor_pick = [1.1, 0.175]
+        self.zone_cursor_release_id = 1
         self.entry_zone = [0.5, 1.1]
         self.cursor_in = [1.35, 0.2, 1.54]
         self.cursor_out = [0.73, 0.2, 1.54]
@@ -245,7 +246,8 @@ class ActionManager(Node):
             self.stop = False
             self.arrived_home = False
             self.obstacle_detected = False
-            self.cursor_done = False
+            self.cursor_begin_done = False
+            self.cursor_end_done = False
             self.activate_cursor = False
             self.release_end = False
             
@@ -291,6 +293,7 @@ class ActionManager(Node):
         self.amp_gauss = data["amp_gauss"] # Gauss amp
         self.coeff_far_zone = data["coeff_far_zone"] # Coeff far zone
         self.end_far_zone = False # Coeff far zone
+        self.coeff_penalty_cursor = 15.0
         self.get_logger().info("Match (ré)initialisé avec succès. En attente du LEASH...")    
 
     def is_point_safe(self, x, y):
@@ -704,7 +707,13 @@ class ActionManager(Node):
                 world_det = SimpleNamespace()
                 world_det.id = det.id
                 world_det.x = self.robot_pos.x + (det.x * cos_t - det.y * sin_t)
+                if world_det.x < self.boundaries[0] or world_det.x > self.boundaries[1]:
+                    continue
+
                 world_det.y = self.robot_pos.y + (det.x * sin_t + det.y * cos_t)
+                if world_det.y < self.boundaries[2] or world_det.y > self.f_zone_y_min - 0.05:
+                    continue
+
                 world_det.theta = self.robot_pos.t + det.theta
                 current_frame_world_dets.append(world_det)
 
@@ -876,7 +885,8 @@ class ActionManager(Node):
             self.entry_zone[0] = self.boundaries[1] - self.entry_zone[0] 
             self.cursor_in[0] = self.boundaries[1] - self.cursor_in[0]
             self.cursor_out[0] = self.boundaries[1] - self.cursor_out[0]
-            self.zone_cursor[0] = self.boundaries[1] - self.zone_cursor[0]
+            self.zone_cursor_pick[0] = self.boundaries[1] - self.zone_cursor_pick[0]
+            self.zone_cursor_release_id = 7
             self.pince_cursor = 5
 
     def feedback_callback(self, msg):
@@ -1092,9 +1102,14 @@ class ActionManager(Node):
                     best_pos = pos
                     best_critical = critical_level
 
+            penality_cursor = 0
+            if z_id == self.zone_cursor_release_id:
+                cpc = self.coeff_penalty_cursor * (0.7 * self.match_time - (time.time() - self.start_match_time))
+                penality_cursor = - cpc if cpc > 0 else 0
+
             # Write the final score into the zone
             if best_dist != float('inf'):
-                reward = self.compute_release_penality(best_pos[0], best_pos[1], best_dist, best_critical)
+                reward = self.compute_release_penality(best_pos[0], best_pos[1], best_dist, best_critical, penality_cursor)
                 zone.release_reward = reward
                 zone.best_release_path = best_path
                 zone.best_release_pos = best_pos
@@ -1237,7 +1252,7 @@ class ActionManager(Node):
 
     def nearest_great_angle(self, current):
         """Helper to find the nearest angle to 0, pi/2, pi, 3pi/2."""
-        angles = [0, np.pi/2, np.pi, 3*np.pi/2]
+        angles = [-np.pi/2, -np.pi, -3*np.pi/2, -2*np.pi, 0, np.pi/2, np.pi, 3*np.pi/2, 2*np.pi]
         return min(angles, key=lambda x: abs(current - x))
 
     def follow_ennemi(self):
@@ -1555,7 +1570,12 @@ class ActionManager(Node):
                 self.payload = {"path": path_e}
         
         elif self.global_sm == GlobalSM.NOP:
+            if self.cursor_begin_done and not self.cursor_end_done:
+                self.cursor_end_done = True
+                self.send_raw(f"PINCE {self.pince_cursor} 8 0 0")
+            self.send_raw(f"PINCE {self.pince_cursor} 8 0 0")
             req_sm, payload = self.select_strategy()
+            
             self.get_logger().info(f"Strategy selected: {req_sm} at {time.time() - self.start_match_time}")
             self.global_sm = req_sm
             self.sub_sm = GlobalSM.NOP
@@ -1614,8 +1634,8 @@ class ActionManager(Node):
     def select_strategy(self):
         """Plan all the options and their rewards."""
 
-        if self.activate_cursor and not self.cursor_done:
-            self.cursor_done = True
+        if self.activate_cursor and not self.cursor_end_done:
+            self.cursor_begin_done = True
             self.get_logger().info(f"CURSOR DONE")
             return GlobalSM.CURSOR, {}
 
@@ -1642,7 +1662,8 @@ class ActionManager(Node):
                 else:
                     release_dict = {
                         "path": best_zone.best_release_path[1:], 
-                        "best_pos": best_zone.best_release_pos
+                        "best_pos": best_zone.best_release_pos,
+                        "id_zone": best_zone.id,
                     }
                     self.get_logger().info(f"Select RELEASE COMP with: {release_dict}")
                     return GlobalSM.RELEASE, release_dict
@@ -1659,7 +1680,8 @@ class ActionManager(Node):
             elif release_available:
                 release_dict = {
                     "path": best_zone.best_release_path[1:], 
-                    "best_pos": best_zone.best_release_pos
+                    "best_pos": best_zone.best_release_pos,
+                    "id_zone": best_zone.id,
                 }
                 self.get_logger().info(f"Select RELEASE with: {release_dict}")
                 return GlobalSM.RELEASE, release_dict   
@@ -1749,7 +1771,7 @@ class ActionManager(Node):
 
             case PickSM.PICK_UPDATE:
                 # 1. Identify which camera is facing the stack
-                self.activate_cursor = not self.cursor_done and self.payload["close_cursor"]
+                self.activate_cursor = not self.cursor_end_done and self.payload["close_cursor"]
 
                 with self.data_lock:
                     pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in self.payload["selected_pliers_ids"]])
@@ -1974,6 +1996,9 @@ class ActionManager(Node):
                 self.sub_sm = ReleaseSM.RELEASE_DONE
 
             case ReleaseSM.RELEASE_DONE:
+                if self.payload["id_zone"] == self.zone_cursor_release_id:
+                    self.get_logger().info(f"Now blocking the cursor action")
+                    self.cursor_end_done = True
                 self.global_sm = GlobalSM.NOP
                 self.sub_sm = GlobalSM.NOP
 
@@ -2011,6 +2036,7 @@ class ActionManager(Node):
                 self.sub_sm = CursorSM.CURSOR_DONE
 
             case CursorSM.CURSOR_DONE:
+                self.cursor_end_done = True
                 self.global_sm = GlobalSM.NOP
                 self.sub_sm = GlobalSM.NOP
 
@@ -2257,10 +2283,9 @@ class ActionManager(Node):
         Checks if ANY part of a rotated crate (0.15m x 0.05m) is inside the zone.
         Uses the Separating Axis Theorem (SAT) for OBB-AABB collision.
         """
-        zx = self.zone_cursor[0]
-        zy = self.zone_cursor[1]
+        zx = self.zone_cursor_pick[0]
+        zy = self.zone_cursor_pick[1]
         hz = 0.125  # Zone half-size
-        self.get_logger().info(f"Cursor zone: {self.zone_cursor[0]}, {self.zone_cursor[1]}, target: {x}, {y}")
         
         # --- Axis 1 & 2: Global X and Y (The Zone's flat edges) ---
         if abs(x - zx) > hz:
@@ -2340,7 +2365,7 @@ class ActionManager(Node):
         ry = x * sin_t + y * cos_t
         return rx, ry
 
-    def compute_release_penality(self, px, py, path_distance, critical_level):
+    def compute_release_penality(self, px, py, path_distance, critical_level, penalty_cursor):
         """Calculates the score of a specific release pose using actual path distance."""
         
         val_center = (1.5 - px) ** 2 + (1 - py) ** 2
@@ -2359,7 +2384,8 @@ class ActionManager(Node):
             self.coeff_release_enn * val_ennemi + 
             self.coeff_release_center * val_center + 
             self.coeff_critical_level * critical_level +
-            self.coeff_far_zone * val_enn_zone
+            self.coeff_far_zone * val_enn_zone +
+            penalty_cursor
         )
 
     def compute_pick_penality(self, x, y, num_crates, path_distance, critical_level, balance):
@@ -2451,26 +2477,16 @@ class ActionManager(Node):
         nodes = set([start, target])
         
         # --- NEW: Use safe boundaries for the street grid ---
-        x_lines = [self.safe_x_min, self.safe_x_max, start[0], target[0]]
-        y_lines = [self.safe_y_min + 0.2, self.f_zone_y_min, start[1], target[1]]
-        
-        # --- NEW: Add dynamic grid lines around the enemy to route around it ---
-        if getattr(self, 'enemy_pos', None) is not None:
-            x_lines.extend([self.enemy_pos.x - 2 * self.robot_radius, self.enemy_pos.x + 2 * self.robot_radius])
-            y_lines.extend([self.enemy_pos.y - 2 * self.robot_radius, self.enemy_pos.y + 2 * self.robot_radius])
+        x_lines = [0.45, 0.8, 1.15, 1.5, 1.85 ,2.2 ,2.55, start[0], target[0]]
+        y_lines = [0.45, 1.125, start[1], target[1]]
+        # x_lines = [self.safe_x_min, self.safe_x_max, start[0], target[0]]
+        # y_lines = [self.safe_y_min + 0.2, self.f_zone_y_min, start[1], target[1]]
         
         # 1. Add the intersections (ONLY if they are safe)
         for x in x_lines:
             for y in y_lines:
                 if self.is_point_safe(x, y):
                     nodes.add(pt(x, y))
-                
-        # 2. Project Start and Target onto the lines
-        for p in [start, target]:
-            for x in x_lines:
-                if self.is_point_safe(x, p[1]): nodes.add(pt(x, p[1]))
-            for y in y_lines:
-                if self.is_point_safe(p[0], y): nodes.add(pt(p[0], y))
                     
         nodes = list(nodes)
         edges = {n: [] for n in nodes}
@@ -2486,8 +2502,8 @@ class ActionManager(Node):
         # 3. Connect nodes that share the same horizontal or vertical "Street"
         for i, n1 in enumerate(nodes):
             for n2 in nodes[i+1:]:
-                if n1[0] == n2[0] and n1[0] in x_lines: add_edge(n1, n2)
-                elif n1[1] == n2[1] and n1[1] in y_lines: add_edge(n1, n2)
+                if n1[0] == n2[0] or n1[1] == n2[1]: 
+                    add_edge(n1, n2)
 
         # 5. Mini-Dijkstra Pathfinding
         queue = [(0, start, [start])]

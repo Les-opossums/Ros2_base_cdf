@@ -374,9 +374,9 @@ class ObstacleAvoider(Node):
     def _detect_obstacle_rectangle(self, lidar_range: list) -> bool:
         """Detect obstacles in the rectangle in front."""
         if self.robot_data.vlin > 1.0:
-            index = 2
+            index = 0
         elif self.robot_data.vlin > 0.7:
-            index = 1
+            index = 0
         else:
             index = 0
 
@@ -440,7 +440,7 @@ class ObstacleAvoider(Node):
     def _compute_security_rectangle_distances(self) -> None:
         """Compute the security distance if rectangle."""
         self.security_dst = {
-            0: self._compute_specific_rectangle(0.6),
+            0: self._compute_specific_rectangle(0.65),
             1: self._compute_specific_rectangle(0.72),
             2: self._compute_specific_rectangle(0.85),
         }
@@ -647,9 +647,9 @@ class ObstacleAvoider(Node):
             angle_final = angle_range[-1] + 1 + self.len_scan if angle_range[-1] + 1 < angle_range[0] else angle_range[-1] + 1
             incr = (angle_final - angle_range[0]) // num_points
             if self.robot_data.vlin > 1.0:
-                index = 2
+                index = 0
             elif self.robot_data.vlin > 0.7:
-                index = 1
+                index = 0
             else:
                 index = 0
             sec_dst = self.security_dst[index] 
