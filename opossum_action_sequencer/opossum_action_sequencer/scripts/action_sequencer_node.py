@@ -2361,16 +2361,16 @@ class ActionManager(Node):
     def compute_release_penality(self, px, py, path_distance, critical_level, penalty_cursor):
         """Calculates the score of a specific release pose using actual path distance."""
         dst_center = (1.5 - px) ** 2
-        dst_center = dst_center if dst_center < 0.1 else 0.1 
+        dst_center = dst_center if dst_center > 0.1 else 0.1 
         val_center = 1 / dst_center
         val_enn_zone = abs(self.boundaries[self.color] - px) * int(self.end_far_zone)
         pd = path_distance ** 2
-        pd = pd if pd < 0.1 else 0.1 
+        pd = pd if pd > 0.1 else 0.1 
         val_dst = 1 / pd
         
         if self.enemy_pos is not None:
             enn_dst = (self.enemy_pos.x - px) ** 2 + (self.enemy_pos.y - py) ** 2
-            enn_dst = enn_dst if enn_dst < 0.1 else 0.1 
+            enn_dst = enn_dst if enn_dst > 0.1 else 0.1 
             val_ennemi = 1 / enn_dst
         else:
             val_ennemi = 0
@@ -2387,16 +2387,16 @@ class ActionManager(Node):
 
     def compute_pick_penality(self, x, y, num_crates, path_distance, critical_level, balance):
         dst_center = (1.5 - x) ** 2
-        dst_center = dst_center if dst_center < 0.1 else 0.1 
+        dst_center = dst_center if dst_center > 0.1 else 0.1 
         val_center = 1 / dst_center
         val_enn_zone = abs(self.boundaries[self.color] - x) * int(self.end_far_zone)
         pd = path_distance ** 2
-        pd = pd if pd < 0.1 else 0.1
+        pd = pd if pd > 0.1 else 0.1
         val_dst = 1 / pd
 
         if self.enemy_pos is not None:
             enn_dst = (self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y) ** 2
-            enn_dst = enn_dst if enn_dst < 0.1 else 0.1 
+            enn_dst = enn_dst if enn_dst > 0.1 else 0.1 
             val_ennemi = 1 / enn_dst
         else:
             val_ennemi = 0
