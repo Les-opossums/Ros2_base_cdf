@@ -1544,10 +1544,13 @@ class ActionManager(Node):
                 self.payload = {"path": path_e}
         
         elif self.global_sm == GlobalSM.NOP:
-            req_sm, payload = self.select_strategy()
+            self.get_logger().info(f"BEGIN: {self.cursor_begin}, END: {self.cursor_end_done}")
             if self.cursor_begin_done and not self.cursor_end_done:
                 self.cursor_end_done = True
                 self.send_raw(f"PINCE {self.pince_cursor} 8 0 0")
+            self.send_raw(f"PINCE {self.pince_cursor} 8 0 0")
+            req_sm, payload = self.select_strategy()
+            
             self.get_logger().info(f"Strategy selected: {req_sm} at {time.time() - self.start_match_time}")
             self.global_sm = req_sm
             self.sub_sm = GlobalSM.NOP
@@ -2005,6 +2008,7 @@ class ActionManager(Node):
                 self.sub_sm = CursorSM.CURSOR_DONE
 
             case CursorSM.CURSOR_DONE:
+                self.cursor_end_done = True
                 self.global_sm = GlobalSM.NOP
                 self.sub_sm = GlobalSM.NOP
 
