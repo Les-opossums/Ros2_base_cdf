@@ -1226,7 +1226,7 @@ class ActionManager(Node):
 
     def nearest_great_angle(self, current):
         """Helper to find the nearest angle to 0, pi/2, pi, 3pi/2."""
-        angles = [0, np.pi/2, np.pi, 3*np.pi/2]
+        angles = [-np.pi/2, -np.pi, -3*np.pi/2, -2*np.pi, 0, np.pi/2, np.pi, 3*np.pi/2, 2*np.pi]
         return min(angles, key=lambda x: abs(current - x))
 
     def follow_ennemi(self):
