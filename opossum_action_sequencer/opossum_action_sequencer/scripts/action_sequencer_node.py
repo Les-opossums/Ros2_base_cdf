@@ -1730,6 +1730,8 @@ class ActionManager(Node):
                     self.payload["final_robot_theta"] = target_angle - pliers_pos.t
                 else: 
                     self.get_logger().info(f"Initiating Pick Sequence with an unknown path...")
+                    target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["crate_ids"]])
+                    self.payload["close_cursor"] = self.in_cursor_zone(target_pos.x, target_pos.y)
                 self.sub_sm = PickSM.PICK_NAV
                 self.payload["retries"] = 0
             
