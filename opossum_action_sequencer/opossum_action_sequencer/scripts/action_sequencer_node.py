@@ -706,7 +706,13 @@ class ActionManager(Node):
                 world_det = SimpleNamespace()
                 world_det.id = det.id
                 world_det.x = self.robot_pos.x + (det.x * cos_t - det.y * sin_t)
+                if world_det.x < self.boundaries[0] or world_det.x > self.boundaries[1]:
+                    continue
+
                 world_det.y = self.robot_pos.y + (det.x * sin_t + det.y * cos_t)
+                if world_det.y < self.boundaries[2] or world_det.y > self.f_zone_y_min - 0.05:
+                    continue
+
                 world_det.theta = self.robot_pos.t + det.theta
                 current_frame_world_dets.append(world_det)
 
