@@ -2461,26 +2461,16 @@ class ActionManager(Node):
         nodes = set([start, target])
         
         # --- NEW: Use safe boundaries for the street grid ---
-        x_lines = [self.safe_x_min, self.safe_x_max, start[0], target[0]]
-        y_lines = [self.safe_y_min + 0.2, self.f_zone_y_min, start[1], target[1]]
-        
-        # --- NEW: Add dynamic grid lines around the enemy to route around it ---
-        if getattr(self, 'enemy_pos', None) is not None:
-            x_lines.extend([self.enemy_pos.x - 2 * self.robot_radius, self.enemy_pos.x + 2 * self.robot_radius])
-            y_lines.extend([self.enemy_pos.y - 2 * self.robot_radius, self.enemy_pos.y + 2 * self.robot_radius])
+        x_lines = [0.45, 0.8, 1.15, 1.5, 1.85 ,2.2 ,2.55, start[0], target[0]]
+        y_lines = [0.45, 1.125, start[1], target[1]]
+        # x_lines = [self.safe_x_min, self.safe_x_max, start[0], target[0]]
+        # y_lines = [self.safe_y_min + 0.2, self.f_zone_y_min, start[1], target[1]]
         
         # 1. Add the intersections (ONLY if they are safe)
         for x in x_lines:
             for y in y_lines:
                 if self.is_point_safe(x, y):
                     nodes.add(pt(x, y))
-                
-        # 2. Project Start and Target onto the lines
-        for p in [start, target]:
-            for x in x_lines:
-                if self.is_point_safe(x, p[1]): nodes.add(pt(x, p[1]))
-            for y in y_lines:
-                if self.is_point_safe(p[0], y): nodes.add(pt(p[0], y))
                     
         nodes = list(nodes)
         edges = {n: [] for n in nodes}
@@ -2496,8 +2486,8 @@ class ActionManager(Node):
         # 3. Connect nodes that share the same horizontal or vertical "Street"
         for i, n1 in enumerate(nodes):
             for n2 in nodes[i+1:]:
-                if n1[0] == n2[0] and n1[0] in x_lines: add_edge(n1, n2)
-                elif n1[1] == n2[1] and n1[1] in y_lines: add_edge(n1, n2)
+                if n1[0] == n2[0] or n1[1] == n2[1]: 
+                    add_edge(n1, n2)
 
         # 5. Mini-Dijkstra Pathfinding
         queue = [(0, start, [start])]
