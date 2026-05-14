@@ -1544,7 +1544,7 @@ class ActionManager(Node):
                 self.payload = {"path": path_e}
         
         elif self.global_sm == GlobalSM.NOP:
-            self.get_logger().info(f"BEGIN: {self.cursor_begin}, END: {self.cursor_end_done}")
+            self.get_logger().info(f"BEGIN: {self.cursor_begin_done}, END: {self.cursor_end_done}")
             if self.cursor_begin_done and not self.cursor_end_done:
                 self.cursor_end_done = True
                 self.send_raw(f"PINCE {self.pince_cursor} 8 0 0")
