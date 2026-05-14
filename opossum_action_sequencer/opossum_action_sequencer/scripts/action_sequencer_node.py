@@ -244,7 +244,8 @@ class ActionManager(Node):
             self.stop = False
             self.arrived_home = False
             self.obstacle_detected = False
-            self.cursor_done = False
+            self.cursor_begin_done = False
+            self.cursor_end_done = False
             self.activate_cursor = False
             self.release_end = False
             
@@ -1544,6 +1545,9 @@ class ActionManager(Node):
         
         elif self.global_sm == GlobalSM.NOP:
             req_sm, payload = self.select_strategy()
+            if self.cursor_begin_done and not self.cursor_end_done:
+                self.cursor_end_done = True
+                self.send_raw(f"PINCE {self.pince_cursor} 8 0 0")
             self.get_logger().info(f"Strategy selected: {req_sm} at {time.time() - self.start_match_time}")
             self.global_sm = req_sm
             self.sub_sm = GlobalSM.NOP
@@ -1597,8 +1601,8 @@ class ActionManager(Node):
     def select_strategy(self):
         """Plan all the options and their rewards."""
 
-        if self.activate_cursor and not self.cursor_done:
-            self.cursor_done = True
+        if self.activate_cursor and not self.cursor_end_done:
+            self.cursor_begin_done = True
             self.get_logger().info(f"CURSOR DONE")
             return GlobalSM.CURSOR, {}
 
@@ -1731,7 +1735,7 @@ class ActionManager(Node):
 
             case PickSM.PICK_UPDATE:
                 # 1. Identify which camera is facing the stack
-                self.activate_cursor = not self.cursor_done and self.payload["close_cursor"]
+                self.activate_cursor = not self.cursor_end_done and self.payload["close_cursor"]
 
                 with self.data_lock:
                     pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in self.payload["selected_pliers_ids"]])
@@ -2250,7 +2254,6 @@ class ActionManager(Node):
         zx = self.zone_cursor[0]
         zy = self.zone_cursor[1]
         hz = 0.125  # Zone half-size
-        self.get_logger().info(f"Cursor zone: {self.zone_cursor[0]}, {self.zone_cursor[1]}, target: {x}, {y}")
         
         # --- Axis 1 & 2: Global X and Y (The Zone's flat edges) ---
         if abs(x - zx) > hz:
