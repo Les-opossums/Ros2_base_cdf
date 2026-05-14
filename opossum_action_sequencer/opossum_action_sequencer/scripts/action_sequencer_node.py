@@ -2361,13 +2361,12 @@ class ActionManager(Node):
     def compute_release_penality(self, px, py, path_distance, critical_level, penalty_cursor):
         """Calculates the score of a specific release pose using actual path distance."""
         
-        val_center = (1.5 - px) ** 2 + (1 - py) ** 2
+        val_center = 1 / (1.5 - px) ** 2
         val_enn_zone = abs(self.boundaries[self.color] - px) * int(self.end_far_zone)
-        # Use the TRUE path distance, not just a straight line guess!
-        val_dst = path_distance**2
+        val_dst = 1 / path_distance ** 2
         
         if self.enemy_pos is not None:
-            val_ennemi = (self.enemy_pos.x - px) ** 2 + (self.enemy_pos.y - py) ** 2
+            val_ennemi = 1 / ((self.enemy_pos.x - px) ** 2 + (self.enemy_pos.y - py) ** 2)
         else:
             val_ennemi = 0
             
@@ -2382,13 +2381,15 @@ class ActionManager(Node):
         )
 
     def compute_pick_penality(self, x, y, num_crates, path_distance, critical_level, balance):
-        val_center = (1.5 - x) ** 2 + (1 - y) ** 2
+        val_center = 1 / (1.5 - x) ** 2
         val_enn_zone = abs(self.boundaries[self.color] - x) * int(self.end_far_zone)
-        val_dst = path_distance ** 2
+        val_dst = 1 / path_distance ** 2
+
         if self.enemy_pos is not None:
-            val_ennemi = (self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y) ** 2
+            val_ennemi = 1 / ((self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y) ** 2)
         else:
             val_ennemi = 0
+
         return (
             self.coeff_pick +
             self.coeff_pick_balance * abs(balance) + 
