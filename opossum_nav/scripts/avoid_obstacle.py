@@ -281,7 +281,6 @@ class ObstacleAvoider(Node):
         elif self.detection_mode == "cone":
             return self._detect_obstacle_cone(lidar_range)
         elif self.detection_mode == "rectangle":
-            self.get_logger().info(f"Detection rectange")
             return self._detect_obstacle_rectangle(lidar_range)
         else:
             raise ValueError("Invalid detection mode")
@@ -398,7 +397,7 @@ class ObstacleAvoider(Node):
                 )
             )
         angle_range = angle_range[: len(sec_dst)]
-        self.publish_visualization("rectangle", angle_range)
+        # self.publish_visualization("rectangle", angle_range)
         try:
             if not self.enable_boundary_check:
                 for i in range(len(angle_range)):

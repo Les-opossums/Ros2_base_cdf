@@ -306,7 +306,7 @@ class ActionManager(Node):
         if self.f_zone_y_min <= y:
             return False
         
-        if not self.enemy_pos:
+        if ignore_enemi or not self.enemy_pos:
             return True
         
         if (self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y) ** 2 < (self.robot_radius * 3) ** 2:
@@ -2573,13 +2573,27 @@ class ActionManager(Node):
         
         if length == 0:
             return True
-            
+
+        # IDEA: See if we go further and further to enemy
         # --- Sample points along the line to check for forbidden zone intersection ---
         steps = int(length / 0.1)
+        if self.enemy_pos is not None:
+            last_dst = (x1 - self.enemy_pos.x) ** 2 + (y1 - self.enemy_pos.y) ** 2
+        else:
+            last_dst = 100.0
         if steps > 0:
             for i in range(1, steps):
                 tx = x1 + (dx * (i / steps))
                 ty = y1 + (dy * (i / steps))
+                if self.enemy_pos is not None:
+                    new_dst = (tx - self.enemy_pos.x) ** 2 + (ty - self.enemy_pos.y) ** 2
+                    if new_dst > last_dst:
+                        last_dst = new_dst
+                        continue
+                    last_dst = new_dst
+                else:
+                    last_dst = 100.0
+
                 if not self.is_point_safe(tx, ty):
                     return False # The path cuts through the forbidden zone!
 
@@ -2631,18 +2645,13 @@ class ActionManager(Node):
         if path:
             return path, cost, 1
 
-        # --- 2. IF NOT ALLOWED TO BE RISKY, STOP HERE ---
-
-        # --- 3. ALLOWED TO BE RISKY: TRY CRITICAL ---
-        self.get_logger().info("Strict path blocked. Attempting Critical Margin.")
-
         if self.is_direct_path_clear(start_pos, target_pos, margin=self.critical_margin, ignore_start=True):
             return [start_pos, target_pos], math.hypot(target_pos[0]-start_pos[0], target_pos[1]-start_pos[1]), 2
 
         path, cost = self.get_street_grid_path(start_pos, target_pos, margin=self.critical_margin)
         if path:
             return path, cost, 2
-        
+
         path, cost = self.get_street_grid_path(start_pos, target_pos, margin=0)
         if path:
             return path, cost, 3
