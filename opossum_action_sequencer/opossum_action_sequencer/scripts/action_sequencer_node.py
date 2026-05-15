@@ -1847,24 +1847,12 @@ class ActionManager(Node):
                         inv = True
                     self.payload["inv"] = inv
 
-                self.payload["final_pos"] = final_pos
-                self.payload["final_path"], _, _ = self.get_best_path((final_pos.x, final_pos.y), allow_critical=True)
-                
-                self.sub_sm = PickSM.PICK_CENTERING
-
-            case PickSM.PICK_CENTERING:
-                self.get_logger().info(f"Pick centering...")
-                if not self.payload["final_path"]:
-                    self.sub_sm = PickSM.PICK_PICK
+                if not self.is_point_safe(final_pos.x, final_pos.y):
+                    self.sub_sm = PickSM.PICK_FAILED
                 else:
-                    with self.data_lock:
-                        target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["final_pick_crate_ids"]])
-                        pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in self.payload["final_selected_pliers_ids"]])
-                    target_angle = mean_angle_mod_pi([self.haz_crates[pid].theta for pid in self.payload["final_pick_crate_ids"]])
-                    final_robot_theta = target_angle - pliers_pos.t + (np.pi if self.payload["inv"] else 0.0)
-
-                    next_point = self.payload["final_path"].pop(0)
-                    self.move_to(Position(x=next_point[0], y=next_point[1], t=final_robot_theta))
+                    self.payload["final_pos"] = final_pos
+                    self.move_to(final_pos)
+                    self.sub_sm = PickSM.PICK_PICK
 
             case PickSM.PICK_PICK:
                 self.get_logger().info(f"Pick pick...")
