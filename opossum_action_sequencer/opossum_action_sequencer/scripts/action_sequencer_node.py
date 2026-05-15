@@ -309,7 +309,7 @@ class ActionManager(Node):
         if ignore_enemi or not self.enemy_pos:
             return True
         
-        if (self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y) ** 2 < (self.robot_radius * 3) ** 2:
+        if (self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y) ** 2 < (self.robot_radius * 2.5) ** 2:
             return False
 
         return True
@@ -1096,8 +1096,7 @@ class ActionManager(Node):
             best_critical = 5
 
             for pos in av_poses:
-                if not (self.boundaries[0] + self.robot_radius < pos[0] < self.boundaries[1] - self.robot_radius and 
-                        self.boundaries[2] + self.robot_radius < pos[1] < self.boundaries[3] - self.robot_radius): 
+                if not self.is_point_safe(pos[0], pos[1]):
                     continue
                     
                 target_pos = (pos[0], pos[1])
@@ -2609,7 +2608,7 @@ class ActionManager(Node):
                 closest_x = x1 + t_raw * dx
                 closest_y = y1 + t_raw * dy
                 
-                if math.hypot(self.enemy_pos.x - closest_x, self.enemy_pos.y - closest_y) < 3 * self.robot_radius:
+                if math.hypot(self.enemy_pos.x - closest_x, self.enemy_pos.y - closest_y) < 2.5 * self.robot_radius:
                     return False
 
         # --- Check against crates ---
