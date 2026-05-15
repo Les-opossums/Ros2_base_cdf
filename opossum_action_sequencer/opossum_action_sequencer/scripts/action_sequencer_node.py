@@ -198,6 +198,7 @@ class ActionManager(Node):
 
         # --- NEW: Navigation Constraints ---
         self.robot_radius = 0.2
+        self.ennemi_distance = 0.5
         self.classic_margin = 0.23
         self.critical_margin = 0.12
 
@@ -309,7 +310,7 @@ class ActionManager(Node):
         if ignore_enemi or not self.enemy_pos:
             return True
         
-        if (self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y) ** 2 < (self.robot_radius * 2.5) ** 2:
+        if (self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y) ** 2 < self.ennemi_distance ** 2:
             return False
 
         return True
@@ -1099,9 +1100,7 @@ class ActionManager(Node):
                 if not self.is_point_safe(pos[0], pos[1]):
                     continue
                     
-                target_pos = (pos[0], pos[1])
-                
-                path, dist, critical_level = self.get_best_path(target_pos)
+                path, dist, critical_level = self.get_best_path((pos[0], pos[1]))
 
                 if dist < best_dist:
                     best_dist = dist
@@ -2608,7 +2607,7 @@ class ActionManager(Node):
                 closest_x = x1 + t_raw * dx
                 closest_y = y1 + t_raw * dy
                 
-                if math.hypot(self.enemy_pos.x - closest_x, self.enemy_pos.y - closest_y) < 2.5 * self.robot_radius:
+                if (self.enemy_pos.x - closest_x) ** 2 + (self.enemy_pos.y - closest_y) ** 2 < self.ennemi_distance ** 2:
                     return False
 
         # --- Check against crates ---
