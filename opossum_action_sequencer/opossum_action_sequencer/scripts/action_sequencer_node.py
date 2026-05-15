@@ -1575,7 +1575,7 @@ class ActionManager(Node):
             self.sub_sm = GlobalSM.NOP
             self.payload = payload
 
-        if self.obstacle_detected and not self.global_sm not in (GlobalSM.STOP, GlobalSM.FINISH):
+        if self.obstacle_detected and self.global_sm not in (GlobalSM.STOP, GlobalSM.FINISH):
             self.get_logger().info(f"Obstacle detected by {self.get_namespace()}, enemy at {self.enemy_pos}. Recomputing...")
             self.global_sm = GlobalSM.NOP
             self.sub_sm = GlobalSM.NOP
@@ -2483,11 +2483,15 @@ class ActionManager(Node):
         
         def add_edge(n1, n2):
             if n1 != n2:
-                # Detect if either end of this edge is the starting position
-                is_connected_to_start = (n1 == start) or (n2 == start)
+                if n1 == start:
+                    path_enable = self.is_direct_path_clear(n1, n2, margin=margin, target_crate_ids=None, ignore_start=True)
+                elif n2 == start:
+                    path_enable = self.is_direct_path_clear(n2, n1, margin=margin, target_crate_ids=None, ignore_start=True)
+                else:
+                    path_enable = self.is_direct_path_clear(n1, n2, margin=margin, target_crate_ids=None, ignore_start=False)
                 
                 # Pass the boolean to your ignore_start parameter
-                if self.is_direct_path_clear(n1, n2, margin=margin, target_crate_ids=None, ignore_start=is_connected_to_start):
+                if path_enable:
                     dist = math.hypot(n1[0]-n2[0], n1[1]-n2[1])
                     edges[n1].append((dist, n2))
                     edges[n2].append((dist, n1))
