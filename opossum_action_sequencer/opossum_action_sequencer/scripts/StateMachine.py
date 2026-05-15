@@ -41,6 +41,7 @@ class PickSM(IntEnum):
     PICK_DONE = auto()
     PICK_FAILED = auto()
     PICK_RETRY = auto()
+    PICK_RELEASE = auto()
 
 class ReleaseSM(IntEnum):
     """Release State Machine of the system."""

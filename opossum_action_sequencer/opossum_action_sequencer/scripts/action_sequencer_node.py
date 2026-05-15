@@ -1964,6 +1964,28 @@ class ActionManager(Node):
                 # On reboucle sur l'étape de prise de vue
                 self.sub_sm = PickSM.PICK_STARE
 
+            case PickSM.PICK_RELEASE:
+                id_side = self.payload.get("id_side")
+                
+                with self.data_lock:
+                    id_active_pliers = {}
+                    for pid, plier in self.pliers.items():
+                        if plier.state == -1 or pid // 4 != id_side:
+                            continue
+                        
+                        crate = self.haz_crates[plier.state]
+                        if crate.color in (-1, 2) or crate.color == self.color:
+                            id_active_pliers[pid] = ["drop", plier.state]
+                        else:
+                            id_active_pliers[pid] = ["rev_drop", plier.state]
+                    
+                    # Clear holding state natively
+                    for pl_id in id_active_pliers:
+                        self.pliers[pl_id].state = -1
+
+                self.send_plier_cmd(id_active_pliers, self.haz_crates)
+                self.sub_sm = PickSM.PICK_DONE
+
             case PickSM.PICK_FAILED:
                 self.global_sm = GlobalSM.NOP
                 self.sub_sm = GlobalSM.NOP
@@ -2356,6 +2378,15 @@ class ActionManager(Node):
             
         # If we survived all 4 axis checks, they are definitively colliding!
         return True
+
+    def is_in_any_zone(self, x, y):
+        for zone in self.zones.values():
+            zx = zone.x
+            zy = zone.y
+            hz = zone.size / 2.0 + 0.03 # Zone half-size plus margin to safely avoid
+            if abs(zx - x) < hz and abs(zy - y) < hz:
+                return True
+        return False
 
     def get_all_points_in_zone(self, id_zone, crate_dict):
         """
