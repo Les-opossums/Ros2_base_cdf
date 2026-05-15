@@ -187,7 +187,7 @@ class ActionManager(Node):
         self.loop_frequency = 10.0
         self.zone_cursor_pick = [1.1, 0.175]
         self.zone_cursor_release_id = 1
-        self.zone_pick_ignore = [0.175, 1.2]
+        self.zone_pick_ignore = [3.0 - 0.175, 1.2]
         self.entry_zone = [0.5, 1.1]
         self.cursor_in = [1.35, 0.2, 1.54]
         self.cursor_out = [0.73, 0.2, 1.54]
@@ -251,7 +251,8 @@ class ActionManager(Node):
             self.cursor_end_done = False
             self.activate_cursor = False
             self.release_end = False
-            
+            self.pick_start_done = False
+
             # 3. Libérer les événements de synchronisation
             self.motion_done = True
             self.break_engage = False
@@ -1075,6 +1076,28 @@ class ActionManager(Node):
                         crate.use_inverted = best_inv
                         crate.is_part_of_stack = stack_ids
 
+    def compute_init_payload(self):
+        group_crates = self.get_in_start_zone()
+        self.payload = {}
+        self.payload["crate_ids"] = [c.id for c in group_crates]
+        approach_distance = 0.32
+        mean_x = np.mean([c.x for c in group_crates])
+        mean_y = np.mean([c.y for c in group_crates])
+        mean_theta = mean_angle_mod_pi([c.theta for c in group_crates])
+        self.get_logger().info(f"x: {[c.x for c in group_crates]}, y: {[c.y for c in group_crates]}")
+        # Calculate Entry Points
+        entries = [
+            (mean_x - approach_distance * np.cos(mean_theta), mean_y - approach_distance * np.sin(mean_theta), False),
+            (mean_x + approach_distance * np.cos(mean_theta), mean_y + approach_distance * np.sin(mean_theta), True)
+        ]
+
+        for ex, ey, is_inv in entries:
+            if not self.is_point_safe(ex, ey):
+                continue
+            
+            self.payload["path"] = [(ex, ey)]
+            self.payload["inv"] = is_inv
+
     def update_release_reward(self):
         distance = 0.32
         for z_id, zone in list(self.zones.items()):
@@ -1521,7 +1544,8 @@ class ActionManager(Node):
         self.start_match_time = time.time()
         self.send_raw("VMAX 1.5")
         self.send_raw("VTMAX 3.0")
-        self.move_to(Position(x=self.entry_zone[0], y=self.entry_zone[1], t=self.robot_pos.t))
+        self.global_sm = GlobalSM.PICK
+        self.compute_init_payload()
         while not self._stop_event.is_set():
             start_local_time = time.time()
             try:
@@ -1541,30 +1565,25 @@ class ActionManager(Node):
 
     def main_loop(self):
         """Run main loop logic."""
-        if self.break_engage:
-            self.break_engage = False
-            self.motion_done = True
-            self.pliers_done = True
-            self.get_logger().info(f"Break engaged")
-            self.global_sm = GlobalSM.NOP
-            self.sub_sm = GlobalSM.NOP
+        if not self.pick_start_done:
+            pass
 
-        if time.time() - self.start_match_time > self.match_time * 3 / 4:
+        elif not self.end_far_zone and time.time() - self.start_match_time > self.match_time * 3 / 4:
             self.end_far_zone = True
-        if time.time() - self.start_match_time > self.match_time - 0.2:
+    
+        elif time.time() - self.start_match_time > self.match_time - 0.2:
             if self.global_sm not in (GlobalSM.STOP, GlobalSM.FINISH):
                 self.get_logger().warn("Stop sequence active! Overriding to STOP.")
                 self.global_sm = GlobalSM.STOP
                 self.sub_sm = GlobalSM.NOP
 
-        elif time.time() - self.start_match_time > self.match_time - 0.1:
-            if self.global_sm not in GlobalSM.GOHOME and not self.arrived_home:
-                self.get_logger().warn("Backstage sequence active! Overriding to GOHOME.")
-                self.global_sm = GlobalSM.GOHOME
-                self.sub_sm = GlobalSM.NOP
-                path_e, _, _ = self.get_best_path(self.entry_zone)
-                self.payload = {"path": path_e}
-        
+        elif self.break_engage:
+            self.break_engage = False
+            self.motion_done = True
+            self.pliers_done = True
+            self.global_sm = GlobalSM.NOP
+            self.sub_sm = GlobalSM.NOP
+    
         elif self.global_sm == GlobalSM.NOP:
             if self.cursor_begin_done and not self.cursor_end_done:
                 self.cursor_end_done = True
@@ -1577,7 +1596,7 @@ class ActionManager(Node):
             self.sub_sm = GlobalSM.NOP
             self.payload = payload
 
-        if self.obstacle_detected and self.global_sm not in (GlobalSM.STOP, GlobalSM.FINISH):
+        if self.pick_start_done and self.obstacle_detected and self.global_sm not in (GlobalSM.STOP, GlobalSM.FINISH):
             self.get_logger().info(f"Obstacle detected by {self.get_namespace()}, enemy at {self.enemy_pos}. Recomputing...")
             self.global_sm = GlobalSM.NOP
             self.sub_sm = GlobalSM.NOP
@@ -1754,6 +1773,7 @@ class ActionManager(Node):
                     self.move_to(Position(x=next_point[0], y=next_point[1], t=self.payload["final_robot_theta"]))
 
             case PickSM.PICK_STARE:
+                self.pick_start_done = True
                 if self.count > int(self.time_stare * self.loop_frequency):
                     self.sub_sm = PickSM.PICK_UPDATE
                     self.count = 0
@@ -2271,6 +2291,27 @@ class ActionManager(Node):
         # If we survived all 4 axis checks, they are definitively colliding!
         return True
     
+    def get_in_start_zone(self):
+        """
+        Checks if ANY part of a rotated crate (0.15m x 0.05m) is inside the zone.
+        Uses the Separating Axis Theorem (SAT) for OBB-AABB collision.
+        """
+
+        zx = self.boundaries[1] - self.zone_pick_ignore[0]
+        zy = self.zone_pick_ignore[1]
+        hz = 0.25  # Zone half-size
+        
+        start_crate = []
+        for c in self.haz_crates.values():
+            if c.state != -1:
+                continue
+
+            # Crates are already in global map coordinates, so no transform needed!
+            if abs(zx - c.x) < hz and abs(zy - c.y) < hz:
+                start_crate.append(c)
+        
+        return start_crate
+
     def in_ignore_zone(self):
         """
         Checks if ANY part of a rotated crate (0.15m x 0.05m) is inside the zone.
@@ -2285,12 +2326,9 @@ class ActionManager(Node):
             if c.state != -1:
                 continue
             # Crates are already in global map coordinates, so no transform needed!
-            if  abs(zx - c.x) < hz:
+            if abs(zx - c.x) < hz and abs(zy - c.y) < hz:
                 rm_id.append(c.id)
             
-            if abs(zy - c.y) < hz:
-                rm_id.append(c.id)
-        
         for rid in rm_id:
             if rid in self.haz_crates:
                 del self.haz_crates[rid]
