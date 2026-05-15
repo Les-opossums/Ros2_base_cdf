@@ -1096,6 +1096,7 @@ class ActionManager(Node):
                 continue
             
             self.payload["path"] = [(ex, ey)]
+            self.payload["save_path"] = [(ex, ey)]
             self.payload["inv"] = is_inv
 
     def update_release_reward(self):
@@ -1568,6 +1569,7 @@ class ActionManager(Node):
         if not self.pick_start_done:
             if self.obstacle_detected:
                 self.get_logger().info(f"Obstacle detected at start")
+                self.payload["path"] = self.payload["save_path"].copy()
                 self.sub_sm = PickSM.PICK_INIT
 
         elif not self.end_far_zone and time.time() - self.start_match_time > self.match_time * 3 / 4:
