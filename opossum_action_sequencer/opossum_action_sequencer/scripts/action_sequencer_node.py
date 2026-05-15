@@ -296,7 +296,7 @@ class ActionManager(Node):
         self.coeff_penalty_cursor = 15.0
         self.get_logger().info("Match (ré)initialisé avec succès. En attente du LEASH...")    
 
-    def is_point_safe(self, x, y):
+    def is_point_safe(self, x, y, ignore_enemi=False):
         """Check if a point is within boundaries and outside forbidden zones."""
         # 1. Check outer boundaries
         if not (self.safe_x_min <= x <= self.safe_x_max and self.safe_y_min <= y <= self.safe_y_max):
@@ -1055,7 +1055,7 @@ class ActionManager(Node):
                     continue
                 
                 # Check Path
-                path, dist, critical_level = self.get_best_path((ex, ey), target_crate_ids=stack_ids, allow_critical=False)
+                path, dist, critical_level = self.get_best_path((ex, ey))
 
                 if critical_level <= best_critical and dist < best_dist:
                     best_dist = dist
@@ -1102,7 +1102,7 @@ class ActionManager(Node):
                     
                 target_pos = (pos[0], pos[1])
                 
-                path, dist, critical_level = self.get_best_path(target_pos, allow_critical=False)
+                path, dist, critical_level = self.get_best_path(target_pos)
 
                 if dist < best_dist:
                     best_dist = dist
@@ -1564,7 +1564,7 @@ class ActionManager(Node):
                 self.get_logger().warn("Backstage sequence active! Overriding to GOHOME.")
                 self.global_sm = GlobalSM.GOHOME
                 self.sub_sm = GlobalSM.NOP
-                path_e, _, _ = self.get_best_path(self.entry_zone, allow_critical=True)
+                path_e, _, _ = self.get_best_path(self.entry_zone)
                 self.payload = {"path": path_e}
         
         elif self.global_sm == GlobalSM.NOP:
@@ -1683,13 +1683,13 @@ class ActionManager(Node):
             if not hasattr(self, 'id_steal'): self.id_steal = 0
 
             pos = self.steal_poses[self.id_steal % len(self.steal_poses)]
-            path, dst_test, critic_level = self.get_best_path((pos[0], pos[1]), allow_critical=True)
+            path, dst_test, critic_level = self.get_best_path((pos[0], pos[1]))
             best_path = path
             attempts = 0
             dst = 10000
             while attempts < len(self.steal_poses) - 1 and critic_level > 2:
                 pos = self.steal_poses[self.id_steal % len(self.steal_poses)]
-                path, dst_test, critic_level = self.get_best_path((pos[0], pos[1]), allow_critical=True)
+                path, dst_test, critic_level = self.get_best_path((pos[0], pos[1]))
                 if dst_test < dst:
                     dst = dst_test
                     best_path = path.copy()
@@ -1697,7 +1697,7 @@ class ActionManager(Node):
                 self.id_steal += 1
 
             if dst_test > 100:
-                if not self.is_point_safe(self.robot_pos.x, self.robot_pos.y):
+                if not self.is_point_safe(self.robot_pos.x, self.robot_pos.y, ignore_enemi=True):
                     return GlobalSM.GOBOARD, {}
                 return GlobalSM.NOP, {}
             return GlobalSM.EXPLORE, {"path": best_path}
@@ -2004,7 +2004,7 @@ class ActionManager(Node):
         match self.sub_sm:
             case GlobalSM.NOP:
                 self.sub_sm = CursorSM.CURSOR_NAV
-                self.payload['path'], _, _ = self.get_best_path((self.cursor_in[0], self.cursor_in[1] + 0.3), allow_critical=True)
+                self.payload['path'], _, _ = self.get_best_path((self.cursor_in[0], self.cursor_in[1] + 0.3))
                 
             case CursorSM.CURSOR_NAV:
                 if not self.payload["path"]:
@@ -2086,7 +2086,7 @@ class ActionManager(Node):
             case GoHomeSM.GOHOME_NAV_E_ZONE:
                 if not self.payload["path"]:
                     self.sub_sm = GoHomeSM.GOHOME_NAV_FINAL
-                    self.payload["final_path"], _, _ = self.get_best_path((self.final_zone["x"], self.final_zone["y"]), allow_critical=True)
+                    self.payload["final_path"], _, _ = self.get_best_path((self.final_zone["x"], self.final_zone["y"]))
                 else:
                     next_point = self.payload["path"].pop(0)
                     self.move_to(Position(x=next_point[0], y=next_point[1]))
@@ -2402,7 +2402,7 @@ class ActionManager(Node):
             self.coeff_release_dst * val_dst + 
             self.coeff_release_enn * val_ennemi + 
             self.coeff_release_center * val_center + 
-            self.coeff_critical_level * critical_level +
+            self.coeff_critical_level * critical_level ** 2 +
             self.coeff_far_zone * val_enn_zone +
             penalty_cursor
         )
@@ -2422,7 +2422,7 @@ class ActionManager(Node):
             self.coeff_pick_enn * val_ennemi + 
             self.coeff_pick_center * val_center + 
             self.coeff_pick_num * num_crates + 
-            self.coeff_critical_level * critical_level +
+            self.coeff_critical_level * critical_level ** 2 +
             self.coeff_far_zone * val_enn_zone
         )
 
@@ -2512,11 +2512,11 @@ class ActionManager(Node):
         def add_edge(n1, n2):
             if n1 != n2:
                 if n1 == start:
-                    path_enable = self.is_direct_path_clear(n1, n2, margin=margin, target_crate_ids=None, ignore_start=True)
+                    path_enable = self.is_direct_path_clear(n1, n2, margin=margin, ignore_start=True)
                 elif n2 == start:
-                    path_enable = self.is_direct_path_clear(n2, n1, margin=margin, target_crate_ids=None, ignore_start=True)
+                    path_enable = self.is_direct_path_clear(n2, n1, margin=margin, ignore_start=True)
                 else:
-                    path_enable = self.is_direct_path_clear(n1, n2, margin=margin, target_crate_ids=None, ignore_start=False)
+                    path_enable = self.is_direct_path_clear(n1, n2, margin=margin, ignore_start=False)
                 
                 # Pass the boolean to your ignore_start parameter
                 if path_enable:
@@ -2555,18 +2555,11 @@ class ActionManager(Node):
                     
         return [], float('inf')
 
-    def is_direct_path_clear(self, start_pos, target_pos, margin, target_crate_ids=None, ignore_start=False):
+    def is_direct_path_clear(self, start_pos, target_pos, margin, ignore_start=False):
         """Checks if the straight line hits crates, the forbidden zone, OR the enemy."""
         x1, y1 = start_pos
         x2, y2 = target_pos
         
-        target_crate_ids = None
-        # Normalize target_crate_ids to always be a list
-        if target_crate_ids is None:
-            target_crate_ids = []
-        elif not isinstance(target_crate_ids, list):
-            target_crate_ids = [target_crate_ids]
-
         # --- Quick check if start or end are fundamentally unsafe ---
         if not ignore_start and not self.is_point_safe(x1, y1):
             return False
@@ -2606,8 +2599,8 @@ class ActionManager(Node):
                     return False
 
         # --- Check against crates ---
-        for cid, crate in self.haz_crates.items():
-            if cid in target_crate_ids or crate.state != -1:
+        for crate in self.haz_crates.values(): 
+            if crate.state != -1:
                 continue
 
             # Calculate RAW t
@@ -2619,21 +2612,19 @@ class ActionManager(Node):
             closest_x = x1 + t_raw * dx
             closest_y = y1 + t_raw * dy
             
-            if math.hypot(crate.x - closest_x, crate.y - closest_y) < margin:
+            if (crate.x - closest_x) ** 2 + (crate.y - closest_y) ** 2 < margin ** 2:
                 return False
                  
         return True
     
-    def get_best_path(self, target_pos, target_crate_ids=None, allow_critical=False):
+    def get_best_path(self, target_pos):
         """
-        - If allow_critical=False: Returns path ONLY if 0.35m margin is respected.
-        - If allow_critical=True: Tries 0.35m, then 0.23m, then returns direct line 
         no matter what (Best Effort).
         """
         start_pos = (self.robot_pos.x, self.robot_pos.y)
 
         # --- 1. TRY THE SAFE WAY ---
-        if self.is_direct_path_clear(start_pos, target_pos, margin=self.classic_margin, target_crate_ids=target_crate_ids, ignore_start=True):
+        if self.is_direct_path_clear(start_pos, target_pos, margin=self.classic_margin, ignore_start=True):
             return [start_pos, target_pos], math.hypot(target_pos[0]-start_pos[0], target_pos[1]-start_pos[1]), 0
 
         path, cost = self.get_street_grid_path(start_pos, target_pos, margin=self.classic_margin)
@@ -2645,16 +2636,13 @@ class ActionManager(Node):
         # --- 3. ALLOWED TO BE RISKY: TRY CRITICAL ---
         self.get_logger().info("Strict path blocked. Attempting Critical Margin.")
 
-        if self.is_direct_path_clear(start_pos, target_pos, margin=self.critical_margin, target_crate_ids=target_crate_ids, ignore_start=True):
+        if self.is_direct_path_clear(start_pos, target_pos, margin=self.critical_margin, ignore_start=True):
             return [start_pos, target_pos], math.hypot(target_pos[0]-start_pos[0], target_pos[1]-start_pos[1]), 2
 
         path, cost = self.get_street_grid_path(start_pos, target_pos, margin=self.critical_margin)
         if path:
             return path, cost, 2
         
-        if not allow_critical:
-            return [], float('inf'), 3
-
         path, cost = self.get_street_grid_path(start_pos, target_pos, margin=0)
         if path:
             return path, cost, 3
