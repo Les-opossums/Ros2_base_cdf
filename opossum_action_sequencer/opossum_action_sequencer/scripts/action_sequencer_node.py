@@ -1567,6 +1567,7 @@ class ActionManager(Node):
         """Run main loop logic."""
         if not self.pick_start_done:
             if self.obstacle_detected:
+                self.get_logger().info(f"Obstacle detected at start")
                 self.sub_sm = PickSM.PICK_INIT
 
         elif not self.end_far_zone and time.time() - self.start_match_time > self.match_time * 3 / 4:
