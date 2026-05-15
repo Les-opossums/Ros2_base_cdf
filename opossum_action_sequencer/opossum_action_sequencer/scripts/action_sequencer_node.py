@@ -187,6 +187,7 @@ class ActionManager(Node):
         self.loop_frequency = 10.0
         self.zone_cursor_pick = [1.1, 0.175]
         self.zone_cursor_release_id = 1
+        self.zone_pick_ignore = [0.175, 1.2]
         self.entry_zone = [0.5, 1.1]
         self.cursor_in = [1.35, 0.2, 1.54]
         self.cursor_out = [0.73, 0.2, 1.54]
@@ -897,6 +898,9 @@ class ActionManager(Node):
             self.zone_cursor_pick[0] = self.boundaries[1] - self.zone_cursor_pick[0]
             self.zone_cursor_release_id = 7
             self.pince_cursor = 5
+            self.zone_pick_ignore[0] = self.boundaries[1] - self.zone_pick_ignore[0]
+        self.in_ignore_zone()
+
 
     def feedback_callback(self, msg):
         """Receive the data from Zynq."""
@@ -2269,6 +2273,30 @@ class ActionManager(Node):
         # If we survived all 4 axis checks, they are definitively colliding!
         return True
     
+    def in_ignore_zone(self):
+        """
+        Checks if ANY part of a rotated crate (0.15m x 0.05m) is inside the zone.
+        Uses the Separating Axis Theorem (SAT) for OBB-AABB collision.
+        """
+        zx = self.zone_pick_ignore[0]
+        zy = self.zone_pick_ignore[1]
+        hz = 0.25  # Zone half-size
+        
+        rm_id = []
+        for c in self.haz_crates.values():
+            if c.state != -1:
+                continue
+            # Crates are already in global map coordinates, so no transform needed!
+            if  abs(zx - c.x) < hz:
+                rm_id.append(c.id)
+            
+            if abs(zy - c.y) < hz:
+                rm_id.append(c.id)
+        
+        for rid in rm_id:
+            if rid in self.haz_crates:
+                del self.haz_crates[rid]
+
     def in_cursor_zone(self, x, y):
         """
         Checks if ANY part of a rotated crate (0.15m x 0.05m) is inside the zone.
