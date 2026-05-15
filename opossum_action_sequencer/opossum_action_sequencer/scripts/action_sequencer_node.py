@@ -1566,7 +1566,8 @@ class ActionManager(Node):
     def main_loop(self):
         """Run main loop logic."""
         if not self.pick_start_done:
-            pass
+            if self.obstacle_detected:
+                self.sub_sm = PickSM.PICK_INIT
 
         elif not self.end_far_zone and time.time() - self.start_match_time > self.match_time * 3 / 4:
             self.end_far_zone = True
