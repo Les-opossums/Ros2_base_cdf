@@ -1568,6 +1568,7 @@ class ActionManager(Node):
         """Run main loop logic."""
         if not self.pick_start_done:
             if self.obstacle_detected:
+                self.motion_done = True
                 self.get_logger().info(f"Obstacle detected at start")
                 self.payload["path"] = self.payload["save_path"].copy()
                 self.sub_sm = PickSM.PICK_INIT
