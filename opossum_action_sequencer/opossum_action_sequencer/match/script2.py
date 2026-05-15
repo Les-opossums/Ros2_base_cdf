@@ -17,10 +17,13 @@ class Script():
         node.move_to(Position(2.7, 0.9), seuil=0.05)
         node.wait_for_motion()
 
-        while time.time() - start_match_time < 85:
-            node.move_to(Position(2.5, 1.3), seuil=0.05)
-            node.wait_for_motion()
+        while time.time() - start_match_time < 10000:
+            for k in range(7):
+                vmax = 0.2 + k*0.2
 
-            if time.time() - start_match_time < 85:
-                node.move_to(Position(2.5, 0.3), seuil=0.05)
+                node.send_raw(f"VMAX {vmax}")
+                node.move_to(Position(0.5, 0.45), seuil=0.05)
+                node.wait_for_motion()
+
+                node.move_to(Position(2.5, 0.45), seuil=0.05)
                 node.wait_for_motion()

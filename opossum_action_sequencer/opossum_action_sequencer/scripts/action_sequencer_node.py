@@ -304,7 +304,13 @@ class ActionManager(Node):
         # 2. Check forbidden zone
         if self.f_zone_y_min <= y:
             return False
-            
+        
+        if not self.enemy_pos:
+            return True
+        
+        if (self.enemy_pos.x - x) ** 2 + (self.enemy_pos.y - y) ** 2 < (self.robot_radius * 3) ** 2:
+            return False
+
         return True
 
     def _init_mapping(self):
@@ -671,7 +677,7 @@ class ActionManager(Node):
 
         if camera_target is None:
             camera_target = []
-        self.get_logger().debug(f"Staring... focusing on camera {camera_target}")
+        self.get_logger().info(f"Staring... focusing on camera {camera_target}")
         
         # 1. Wait for physical motion blur to clear
         current_time = time.time()
@@ -686,7 +692,7 @@ class ActionManager(Node):
 
             # 2. Grab the latest message in the buffer
             if not msg.object:
-                self.get_logger().debug(f"Stare complete: No objects currently visible for camera {key}.")
+                self.get_logger().info(f"Stare complete: No objects currently visible for camera {key}.")
                 continue
 
             # =====================================================================
@@ -696,12 +702,16 @@ class ActionManager(Node):
             cos_t = math.cos(self.robot_pos.t)
             sin_t = math.sin(self.robot_pos.t)
 
+            # self.get_logger().info(f"For camera {key}:")
             for det in msg.object:
+                # self.get_logger().info(f"Det {det.x} {det.y}")
                 # Filter noise/chassis (too close) and far objects
                 if det.x ** 2 + det.y ** 2 < 0.05 and det.z > 0.17:
                     continue
                 if det.x ** 2 + det.y ** 2 > 1.0 ** 2:
                     continue
+
+                # self.get_logger().info(f"CAMERA {key}: {}")
                     
                 world_det = SimpleNamespace()
                 world_det.id = det.id
@@ -778,7 +788,7 @@ class ActionManager(Node):
                     if key in camera_target:
                         crates_seen_by_target.append(new_crate)
                         
-                    self.get_logger().debug(f"Tracking: Discovered new crate! ID: {new_id} at X:{det.x:.2f} Y:{det.y:.2f} via Cam {key}")
+                    self.get_logger().info(f"Tracking: Discovered new crate! ID: {new_id} at X:{det.x:.2f} Y:{det.y:.2f} via Cam {key}")
 
         # =====================================================================
         # 6. GHOST CLEANUP (Targeted by FOV)
@@ -810,7 +820,7 @@ class ActionManager(Node):
                 
                 # Execute cleanup
                 for cid in to_delete:
-                    self.get_logger().debug(f"Ghost cleanup: Crate {cid} vanished from camera {ct}'s FOV. Deleting.")
+                    self.get_logger().info(f"Ghost cleanup: Crate {cid} vanished from camera {ct}'s FOV. Deleting.")
                     del crate_dict[cid]
 
         return crates_seen_by_target
@@ -948,8 +958,7 @@ class ActionManager(Node):
                         # If firmware reports 0 while we expected a success
                         if not success_bit and plier.state != -1:
                             crate = self.haz_crates[plier.state]
-                            self.get_logger().debug(f"The {label} plier of ID {cmd_id} failed.")
-                            
+
                             # Reset tracking
                             crate.state = -1
                             crate.attempts += 1
@@ -1038,13 +1047,11 @@ class ActionManager(Node):
             best_critical = 5
 
             for ex, ey, is_inv in entries:
-                if not (self.boundaries[0] + self.robot_radius <= ex <= self.boundaries[1] - self.robot_radius and self.boundaries[2] + self.robot_radius <= ey <= self.boundaries[3] - self.robot_radius):
+                if not self.is_point_safe(ex, ey):
                     continue
-                    
-                target_pos = (ex, ey)
                 
                 # Check Path
-                path, dist, critical_level = self.get_best_path(target_pos, target_crate_ids=stack_ids, allow_critical=False)
+                path, dist, critical_level = self.get_best_path((ex, ey), target_crate_ids=stack_ids, allow_critical=False)
 
                 if critical_level <= best_critical and dist < best_dist:
                     best_dist = dist
@@ -1510,7 +1517,7 @@ class ActionManager(Node):
         """Run the threaded loop."""
         period = 1.0 / self.loop_frequency
         self.start_match_time = time.time()
-        self.send_raw("VMAX 0.2")
+        self.send_raw("VMAX 1.5")
         self.send_raw("VTMAX 3.0")
         self.move_to(Position(x=self.entry_zone[0], y=self.entry_zone[1], t=self.robot_pos.t))
         while not self._stop_event.is_set():
@@ -1584,7 +1591,7 @@ class ActionManager(Node):
         if (not self.motion_done or not self.pliers_done) and self.global_sm != GlobalSM.STOP: # or time.time() - self.last_enemy_detected < 5.0:
             return
         
-        if time.time() - self.start_match_time > 85.0:
+        if not self.release_end and time.time() - self.start_match_time > 85.0:
             self.send_raw("VMAX 0.3")
             self.release_end = True
 
@@ -1704,6 +1711,8 @@ class ActionManager(Node):
                     # OPTIMISATION : Trouver la face qui nécessite le moins de rotation
                     with self.data_lock:
                         target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["crate_ids"]])
+                        target_pos.t = mean_angle_mod_pi([self.haz_crates[pid].theta for pid in self.payload["crate_ids"]])
+
                         self.payload["close_cursor"] = self.in_cursor_zone(target_pos.x, target_pos.y)
 
                         best_side_ids = available_sides[0]
@@ -1722,7 +1731,6 @@ class ActionManager(Node):
                     selected_pliers_ids = best_side_ids
                     self.payload["selected_pliers_ids"] = selected_pliers_ids
                     with self.data_lock:
-                        target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["crate_ids"]])
                         pliers_pos = self.get_mean_pose([self.pliers[pid] for pid in selected_pliers_ids])
                         
                     target_angle = target_pos.t + (np.pi if self.payload["inv"] else 0.0)
@@ -1730,6 +1738,7 @@ class ActionManager(Node):
                 else: 
                     self.get_logger().info(f"Initiating Pick Sequence with an unknown path...")
                     target_pos = self.get_mean_pose([self.haz_crates[pid] for pid in self.payload["crate_ids"]])
+                    target_pos.t = mean_angle_mod_pi([self.haz_crates[pid].theta for pid in self.payload["crate_ids"]])
                     self.payload["close_cursor"] = self.in_cursor_zone(target_pos.x, target_pos.y)
                 self.sub_sm = PickSM.PICK_NAV
                 self.payload["retries"] = 0
@@ -1748,7 +1757,7 @@ class ActionManager(Node):
                     self.count = 0
                 else:
                     if self.count == 0:
-                        self.get_logger().debug(f"Staring for a sec")
+                        self.get_logger().info(f"Staring for a sec")
                         self.payload["stare_pos"] = Position(x=self.robot_pos.x, y=self.robot_pos.y, t=self.robot_pos.t)
                     self.count += 1
 
@@ -1876,7 +1885,7 @@ class ActionManager(Node):
                     remaining_targets = [tid for tid in pick_targets if tid in self.haz_crates]
                     
                     if not remaining_targets:
-                        self.get_logger().debug("All targets vanished during approach! Aborting.")
+                        self.get_logger().info("All targets vanished during approach! Aborting.")
                         self.sub_sm = PickSM.PICK_FAILED
                         return 
 
@@ -2058,7 +2067,7 @@ class ActionManager(Node):
                     self.count = 0
                 else:
                     if self.count == 0:
-                        self.get_logger().debug(f"Staring for a sec")
+                        self.get_logger().info(f"Staring for a sec")
                     self.count += 1
 
             case ExploreSM.EXPLORE_UPDATE:
@@ -2363,7 +2372,7 @@ class ActionManager(Node):
         """Calculates the score of a specific release pose using actual path distance."""
         
         val_center = (1.5 - px) ** 2 + (1 - py) ** 2
-        val_enn_zone = abs(self.boundaries[self.color] - px) * int(self.end_far_zone)
+        val_enn_zone = 1.5 - abs(1.5 - px) * int(self.end_far_zone)
         # Use the TRUE path distance, not just a straight line guess!
         val_dst = path_distance**2 
         
@@ -2468,13 +2477,12 @@ class ActionManager(Node):
         
         start = pt(*start)
         target = pt(*target)
-        nodes = set([start, target])
+        # Start and target are secured in the set here, they will never be removed
+        nodes = set([start, target]) 
         
         # --- NEW: Use safe boundaries for the street grid ---
-        x_lines = [0.45, 0.8, 1.15, 1.5, 1.85 ,2.2 ,2.55, start[0], target[0]]
+        x_lines = [0.45, 0.8, 1.15, 1.5, 1.85, 2.2, 2.55, start[0], target[0]]
         y_lines = [0.45, 1.125, start[1], target[1]]
-        # x_lines = [self.safe_x_min, self.safe_x_max, start[0], target[0]]
-        # y_lines = [self.safe_y_min + 0.2, self.f_zone_y_min, start[1], target[1]]
         
         # 1. Add the intersections (ONLY if they are safe)
         for x in x_lines:
@@ -2487,8 +2495,11 @@ class ActionManager(Node):
         
         def add_edge(n1, n2):
             if n1 != n2:
-                # Verify the edge doesn't cut through the forbidden zone OR the enemy
-                if self.is_direct_path_clear(n1, n2, margin=margin, target_crate_ids=None):
+                # Detect if either end of this edge is the starting position
+                is_connected_to_start = (n1 == start) or (n2 == start)
+                
+                # Pass the boolean to your ignore_start parameter
+                if self.is_direct_path_clear(n1, n2, margin=margin, target_crate_ids=None, ignore_start=is_connected_to_start):
                     dist = math.hypot(n1[0]-n2[0], n1[1]-n2[1])
                     edges[n1].append((dist, n2))
                     edges[n2].append((dist, n1))
@@ -2524,7 +2535,7 @@ class ActionManager(Node):
                     
         return [], float('inf')
 
-    def is_direct_path_clear(self, start_pos, target_pos, margin, target_crate_ids=None):
+    def is_direct_path_clear(self, start_pos, target_pos, margin, target_crate_ids=None, ignore_start=False):
         """Checks if the straight line hits crates, the forbidden zone, OR the enemy."""
         x1, y1 = start_pos
         x2, y2 = target_pos
@@ -2537,7 +2548,10 @@ class ActionManager(Node):
             target_crate_ids = [target_crate_ids]
 
         # --- Quick check if start or end are fundamentally unsafe ---
-        if not self.is_point_safe(x1, y1) or not self.is_point_safe(x2, y2):
+        if not ignore_start and not self.is_point_safe(x1, y1):
+            return False
+ 
+        if not self.is_point_safe(x2, y2):
             return False
 
         dx = x2 - x1
@@ -2599,7 +2613,7 @@ class ActionManager(Node):
         start_pos = (self.robot_pos.x, self.robot_pos.y)
 
         # --- 1. TRY THE SAFE WAY ---
-        if self.is_direct_path_clear(start_pos, target_pos, margin=self.classic_margin, target_crate_ids=target_crate_ids):
+        if self.is_direct_path_clear(start_pos, target_pos, margin=self.classic_margin, target_crate_ids=target_crate_ids, ignore_start=True):
             return [start_pos, target_pos], math.hypot(target_pos[0]-start_pos[0], target_pos[1]-start_pos[1]), 0
 
         path, cost = self.get_street_grid_path(start_pos, target_pos, margin=self.classic_margin)
@@ -2609,9 +2623,9 @@ class ActionManager(Node):
         # --- 2. IF NOT ALLOWED TO BE RISKY, STOP HERE ---
 
         # --- 3. ALLOWED TO BE RISKY: TRY CRITICAL ---
-        self.get_logger().debug("Strict path blocked. Attempting Critical Margin.")
+        self.get_logger().info("Strict path blocked. Attempting Critical Margin.")
 
-        if self.is_direct_path_clear(start_pos, target_pos, margin=self.critical_margin, target_crate_ids=target_crate_ids):
+        if self.is_direct_path_clear(start_pos, target_pos, margin=self.critical_margin, target_crate_ids=target_crate_ids, ignore_start=True):
             return [start_pos, target_pos], math.hypot(target_pos[0]-start_pos[0], target_pos[1]-start_pos[1]), 2
 
         path, cost = self.get_street_grid_path(start_pos, target_pos, margin=self.critical_margin)
