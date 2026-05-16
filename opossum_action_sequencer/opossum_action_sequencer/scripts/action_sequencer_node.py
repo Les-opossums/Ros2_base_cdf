@@ -1924,6 +1924,7 @@ class ActionManager(Node):
 
                 self.send_plier_cmd(dict_sel_pliers, self.haz_crates)
                 px, py = self.payload["pos_crates"]
+                self.get_logger().info(f"POS Crates: {px}, {py}")
                 if self.is_in_any_zone(px, py):
                     self.sub_sm = PickSM.PICK_RELEASE
                 else:
@@ -2388,6 +2389,7 @@ class ActionManager(Node):
 
     def is_in_any_zone(self, x, y):
         for zone in self.zones.values():
+            self.get_logger().info(f"ZONE: {zx}, {zy}")
             zx = zone.x
             zy = zone.y
             hz = zone.size / 2.0 + 0.03 # Zone half-size plus margin to safely avoid
