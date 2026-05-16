@@ -1971,6 +1971,7 @@ class ActionManager(Node):
 
             case PickSM.PICK_RELEASE:
                 sel_pl_ids = self.payload["final_selected_pliers_ids"]
+                self.get_logger().info(f"releasing after detection of stack in zone: {sel_pl_ids}")
 
                 with self.data_lock:
                     id_active_pliers = {}
