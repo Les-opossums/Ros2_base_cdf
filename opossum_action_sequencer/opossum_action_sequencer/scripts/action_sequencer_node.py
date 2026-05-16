@@ -1854,7 +1854,7 @@ class ActionManager(Node):
                         actual_stack_crates = [self.haz_crates[tid] for tid in best_stack_ids]
                         target_pos = self.get_mean_pose(actual_stack_crates)
                         target_pos.t = mean_angle_mod_pi([crate.theta for crate in actual_stack_crates])
-
+                        self.payload["pos_crates"] = (target_pos.x, target_pos.y)
                         # Shift pliers configuration to match the new size of the stack
                         sel_pl_ids = self.payload["selected_pliers_ids"]
                         new_pliers_selected = list(range(sel_pl_ids[0], sel_pl_ids[0] + len(best_stack_ids)))
@@ -1923,7 +1923,11 @@ class ActionManager(Node):
                         dict_sel_pliers[pl_id] = ["pick", best_obj_id]
 
                 self.send_plier_cmd(dict_sel_pliers, self.haz_crates)
-                self.sub_sm = PickSM.PICK_DONE
+                px, py = self.payload["pos_crates"]
+                if self.is_in_any_zone(px, py):
+                    self.sub_sm = PickSM.PICK_RELEASE
+                else:
+                    self.sub_sm = PickSM.PICK_DONE
 
             case PickSM.PICK_DONE:
                 # 1. On compte combien de pinces ont réussi
@@ -1965,12 +1969,15 @@ class ActionManager(Node):
                 self.sub_sm = PickSM.PICK_STARE
 
             case PickSM.PICK_RELEASE:
-                id_side = self.payload.get("id_side")
-                
+                sel_pl_ids = self.payload["final_selected_pliers_ids"]
+
                 with self.data_lock:
                     id_active_pliers = {}
                     for pid, plier in self.pliers.items():
-                        if plier.state == -1 or pid // 4 != id_side:
+                        if pid not in sel_pl_ids:
+                            continue
+
+                        if plier.state == -1:
                             continue
                         
                         crate = self.haz_crates[plier.state]
