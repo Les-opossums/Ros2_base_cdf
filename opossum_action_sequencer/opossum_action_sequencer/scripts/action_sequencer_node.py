@@ -2389,10 +2389,10 @@ class ActionManager(Node):
 
     def is_in_any_zone(self, x, y):
         for zone in self.zones.values():
-            self.get_logger().info(f"ZONE: {zx}, {zy}")
             zx = zone.x
             zy = zone.y
             hz = zone.size / 2.0 + 0.03 # Zone half-size plus margin to safely avoid
+            self.get_logger().info(f"ZONE: {zx}, {zy}")
             if abs(zx - x) < hz and abs(zy - y) < hz:
                 return True
         return False
