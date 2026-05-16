@@ -1092,7 +1092,7 @@ class ActionManager(Node):
         ]
 
         for ex, ey, is_inv in entries:
-            if not self.is_point_safe(ex, ey):
+            if not self.is_point_safe(ex, ey, ignore_enemi=True):
                 continue
             
             self.payload["path"] = [(ex, ey)]
