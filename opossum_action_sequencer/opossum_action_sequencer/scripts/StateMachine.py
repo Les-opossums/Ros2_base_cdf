@@ -14,6 +14,7 @@ class GlobalSM(IntEnum):
     FINISH = auto()
     CURSOR = auto()
     GOBOARD = auto()
+    FINISHSEQUENCESM = auto()
 
 class GoBoardSM(IntEnum):
     """GoBoard State Machine."""
@@ -71,6 +72,16 @@ class ExploreSM(IntEnum):
     EXPLORE_UPDATE = auto()
     EXPLORE_DONE = auto()   
 
+class FinishSequenceSM(IntEnum):
+    """Finish Sequence State Machine of the system."""
+
+    FINISH_SEQUENCE_INIT = auto()
+    FINISH_SEQUENCE_NAV = auto()
+    FINISH_SEQUENCE_MOVE = auto()
+    FINISH_SEQUENCE_DOWN = auto()
+    FINISH_SEQUENCE_DROP = auto()
+    FINISH_SEQUENCE_DONE = auto()
+
 class StopSM(IntEnum):
     """Stop State Machine of the system."""
 
@@ -84,6 +95,7 @@ _SUB_STATE_MAP = {
     GlobalSM.PICK: PickSM,
     GlobalSM.RELEASE: ReleaseSM,
     GlobalSM.GOHOME: GoHomeSM,
+    GlobalSM.FINISHSEQUENCESM: FinishSequenceSM,
 }
 
 

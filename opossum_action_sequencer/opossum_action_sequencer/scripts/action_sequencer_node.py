@@ -45,6 +45,7 @@ from opossum_action_sequencer.scripts.StateMachine import (
     StopSM,
     CursorSM,
     GoBoardSM,
+    FinishSequenceSM,
 )
 
 def are_angles_close(angle1, angle2, tolerance=0.01):
@@ -191,6 +192,9 @@ class ActionManager(Node):
         self.entry_zone = [0.5, 1.1]
         self.cursor_in = [1.35, 0.2, 1.54]
         self.cursor_out = [0.73, 0.2, 1.54]
+        self.finish_strat_pos = [2.5, 1.38, -1.54]
+        self.second_finish_pos = [2.0, 1.10, 0.5]
+        self.finish_middle_zone_seq = [2.55, 0.8, self.finish_strat_pos[2]]
         self.pince_cursor = 4
         self.steal_poses = [[0.65, 1.10], [0.90, 1.10], [1.20, 1.10], [1.50, 1.10], [1.80, 1.10], [2.10, 1.10], [2.35, 1.10], 
                             [0.65, 0.80],                                                                       [2.35, 0.80],
@@ -223,11 +227,16 @@ class ActionManager(Node):
     @property
     def coeff_release(self):
         add_end = 500 if self.release_end else 0
-        return -self.gaussienne(time.time() - self.start_match_time) + add_end
+        return 0
+        # return -self.gaussienne(time.time() - self.start_match_time) + add_end
 
     @property
     def coeff_pick(self):
-        return self.gaussienne(time.time() - self.start_match_time)
+        if time.time() - self.start_match_time < 50:
+            return -50
+        else:
+            return 50
+        #return self.gaussienne(time.time() - self.start_match_time)
     
     def init_match(self):
         """Réinitialise l'état du robot et la carte pour un nouveau match (et sert d'init)."""
@@ -252,6 +261,9 @@ class ActionManager(Node):
             self.activate_cursor = False
             self.release_end = False
             self.pick_start_done = False
+            self.finish_plier_state = [False, False, False, False]
+            self.finish_seq_done = False
+            self.count_stop = 0
 
             # 3. Libérer les événements de synchronisation
             self.motion_done = True
@@ -901,6 +913,10 @@ class ActionManager(Node):
             self.zone_cursor_release_id = 7
             self.pince_cursor = 5
             self.zone_pick_ignore[0] = self.boundaries[1] - self.zone_pick_ignore[0]
+            self.finish_strat_pos[0] = self.boundaries[1] - self.finish_strat_pos[0]
+            self.second_finish_pos[0] = self.boundaries[1] - self.second_finish_pos[0]
+            self.second_finish_pos[2] = 2.57
+            self.finish_middle_zone_seq[0] = self.boundaries[1] - self.finish_middle_zone_seq[0]
         self.in_ignore_zone()
 
 
@@ -948,6 +964,17 @@ class ActionManager(Node):
                         # crate = self.haz_crates[plier.state]
                         # crate.state = -1
                         # plier.state = -1
+            elif data[1] == 12: # Feedback for cursor, we don't care about it for now
+                # State of plier # !!!!!!!!!!!!!! Need to handle feedback !!!!!!!!!!!!!!!!!!!!
+                # PINCEFEEDBACK 7 12 1 1 (PINCE 9 0 0)
+                if data[0] == "2":
+                    self.finish_plier_state[0] = True
+                elif data[0] == "3":
+                    self.finish_plier_state[1] = True
+                elif data[0] == "6":
+                    self.finish_plier_state[2] = True
+                elif data[0] == "7":
+                    self.finish_plier_state[3] = True
             else:
                 # Map the two success bits and the two plier objects
                 # v0 = data[2], v1 = data[3]
@@ -1581,6 +1608,14 @@ class ActionManager(Node):
                 self.get_logger().warn("Stop sequence active! Overriding to STOP.")
                 self.global_sm = GlobalSM.STOP
                 self.sub_sm = GlobalSM.NOP
+        
+        elif time.time() - self.start_match_time > 96.0:
+            self.break_engage = False
+            self.motion_done = True
+            if self.sub_sm not in (FinishSequenceSM.FINISH_SEQUENCE_DROP, FinishSequenceSM.FINISH_SEQUENCE_DONE) and self.global_sm != GlobalSM.FINISH:
+                self.get_logger().warn(f"Dropping. {self.sub_sm}")
+                self.global_sm = GlobalSM.FINISHSEQUENCESM
+                self.sub_sm = FinishSequenceSM.FINISH_SEQUENCE_DROP
 
         elif self.break_engage:
             self.break_engage = False
@@ -1589,6 +1624,16 @@ class ActionManager(Node):
             self.global_sm = GlobalSM.NOP
             self.sub_sm = GlobalSM.NOP
     
+        elif time.time() - self.start_match_time > 80.0:
+            if self.cursor_begin_done and not self.cursor_end_done:
+                self.cursor_end_done = True
+                self.send_raw(f"PINCE {self.pince_cursor} 8 0 0")
+            if self.global_sm != GlobalSM.FINISHSEQUENCESM and not self.finish_seq_done:
+                self.get_logger().info(f"Time is running out, activating FINISH sequence!")
+                self.global_sm = GlobalSM.FINISHSEQUENCESM
+                self.sub_sm = GlobalSM.NOP
+                self.payload = {}
+
         elif self.global_sm == GlobalSM.NOP:
             if self.cursor_begin_done and not self.cursor_end_done:
                 self.cursor_end_done = True
@@ -1602,7 +1647,7 @@ class ActionManager(Node):
             self.payload = payload
 
         if self.pick_start_done and self.obstacle_detected and self.global_sm not in (GlobalSM.STOP, GlobalSM.FINISH):
-            self.get_logger().info(f"Obstacle detected by {self.get_namespace()}, enemy at {self.enemy_pos}. Recomputing...")
+            self.get_logger().info(f"Obstacle detected")
             self.global_sm = GlobalSM.NOP
             self.sub_sm = GlobalSM.NOP
 
@@ -1616,10 +1661,6 @@ class ActionManager(Node):
 
         if (not self.motion_done or not self.pliers_done) and self.global_sm != GlobalSM.STOP: # or time.time() - self.last_enemy_detected < 5.0:
             return
-        
-        if not self.release_end and time.time() - self.start_match_time > 85.0:
-            self.send_raw("VMAX 0.3")
-            self.release_end = True
 
         match self.global_sm:
             case GlobalSM.NOP:
@@ -1640,6 +1681,8 @@ class ActionManager(Node):
                 self.cursor_sm()
             case GlobalSM.GOBOARD:
                 self.go_board_sm()
+            case GlobalSM.FINISHSEQUENCESM:
+                self.finish_seq_sm()
             case _:
                 print(f"Unknown State: {self.global_sm}")
 
@@ -2142,6 +2185,10 @@ class ActionManager(Node):
                 self.sub_sm = GlobalSM.NOP
                 self.arrived_home = True
 
+    # =========================================================================
+    # GO BOARD STATE MACHINE (Converted to pure SM architecture)
+    # =========================================================================
+
     def go_board_sm(self):
         match self.sub_sm:
             case GlobalSM.NOP:
@@ -2172,16 +2219,104 @@ class ActionManager(Node):
                 self.global_sm = GlobalSM.NOP
                 self.sub_sm = GlobalSM.NOP
 
+    # =========================================================================
+    # STOP STATE MACHINE (Converted to pure SM architecture)
+    # =========================================================================
+
     def stop_sm(self):
         match self.sub_sm:
             case GlobalSM.NOP:
                 self.sub_sm = StopSM.STOP_STOP
 
             case StopSM.STOP_STOP:
-                self.send_raw("BLOCK")
-                self.send_raw("PINCE 10 0 0")
+                if self.count_stop == 3:
+                    self.send_raw("BLOCK")
+                    self.send_raw("PINCE 10 0 0")
+                    self.sub_sm = StopSM.STOP_DONE
+                else:
+                    self.count_stop += 1
 
             case StopSM.STOP_DONE:
+                self.global_sm = GlobalSM.FINISH
+                self.sub_sm = GlobalSM.NOP
+
+    # =========================================================================
+    # FINISH SEQUENCE STATE MACHINE
+    # =========================================================================
+
+    def finish_seq_sm(self):
+        match self.sub_sm:
+            case GlobalSM.NOP:
+                self.f_zone_y_min = 1.5
+                path, _, _ = self.get_best_path((self.finish_strat_pos[0], self.finish_strat_pos[1]))
+                if not path:
+                    self.payload['path_choice'] = 1
+                    self.get_logger().warn("No path to the finish strategy position, trying the second one...")
+                    path , _, _ = self.get_best_path((self.second_finish_pos[0], self.second_finish_pos[1]))
+                else:
+                    self.payload['path_choice'] = 0
+                self.payload["finish_path"] = path
+                if not self.payload["finish_path"]:
+                    self.get_logger().warn("No path to the finish strategy position")
+                    self.sub_sm = FinishSequenceSM.FINISH_SEQUENCE_DROP
+                else:
+                    self.sub_sm = FinishSequenceSM.FINISH_SEQUENCE_NAV
+
+            case FinishSequenceSM.FINISH_SEQUENCE_NAV:
+                if not self.payload["finish_path"]:
+                    self.send_raw('VMAX 0.3')
+                    self.sub_sm = FinishSequenceSM.FINISH_SEQUENCE_DOWN
+                else:
+                    next_point = self.payload["finish_path"].pop(0)
+                    if self.payload['path_choice'] == 0:
+                        self.move_to(Position(x=next_point[0], y=next_point[1], t=self.finish_strat_pos[2]))
+                    else:
+                        self.move_to(Position(x=next_point[0], y=next_point[1], t=self.second_finish_pos[2]))
+
+            case FinishSequenceSM.FINISH_SEQUENCE_DOWN: # PINCE 2 3 6 7 
+                if self.count > int(0.2 * self.loop_frequency):
+                    self.count = 0  
+                # !!!!!!!!!!!!!! Need to handle feedback !!!!!!!!!!!!!!!!!!!!
+                # PINCEFEEDBACK 7 12 1 1 (PINCE 9 0 0)
+                    self.sub_sm = FinishSequenceSM.FINISH_SEQUENCE_MOVE
+                else:
+                    if self.count == 0:
+                        finish_pliers = [2, 3, 6, 7]
+                        for pid in finish_pliers:
+                            self.send_raw(f"PINCE {pid} 9 0 0")
+                            self.get_logger().info(f"Sending PINCE command for plier {pid}")
+                    self.count += 1 
+
+            case FinishSequenceSM.FINISH_SEQUENCE_MOVE:
+                if time.time() - self.start_match_time > 92.0:
+                    self.sub_sm = FinishSequenceSM.FINISH_SEQUENCE_DROP
+                    if self.payload['path_choice'] == 0:
+                        self.move_to(Position(x=self.finish_middle_zone_seq[0], y=self.finish_middle_zone_seq[1], t=self.finish_middle_zone_seq[2]))
+
+            case FinishSequenceSM.FINISH_SEQUENCE_DROP: # Dépose pinces 2 3 6 7
+                with self.data_lock:
+                    id_active_pliers = {}
+                    for pid, plier in self.pliers.items():
+                        current_side = pid // 4
+                        if plier.state == -1 or current_side not in (1, 3):
+                            continue
+                        
+                        crate = self.haz_crates[plier.state]
+                        self.get_logger().info(f"PLIERS ID: {plier.id}, CRATE ID: {crate.id}")
+                        if crate.color in (-1, 2) or crate.color == self.color:
+                            id_active_pliers[pid] = ["drop", plier.state]
+                        else:
+                            id_active_pliers[pid] = ["rev_drop", plier.state]
+                    
+                    # Clear holding state natively
+                    for pl_id in id_active_pliers:
+                        self.pliers[pl_id].state = -1
+
+                self.send_plier_cmd(id_active_pliers, self.haz_crates)
+                self.sub_sm = FinishSequenceSM.FINISH_SEQUENCE_DONE
+
+            case FinishSequenceSM.FINISH_SEQUENCE_DONE:
+                self.finish_seq_done = True
                 self.global_sm = GlobalSM.FINISH
                 self.sub_sm = GlobalSM.NOP
 
@@ -2522,6 +2657,9 @@ class ActionManager(Node):
         # for side in available_sides:
         #     self.robot_pos.t + self.pliers[side].theta 
         return available_sides if available_sides != [] else None
+    
+    def is_face_active(self, plier_ids):
+        return any(self.pliers[p_id].state >= 0 for p_id in plier_ids)
 
     def angular_distance(self, a1, a2):
         diff = (a2 - a1 + np.pi) % (2 * np.pi) - np.pi

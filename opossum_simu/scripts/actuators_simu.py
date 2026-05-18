@@ -104,6 +104,10 @@ class ActuatorsSimu(Node):
                     for pid in self.states.keys():
                         if pid.startswith("PINCE"):
                             self.states[pid] = 2
+                elif id == 9:
+                    for pid in self.states.keys():
+                        if pid.startswith("PINCE"):
+                            self.states[pid] = 2
                 elif side == 2:
                     if mode == 4:
                         self.states[f"PINCE{id * 2}"] = 2
@@ -144,6 +148,8 @@ class ActuatorsSimu(Node):
                     for pid in self.states.keys():
                         if pid.startswith("PINCE"):
                             self.states[pid] = 0
+                if mode == 9:
+                    pass
                 if side == 2:
                     self.states[f"PINCE{id * 2}"] = end_mode1
                     self.states[f"PINCE{id * 2 + 1}"] = end_mode2
