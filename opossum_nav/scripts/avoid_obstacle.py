@@ -397,7 +397,7 @@ class ObstacleAvoider(Node):
                 )
             )
         angle_range = angle_range[: len(sec_dst)]
-        # self.publish_visualization("rectangle", angle_range)
+        self.publish_visualization("rectangle", angle_range)
         try:
             if not self.enable_boundary_check:
                 for i in range(len(angle_range)):

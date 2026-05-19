@@ -68,7 +68,8 @@ def generate_launch_description():
         ),
         launch_arguments={
             "robot_names": robot_names, 
-            "nav_params_file": nav_params_file
+            "nav_params_file": nav_params_file,
+            "simulation": simulation
             }.items(),
     )
 

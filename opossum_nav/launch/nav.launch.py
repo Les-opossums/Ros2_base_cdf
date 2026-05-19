@@ -10,6 +10,10 @@ from launch.actions import DeclareLaunchArgument, OpaqueFunction
 def launch_setup(context, *args, **kwargs):
     """Launch the setup."""
     nodes = []
+    
+    simulation_str = LaunchConfiguration("simulation").perform(context)
+    is_simulation = simulation_str.lower() in ["true", "1"]
+    
     robot_names_str = LaunchConfiguration("robot_names").perform(context)
     robot_names_list = [name.strip() for name in robot_names_str.split(",")]
 
@@ -21,9 +25,10 @@ def launch_setup(context, *args, **kwargs):
             package="opossum_nav",
             executable="avoid_obstacle.py",
             name="avoid_obstacle_node",
-            parameters=[param_file],
+            parameters=[param_file, {"use_sim_time": is_simulation}],
         )
         nodes.append(node_avoid_obstacle)
+        
     return nodes
 
 
