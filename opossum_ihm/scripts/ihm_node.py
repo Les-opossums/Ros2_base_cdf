@@ -13,7 +13,6 @@ if "GTK_PATH" in os.environ:
 
 import rclpy
 from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThread, pyqtSignal
 
@@ -26,6 +25,13 @@ from std_msgs.msg import Int32, Bool, String
 class RosNode(Node):
     def __init__(self):
         super().__init__("ihm_node")
+        
+        # --- Variables partagées (remplacent les signaux haute fréquence) ---
+        self.latest_lidar = (0.0, 0.0, 0.0)
+        self.latest_zynq = (0.0, 0.0, 0.0)
+        self.latest_cams = {1: (0.0, 0.0, 0.0), 2: (0.0, 0.0, 0.0), 3: (0.0, 0.0, 0.0)}
+
+        # --- Clients / Publishers ---
         self.param_client = self.create_client(Init, "set_parameters")
         self.reset_match_client = self.create_client(Trigger, "reset_match")
         self.pub_color = self.create_publisher(String, "init_team_color", 10)
@@ -44,41 +50,49 @@ class RosNode(Node):
         req.script_number = script
         self.param_client.call_async(req)
 
+
 class RosThread(QThread):
+    # Uniquement les signaux événementiels ou basse fréquence
     sig_score = pyqtSignal(int)
-    sig_lidar = pyqtSignal(float, float, float)
-    sig_zynq = pyqtSignal(float, float, float)
     sig_au = pyqtSignal(bool)
     sig_comm_state = pyqtSignal(bool)
     sig_feedback_command = pyqtSignal(str) 
-    sig_camera = pyqtSignal(int, float, float, float) 
 
-    def run(self):
+    def __init__(self):
+        super().__init__()
+        # 1. CRÉATION DE L'ENVIRONNEMENT ROS DÈS L'INITIALISATION
         rclpy.init()
         self.node = RosNode()
         
-        # Abonnements avec lambdas corrigées (m.data, m.robot_position, etc.)
+        # 2. Abonnements lents -> Signaux PyQt
         self.node.create_subscription(Int32, "score", lambda m: self.sig_score.emit(m.data), 10)
         self.node.create_subscription(Bool, "au", lambda m: self.sig_au.emit(m.data), 10)
         self.node.create_subscription(Bool, "comm_state", lambda m: self.sig_comm_state.emit(m.data), 10)
         self.node.create_subscription(String, "feedback_command", lambda m: self.sig_feedback_command.emit(m.data), 10)
-        self.node.create_subscription(String, "command", self.cb_cam, 10)
         
-        self.node.create_subscription(LidarLoc, "position_out", lambda m: self.sig_lidar.emit(m.robot_position.x, m.robot_position.y, m.robot_position.z), 1)
-        self.node.create_subscription(RobotData, "robot_data", lambda m: self.sig_zynq.emit(m.x, m.y, m.theta), 1)
+        # 3. Abonnements rapides -> Mise à jour directe des variables (thread-safe)
+        self.node.create_subscription(String, "command", self.cb_cam, 10)
+        self.node.create_subscription(LidarLoc, "position_out", self.cb_lidar, 1)
+        self.node.create_subscription(RobotData, "robot_data", self.cb_zynq, 1)
 
-        executor = MultiThreadedExecutor()
-        executor.add_node(self.node)
-        executor.spin()
+    def cb_lidar(self, msg):
+        self.node.latest_lidar = (msg.robot_position.x, msg.robot_position.y, msg.robot_position.z)
+
+    def cb_zynq(self, msg):
+        self.node.latest_zynq = (msg.x, msg.y, msg.theta)
 
     def cb_cam(self, msg):
         d = msg.data.strip().split()
         if d and d[0].startswith("SETCAMERA"):
             try:
                 cam_id = int(d[0].replace("SETCAMERA", ""))
-                self.sig_camera.emit(cam_id, float(d[1]), float(d[2]), float(d[3]))
+                self.node.latest_cams[cam_id] = (float(d[1]), float(d[2]), float(d[3]))
             except:
                 pass
+
+    def run(self):
+        # 4. LE THREAD NE FAIT PLUS QUE TOURNER LE NOEUD (SingleThreadedExecutor implicite)
+        rclpy.spin(self.node)
 
     def stop(self):
         if hasattr(self, 'node'):
@@ -87,60 +101,48 @@ class RosThread(QThread):
         self.quit()
         self.wait()
 
+
 def main():
     app = QApplication(sys.argv)
 
-    # --- STYLE GLOBAL (Spécial tactile : pop-ups et boutons géants) ---
+    # --- STYLE GLOBAL ---
     app.setStyleSheet("""
-        QMessageBox {
-            background-color: #F0F0F0;
-        }
-        /* Style du texte des messages d'alerte */
+        QMessageBox { background-color: #F0F0F0; }
         QMessageBox QLabel {
-            font-size: 24px;
-            font-weight: bold;
-            color: black;
-            min-width: 420px; 
-            margin: 20px;
+            font-size: 24px; font-weight: bold; color: black;
+            min-width: 420px; margin: 20px;
         }
-        /* Style des boutons des pop-ups (Yes/No/OK) */
         QMessageBox QPushButton {
-            font-size: 22px;
-            font-weight: bold;
-            min-width: 180px;
-            min-height: 100px; /* Boutons très hauts pour le tactile */
-            border-radius: 12px;
-            border: 2px solid #333333;
-            background-color: #DDDDDD;
-            margin: 10px;
+            font-size: 22px; font-weight: bold;
+            min-width: 180px; min-height: 100px;
+            border-radius: 12px; border: 2px solid #333333;
+            background-color: #DDDDDD; margin: 10px;
         }
-        QMessageBox QPushButton:pressed {
-            background-color: #999999;
-        }
-        /* Style général des boutons de l'IHM (Restart Match/Service) */
-        QPushButton {
-            font-size: 18px;
-            font-weight: bold;
-        }
+        QMessageBox QPushButton:pressed { background-color: #999999; }
+        QPushButton { font-size: 18px; font-weight: bold; }
     """)
 
+    # Initialisation du thread ROS (le noeud est créé instantanément)
     ros_thread = RosThread()
-    ros_thread.start()
     
+    # Création de l'IHM
     window = MainWindow()
 
-    # Branchements ROS -> IHM
+    # CRUCIAL : Le noeud existant déjà, l'injection fonctionne parfaitement !
+    window.page_match.ros_node_ref = ros_thread.node
+
+    # Lancement du thread ROS (qui va appeler 'run' en tâche de fond)
+    ros_thread.start()
+
+    # Branchements ROS -> IHM (Signaux restants)
     ros_thread.sig_score.connect(window.page_match.update_score)
-    ros_thread.sig_lidar.connect(window.page_match.update_lidar)
-    ros_thread.sig_zynq.connect(window.page_match.update_zynq)
     ros_thread.sig_au.connect(window.page_match.set_au_state)
     ros_thread.sig_comm_state.connect(window.page_match.set_comm_state)
     ros_thread.sig_feedback_command.connect(window.page_match.set_match_state)
-    ros_thread.sig_camera.connect(window.page_match.update_camera)
 
     # Branchements IHM -> ROS
     window.page_match.request_restart_match.connect(
-        lambda: ros_thread.node.reset_match_client.call_async(Trigger.Request()) if ros_thread.node else None
+        lambda: ros_thread.node.reset_match_client.call_async(Trigger.Request()) if hasattr(ros_thread, 'node') else None
     )
     
     window.page_config.request_param_update.connect(

@@ -91,8 +91,24 @@ class MatchPage(QWidget):
             self.lbl_score.setText(f"{self.match_time} s\n")
         else:
             self.lbl_score.setText(str(self.current_score))
-            self.lbl_zynq.setText(self.buf_zynq); self.lbl_lidar.setText(self.buf_lidar)
-            for i in range(1, 4): self.cam_labels[i].setText(f"CAM {i} - {self.buf_cams[i]}")
+            
+            # On formatte les strings UNIQUEMENT 5 fois par seconde
+            if hasattr(self, 'ros_node_ref'):
+                # Lecture des variables thread-safe
+                lx, ly, lt = self.ros_node_ref.latest_lidar
+                zx, zy, zt = self.ros_node_ref.latest_zynq
+                
+                self.lbl_zynq.setText(f"ZYNQ - X: {zx:.2f}  Y: {zy:.2f}  T: {zt:.2f}")
+                self.lbl_lidar.setText(f"LIDAR - X: {lx:.2f}  Y: {ly:.2f}  T: {lt:.2f}")
+                
+                for i in range(1, 4):
+                    cx, cy, ct = self.ros_node_ref.latest_cams.get(i, (0,0,0))
+                    self.cam_labels[i].setText(f"CAM {i} - X: {cx:.2f} Y: {cy:.2f} T: {ct:.2f}")
+                    
+                # Mise à jour des positions pour le check mismatch
+                self.positions['lidar'] = (lx, ly)
+                self.positions['zynq'] = (zx, zy)
+            
             self.check_positions()
 
     def tick_chrono(self): self.match_time += 1
