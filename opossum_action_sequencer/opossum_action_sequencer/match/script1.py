@@ -14,15 +14,22 @@ class Script():
     def run(self, node):
         start_match_time = time.time()
         node.send_raw("VMAX 1.0")
-        node.move_to(Position(0.3, 0.9), seuil=0.05)
-        node.wait_for_motion()
 
         while time.time() - start_match_time < 85:
-            node.move_to(Position(0.5, 1.3), seuil=0.05)
+            node.move_to(Position(0.5, 1.7, 0.0), seuil=0.05)
             node.wait_for_motion()
             
             if time.time() - start_match_time < 85:
-                node.move_to(Position(0.5, 0.3), seuil=0.05)
+                node.move_to(Position(0.5, 0.3, 0.0), seuil=0.05)
+                node.wait_for_motion()
+
+                node.move_to(Position(0.5, 1.7, 3.14), seuil=0.05)
+                node.wait_for_motion()
+
+                node.move_to(Position(0.5, 0.3, 3.14), seuil=0.05)
+                node.wait_for_motion()
+
+                node.move_to(Position(0.5, 1.7, 0), seuil=0.05)
                 node.wait_for_motion()
 
 

@@ -16,7 +16,7 @@ main_robot:
       cards:
         zynq:
           port: '/dev/ttyZynq'
-          baudrate: 115200
+          baudrate: 921600
 
 second_robot:
   comm_node:
@@ -36,4 +36,4 @@ second_robot:
       cards:
         zynq:
           port: '/dev/ttyZynq'
-          baudrate: 115200
+          baudrate: 921600

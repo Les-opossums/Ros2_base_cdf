@@ -53,7 +53,7 @@ def generate_launch_description():
     node_com = Node(
         package="opossum_comm",
         namespace=namespace,
-        executable="comm.py",
+        executable="comm_node",
         name="comm_node",
         parameters=[param_com, {"simulation": False}],
     )

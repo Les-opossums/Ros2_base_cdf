@@ -122,7 +122,7 @@ private:
             std::vector<std::string> cards_name = this->get_parameter("cards_name").as_string_array();
             for (const auto& name : cards_name) {
                 this->declare_parameter<std::string>("cards." + name + ".port", "/dev/ttyZynq");
-                this->declare_parameter<int>("cards." + name + ".baudrate", 115200);
+                this->declare_parameter<int>("cards." + name + ".baudrate", 921600);
                 
                 cards_[name].port = this->get_parameter("cards." + name + ".port").as_string();
                 cards_[name].baudrate = this->get_parameter("cards." + name + ".baudrate").as_int();
