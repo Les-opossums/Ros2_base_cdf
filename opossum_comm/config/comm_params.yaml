@@ -7,6 +7,7 @@ main_robot:
 
       asserv_topic: asserv
       robot_data_topic: robot_data
+      motion_done_topic: motion_done
       goal_position_topic: goal_position
 
       cards_name: ["zynq"]
@@ -15,8 +16,13 @@ main_robot:
       frequency: 20.
       cards:
         zynq:
-          port: '/dev/ttyZynq'
+          transport: 'ethernet'
+          port: '/dev/ttyZynq'      # ignore si transport=ethernet, garde pour pouvoir repasser en serial facilement
           baudrate: 921600
+          zynq_ip: '192.168.1.10'
+          telemetry_port: 5001
+          debug_port: 5000
+          raw_cmd_port: 5003
 
 second_robot:
   comm_node:
@@ -27,6 +33,7 @@ second_robot:
 
       asserv_topic: asserv
       robot_data_topic: robot_data
+      motion_done_topic: motion_done
       goal_position_topic: goal_position
 
       cards_name: ["zynq"]
@@ -35,5 +42,10 @@ second_robot:
       frequency: 20.
       cards:
         zynq:
+          transport: 'ethernet'
           port: '/dev/ttyZynq'
           baudrate: 921600
+          zynq_ip: '192.168.2.10'   # IP differente du main_robot si les deux tournent en meme temps
+          telemetry_port: 5001
+          debug_port: 5000
+          raw_cmd_port: 5003
