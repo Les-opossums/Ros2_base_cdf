@@ -420,15 +420,20 @@ private:
             return;
         }
 
+        const uint8_t* payload = buf + sizeof(hdr);
+
         uint16_t rx_crc = hdr.crc16;
-        std::vector<uint8_t> check(buf, buf + n);
-        check[12] = 0; check[13] = 0; // offset du champ crc16 dans le header, mis a 0 avant recalcul
-        if (eth::crc16_ccitt(check.data(), n) != rx_crc) {
+        /* CRC calcule en 3 passes (header avant crc16, crc16 virtuellement a
+         * zero, payload) plutot que copier tout le buffer dans un vector --
+         * evite une allocation heap par trame recue (significatif a 1kHz). */
+        uint16_t calc_crc = eth::crc16_ccitt(buf, 12, 0xFFFF);
+        static const uint8_t zero_crc_field[2] = {0, 0};
+        calc_crc = eth::crc16_ccitt(zero_crc_field, 2, calc_crc);
+        calc_crc = eth::crc16_ccitt(payload, hdr.payload_len, calc_crc);
+        if (calc_crc != rx_crc) {
             RCLCPP_WARN(this->get_logger(), "CRC error on eth frame from card %s", name.c_str());
             return;
         }
-
-        const uint8_t* payload = buf + sizeof(hdr);
 
         switch (hdr.msg_type) {
             case eth::MSG_ROBOT_STATE: {
