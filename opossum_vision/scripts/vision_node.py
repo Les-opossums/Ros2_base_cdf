@@ -51,7 +51,7 @@ class SingleVisionNode(Node):
     def _init_cam(self):
         """Initialise la connexion série de manière sécurisée pour ROS 2."""
         while self.is_running:
-            self.get_logger().info(f"Tentative de connexion sur {self.port} (Baudrate: {self.baudrate})...")
+            # self.get_logger().info(f"Tentative de connexion sur {self.port} (Baudrate: {self.baudrate})...")
             try:
                 tested_serial = serial.Serial(
                     port=self.port, 
@@ -65,7 +65,7 @@ class SingleVisionNode(Node):
                 return tested_serial
                 
             except serial.SerialException as e:
-                self.get_logger().warn(f"Échec sur {self.port}. Nouvel essai dans 1s... ({e})")
+                # self.get_logger().warn(f"Échec sur {self.port}. Nouvel essai dans 1s... ({e})")
                 time.sleep(1.0)
                 
         return None

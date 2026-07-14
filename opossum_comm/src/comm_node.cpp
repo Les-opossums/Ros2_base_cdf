@@ -470,7 +470,12 @@ private:
         std::string msg_name = (it != protocol_.messages_by_id.end()) ? it->second.name : "UNKNOWN";
 
         if (msg_name == "ROBOT_STATE") {
-            if (hdr.payload_len != sizeof(eth::PayloadRobotState)) return;
+            if (hdr.payload_len != sizeof(eth::PayloadRobotState)) {
+                RCLCPP_WARN(this->get_logger(), 
+                            "ROBOT_STATE size mismatch from %s! Expected %zu bytes, got %u bytes", 
+                            name.c_str(), sizeof(eth::PayloadRobotState), hdr.payload_len);
+                return;
+            }
             eth::PayloadRobotState rs;
             std::memcpy(&rs, payload, sizeof(rs));
 
@@ -494,7 +499,7 @@ private:
             if (!text.empty()) handle_received_line(text);
 
         } else {
-            // HEARTBEAT, ODOM, IMU, MOTOR_STATE -- pas encore cables cote ROS2
+            RCLCPP_DEBUG(this->get_logger(), "Ignored or unhandled message type: %s", msg_name.c_str());
         }
     }
 
