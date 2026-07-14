@@ -19,6 +19,10 @@ def launch_setup(context, *args, **kwargs):
         [FindPackageShare("opossum_comm"), "config", "comm_params.yaml"]
     )
 
+    param_eth = PathJoinSubstitution(
+        [FindPackageShare("opossum_comm"), "config", "eth_protocol.yaml"]
+    )
+
     for robot in robot_names_list:
         node_communication = Node(
             namespace=robot,
@@ -26,7 +30,11 @@ def launch_setup(context, *args, **kwargs):
             # executable="comm.py",
             executable="comm_node",
             name="comm_node",
-            parameters=[param_file, {"simulation": simulation}],
+            parameters=[
+                param_file, 
+                param_eth, 
+                {"simulation": simulation}
+            ],
         )
         nodes.append(node_communication)
     return nodes

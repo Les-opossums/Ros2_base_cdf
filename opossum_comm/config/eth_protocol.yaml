@@ -1,0 +1,40 @@
+# Miroir de ETH_CHANNEL_LIST / ETH_MESSAGE_LIST (eth_protocol.h, firmware Zynq).
+# Source de verite pour le node ROS2 : ports et IDs de message sont lus ici,
+# jamais codes en dur dans le C++. Si tu ajoutes un canal ou un message cote
+# firmware, reporte la meme ligne ici pour garder les deux cotes synchronises
+# (pas d'auto-generation pour l'instant -- a la main, mais centralise).
+
+channels:
+  DEBUG:
+    port: 5000
+    direction: tx        # Zynq -> Pi (le Pi ecoute sur ce port)
+  TELEMETRY:
+    port: 5001
+    direction: tx
+  CMD:
+    port: 5002
+    direction: rx        # Pi -> Zynq (le Pi envoie sur ce port, n'ecoute pas dessus)
+  RAW_CMD:
+    port: 5003
+    direction: rx
+
+messages:
+  # --- TX (Zynq -> Pi) ---
+  HEARTBEAT:            { id: 0x01, channel: TELEMETRY }
+  DEBUG_TEXT:           { id: 0x02, channel: DEBUG }
+  ODOM:                 { id: 0x10, channel: TELEMETRY }
+  IMU:                  { id: 0x11, channel: TELEMETRY }
+  MOTOR_STATE:          { id: 0x12, channel: TELEMETRY }
+  ROBOT_STATE:          { id: 0x13, channel: TELEMETRY }
+  AU:                   { id: 0x14, channel: TELEMETRY }
+
+  # --- RX (Pi -> Zynq) ---
+  CMD_GENERIC:          { id: 0x20, channel: CMD }
+  CMD_GOAL_POSITION:    { id: 0x21, channel: CMD }
+  CMD_SET_LIDAR:        { id: 0x22, channel: CMD }
+  CMD_SET_CAMERA_1:     { id: 0x23, channel: CMD }
+  CMD_SET_CAMERA_2:     { id: 0x24, channel: CMD }
+  CMD_SET_CAMERA_3:     { id: 0x25, channel: CMD }
+  CMD_SET_SPEED_MAX:    { id: 0x26, channel: CMD }
+  CMD_BLOCK:            { id: 0x27, channel: CMD }
+  CMD_FREE:             { id: 0x28, channel: CMD }

@@ -4,7 +4,8 @@
 #include <opossum_msgs/msg/robot_data.hpp>
 #include <opossum_msgs/msg/goal_detection.hpp>
 
-#include <serial/serial.h> // Standard ROS serial library
+#include <serial/serial.h>
+#include <yaml-cpp/yaml.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -20,29 +21,20 @@
 #include <atomic>
 #include <cstring>
 #include <cerrno>
-#include <algorithm> // Pour std::remove
-#include <cctype>    // Pour std::isalpha
-#include <clocale>   // <--- AJOUT POUR LA LOCALE (Fix std::stod)
+#include <algorithm>
+#include <cctype>
+#include <clocale>
+#include <stdexcept>
 
 /* ------------------------------------------------------------------------
- * Miroir de eth_protocol.h (firmware Zynq). Idealement, copie directement
- * eth_protocol.h dans ce package ROS2 (include/opossum_communication/) et
- * remplace ce namespace par un #include, pour garder les deux cotes
- * synchronises automatiquement plutot que par copie manuelle.
+ * Miroir de eth_protocol.h : header de trame + CRC. Le mapping port/id est
+ * lui charge depuis eth_protocol.yaml (voir EthProtocolConfig plus bas),
+ * PAS code en dur ici -- c'est le but de cette version.
  * ------------------------------------------------------------------------ */
 namespace eth {
 
 constexpr uint16_t FRAME_MAGIC = 0xC0DE;
-
-enum MsgType : uint8_t {
-    MSG_HEARTBEAT   = 0x01,
-    MSG_DEBUG_TEXT  = 0x02,
-    MSG_ODOM        = 0x10,
-    MSG_IMU         = 0x11,
-    MSG_MOTOR_STATE = 0x12,
-    MSG_ROBOT_STATE = 0x13,
-    MSG_CMD_GENERIC = 0x20,
-};
+constexpr uint8_t  PROTOCOL_VERSION = 1;
 
 #pragma pack(push, 1)
 struct FrameHeader {
@@ -55,12 +47,18 @@ struct FrameHeader {
     uint16_t crc16;
 };
 
+/* Miroir de robot_messages.h */
 struct PayloadRobotState {
     uint32_t timestamp_ms;
     float    x, y, theta;
-    float    speed_linear, speed_direction, vt;
+    float    speed_linear, speed_direction, speed_angular;
     uint8_t  motion_done;
 };
+
+/* Miroir de Asserv_type.h -- structs utilisees pour les commandes structurees */
+struct Position { float x, y, t; };
+struct SetLidar { float x, y, t; uint32_t delay; };
+struct SetCamera { float x, y, t; uint32_t delay; float noise_x, noise_y, noise_t; };
 #pragma pack(pop)
 
 static_assert(sizeof(FrameHeader) == 14, "FrameHeader doit faire 14 octets (desync avec le firmware sinon)");
@@ -78,10 +76,63 @@ inline uint16_t crc16_ccitt(const uint8_t *data, size_t len, uint16_t crc = 0xFF
 
 } // namespace eth
 
+/* ------------------------------------------------------------------------
+ * Config protocole chargee depuis eth_protocol.yaml : channels (nom -> port
+ * + direction) et messages (nom -> id + canal). Source de verite unique
+ * pour le node -- aucun port/ID code en dur ailleurs dans ce fichier.
+ * ------------------------------------------------------------------------ */
+struct ChannelDesc {
+    std::string name;
+    uint16_t    port;
+    std::string direction; // "tx" (Zynq emet, le Pi ecoute) ou "rx" (le Pi emet)
+};
+
+struct MessageDesc {
+    std::string name;
+    uint8_t     id;
+    std::string channel;
+};
+
+class EthProtocolConfig {
+public:
+    std::map<std::string, ChannelDesc> channels_by_name;
+    std::map<std::string, MessageDesc> messages_by_name;
+    std::map<uint8_t, MessageDesc>     messages_by_id;
+
+    void load(const std::string &path) {
+        YAML::Node root = YAML::LoadFile(path);
+
+        for (const auto &kv : root["channels"]) {
+            ChannelDesc c;
+            c.name = kv.first.as<std::string>();
+            c.port = static_cast<uint16_t>(kv.second["port"].as<int>());
+            c.direction = kv.second["direction"].as<std::string>();
+            channels_by_name[c.name] = c;
+        }
+
+        for (const auto &kv : root["messages"]) {
+            MessageDesc m;
+            m.name = kv.first.as<std::string>();
+            m.id = static_cast<uint8_t>(kv.second["id"].as<int>());
+            m.channel = kv.second["channel"].as<std::string>();
+            messages_by_name[m.name] = m;
+            messages_by_id[m.id] = m;
+        }
+    }
+
+    uint16_t port_for_message(const std::string &msg_name) const {
+        const auto &m = messages_by_name.at(msg_name); // .at() leve si inconnu -- fail-fast voulu
+        return channels_by_name.at(m.channel).port;
+    }
+
+    uint8_t id_for_message(const std::string &msg_name) const {
+        return messages_by_name.at(msg_name).id;
+    }
+};
+
 class Communication : public rclcpp::Node {
 public:
     Communication() : Node("beacon_detector_node"), enable_send_(true) {
-        // 1. Declare Parameters
         this->declare_parameter<bool>("simulation", false);
         this->declare_parameter<std::string>("send_comm_topic", "");
         this->declare_parameter<std::string>("rcv_comm_topic", "");
@@ -93,8 +144,24 @@ public:
         this->declare_parameter<std::string>("motion_done_topic", "motion_done");
         this->declare_parameter<std::string>("goal_position_topic", "goal_position");
         this->declare_parameter<double>("frequency", 10.0);
+        this->declare_parameter<std::string>("protocol_config_path", "");
 
         simulation_ = this->get_parameter("simulation").as_bool();
+
+        std::string protocol_path = this->get_parameter("protocol_config_path").as_string();
+        if (protocol_path.empty()) {
+            RCLCPP_FATAL(this->get_logger(),
+                "Parametre 'protocol_config_path' non renseigne -- chemin vers eth_protocol.yaml requis.");
+            throw std::runtime_error("protocol_config_path manquant");
+        }
+        try {
+            protocol_.load(protocol_path);
+            RCLCPP_INFO(this->get_logger(), "Protocole charge depuis %s (%zu canaux, %zu messages)",
+                        protocol_path.c_str(), protocol_.channels_by_name.size(), protocol_.messages_by_name.size());
+        } catch (const std::exception &e) {
+            RCLCPP_FATAL(this->get_logger(), "Echec chargement %s : %s", protocol_path.c_str(), e.what());
+            throw;
+        }
 
         init_publishers();
         init_subscribers();
@@ -108,8 +175,6 @@ public:
     }
 
     ~Communication() {
-        // Les threads (serial ou ethernet) verifient rclcpp::ok() periodiquement
-        // (timeout 500ms sur les sockets UDP, timeout deja present sur le serial).
         for (auto& thread : serial_threads_) {
             if (thread.joinable()) {
                 thread.join();
@@ -117,17 +182,18 @@ public:
         }
         for (auto& pair : cards_) {
             CardInfo &card = pair.second;
-            if (card.udp_recv_telemetry_fd >= 0) close(card.udp_recv_telemetry_fd);
-            if (card.udp_recv_debug_fd >= 0)     close(card.udp_recv_debug_fd);
-            if (card.udp_send_fd >= 0)           close(card.udp_send_fd);
+            for (auto &rf : card.recv_fds) {
+                if (rf.second >= 0) close(rf.second);
+            }
+            if (card.udp_send_fd >= 0) close(card.udp_send_fd);
         }
     }
 
 private:
     bool simulation_;
     std::atomic<bool> enable_send_;
+    EthProtocolConfig protocol_;
 
-    // Publishers
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_comm_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_feedback_command_;
     rclcpp::Publisher<opossum_msgs::msg::RobotData>::SharedPtr pub_robot_data_;
@@ -135,7 +201,6 @@ private:
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_comm_state_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_motion_done_;
 
-    // Subscribers & Callbacks
     rclcpp::CallbackGroup::SharedPtr mutex_clb_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_comm_topic_;
     std::map<std::string, rclcpp::Subscription<std_msgs::msg::String>::SharedPtr> sub_command_map_;
@@ -143,7 +208,6 @@ private:
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_command_simu_;
     rclcpp::TimerBase::SharedPtr read_timer_;
 
-    // Serial & Ethernet & Threading
     struct CardInfo {
         std::string transport = "serial"; // "serial" ou "ethernet"
 
@@ -152,15 +216,11 @@ private:
         int baudrate = 115200;
         std::shared_ptr<serial::Serial> serial_port;
 
-        // --- ethernet (UDP) ---
+        // --- ethernet ---
         std::string zynq_ip;
-        uint16_t telemetry_port = 5001;
-        uint16_t debug_port     = 5000;
-        uint16_t raw_cmd_port   = 5003;
-        int udp_recv_telemetry_fd = -1;
-        int udp_recv_debug_fd     = -1;
-        int udp_send_fd           = -1;
-        struct sockaddr_in zynq_raw_cmd_addr {};
+        int udp_send_fd = -1;
+        uint16_t tx_seq = 0;
+        std::map<std::string, int> recv_fds; // nom du canal (direction tx) -> fd bind
     };
     std::map<std::string, CardInfo> cards_;
     std::vector<std::thread> serial_threads_;
@@ -210,18 +270,12 @@ private:
                 this->declare_parameter<std::string>("cards." + name + ".port", "/dev/ttyZynq");
                 this->declare_parameter<int>("cards." + name + ".baudrate", 115200);
                 this->declare_parameter<std::string>("cards." + name + ".zynq_ip", "192.168.1.10");
-                this->declare_parameter<int>("cards." + name + ".telemetry_port", 5001);
-                this->declare_parameter<int>("cards." + name + ".debug_port", 5000);
-                this->declare_parameter<int>("cards." + name + ".raw_cmd_port", 5003);
 
                 CardInfo &card = cards_[name];
-                card.transport      = this->get_parameter("cards." + name + ".transport").as_string();
-                card.port           = this->get_parameter("cards." + name + ".port").as_string();
-                card.baudrate       = this->get_parameter("cards." + name + ".baudrate").as_int();
-                card.zynq_ip        = this->get_parameter("cards." + name + ".zynq_ip").as_string();
-                card.telemetry_port = static_cast<uint16_t>(this->get_parameter("cards." + name + ".telemetry_port").as_int());
-                card.debug_port     = static_cast<uint16_t>(this->get_parameter("cards." + name + ".debug_port").as_int());
-                card.raw_cmd_port   = static_cast<uint16_t>(this->get_parameter("cards." + name + ".raw_cmd_port").as_int());
+                card.transport = this->get_parameter("cards." + name + ".transport").as_string();
+                card.port      = this->get_parameter("cards." + name + ".port").as_string();
+                card.baudrate  = this->get_parameter("cards." + name + ".baudrate").as_int();
+                card.zynq_ip   = this->get_parameter("cards." + name + ".zynq_ip").as_string();
 
                 init_card(name);
 
@@ -236,9 +290,9 @@ private:
     void init_card(const std::string& name) {
         if (cards_[name].transport == "ethernet") {
             init_card_ethernet(name);
-            return;
+        } else {
+            init_card_serial(name);
         }
-        init_card_serial(name);
     }
 
     void init_card_serial(const std::string& name) {
@@ -246,15 +300,11 @@ private:
             RCLCPP_INFO(this->get_logger(), "Trying to connect to %s on %s", name.c_str(), cards_[name].port.c_str());
             try {
                 auto port = std::make_shared<serial::Serial>(
-                    cards_[name].port,
-                    cards_[name].baudrate,
-                    serial::Timeout::simpleTimeout(1000)
-                );
+                    cards_[name].port, cards_[name].baudrate, serial::Timeout::simpleTimeout(1000));
 
                 if (port->isOpen()) {
                     port->write("VERSION\n");
                     std::string response = port->readline(65536, "\n");
-
                     RCLCPP_INFO(this->get_logger(), "Card %s connected. Version: %s", name.c_str(), response.c_str());
                     cards_[name].serial_port = port;
                     return;
@@ -262,7 +312,6 @@ private:
             } catch (serial::IOException& e) {
                 RCLCPP_ERROR(this->get_logger(), "Scanned serial port is already opened nor existing! %s", e.what());
             }
-
             RCLCPP_WARN(this->get_logger(), "Retrying to connect the '%s' card in 1s", name.c_str());
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
@@ -272,11 +321,9 @@ private:
         int fd = socket(AF_INET, SOCK_DGRAM, 0);
         if (fd < 0) return -1;
 
-        // Timeout de reception pour pouvoir re-checker rclcpp::ok() periodiquement
-        // dans les workers (sinon un recv() bloquant ne rendrait jamais la main).
         struct timeval tv;
         tv.tv_sec = 0;
-        tv.tv_usec = 500000; // 500ms
+        tv.tv_usec = 500000; // 500ms, pour re-checker rclcpp::ok() periodiquement
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
         struct sockaddr_in addr {};
@@ -293,28 +340,30 @@ private:
 
     void init_card_ethernet(const std::string& name) {
         CardInfo &card = cards_[name];
-
         card.udp_send_fd = socket(AF_INET, SOCK_DGRAM, 0);
-        card.zynq_raw_cmd_addr = {};
-        card.zynq_raw_cmd_addr.sin_family = AF_INET;
-        card.zynq_raw_cmd_addr.sin_port = htons(card.raw_cmd_port);
-        inet_pton(AF_INET, card.zynq_ip.c_str(), &card.zynq_raw_cmd_addr.sin_addr);
 
-        card.udp_recv_telemetry_fd = udp_bind_socket(card.telemetry_port);
-        card.udp_recv_debug_fd     = udp_bind_socket(card.debug_port);
+        // Un canal "tx" (Zynq -> Pi) doit etre ecoute par le Pi. Un canal "rx"
+        // (Pi -> Zynq) n'a rien a ecouter, seulement un port de destination.
+        // Entierement pilote par eth_protocol.yaml -- ajouter un canal tx la-bas
+        // suffit a le faire ecouter ici, sans toucher a ce code.
+        for (const auto& kv : protocol_.channels_by_name) {
+            const ChannelDesc &chan = kv.second;
+            if (chan.direction != "tx") continue;
 
-        if (card.udp_send_fd < 0 || card.udp_recv_telemetry_fd < 0 || card.udp_recv_debug_fd < 0) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to setup ethernet sockets for card %s", name.c_str());
-            return;
+            int fd = udp_bind_socket(chan.port);
+            if (fd < 0) {
+                RCLCPP_ERROR(this->get_logger(), "Failed to bind port %d (channel %s) for card %s",
+                             chan.port, chan.name.c_str(), name.c_str());
+                continue;
+            }
+            card.recv_fds[chan.name] = fd;
         }
 
-        // Note: contrairement au serial, pas de handshake VERSION possible ici
-        // (UDP est sans connexion, pas d'ACK garanti sur le port raw cmd).
-        RCLCPP_INFO(this->get_logger(), "Card %s (ethernet) ready: %s telemetry:%d debug:%d cmd:%d",
-                    name.c_str(), card.zynq_ip.c_str(), card.telemetry_port, card.debug_port, card.raw_cmd_port);
+        RCLCPP_INFO(this->get_logger(), "Card %s (ethernet) ready: %s, %zu canaux en ecoute",
+                    name.c_str(), card.zynq_ip.c_str(), card.recv_fds.size());
     }
 
-    // --- SIMULATION METHODS ---
+    // --- SIMULATION ---
 
     void save_in_buffer(const std_msgs::msg::String::SharedPtr msg) {
         buffer_simu_rcv_ += msg->data;
@@ -322,22 +371,17 @@ private:
 
     void read_card_simu() {
         if (buffer_simu_rcv_.empty()) return;
-
         std::istringstream stream(buffer_simu_rcv_);
         std::string line;
-
         while (std::getline(stream, line)) {
             line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
-            if (!line.empty()) {
-                handle_received_line(line);
-            }
+            if (!line.empty()) handle_received_line(line);
         }
         buffer_simu_rcv_ = "";
     }
 
     void send_card_simu(const std_msgs::msg::String::SharedPtr msg) {
         if (!enable_send_) return;
-
         std::string out = process_data_send(msg->data);
         if (!out.empty()) {
             auto out_msg = std_msgs::msg::String();
@@ -351,9 +395,11 @@ private:
             std::string name = pair.first;
             CardInfo &card = pair.second;
             if (card.transport == "ethernet") {
-                serial_threads_.emplace_back(&Communication::eth_read_worker, this, name, true);  // telemetry
-                serial_threads_.emplace_back(&Communication::eth_read_worker, this, name, false); // debug
-                RCLCPP_INFO(this->get_logger(), "Started ethernet reading threads for card: %s", name.c_str());
+                for (const auto& rf : card.recv_fds) {
+                    serial_threads_.emplace_back(&Communication::eth_read_worker, this, name, rf.first);
+                }
+                RCLCPP_INFO(this->get_logger(), "Started %zu ethernet reading threads for card: %s",
+                            card.recv_fds.size(), name.c_str());
             } else {
                 serial_threads_.emplace_back(&Communication::serial_read_worker, this, name);
                 RCLCPP_INFO(this->get_logger(), "Started reading thread for card: %s", name.c_str());
@@ -363,25 +409,20 @@ private:
 
     void serial_read_worker(std::string name) {
         auto serial_card = cards_[name].serial_port;
-        serial_card->setTimeout(serial::Timeout::max(), 1000, 0, 1000, 0); // Blocking read with timeout
+        serial_card->setTimeout(serial::Timeout::max(), 1000, 0, 1000, 0);
 
         while (rclcpp::ok()) {
             try {
                 std::string line = serial_card->readline(65536, "\n");
                 if (!line.empty()) {
-                    // 1. Trouver le premier vrai caractère (Left Trim)
                     size_t start = line.find_first_not_of(" \n\r\t");
                     if (start == std::string::npos) {
-                        line = ""; // La ligne ne contenait que des espaces
+                        line = "";
                     } else {
                         line = line.substr(start);
-                        // 2. Nettoyer la fin (Right Trim)
                         line.erase(line.find_last_not_of(" \n\r\t") + 1);
                     }
-
-                    if (!line.empty()) {
-                        handle_received_line(line);
-                    }
+                    if (!line.empty()) handle_received_line(line);
                 }
             } catch (std::exception& e) {
                 RCLCPP_ERROR(this->get_logger(), "Serial exception on %s: %s", name.c_str(), e.what());
@@ -390,32 +431,24 @@ private:
         }
     }
 
-    // is_telemetry=true -> lit le socket telemetrie (port 5001), false -> debug (port 5000)
-    void eth_read_worker(std::string name, bool is_telemetry) {
+    void eth_read_worker(std::string name, std::string chan_name) {
         CardInfo &card = cards_[name];
-        int fd = is_telemetry ? card.udp_recv_telemetry_fd : card.udp_recv_debug_fd;
-        if (fd < 0) return;
-
+        int fd = card.recv_fds.at(chan_name);
         uint8_t buf[1024];
         while (rclcpp::ok()) {
             ssize_t n = recv(fd, buf, sizeof(buf), 0);
-            if (n <= 0) {
-                continue; // timeout (500ms) ou erreur transitoire -> on reboucle
-            }
+            if (n <= 0) continue; // timeout (500ms) ou erreur transitoire
             handle_eth_frame(buf, static_cast<size_t>(n), name);
         }
     }
 
     void handle_eth_frame(const uint8_t* buf, size_t n, const std::string& name) {
-        if (n < sizeof(eth::FrameHeader)) {
-            return;
-        }
+        if (n < sizeof(eth::FrameHeader)) return;
 
         eth::FrameHeader hdr;
         std::memcpy(&hdr, buf, sizeof(hdr));
 
-        if (hdr.magic != eth::FRAME_MAGIC ||
-            sizeof(hdr) + hdr.payload_len != n) {
+        if (hdr.magic != eth::FRAME_MAGIC || sizeof(hdr) + hdr.payload_len != n) {
             RCLCPP_WARN(this->get_logger(), "Malformed eth frame from card %s", name.c_str());
             return;
         }
@@ -423,54 +456,45 @@ private:
         const uint8_t* payload = buf + sizeof(hdr);
 
         uint16_t rx_crc = hdr.crc16;
-        /* CRC calcule en 3 passes (header avant crc16, crc16 virtuellement a
-         * zero, payload) plutot que copier tout le buffer dans un vector --
-         * evite une allocation heap par trame recue (significatif a 1kHz). */
-        uint16_t calc_crc = eth::crc16_ccitt(buf, 12, 0xFFFF);
+        uint16_t calc_crc = eth::crc16_ccitt(buf, 12, 0xFFFF); // header avant le champ crc16
         static const uint8_t zero_crc_field[2] = {0, 0};
         calc_crc = eth::crc16_ccitt(zero_crc_field, 2, calc_crc);
         calc_crc = eth::crc16_ccitt(payload, hdr.payload_len, calc_crc);
+
         if (calc_crc != rx_crc) {
             RCLCPP_WARN(this->get_logger(), "CRC error on eth frame from card %s", name.c_str());
             return;
         }
 
-        switch (hdr.msg_type) {
-            case eth::MSG_ROBOT_STATE: {
-                if (hdr.payload_len != sizeof(eth::PayloadRobotState)) {
-                    return;
-                }
-                eth::PayloadRobotState rs;
-                std::memcpy(&rs, payload, sizeof(rs));
+        auto it = protocol_.messages_by_id.find(hdr.msg_type);
+        std::string msg_name = (it != protocol_.messages_by_id.end()) ? it->second.name : "UNKNOWN";
 
-                auto rdata = opossum_msgs::msg::RobotData();
-                rdata.name = name;
-                rdata.x = rs.x;
-                rdata.y = rs.y;
-                rdata.theta = rs.theta;
-                rdata.vlin = rs.speed_linear;
-                rdata.vdir = rs.speed_direction;
-                rdata.vt = rs.vt;
-                pub_robot_data_->publish(rdata);
+        if (msg_name == "ROBOT_STATE") {
+            if (hdr.payload_len != sizeof(eth::PayloadRobotState)) return;
+            eth::PayloadRobotState rs;
+            std::memcpy(&rs, payload, sizeof(rs));
 
-                auto md = std_msgs::msg::Bool();
-                md.data = (rs.motion_done != 0);
-                pub_motion_done_->publish(md);
-                break;
-            }
-            case eth::MSG_DEBUG_TEXT: {
-                std::string text(reinterpret_cast<const char*>(payload), hdr.payload_len);
-                while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) {
-                    text.pop_back();
-                }
-                if (!text.empty()) {
-                    handle_received_line(text);
-                }
-                break;
-            }
-            default:
-                // HEARTBEAT, ODOM, IMU, etc. -- non geres cote ROS2 pour l'instant
-                break;
+            auto rdata = opossum_msgs::msg::RobotData();
+            rdata.name = name;
+            rdata.x = rs.x;
+            rdata.y = rs.y;
+            rdata.theta = rs.theta;
+            rdata.vlin = rs.speed_linear;
+            rdata.vdir = rs.speed_direction;
+            rdata.vt = rs.speed_angular;
+            pub_robot_data_->publish(rdata);
+
+            auto md = std_msgs::msg::Bool();
+            md.data = (rs.motion_done != 0);
+            pub_motion_done_->publish(md);
+
+        } else if (msg_name == "DEBUG_TEXT") {
+            std::string text(reinterpret_cast<const char*>(payload), hdr.payload_len);
+            while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) text.pop_back();
+            if (!text.empty()) handle_received_line(text);
+
+        } else {
+            // HEARTBEAT, ODOM, IMU, MOTOR_STATE -- pas encore cables cote ROS2
         }
     }
 
@@ -485,28 +509,153 @@ private:
         process_data_rcv(data);
     }
 
+    // Construit et envoie une trame framee (header + CRC) sur le canal associe
+    // au nom de message donne dans eth_protocol.yaml. Retourne false si le nom
+    // de message est inconnu ou l'envoi a echoue.
+    bool send_framed(CardInfo &card, const std::string &msg_name,
+                      const uint8_t *payload, uint16_t payload_len) {
+        uint8_t id;
+        uint16_t port;
+        try {
+            id = protocol_.id_for_message(msg_name);
+            port = protocol_.port_for_message(msg_name);
+        } catch (const std::exception &e) {
+            RCLCPP_ERROR(this->get_logger(), "Message '%s' inconnu dans eth_protocol.yaml: %s",
+                         msg_name.c_str(), e.what());
+            return false;
+        }
+
+        uint8_t buf[sizeof(eth::FrameHeader) + 256];
+        if (payload_len > sizeof(buf) - sizeof(eth::FrameHeader)) {
+            RCLCPP_ERROR(this->get_logger(), "Payload trop grand pour '%s' (%u octets)", msg_name.c_str(), payload_len);
+            return false;
+        }
+
+        eth::FrameHeader hdr{};
+        hdr.magic = eth::FRAME_MAGIC;
+        hdr.version = eth::PROTOCOL_VERSION;
+        hdr.msg_type = id;
+        hdr.seq = card.tx_seq++;
+        hdr.timestamp_us = 0; // pas d'horloge partagee avec le Zynq cote Pi, non utilise par le firmware
+        hdr.payload_len = payload_len;
+        hdr.crc16 = 0;
+
+        std::memcpy(buf, &hdr, sizeof(hdr));
+        if (payload_len) {
+            std::memcpy(buf + sizeof(hdr), payload, payload_len);
+        }
+
+        uint16_t total_len = static_cast<uint16_t>(sizeof(hdr) + payload_len);
+        uint16_t crc = eth::crc16_ccitt(buf, total_len);
+        std::memcpy(buf + 12, &crc, sizeof(crc)); // offset du champ crc16 dans le header
+
+        struct sockaddr_in dst {};
+        dst.sin_family = AF_INET;
+        dst.sin_port = htons(port);
+        inet_pton(AF_INET, card.zynq_ip.c_str(), &dst.sin_addr);
+
+        ssize_t sent = sendto(card.udp_send_fd, buf, total_len, 0,
+                               reinterpret_cast<struct sockaddr*>(&dst), sizeof(dst));
+        if (sent != static_cast<ssize_t>(total_len)) {
+            RCLCPP_ERROR(this->get_logger(), "UDP send failed for '%s': %s", msg_name.c_str(), strerror(errno));
+            return false;
+        }
+        return true;
+    }
+
     void send_card(const std_msgs::msg::String::SharedPtr msg, const std::string& name) {
         if (!enable_send_) return;
-
-        std::string out = process_data_send(msg->data);
-        if (out.empty()) return;
-
         CardInfo &card = cards_[name];
 
-        if (card.transport == "ethernet") {
-            std::string line = out + "\n";
-            ssize_t sent = sendto(card.udp_send_fd, line.c_str(), line.size(), 0,
-                                   reinterpret_cast<struct sockaddr*>(&card.zynq_raw_cmd_addr),
-                                   sizeof(card.zynq_raw_cmd_addr));
-            if (sent < 0) {
-                RCLCPP_ERROR(this->get_logger(), "UDP send failed to card %s: %s", name.c_str(), strerror(errno));
+        if (card.transport != "ethernet") {
+            std::string out = process_data_send(msg->data);
+            if (!out.empty()) {
+                try {
+                    card.serial_port->write(out + "\n");
+                } catch (std::exception& e) {
+                    RCLCPP_ERROR(this->get_logger(), "Failed to write to card %s: %s", name.c_str(), e.what());
+                }
             }
-        } else {
-            try {
-                card.serial_port->write(out + "\n");
-            } catch (std::exception& e) {
-                RCLCPP_ERROR(this->get_logger(), "Failed to write to card %s: %s", name.c_str(), e.what());
+            return;
+        }
+
+        // Chemin ethernet : on essaie de reconnaitre une commande structuree
+        // connue et de l'encoder en trame binaire ; sinon fallback texte libre
+        // encapsule en CMD_GENERIC (framed + CRC).
+        //
+        // Grammaire assumee -- a adapter a ta convention reelle cote strategie :
+        //   MOVE x y t                              -> CMD_GOAL_POSITION
+        //   SETLIDAR x y t delay                    -> CMD_SET_LIDAR
+        //   SETCAM1/2/3 x y t delay nx ny nt         -> CMD_SET_CAMERA_1/2/3
+        //   BLOCK / FREE                             -> CMD_BLOCK / CMD_FREE
+        auto tokens = split(msg->data);
+        if (tokens.empty()) return;
+
+        try {
+            if (tokens[0] == "MOVE" && tokens.size() >= 4) {
+                eth::Position pos{};
+                pos.x = std::stof(tokens[1]);
+                pos.y = std::stof(tokens[2]);
+                pos.t = std::stof(tokens[3]);
+                send_framed(card, "CMD_GOAL_POSITION", reinterpret_cast<uint8_t*>(&pos), sizeof(pos));
+
+                auto goal_pos = opossum_msgs::msg::GoalDetection();
+                goal_pos.goal_position.x = pos.x;
+                goal_pos.goal_position.y = pos.y;
+                goal_pos.goal_position.z = pos.t;
+                goal_pos.detection_mode = -1;
+                goal_pos.obstacle_detection_distance = 0.5;
+                pub_goal_position_->publish(goal_pos);
+                return;
             }
+
+            if (tokens[0] == "SETLIDAR" && tokens.size() >= 5) {
+                eth::SetLidar sl{};
+                sl.x = std::stof(tokens[1]);
+                sl.y = std::stof(tokens[2]);
+                sl.t = std::stof(tokens[3]);
+                sl.delay = static_cast<uint32_t>(std::stoul(tokens[4]));
+                send_framed(card, "CMD_SET_LIDAR", reinterpret_cast<uint8_t*>(&sl), sizeof(sl));
+                return;
+            }
+
+            if ((tokens[0] == "SETCAM1" || tokens[0] == "SETCAM2" || tokens[0] == "SETCAM3") && tokens.size() >= 8) {
+                eth::SetCamera sc{};
+                sc.x = std::stof(tokens[1]);
+                sc.y = std::stof(tokens[2]);
+                sc.t = std::stof(tokens[3]);
+                sc.delay = static_cast<uint32_t>(std::stoul(tokens[4]));
+                sc.noise_x = std::stof(tokens[5]);
+                sc.noise_y = std::stof(tokens[6]);
+                sc.noise_t = std::stof(tokens[7]);
+                std::string msg_name = (tokens[0] == "SETCAM1") ? "CMD_SET_CAMERA_1"
+                                      : (tokens[0] == "SETCAM2") ? "CMD_SET_CAMERA_2"
+                                                                  : "CMD_SET_CAMERA_3";
+                send_framed(card, msg_name, reinterpret_cast<uint8_t*>(&sc), sizeof(sc));
+                return;
+            }
+
+            if (tokens[0] == "BLOCK") {
+                uint8_t v = 1;
+                send_framed(card, "CMD_BLOCK", &v, sizeof(v));
+                return;
+            }
+
+            if (tokens[0] == "FREE") {
+                uint8_t v = 1;
+                send_framed(card, "CMD_FREE", &v, sizeof(v));
+                return;
+            }
+        } catch (const std::exception &e) {
+            RCLCPP_WARN(this->get_logger(), "Failed to parse structured command '%s': %s", msg->data.c_str(), e.what());
+            return;
+        }
+
+        // Fallback : texte libre encapsule en CMD_GENERIC
+        std::string out = process_data_send(msg->data);
+        if (!out.empty()) {
+            send_framed(card, "CMD_GENERIC", reinterpret_cast<const uint8_t*>(out.data()),
+                        static_cast<uint16_t>(out.size()));
         }
     }
 
@@ -516,13 +665,10 @@ private:
         std::vector<std::string> tokens;
         std::string token;
         std::istringstream tokenStream(str);
-        while (tokenStream >> token) {
-            tokens.push_back(token);
-        }
+        while (tokenStream >> token) tokens.push_back(token);
         return tokens;
     }
 
-    // Outil pour limiter le nombre de décimales (évite de surcharger la Zynq)
     std::string limit_decimals(const std::string& token, int max_decimals = 3) {
         size_t dot_pos = token.find('.');
         if (dot_pos != std::string::npos && token.length() > dot_pos + 1 + max_decimals) {
@@ -531,35 +677,17 @@ private:
         return token;
     }
 
+    // Reconstruction texte generique (utilisee pour le serial, et en fallback
+    // ethernet pour tout ce qui n'est pas une commande structuree reconnue).
     std::string process_data_send(std::string data) {
         auto splitted_data = split(data);
         if (splitted_data.empty()) return "";
 
-        // 1. Publication de goal_position (Ne plantera plus grâce au fix de la locale)
-        if (splitted_data[0] == "MOVE" && splitted_data.size() == 4) {
-            try {
-                auto goal_pos = opossum_msgs::msg::GoalDetection();
-                goal_pos.goal_position.x = std::stod(splitted_data[1]);
-                goal_pos.goal_position.y = std::stod(splitted_data[2]);
-                goal_pos.goal_position.z = std::stod(splitted_data[3]);
-                goal_pos.detection_mode = -1;
-                goal_pos.obstacle_detection_distance = 0.5;
-                pub_goal_position_->publish(goal_pos);
-            } catch (const std::exception& e) {
-                RCLCPP_WARN(this->get_logger(), "GREGOIRE SEND GOOD COMMAND: %s", e.what());
-            }
-        }
-
-        // 2. Reconstruction propre et tronquée de la chaîne pour la Zynq
         std::string out_msg = splitted_data[0];
-
-        // Gère l'exception du MOVE à 5 arguments
         size_t arg_count = (splitted_data[0] == "MOVE" && splitted_data.size() == 5) ? 4 : splitted_data.size();
-
         for (size_t i = 1; i < arg_count; ++i) {
-            out_msg += " " + limit_decimals(splitted_data[i], 3); // On force 3 décimales
+            out_msg += " " + limit_decimals(splitted_data[i], 3);
         }
-
         return out_msg;
     }
 
@@ -594,8 +722,6 @@ private:
 };
 
 int main(int argc, char** argv) {
-    // --- CORRECTION MAJEURE: FIXE LA LOCALE POUR STD::STOD ---
-    // Indispensable si l'OS est en français pour que C++ lise "1.23" et non "1,23"
     std::setlocale(LC_NUMERIC, "C");
 
     rclcpp::init(argc, argv);

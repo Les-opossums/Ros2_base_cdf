@@ -12,14 +12,12 @@ find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(opossum_msgs REQUIRED)
-
-# Find the C++ serial library
+find_package(yaml-cpp REQUIRED)
 find_package(serial REQUIRED)
 
 include_directories(include)
 
 # 2. Build the C++ Executable
-# Make sure your file is located at src/comm_node.cpp
 add_executable(comm_node src/comm_node.cpp)
 
 # 3. Link the dependencies to your new C++ node
@@ -29,6 +27,7 @@ ament_target_dependencies(comm_node
   opossum_msgs
   serial
 )
+target_link_libraries(comm_node yaml-cpp)
 
 # 4. Install the C++ executable
 install(TARGETS
