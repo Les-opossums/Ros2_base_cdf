@@ -526,6 +526,7 @@ private:
                 msg.data = "LEASH";
                 pub_feedback_command_->publish(msg);
             }
+        }
     
         else {
             RCLCPP_DEBUG(this->get_logger(), "Ignored or unhandled message type: %s", msg_name.c_str());
