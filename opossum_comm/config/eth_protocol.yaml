@@ -27,6 +27,7 @@ messages:
   MOTOR_STATE:          { id: 0x12, channel: TELEMETRY }
   ROBOT_STATE:          { id: 0x13, channel: TELEMETRY }
   AU:                   { id: 0x14, channel: TELEMETRY }
+  LEASH:                { id: 0x15, channel: TELEMETRY }
 
   # --- RX (Pi -> Zynq) ---
   CMD_GENERIC:          { id: 0x20, channel: CMD }

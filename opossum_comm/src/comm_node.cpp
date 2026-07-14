@@ -498,7 +498,36 @@ private:
             while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) text.pop_back();
             if (!text.empty()) handle_received_line(text);
 
-        } else {
+        else if (msg_name == "AU") {
+            // Sécurité : on vérifie qu'on a bien au moins 1 octet de donnée
+            if (hdr.payload_len < 1) {
+                RCLCPP_WARN(this->get_logger(), "Taille payload AU incorrecte depuis %s", name.c_str());
+                return;
+            }
+            
+            // On lit le premier octet du payload (0, 1 ou 2)
+            uint8_t au_state = payload[0]; 
+
+            // On formate le message texte pour le noeud Python ("AU 0", "AU 1", etc.)
+            auto msg = std_msgs::msg::String();
+            msg.data = "AU " + std::to_string(au_state);
+            pub_feedback_command_->publish(msg);
+
+        } else if (msg_name == "LEASH") {
+            if (hdr.payload_len < 1) {
+                RCLCPP_WARN(this->get_logger(), "Taille payload LEASH incorrecte depuis %s", name.c_str());
+                return;
+            }
+            
+            uint8_t leash_state = payload[0];
+
+            if (leash_state == 1) {
+                auto msg = std_msgs::msg::String();
+                msg.data = "LEASH";
+                pub_feedback_command_->publish(msg);
+            }
+    
+        else {
             RCLCPP_DEBUG(this->get_logger(), "Ignored or unhandled message type: %s", msg_name.c_str());
         }
     }
