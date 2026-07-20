@@ -133,92 +133,83 @@ class SingleVisionNode(Node):
             self.process_data_rcv(data)
 
     def process_data_rcv(self, data):
-        """Traite les données brutes et publie les messages ROS."""
-        if len(data) == 0:
+        """Traite les données brutes et publie les messages ROS.
+
+        Le dispatch initial se fait sur le premier mot via partition(), pas
+        via un split() complet de la ligne : une trame ARUCO avec plusieurs
+        tags detectes peut contenir des dizaines de tokens, et un split()
+        complet ne servirait qu'a lire l'element 0 avant d'etre jete -- le
+        parsing detaille de chaque branche se charge ensuite de decouper ce
+        dont elle a reellement besoin. A 30-60Hz par camera (x3 cameras),
+        ca evite un aller-retour d'allocation Python inutile par ligne.
+        """
+        if not data:
             return
-        splitted_data = data.split()
-        if len(splitted_data) < 1:
-            return
-            
-        if splitted_data[0] == "ARUCO":  
-            parts = data.split(',')
-            if len(parts) < 1:
-                return
 
-            header_tokens = parts[0].split()
-            if len(header_tokens) < 2:
-                return
+        head = data.partition(' ')[0]
 
-            vision_frame_msg = VisionDataFrame()
-            try:
-                # Utilise l'ID envoyé par la carte, sinon l'ID du paramètre
-                vision_frame_msg.id = int(header_tokens[1])
-            except ValueError:
-                vision_frame_msg.id = self.camera_id
-
-            # Format JeVois : "ARUCO <CAM_ID> <CAPTURE_US>,..." -- convertit
-            # l'instant de capture (horloge locale JeVois) en temps Pi via la
-            # calibration HEARTBEAT. 0.0 si pas encore calibre : le
-            # consommateur (action_sequencer_node) doit alors retomber sur la
-            # pose robot courante plutot que sur l'historique.
-            vision_frame_msg.capture_time = 0.0
-            if len(header_tokens) >= 3:
-                try:
-                    capture_us = int(header_tokens[2])
-                    local_t = self._clock_sync.to_local(capture_us)
-                    if local_t is not None:
-                        vision_frame_msg.capture_time = local_t
-                except ValueError:
-                    pass
-
-            vision_frame_msg.object = []
-
-            for part in parts[1:]:
-                tag_tokens = part.split()
-                if tag_tokens:
-                    obj = self.create_vision_data(tag_tokens)
-                    if obj:
-                        vision_frame_msg.object.append(obj)
-
-            self.aruco_pub.publish(vision_frame_msg)
-
-        # elif splitted_data[0] == "ROBOTPOS" and len(splitted_data) == 9: 
-        #     try:
-        #         loc_msg = CameraLoc()
-        #         loc_msg.camera_id = int(splitted_data[1])
-        #         loc_msg.robot_position.x = float(splitted_data[2])
-        #         loc_msg.robot_position.y = float(splitted_data[3])
-        #         loc_msg.robot_position.z = float(splitted_data[4]) 
-        #         loc_msg.latency = int(splitted_data[5])
-        #         loc_msg.noise.x = float(splitted_data[6])
-        #         loc_msg.noise.y = float(splitted_data[7])
-        #         loc_msg.noise.z = float(splitted_data[8]) 
-        #         self.pub_command.publish(
-        #             String(data=f"SETCAMERA{loc_msg.camera_id}" +
-        #             f" {loc_msg.robot_position.x}" +
-        #             f" {loc_msg.robot_position.y}" +
-        #             f" {loc_msg.robot_position.z}" +
-        #             f" {loc_msg.latency}" +
-        #             f" {loc_msg.noise.x}" +
-        #             f" {loc_msg.noise.y}" +
-        #             f" {loc_msg.noise.z} \n")                    
-        #             )
-        #         self.camera_loc_pub.publish(loc_msg)
-        #     except Exception as e:
-        #         self.get_logger().warn(f"Erreur parsing LOC: {e}")
-
-        elif splitted_data[0] == "HEARTBEAT":
-            # Format JeVois : "HEARTBEAT <CAM_ID> <CAPTURE_US>" -- sert
-            # uniquement a caler l'horloge locale du JeVois sur celle du Pi.
-            if len(splitted_data) >= 3:
-                try:
-                    capture_us = int(splitted_data[2])
-                    self._clock_sync.update(capture_us, time.time())
-                except ValueError:
-                    pass
-
-        elif splitted_data[0] == "ERROR":
+        if head == "ARUCO":
+            self._handle_aruco(data)
+        elif head == "HEARTBEAT":
+            self._handle_heartbeat(data)
+        elif head == "ERROR":
             self.get_logger().error(f"Erreur de la carte: {data}")
+
+    def _handle_aruco(self, data):
+        parts = data.split(',')
+        if len(parts) < 1:
+            return
+
+        header_tokens = parts[0].split()
+        if len(header_tokens) < 2:
+            return
+
+        vision_frame_msg = VisionDataFrame()
+        try:
+            # Utilise l'ID envoyé par la carte, sinon l'ID du paramètre
+            vision_frame_msg.id = int(header_tokens[1])
+        except ValueError:
+            vision_frame_msg.id = self.camera_id
+
+        # Format JeVois : "ARUCO <CAM_ID> <CAPTURE_US>,..." -- convertit
+        # l'instant de capture (horloge locale JeVois) en temps Pi via la
+        # calibration HEARTBEAT. 0.0 si pas encore calibre : le
+        # consommateur (action_sequencer_node) doit alors retomber sur la
+        # pose robot courante plutot que sur l'historique.
+        vision_frame_msg.capture_time = 0.0
+        if len(header_tokens) >= 3:
+            try:
+                capture_us = int(header_tokens[2])
+                local_t = self._clock_sync.to_local(capture_us)
+                if local_t is not None:
+                    vision_frame_msg.capture_time = local_t
+            except ValueError:
+                pass
+
+        vision_frame_msg.object = []
+
+        for part in parts[1:]:
+            tag_tokens = part.split()
+            if tag_tokens:
+                obj = self.create_vision_data(tag_tokens)
+                if obj:
+                    vision_frame_msg.object.append(obj)
+
+        self.aruco_pub.publish(vision_frame_msg)
+
+    # ROBOTPOS desactive cote firmware/Pi pour le moment (cf historique du
+    # depot) -- laisse volontairement de cote ici, rien a reactiver.
+
+    def _handle_heartbeat(self, data):
+        # Format JeVois : "HEARTBEAT <CAM_ID> <CAPTURE_US>" -- sert
+        # uniquement a caler l'horloge locale du JeVois sur celle du Pi.
+        tokens = data.split()
+        if len(tokens) >= 3:
+            try:
+                capture_us = int(tokens[2])
+                self._clock_sync.update(capture_us, time.time())
+            except ValueError:
+                pass
 
     def create_vision_data(self, tokens):
         """Convertit les tokens bruts en un objet VisionData."""
