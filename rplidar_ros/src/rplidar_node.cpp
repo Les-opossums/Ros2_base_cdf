@@ -552,13 +552,22 @@ public:
                                 frame_id);
                     }
                 } else if (op_result == SL_RESULT_OPERATION_FAIL) {
-                    // All the data is invalid, just publish them
-                    float angle_min = DEG2RAD(0.0f);
-                    float angle_max = DEG2RAD(359.0f);
-                    publish_scan(scan_pub, nodes, count,
-                                start_scan_time, scan_duration, inverted, flip_x_axis,
-                                angle_min, angle_max, max_distance,
-                                frame_id);
+                    // ascendScanData a signale qu'AUCUN point de ce tour n'est
+                    // valide (tous a distance 0) -- ca ne peut arriver que sur
+                    // un tour entierement rate (glitch capteur, cache-poussiere,
+                    // reglage moteur au demarrage...). Publier quand meme ce
+                    // scan revient a envoyer un LaserScan 100% "infini" qui
+                    // n'apporte aucune information utile, pollue le taux de
+                    // publication observe (ros2 topic hz), et peut perturber
+                    // les consommateurs en aval (triangulation, obstacle
+                    // detector) avec un message parasite entre deux tours
+                    // valides. On le journalise (limite a 1/s pour ne pas
+                    // spammer) et on saute la publication plutot que
+                    // d'envoyer des donnees qu'on sait deja inutilisables.
+                    RCLCPP_WARN_THROTTLE(
+                        this->get_logger(), *this->get_clock(), 1000,
+                        "Tour de scan entierement invalide (0/%zu points valides), publication ignoree.",
+                        count);
                 }
             }
 
