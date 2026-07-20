@@ -5,6 +5,7 @@ from rclpy.node import Node
 import serial
 import threading
 import time
+from collections import deque
 
 # Assurez-vous que l'import fonctionne selon votre structure
 try:
@@ -15,6 +16,41 @@ except ImportError:
     class VisionDataFrame: pass
     class CameraLoc: pass
     class String: pass
+
+class JevoisClockSync:
+    """Estime l'offset entre l'horloge locale (arbitraire, boot du module) du
+    JeVois et l'horloge du Raspberry Pi, a partir des trames
+    "HEARTBEAT <CAM_ID> <capture_us>" envoyees periodiquement par la camera.
+
+    Principe (NTP simplifie, sens unique) : a chaque HEARTBEAT recu,
+    offset_estimate = t_local_reception - capture_us/1e6. La seule chose qui
+    peut faire varier cette estimation d'un heartbeat a l'autre est un DELAI
+    de transmission (traitement JeVois + liaison serie + ordonnancement sur
+    le Pi), qui ne peut qu'AJOUTER du retard, jamais en retirer. Donc la
+    vraie valeur de l'offset est la valeur MINIMALE observee sur une fenetre
+    glissante -- les echantillons plus grands ne sont que du jitter de
+    transmission qu'on ne veut pas propager dans le calcul du retard camera.
+    """
+
+    def __init__(self, window=25):
+        self._samples = deque(maxlen=window)
+
+    def update(self, capture_us, t_local_recv):
+        offset = t_local_recv - (capture_us / 1.0e6)
+        self._samples.append(offset)
+
+    @property
+    def ready(self):
+        return len(self._samples) > 0
+
+    def to_local(self, capture_us):
+        """Convertit un timestamp JeVois (us, horloge locale camera) en
+        timestamp Pi (s, meme horloge que time.time()). Retourne None tant
+        qu'aucun HEARTBEAT n'a ete recu."""
+        if not self._samples:
+            return None
+        return (capture_us / 1.0e6) + min(self._samples)
+
 
 class SingleVisionNode(Node):
     def __init__(self):
@@ -35,6 +71,13 @@ class SingleVisionNode(Node):
         self.aruco_pub = self.create_publisher(VisionDataFrame, 'aruco_loc', 10)
         self.pub_command = self.create_publisher(String, "command", 10)
         self.camera_loc_pub = self.create_publisher(CameraLoc, 'camera_loc', 10)
+
+        # Calibration d'horloge JeVois -> Pi, alimentee par les trames HEARTBEAT.
+        # Necessaire pour convertir le CAPTURE_US envoye dans les trames ARUCO
+        # (horloge locale/arbitraire du JeVois) en un temps comparable a
+        # time.time() sur le Pi -- indispensable pour compenser le retard
+        # camera cote action_sequencer_node (historique de pose robot).
+        self._clock_sync = JevoisClockSync()
 
         # 3. Démarrage
         self.is_running = True
@@ -109,9 +152,24 @@ class SingleVisionNode(Node):
             vision_frame_msg = VisionDataFrame()
             try:
                 # Utilise l'ID envoyé par la carte, sinon l'ID du paramètre
-                vision_frame_msg.id = int(header_tokens[1]) 
+                vision_frame_msg.id = int(header_tokens[1])
             except ValueError:
                 vision_frame_msg.id = self.camera_id
+
+            # Format JeVois : "ARUCO <CAM_ID> <CAPTURE_US>,..." -- convertit
+            # l'instant de capture (horloge locale JeVois) en temps Pi via la
+            # calibration HEARTBEAT. 0.0 si pas encore calibre : le
+            # consommateur (action_sequencer_node) doit alors retomber sur la
+            # pose robot courante plutot que sur l'historique.
+            vision_frame_msg.capture_time = 0.0
+            if len(header_tokens) >= 3:
+                try:
+                    capture_us = int(header_tokens[2])
+                    local_t = self._clock_sync.to_local(capture_us)
+                    if local_t is not None:
+                        vision_frame_msg.capture_time = local_t
+                except ValueError:
+                    pass
 
             vision_frame_msg.object = []
 
@@ -148,6 +206,16 @@ class SingleVisionNode(Node):
         #         self.camera_loc_pub.publish(loc_msg)
         #     except Exception as e:
         #         self.get_logger().warn(f"Erreur parsing LOC: {e}")
+
+        elif splitted_data[0] == "HEARTBEAT":
+            # Format JeVois : "HEARTBEAT <CAM_ID> <CAPTURE_US>" -- sert
+            # uniquement a caler l'horloge locale du JeVois sur celle du Pi.
+            if len(splitted_data) >= 3:
+                try:
+                    capture_us = int(splitted_data[2])
+                    self._clock_sync.update(capture_us, time.time())
+                except ValueError:
+                    pass
 
         elif splitted_data[0] == "ERROR":
             self.get_logger().error(f"Erreur de la carte: {data}")

@@ -24,6 +24,7 @@ import yaml
 import numpy as np
 from opossum_action_sequencer.utils import (
     Position,
+    RobotPoseHistory,
 )
 
 import threading
@@ -170,6 +171,13 @@ class ActionManager(Node):
         self.is_pump_bottom_on = False
         self.obstacle_detected = False
         self.robot_pos = None
+        # Historique pose/vitesse robot (alimente par robot_data_callback),
+        # utilise pour retrouver la pose du robot au moment ou une frame
+        # camera a ete capturee -- voir stare_and_update() -- au lieu de la
+        # pose courante, ce qui compense le retard camera quand le robot
+        # bouge. 2s couvre largement le retard camera+serie attendu.
+        self.pose_history = RobotPoseHistory(max_age_s=2.0)
+        self._last_camera_latency_log = {1: 0.0, 2: 0.0, 3: 0.0}
         self.motion_done = True
         self.break_engage = False
         self.pliers_done = True
@@ -701,9 +709,39 @@ class ActionManager(Node):
             # =====================================================================
             # 3. TRANSFORM DETECTIONS: ROBOT FRAME -> WORLD FRAME
             # =====================================================================
+            # Compensation du retard camera : on transforme la detection avec
+            # la pose du robot AU MOMENT OU LA FRAME A ETE CAPTUREE (retrouvee
+            # dans l'historique de pose), pas la pose courante. Sans ca,
+            # l'erreur de transformation grandit avec la vitesse du robot et
+            # empeche d'exploiter les cameras pendant un deplacement.
+            capture_time = getattr(msg, 'capture_time', 0.0)
+            frame_pose = None
+            extrapolated_by = None
+            if capture_time > 0.0:
+                frame_pose, extrapolated_by = self.pose_history.get_pose_at(capture_time)
+
+                # Diagnostic (rate-limite) : combien de retard camera on compense
+                # reellement, et si on a du extrapoler hors de l'historique
+                # dispo (signe potentiel de souci de calibration d'horloge).
+                if current_time - self._last_camera_latency_log.get(key, 0.0) > 2.0:
+                    latency_ms = (current_time - capture_time) * 1000.0
+                    msg_extra = ""
+                    if extrapolated_by is not None and abs(extrapolated_by) > 1e-3:
+                        msg_extra = f" (extrapole de {extrapolated_by*1000:.0f}ms hors historique)"
+                    self.get_logger().info(
+                        f"Camera {key}: retard capture->traitement = {latency_ms:.0f}ms{msg_extra}"
+                    )
+                    self._last_camera_latency_log[key] = current_time
+
+            if frame_pose is None:
+                # Pas de timestamp de capture calibre (camera pas encore
+                # synchronisee, ou source ne le fournissant pas, ex: simu) :
+                # on retombe sur le comportement d'origine.
+                frame_pose = self.robot_pos
+
             current_frame_world_dets = []
-            cos_t = math.cos(self.robot_pos.t)
-            sin_t = math.sin(self.robot_pos.t)
+            cos_t = math.cos(frame_pose.t)
+            sin_t = math.sin(frame_pose.t)
 
             # self.get_logger().info(f"For camera {key}:")
             for det in msg.object:
@@ -715,18 +753,18 @@ class ActionManager(Node):
                     continue
 
                 # self.get_logger().info(f"CAMERA {key}: {}")
-                    
+
                 world_det = SimpleNamespace()
                 world_det.id = det.id
-                world_det.x = self.robot_pos.x + (det.x * cos_t - det.y * sin_t)
+                world_det.x = frame_pose.x + (det.x * cos_t - det.y * sin_t)
                 if world_det.x < self.boundaries[0] or world_det.x > self.boundaries[1]:
                     continue
 
-                world_det.y = self.robot_pos.y + (det.x * sin_t + det.y * cos_t)
+                world_det.y = frame_pose.y + (det.x * sin_t + det.y * cos_t)
                 if world_det.y < self.boundaries[2] or world_det.y > self.f_zone_y_min - 0.05:
                     continue
 
-                world_det.theta = self.robot_pos.t + det.theta
+                world_det.theta = frame_pose.t + det.theta
                 current_frame_world_dets.append(world_det)
 
             # =====================================================================
@@ -1179,9 +1217,11 @@ class ActionManager(Node):
 
     def robot_data_callback(self, msg: RobotData):
         """Receive the Robot Data from Zynq."""
+        now = time.time()
         with self.data_lock:
             self.robot_pos = Position(x=msg.x, y=msg.y, t=msg.theta)
             self.robot_speed = Position(x=msg.vlin, y=msg.vdir, t=msg.vt)
+            self.pose_history.push(now, msg.x, msg.y, msg.theta, msg.vlin, msg.vdir, msg.vt)
 
         if not self.motion_done:
             # Update motion state
