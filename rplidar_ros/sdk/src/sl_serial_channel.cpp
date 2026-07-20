@@ -88,12 +88,35 @@ namespace sl {
                 return RESULT_OPERATION_FAIL;
             }
 
-            result = _rxtxSerial->waitfordata(1, timeoutInMs, &size_holder);
+            // IMPORTANT (perf) : avec un flux serie continu (scan haute
+            // densite, ex: mode Sensitivity du A2M12), attendre ne serait-ce
+            // qu'1 octet fait revenir cet appel quasi instantanement a
+            // chaque fois puisqu'il y a (presque) toujours au moins 1 octet
+            // deja arrive -- le thread de reception (_proc_rxThread) tourne
+            // alors en quasi busy-loop : un new/delete + un lock + un
+            // read()/ioctl() par octet ou presque, des milliers de fois par
+            // seconde, rien que pour "attendre" un evenement qui n'en est
+            // plus un. On force donc un lot minimum avant de considerer les
+            // donnees "pretes", ce qui reduit d'autant le nombre de
+            // reveils/allocations. kMinBatchBytes reste petit (largement
+            // sous la milliseconde de donnees a haut debit) donc la latence
+            // ajoutee est negligeable comparee au reste de la chaine.
+            static const size_t kMinBatchBytes = 64;
+
+            result = _rxtxSerial->waitfordata(kMinBatchBytes, timeoutInMs, &size_holder);
             size_hint = size_holder;
             if (result == (_word_size_t)rp::hal::serial_rxtx::ANS_DEV_ERR)
                 return RESULT_OPERATION_FAIL;
-            if (result == (_word_size_t)rp::hal::serial_rxtx::ANS_TIMEOUT)
+            if (result == (_word_size_t)rp::hal::serial_rxtx::ANS_TIMEOUT) {
+                // Moins de kMinBatchBytes sont arrives avant le timeout (fin
+                // de trame, debit plus faible...). On recupere quand meme ce
+                // qui est disponible plutot que d'attendre indefiniment un
+                // lot complet qui peut ne jamais se produire.
+                if (size_holder > 0) {
+                    return RESULT_OK;
+                }
                 return RESULT_OPERATION_TIMEOUT;
+            }
 
             return RESULT_OK;
         }

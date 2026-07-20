@@ -347,8 +347,18 @@ int raw_serial::waitfordata(size_t data_count, _u32 timeout, size_t * returned_s
         }
         else if (n == 0)
         {
-            // time out
-            *returned_size =0;
+            // Timeout en attendant data_count octets. On rapporte quand meme
+            // ce qui est reellement disponible (au lieu de forcer 0) : ca
+            // permet a l'appelant (voir waitForDataExt / _proc_rxThread) de
+            // recuperer un lot partiel plutot que d'attendre indefiniment un
+            // lot complet qui peut ne jamais arriver (fin de trame, faible
+            // debit...).
+            int nread = 0;
+            if (isOpened() && ioctl(serial_fd, FIONREAD, &nread) != -1) {
+                *returned_size = nread;
+            } else {
+                *returned_size = 0;
+            }
             return ANS_TIMEOUT;
         }
         else
