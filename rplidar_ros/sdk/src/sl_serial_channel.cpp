@@ -33,6 +33,7 @@
 #include "sl_lidar_driver.h"
 #include "hal/abs_rxtx.h"
 #include "hal/socket.h"
+#include <unistd.h> // usleep -- ce fichier n'est compile que pour la cible Linux dans ce workspace
 
 
 namespace sl {
@@ -96,27 +97,39 @@ namespace sl {
             // alors en quasi busy-loop : un new/delete + un lock + un
             // read()/ioctl() par octet ou presque, des milliers de fois par
             // seconde, rien que pour "attendre" un evenement qui n'en est
-            // plus un. On force donc un lot minimum avant de considerer les
-            // donnees "pretes", ce qui reduit d'autant le nombre de
-            // reveils/allocations. kMinBatchBytes reste petit (largement
-            // sous la milliseconde de donnees a haut debit) donc la latence
-            // ajoutee est negligeable comparee au reste de la chaine.
-            static const size_t kMinBatchBytes = 64;
-
-            result = _rxtxSerial->waitfordata(kMinBatchBytes, timeoutInMs, &size_holder);
-            size_hint = size_holder;
-            if (result == (_word_size_t)rp::hal::serial_rxtx::ANS_DEV_ERR)
+            // plus un.
+            //
+            // ATTENTION : select()/poll() sont "level-triggered" sur la
+            // presence de donnees, pas sur un NOMBRE d'octets -- demander
+            // directement un data_count eleve a waitfordata() ne fonctionne
+            // pas : des qu'1 octet est present, select() ne bloque plus du
+            // tout, et la boucle interne de waitfordata() tourne alors en
+            // pur busy-spin (ioctl(FIONREAD) en rafale) jusqu'a ce que le
+            // seuil soit atteint -- c'est PIRE que l'origine (verifie en
+            // prod : un thread a 99% au lieu de deux a ~40%/~20%).
+            //
+            // La bonne approche : attendre qu'il y ait AU MOINS 1 octet
+            // (bloquant, pas de busy-loop), puis faire une courte pause
+            // fixe pour laisser un lot s'accumuler avant de reveiller
+            // _proc_rxThread. 2ms est negligeable en latence face au reste
+            // de la chaine (camera, etc.) mais suffit a regrouper plusieurs
+            // octets/capsules par reveil, ce qui divise d'autant le nombre
+            // d'allocations/locks/decodages par seconde.
+            result = _rxtxSerial->waitfordata(1, timeoutInMs, &size_holder);
+            if (result == (_word_size_t)rp::hal::serial_rxtx::ANS_DEV_ERR) {
+                size_hint = 0;
                 return RESULT_OPERATION_FAIL;
+            }
             if (result == (_word_size_t)rp::hal::serial_rxtx::ANS_TIMEOUT) {
-                // Moins de kMinBatchBytes sont arrives avant le timeout (fin
-                // de trame, debit plus faible...). On recupere quand meme ce
-                // qui est disponible plutot que d'attendre indefiniment un
-                // lot complet qui peut ne jamais se produire.
-                if (size_holder > 0) {
-                    return RESULT_OK;
-                }
+                size_hint = 0;
                 return RESULT_OPERATION_TIMEOUT;
             }
+
+            static const useconds_t kCoalesceUs = 2000; // 2ms
+            usleep(kCoalesceUs);
+
+            size_t available = _rxtxSerial->rxqueue_count();
+            size_hint = (available > size_holder) ? available : size_holder;
 
             return RESULT_OK;
         }
