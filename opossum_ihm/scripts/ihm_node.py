@@ -11,16 +11,36 @@ if "GTK_PATH" in os.environ:
     del os.environ["GTK_PATH"]
 # ----------------------------------------
 
+import time
+
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from opossum_ihm.interface import MainWindow
 from opossum_msgs.msg import LidarLoc, RobotData
 from opossum_msgs.srv import Init
-from std_srvs.srv import Trigger 
+from std_srvs.srv import Trigger
 from std_msgs.msg import Int32, Bool, String
+
+# La GUI n'affiche ces valeurs qu'a 5 Hz (voir MatchPage.gui_timer, 200ms).
+# Les topics "command" (3 cameras JeVois cumulees), "position_out" et
+# "robot_data" arrivent eux a un debit bien plus eleve (jusqu'a plusieurs
+# dizaines/centaines de Hz), et rclpy paie un cout de deserialisation +
+# dispatch Python par message recu, meme si le callback est trivial. On
+# n'a donc aucune raison de traiter ces messages plus vite que ce que la
+# GUI en fait ensuite: on droppe les messages trop rapproches AVANT de les
+# parser, ce qui coupe le travail Python inutile (et permet de passer les
+# souscriptions en depth=1/best_effort pour ne jamais accumuler de backlog).
+FAST_TOPIC_MIN_PERIOD_S = 0.1  # 10 Hz max de traitement reel
+
+FAST_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.BEST_EFFORT,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+)
 
 class RosNode(Node):
     def __init__(self):
@@ -71,17 +91,35 @@ class RosThread(QThread):
         self.node.create_subscription(String, "feedback_command", lambda m: self.sig_feedback_command.emit(m.data), 10)
         
         # 3. Abonnements rapides -> Mise à jour directe des variables (thread-safe)
-        self.node.create_subscription(String, "command", self.cb_cam, 10)
-        self.node.create_subscription(LidarLoc, "position_out", self.cb_lidar, 1)
-        self.node.create_subscription(RobotData, "robot_data", self.cb_zynq, 1)
+        # QoS best_effort/depth=1 : on ne veut jamais qu'un backlog de messages
+        # (surtout "command", cumule des 3 cameras JeVois) s'accumule et soit
+        # traite en rafale par l'executor.
+        self._last_cam_ts = 0.0
+        self._last_lidar_ts = 0.0
+        self._last_zynq_ts = 0.0
+        self.node.create_subscription(String, "command", self.cb_cam, FAST_QOS)
+        self.node.create_subscription(LidarLoc, "position_out", self.cb_lidar, FAST_QOS)
+        self.node.create_subscription(RobotData, "robot_data", self.cb_zynq, FAST_QOS)
 
     def cb_lidar(self, msg):
+        now = time.monotonic()
+        if now - self._last_lidar_ts < FAST_TOPIC_MIN_PERIOD_S:
+            return
+        self._last_lidar_ts = now
         self.node.latest_lidar = (msg.robot_position.x, msg.robot_position.y, msg.robot_position.z)
 
     def cb_zynq(self, msg):
+        now = time.monotonic()
+        if now - self._last_zynq_ts < FAST_TOPIC_MIN_PERIOD_S:
+            return
+        self._last_zynq_ts = now
         self.node.latest_zynq = (msg.x, msg.y, msg.theta)
 
     def cb_cam(self, msg):
+        now = time.monotonic()
+        if now - self._last_cam_ts < FAST_TOPIC_MIN_PERIOD_S:
+            return
+        self._last_cam_ts = now
         d = msg.data.strip().split()
         if d and d[0].startswith("SETCAMERA"):
             try:
