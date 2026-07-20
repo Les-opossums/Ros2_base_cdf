@@ -38,6 +38,7 @@
 #include "sl_lidar.h"
 #include "math.h"
 #include <algorithm>  // for std::rotate
+#include <memory>     // for std::unique_ptr
 #include <signal.h>
 
 #ifndef _countof
@@ -502,7 +503,15 @@ public:
                         //const int angle_compensate_multiple = 1;
                         const int angle_compensate_nodes_count = 360*angle_compensate_multiple;
                         int angle_compensate_offset = 0;
-                        auto angle_compensate_nodes = new sl_lidar_response_measurement_node_hq_t[angle_compensate_nodes_count];
+
+                        // Reuse a member buffer instead of new[]/delete[] on every
+                        // single scan (10-20 Hz): that churn was a real source of
+                        // CPU/heap-allocator overhead on the Pi.
+                        if (angle_compensate_buffer_count < (size_t)angle_compensate_nodes_count) {
+                            angle_compensate_buffer.reset(new sl_lidar_response_measurement_node_hq_t[angle_compensate_nodes_count]);
+                            angle_compensate_buffer_count = angle_compensate_nodes_count;
+                        }
+                        auto angle_compensate_nodes = angle_compensate_buffer.get();
                         memset(angle_compensate_nodes, 0, angle_compensate_nodes_count*sizeof(sl_lidar_response_measurement_node_hq_t));
 
                         size_t i = 0, j = 0;
@@ -524,11 +533,6 @@ public:
                                 start_scan_time, scan_duration, inverted, flip_x_axis,
                                 angle_min, angle_max, max_distance,
                                 frame_id);
-
-                        if (angle_compensate_nodes) {
-                            delete[] angle_compensate_nodes;
-                            angle_compensate_nodes = nullptr;
-                        }
                     } else {
                         int start_node = 0, end_node = 0;
                         int i = 0;
@@ -595,6 +599,10 @@ public:
     float max_distance_soft;
     /* State */
     bool is_scanning = false;
+
+    // Reused across scans to avoid a new[]/delete[] every publish_scan call.
+    std::unique_ptr<sl_lidar_response_measurement_node_hq_t[]> angle_compensate_buffer;
+    size_t angle_compensate_buffer_count = 0;
 
     ILidarDriver *drv = nullptr;
 };

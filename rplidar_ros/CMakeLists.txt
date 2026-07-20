@@ -4,6 +4,15 @@
 cmake_minimum_required(VERSION 3.5)
 project(rplidar_ros)
 
+# A plain `colcon build` does not pass -DCMAKE_BUILD_TYPE, which leaves this
+# package unoptimized (no -O flags) and noticeably increases CPU usage of the
+# scan loop (sort, angle compensation) and of the SDK's serial decoding
+# threads. Default to Release unless the user explicitly asked for something
+# else (e.g. -DCMAKE_BUILD_TYPE=Debug for debugging).
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+endif()
+
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
 endif()
