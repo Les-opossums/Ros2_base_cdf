@@ -498,7 +498,7 @@ private:
             while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) text.pop_back();
             if (!text.empty()) handle_received_line(text);
 
-        else if (msg_name == "AU") {
+        }else if (msg_name == "AU") {
             // Sécurité : on vérifie qu'on a bien au moins 1 octet de donnée
             if (hdr.payload_len < 1) {
                 RCLCPP_WARN(this->get_logger(), "Taille payload AU incorrecte depuis %s", name.c_str());
