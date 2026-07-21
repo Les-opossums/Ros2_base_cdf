@@ -56,6 +56,32 @@ class RosNode(Node):
         self.reset_match_client = self.create_client(Trigger, "reset_match")
         self.pub_color = self.create_publisher(String, "init_team_color", 10)
 
+        # --- Config plateau (grand / petit) publiee pour la page web debug ---
+        # Topic absolu (hors namespace robot) re-publie periodiquement pour que
+        # tout client rosbridge tardif le recoive quelle que soit sa QoS.
+        self.plateau_config = self._read_plateau_config()
+        self.pub_plateau = self.create_publisher(String, "/plateau_config", 10)
+        self.create_timer(3.0, self._publish_plateau_config)
+        self._publish_plateau_config()
+
+    @staticmethod
+    def _read_plateau_config():
+        path = "/home/opossum/robot_ws/config_plateau.txt"
+        try:
+            with open(path) as f:
+                val = f.read().strip().lower()
+            return val if val in ("grand", "petit") else "petit"
+        except Exception:
+            return "petit"
+
+    def _publish_plateau_config(self):
+        # Relit le fichier a chaque tick pour refleter un changement sans
+        # redemarrer le noeud (le choix est ecrit par interface_bringup.py).
+        self.plateau_config = self._read_plateau_config()
+        msg = String()
+        msg.data = self.plateau_config
+        self.pub_plateau.publish(msg)
+
     def publish_color(self, color):
         msg = String()
         msg.data = color
@@ -193,6 +219,8 @@ def main():
 
     window.show()
 
+    # Arret propre : couper rosbridge (s'il tourne) puis le thread ROS
+    app.aboutToQuit.connect(window.page_match.stop_rosbridge)
     app.aboutToQuit.connect(ros_thread.stop)
     sys.exit(app.exec_())
 

@@ -677,6 +677,116 @@ class ActionManager(Node):
             return 2  # Rot (Red)
         return -1 # Unknown
 
+    def _frame_pose_for_camera_msg(self, cam_key, msg, current_time=None):
+        """Pose du robot a utiliser pour transformer une detection camera
+        (robot-frame) en coordonnees monde : celle du robot AU MOMENT OU LA
+        FRAME A ETE CAPTUREE (retrouvee dans l'historique de pose), pas la
+        pose courante. Sans ca, l'erreur de transformation grandit avec la
+        vitesse du robot et empeche d'exploiter les cameras en mouvement.
+
+        Utilisee par stare_and_update() et follow_tag_aruco() -- meme logique
+        de compensation dans les deux cas, extraite ici pour ne pas la
+        dupliquer.
+        """
+        if current_time is None:
+            current_time = time.time()
+
+        capture_time = getattr(msg, 'capture_time', 0.0)
+        frame_pose = None
+        if capture_time > 0.0:
+            frame_pose, extrapolated_by = self.pose_history.get_pose_at(capture_time)
+
+            # Diagnostic (rate-limite) : combien de retard camera on compense
+            # reellement, et si on a du extrapoler hors de l'historique
+            # dispo (signe potentiel de souci de calibration d'horloge).
+            if current_time - self._last_camera_latency_log.get(cam_key, 0.0) > 2.0:
+                latency_ms = (current_time - capture_time) * 1000.0
+                msg_extra = ""
+                if extrapolated_by is not None and abs(extrapolated_by) > 1e-3:
+                    msg_extra = f" (extrapole de {extrapolated_by*1000:.0f}ms hors historique)"
+                self.get_logger().info(
+                    f"Camera {cam_key}: retard capture->traitement = {latency_ms:.0f}ms{msg_extra}"
+                )
+                self._last_camera_latency_log[cam_key] = current_time
+
+        if frame_pose is None:
+            # Pas de timestamp de capture calibre (camera pas encore
+            # synchronisee, ou source ne le fournissant pas, ex: simu) :
+            # on retombe sur la pose courante.
+            frame_pose = self.robot_pos
+
+        return frame_pose
+
+    def write_log(self, message):
+        """Log utilitaire utilise par tous les scripts de match (node.write_log(...))."""
+        self.get_logger().info(str(message))
+
+    def follow_tag_aruco(self, tag_id=None, camera_ids=None, min_period=0.15):
+        """Suit en continu la position MONDE d'un tag ArUco detecte par les
+        cameras, en compensant le retard camera via l'historique de pose
+        (cf _frame_pose_for_camera_msg) -- script de test pour verifier que
+        la detection camera reste juste pendant que le robot est en
+        mouvement, pas seulement a l'arret.
+
+        tag_id=None  -> prend le premier tag detecte, peu importe son ID.
+        camera_ids=None -> regarde les 3 cameras (dans l'ordre de self.cameras).
+        """
+        if camera_ids is None:
+            camera_ids = list(self.cameras.keys())
+
+        self.write_log(
+            f"follow_tag_aruco: demarrage (tag_id={tag_id if tag_id is not None else 'any'}, "
+            f"cameras={camera_ids})"
+        )
+        self.send_raw("VMAX 0.5")
+
+        while not self.stop:
+            current_time = time.time()
+            target = None
+
+            for cam_id in camera_ids:
+                cam = self.cameras.get(cam_id)
+                if cam is None or cam.last_msg is None:
+                    continue
+                if current_time - cam.last_timestamp > 0.4:
+                    continue  # frame trop vieille, camera muette/deconnectee
+
+                msg = cam.last_msg
+                if not msg.object:
+                    continue
+
+                frame_pose = self._frame_pose_for_camera_msg(cam_id, msg, current_time)
+                if frame_pose is None or frame_pose.t is None:
+                    continue
+
+                cos_t = math.cos(frame_pose.t)
+                sin_t = math.sin(frame_pose.t)
+
+                for det in msg.object:
+                    if tag_id is not None and det.id != tag_id:
+                        continue
+                    # Ignore le bruit trop proche du chassis
+                    if det.x ** 2 + det.y ** 2 < 0.05:
+                        continue
+
+                    world_x = frame_pose.x + (det.x * cos_t - det.y * sin_t)
+                    world_y = frame_pose.y + (det.x * sin_t + det.y * cos_t)
+                    world_t = frame_pose.t + det.theta
+                    target = Position(x=world_x, y=world_y, t=world_t)
+                    break
+
+                if target is not None:
+                    break
+
+            if target is not None:
+                if self.is_point_safe(target.x, target.y, ignore_enemi=True):
+                    self.write_log(f"follow_tag_aruco: cible X:{target.x:.2f} Y:{target.y:.2f}")
+                    self.move_to(target)
+                else:
+                    self.write_log("follow_tag_aruco: cible hors zone sure, ignoree.")
+
+            time.sleep(min_period)
+
     def stare_and_update(self, crate_dict, camera_target=None):
         """
         Stop, let the camera settle, and process the latest frame in World Coordinates.
@@ -709,35 +819,7 @@ class ActionManager(Node):
             # =====================================================================
             # 3. TRANSFORM DETECTIONS: ROBOT FRAME -> WORLD FRAME
             # =====================================================================
-            # Compensation du retard camera : on transforme la detection avec
-            # la pose du robot AU MOMENT OU LA FRAME A ETE CAPTUREE (retrouvee
-            # dans l'historique de pose), pas la pose courante. Sans ca,
-            # l'erreur de transformation grandit avec la vitesse du robot et
-            # empeche d'exploiter les cameras pendant un deplacement.
-            capture_time = getattr(msg, 'capture_time', 0.0)
-            frame_pose = None
-            extrapolated_by = None
-            if capture_time > 0.0:
-                frame_pose, extrapolated_by = self.pose_history.get_pose_at(capture_time)
-
-                # Diagnostic (rate-limite) : combien de retard camera on compense
-                # reellement, et si on a du extrapoler hors de l'historique
-                # dispo (signe potentiel de souci de calibration d'horloge).
-                if current_time - self._last_camera_latency_log.get(key, 0.0) > 2.0:
-                    latency_ms = (current_time - capture_time) * 1000.0
-                    msg_extra = ""
-                    if extrapolated_by is not None and abs(extrapolated_by) > 1e-3:
-                        msg_extra = f" (extrapole de {extrapolated_by*1000:.0f}ms hors historique)"
-                    self.get_logger().info(
-                        f"Camera {key}: retard capture->traitement = {latency_ms:.0f}ms{msg_extra}"
-                    )
-                    self._last_camera_latency_log[key] = current_time
-
-            if frame_pose is None:
-                # Pas de timestamp de capture calibre (camera pas encore
-                # synchronisee, ou source ne le fournissant pas, ex: simu) :
-                # on retombe sur le comportement d'origine.
-                frame_pose = self.robot_pos
+            frame_pose = self._frame_pose_for_camera_msg(key, msg, current_time)
 
             current_frame_world_dets = []
             cos_t = math.cos(frame_pose.t)
@@ -890,7 +972,14 @@ class ActionManager(Node):
             5: ("opossum_action_sequencer.match.script5", "Script 5"),
             6: ("opossum_action_sequencer.match.script6", "Script 6"),
             7: ("opossum_action_sequencer.match.script_homologation", "Script Homologation"),
-            9: ("opossum_action_sequencer.match.follow_ennemi", "Script Follow Ennemi"),
+            # follow_ennemi.py appelle en realite node.follow_tag_aruco() (le
+            # suivi d'ennemi est commente) : c'est le script de test "suit le
+            # tag ArUco vu par les cameras, y compris en mouvement". Deux
+            # numeros (jaune/bleu) pour le meme module, comme MATCH JAUNE/BLEU
+            # ci-dessous -- necessaire pour que le changement de parametre
+            # ROS2 soit toujours detecte meme si on relance le meme test.
+            9: ("opossum_action_sequencer.match.follow_ennemi", "Test suivi camera (jaune)"),
+            10: ("opossum_action_sequencer.match.follow_ennemi", "Test suivi camera (bleu)"),
             11: ("opossum_action_sequencer.match.smart_script", "Script Smart"),
             12: ("opossum_action_sequencer.match.smart_script", "Script Smart"),
             69: ("opossum_action_sequencer.match.script_init", "Script Init"),

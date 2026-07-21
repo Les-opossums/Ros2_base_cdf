@@ -1,5 +1,6 @@
 import os
 import math
+import signal
 import subprocess
 from ament_index_python.packages import get_package_share_directory
 
@@ -36,7 +37,15 @@ class ConfigPage(QWidget):
             ("MATCH JAUNE", "#FFD700", "black", "yellow", 11),
             ("MATCH BLEU", "#0000FF", "white", "blue", 12),
             ("HOMOLOGATION JAUNE", "#B8860B", "white", "yellow", 1),
-            ("HOMOLOGATION BLEU", "#000080", "white", "blue", 2)
+            ("HOMOLOGATION BLEU", "#000080", "white", "blue", 2),
+            # Script de test : le robot suit en continu la position monde du
+            # premier tag ArUco vu par les cameras (compensee du retard
+            # camera), y compris pendant qu'il se deplace -- sert a verifier
+            # que la detection reste juste en mouvement, pas seulement a
+            # l'arret. Voir opossum_action_sequencer/match/follow_ennemi.py
+            # (node.follow_tag_aruco()).
+            ("TEST CAMERA JAUNE", "#808080", "white", "yellow", 9),
+            ("TEST CAMERA BLEU", "#404040", "white", "blue", 10),
         ]
 
         for text, bg, fg, color, script in buttons_data:
@@ -59,6 +68,7 @@ class MatchPage(QWidget):
         super().__init__()
         self.team_color = "lightgray"; self.is_au = False; self.comm_state = True; self.is_match = False
         self.position_mismatch = False; self.positions = {}; self.current_score = 0; self.match_time = 0
+        self.rosbridge_proc = None  # process rosbridge (debug web / Foxglove)
         
         self.buf_zynq = "ZYNQ - X: --.-- Y: --.-- T: --.--"
         self.buf_lidar = "LIDAR - X: --.-- Y: --.-- T: --.--"
@@ -84,7 +94,46 @@ class MatchPage(QWidget):
         btn_l = QHBoxLayout(); btn_l.setSpacing(10)
         b_res = QPushButton("Restart\nMatch"); b_res.setStyleSheet("background-color: #3498db; color: white; font-weight: bold; height: 80px; border-radius: 10px;"); b_res.clicked.connect(self.trigger_restart_match)
         b_srv = QPushButton("Restart\nService"); b_srv.setStyleSheet("background-color: orange; color: black; font-weight: bold; height: 80px; border-radius: 10px;"); b_srv.clicked.connect(self.restart_service)
-        btn_l.addWidget(b_res); btn_l.addWidget(b_srv); l.addLayout(btn_l)
+        self.b_rb = QPushButton("Rosbridge\nOFF"); self.b_rb.clicked.connect(self.toggle_rosbridge)
+        self._style_rosbridge_btn()
+        btn_l.addWidget(b_res); btn_l.addWidget(b_srv); btn_l.addWidget(self.b_rb); l.addLayout(btn_l)
+
+    def _style_rosbridge_btn(self):
+        on = self.rosbridge_proc is not None
+        bg = "#2ecc71" if on else "#7f8c8d"
+        self.b_rb.setText("Rosbridge\nON" if on else "Rosbridge\nOFF")
+        self.b_rb.setStyleSheet(f"background-color: {bg}; color: white; font-weight: bold; height: 80px; border-radius: 10px;")
+
+    def toggle_rosbridge(self):
+        # Demarre / arrete rosbridge_server (pont WebSocket pour la page web de
+        # debug et Foxglove). Le process herite de l'environnement ROS deja
+        # source par l'IHM (RMW, ROS_DOMAIN_ID), donc il voit les memes topics.
+        if self.rosbridge_proc is None:
+            try:
+                self.rosbridge_proc = subprocess.Popen(
+                    ["ros2", "launch", "rosbridge_server",
+                     "rosbridge_websocket_launch.xml"],
+                    start_new_session=True,  # groupe de process propre -> kill fiable
+                )
+            except Exception as e:
+                self.rosbridge_proc = None
+                QMessageBox.warning(self, "Rosbridge", f"Echec du lancement :\n{e}")
+        else:
+            self.stop_rosbridge()
+        self._style_rosbridge_btn()
+
+    def stop_rosbridge(self):
+        if self.rosbridge_proc is None:
+            return
+        try:
+            os.killpg(os.getpgid(self.rosbridge_proc.pid), signal.SIGINT)
+            self.rosbridge_proc.wait(timeout=5)
+        except Exception:
+            try:
+                os.killpg(os.getpgid(self.rosbridge_proc.pid), signal.SIGKILL)
+            except Exception:
+                pass
+        self.rosbridge_proc = None
 
     def refresh_gui_elements(self):
         if self.is_match:

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Opossum — Debug Web</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/roslibjs/1.4.1/roslib.min.js"></script>
+<style>
+  :root {
+    --bg:#12151c; --panel:#1b1f2a; --border:#2a3040; --txt:#e6e9ef;
+    --muted:#8b93a7; --accent:#4c8dff; --ok:#33d17a; --err:#ff5c5c; --warn:#ffb454;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; }
+  body { font-family:system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt);
+         display:flex; flex-direction:column; min-height:100vh; }
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:10px 14px;
+           background:var(--panel); border-bottom:1px solid var(--border); flex:0 0 auto; }
+  header h1 { font-size:15px; margin:0 12px 0 0; font-weight:600; white-space:nowrap; }
+  input, select, button { font-size:13px; font-family:inherit; }
+  input[type=text] { background:#0d1017; border:1px solid var(--border); color:var(--txt);
+                     border-radius:6px; padding:6px 8px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:7px 12px;
+           cursor:pointer; font-weight:600; }
+  button.sec { background:#2a3040; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; background:var(--err); flex:0 0 auto; }
+  .dot.on { background:var(--ok); }
+  .pill { font-size:12px; padding:3px 9px; border-radius:99px; background:#2a3040; color:var(--muted); }
+
+  /* Layout principal : deux colonnes qui repassent en une seule si étroit */
+  .wrap { display:flex; flex-wrap:wrap; gap:14px; padding:14px; align-items:flex-start; flex:1 1 auto; }
+  .canvascol { flex:1 1 520px; min-width:280px; display:flex; flex-direction:column; gap:8px; }
+  /* Le conteneur impose le ratio 3:2 ; le canvas le remplit à 100% */
+  .canvasbox { position:relative; width:100%; aspect-ratio:3/2; background:#0d1017;
+               border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .canvasbox canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  aside { flex:1 1 260px; max-width:340px; min-width:240px; display:flex; flex-direction:column; gap:12px; }
+  @media (max-width:720px){ aside{ max-width:none; } }
+
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:12px; }
+  .card h2 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:0 0 8px; }
+  .kv { display:flex; justify-content:space-between; font-size:13px; padding:2px 0; }
+  .kv b { font-variant-numeric:tabular-nums; }
+  .cmd-row { display:flex; gap:6px; margin-top:6px; }
+  .cmd-row input { flex:1; min-width:0; }
+  .muted { color:var(--muted); font-size:12px; }
+  .armbtn { width:100%; }
+  .armbtn.armed { background:var(--err); }
+  .legend { display:flex; flex-wrap:wrap; gap:8px 12px; font-size:12px; }
+  .legend span { display:flex; align-items:center; gap:4px; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  .topic-row { margin-top:8px; }
+  .topic-row input { width:100%; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🤖 Opossum — Debug Web</h1>
+  <span class="dot" id="statusDot"></span>
+  <span id="statusText" class="muted">Déconnecté</span>
+  <input type="text" id="wsUrl" value="ws://100.73.192.52:9090" size="24" title="Adresse rosbridge">
+  <button id="connectBtn">Connecter</button>
+  <span class="pill" id="plateauPill">plateau : ?</span>
+  <span class="muted" id="rateText"></span>
+</header>
+
+<div class="wrap">
+  <div class="canvascol">
+    <div class="canvasbox"><canvas id="field"></canvas></div>
+    <div class="legend">
+      <span><i class="sw" style="background:#4c8dff"></i>Robot</span>
+      <span><i class="sw" style="background:#ff5c5c"></i>Adverse</span>
+      <span><i class="sw" style="background:#ffd447"></i>Balise</span>
+      <span><i class="sw" style="background:#33d17a"></i>Objet libre</span>
+      <span><i class="sw" style="background:#b06cff"></i>Objet tenu</span>
+      <span><i class="sw" style="background:#2b3550;border:1px solid #4c8dff"></i>Zone active</span>
+    </div>
+    <p class="muted">Clic sur le plateau = position cible (mode ARMÉ requis).</p>
+  </div>
+
+  <aside>
+    <div class="card">
+      <h2>Position robot</h2>
+      <div class="kv"><span>x (m)</span><b id="rx">—</b></div>
+      <div class="kv"><span>y (m)</span><b id="ry">—</b></div>
+      <div class="kv"><span>θ (°)</span><b id="rt">—</b></div>
+      <div class="kv"><span>Balises</span><b id="rb">—</b></div>
+      <div class="kv"><span>Objets</span><b id="ro">—</b></div>
+    </div>
+
+    <div class="card">
+      <h2>Sécurité</h2>
+      <button id="armBtn" class="armbtn sec">🔒 Mode LECTURE SEULE</button>
+      <p class="muted" id="armHint">Aucune commande ne sera envoyée tant que le mode est verrouillé.</p>
+    </div>
+
+    <div class="card">
+      <h2>Envoyer une commande</h2>
+      <p class="muted">Topic : <span id="cmdTopicLbl"></span></p>
+      <div class="cmd-row">
+        <input type="text" id="cmdInput" placeholder="MOVE 1.5 1.0 0.0" disabled>
+        <button id="cmdBtn" disabled>Envoyer</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Topics</h2>
+      <div class="topic-row"><span class="muted">Position</span><input type="text" id="topicPos" value="/main_robot/position_out"></div>
+      <div class="topic-row"><span class="muted">Objets (GlobalView)</span><input type="text" id="topicObj" value="/global_view"></div>
+      <div class="topic-row"><span class="muted">Commande</span><input type="text" id="topicCmd" value="/main_robot/command"></div>
+      <div class="topic-row"><span class="muted">Config plateau</span><input type="text" id="topicPlat" value="/plateau_config"></div>
+      <button id="applyTopics" class="sec" style="width:100%;margin-top:10px">Ré-abonner</button>
+    </div>
+  </aside>
+</div>
+
+<script>
+// ---- Plateau Coupe de France : table 3000 x 2000 mm, positions en mètres ----
+const TABLE_W = 3.0, TABLE_H = 2.0;
+// Zone de jeu active selon la config (voir boundaries des launch bringup)
+const ZONES = {
+  grand: { x0:0.0, x1:3.0, y0:0.0, y1:2.0 },
+  petit: { x0:0.0, x1:1.0, y0:0.0, y1:2.0 },
+};
+let plateau = 'grand';
+
+const cv = document.getElementById('field'), ctx = cv.getContext('2d');
+const box = cv.parentElement;
+let LW = 900, LH = 600;   // dimensions logiques (px CSS), recalculées au resize
+
+// monde (m) -> pixels logiques. y inversé (origine monde en bas-gauche).
+function toPx(x, y){ return [ x / TABLE_W * LW, (1 - y / TABLE_H) * LH ]; }
+function toWorld(px, py){ return [ px / LW * TABLE_W, (1 - py / LH) * TABLE_H ]; }
+
+// --- Redimensionnement net (gère le DPI écran) ---
+function resizeCanvas(){
+  const dpr = window.devicePixelRatio || 1;
+  LW = box.clientWidth;
+  LH = box.clientHeight;
+  cv.width  = Math.round(LW * dpr);
+  cv.height = Math.round(LH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // 1 unité ctx = 1 px CSS
+  render();
+}
+if (window.ResizeObserver) new ResizeObserver(resizeCanvas).observe(box);
+window.addEventListener('resize', resizeCanvas);
+
+let state = { robot:null, others:[], balises:[], objects:[] };
+
+function drawField(){
+  ctx.clearRect(0,0,LW,LH);
+  ctx.fillStyle = '#0d1017'; ctx.fillRect(0,0,LW,LH);
+
+  // zone active mise en évidence
+  const z = ZONES[plateau] || ZONES.grand;
+  const [zx0,zy1] = toPx(z.x0, z.y1);   // coin haut-gauche à l'écran
+  const [zx1,zy0] = toPx(z.x1, z.y0);
+  ctx.fillStyle = 'rgba(76,141,255,0.10)';
+  ctx.fillRect(zx0, zy1, zx1-zx0, zy0-zy1);
+  ctx.strokeStyle = 'rgba(76,141,255,0.7)'; ctx.lineWidth = 2;
+  ctx.strokeRect(zx0, zy1, zx1-zx0, zy0-zy1);
+
+  // grille 0.5 m
+  ctx.strokeStyle = '#1e2432'; ctx.lineWidth = 1;
+  ctx.fillStyle = '#586074'; ctx.font = '11px system-ui';
+  for(let x=0; x<=TABLE_W+1e-6; x+=0.5){ const [px]=toPx(x,0); ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,LH); ctx.stroke(); ctx.fillText(x.toFixed(1), px+2, LH-4); }
+  for(let y=0; y<=TABLE_H+1e-6; y+=0.5){ const [,py]=toPx(0,y); ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(LW,py); ctx.stroke(); ctx.fillText(y.toFixed(1), 2, py-3); }
+
+  // bord table
+  ctx.strokeStyle = '#3a4257'; ctx.lineWidth = 2; ctx.strokeRect(1,1,LW-2,LH-2);
+}
+
+function drawRobot(r, color, main){
+  if(!r) return;
+  const [px,py] = toPx(r.x, r.y);
+  const size = main ? 15 : 12;
+  ctx.save();
+  ctx.translate(px,py);
+  ctx.rotate(-r.theta);
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(0,0,size,0,2*Math.PI); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(size+8,0); ctx.stroke();
+  ctx.restore();
+}
+
+function drawBalise(b){
+  const [px,py] = toPx(b.x, b.y);
+  ctx.fillStyle = '#ffd447';
+  ctx.beginPath(); ctx.arc(px,py,5,0,2*Math.PI); ctx.fill();
+}
+
+function drawObject(o){
+  const [px,py] = toPx(o.x, o.y);
+  const held = (o.state||'').toLowerCase() !== 'free';
+  ctx.fillStyle = held ? '#b06cff' : '#33d17a';
+  ctx.fillRect(px-7, py-7, 14, 14);
+  ctx.fillStyle = '#cdd3e0'; ctx.font = '10px system-ui';
+  ctx.fillText((o.type||'') + ' #' + (o.id ?? ''), px+9, py+3);
+}
+
+function render(){
+  drawField();
+  state.balises.forEach(drawBalise);
+  state.objects.forEach(drawObject);
+  state.others.forEach(o => drawRobot(o, '#ff5c5c', false));
+  drawRobot(state.robot, '#4c8dff', true);
+}
+
+function setPlateau(v){
+  if(!ZONES[v]) return;
+  plateau = v;
+  document.getElementById('plateauPill').textContent = 'plateau : ' + v;
+  render();
+}
+
+// ---------------- ROS ----------------
+let ros=null, subPos=null, subObj=null, subPlat=null, pubCmd=null;
+let msgCount=0; setInterval(()=>{ document.getElementById('rateText').textContent = ros&&ros.isConnected? (msgCount+' msg/s'):''; msgCount=0; }, 1000);
+
+function setStatus(on, txt){
+  document.getElementById('statusDot').classList.toggle('on', on);
+  document.getElementById('statusText').textContent = txt;
+}
+
+function connect(){
+  const url = document.getElementById('wsUrl').value.trim();
+  if(ros){ try{ros.close();}catch(e){} }
+  setStatus(false, 'Connexion…');
+  ros = new ROSLIB.Ros({ url });
+  ros.on('connection', ()=>{ setStatus(true,'Connecté'); subscribeAll(); });
+  ros.on('error', ()=> setStatus(false,'Erreur de connexion'));
+  ros.on('close', ()=> setStatus(false,'Déconnecté'));
+}
+
+function subscribeAll(){
+  if(!ros) return;
+  [subPos, subObj, subPlat].forEach(s => { if(s) s.unsubscribe(); });
+
+  subPos = new ROSLIB.Topic({ ros, name:document.getElementById('topicPos').value.trim(),
+                              messageType:'opossum_msgs/msg/LidarLoc' });
+  subPos.subscribe(m=>{
+    msgCount++;
+    const p = m.robot_position || {};
+    state.robot = { x:p.x||0, y:p.y||0, theta:p.z||0 };
+    state.others = (m.other_robot_position||[]).map(o=>({x:o.x||0,y:o.y||0,theta:o.z||0}));
+    state.balises = (m.balises||[]).map(b=>({x:b.x||0,y:b.y||0}));
+    document.getElementById('rx').textContent = state.robot.x.toFixed(3);
+    document.getElementById('ry').textContent = state.robot.y.toFixed(3);
+    document.getElementById('rt').textContent = (state.robot.theta*180/Math.PI).toFixed(1);
+    document.getElementById('rb').textContent = state.balises.length;
+    render();
+  });
+
+  subObj = new ROSLIB.Topic({ ros, name:document.getElementById('topicObj').value.trim(),
+                              messageType:'opossum_msgs/msg/GlobalView' });
+  subObj.subscribe(m=>{
+    msgCount++;
+    state.objects = (m.objects||[]).map(o=>({id:o.id,type:o.type,state:o.state,x:o.x||0,y:o.y||0,theta:o.theta||0}));
+    document.getElementById('ro').textContent = state.objects.length;
+    render();
+  });
+
+  subPlat = new ROSLIB.Topic({ ros, name:document.getElementById('topicPlat').value.trim(),
+                               messageType:'std_msgs/String' });
+  subPlat.subscribe(m=> setPlateau((m.data||'').trim().toLowerCase()));
+
+  pubCmd = new ROSLIB.Topic({ ros, name:document.getElementById('topicCmd').value.trim(),
+                              messageType:'std_msgs/String' });
+  document.getElementById('cmdTopicLbl').textContent = document.getElementById('topicCmd').value.trim();
+}
+
+// ---------------- Commandes + sécurité ----------------
+let armed = false;
+const armBtn = document.getElementById('armBtn');
+function setArmed(v){
+  armed = v;
+  armBtn.classList.toggle('armed', v);
+  armBtn.textContent = v ? '⚠️ Mode ARMÉ — commandes actives' : '🔒 Mode LECTURE SEULE';
+  document.getElementById('cmdInput').disabled = !v;
+  document.getElementById('cmdBtn').disabled = !v;
+  document.getElementById('armHint').textContent = v
+    ? 'Les commandes et clics sur le plateau sont envoyés au robot.'
+    : 'Aucune commande ne sera envoyée tant que le mode est verrouillé.';
+}
+armBtn.onclick = ()=> setArmed(!armed);
+
+function sendCommand(str){
+  if(!armed || !pubCmd){ return; }
+  pubCmd.publish(new ROSLIB.Message({ data:str }));
+}
+
+document.getElementById('cmdBtn').onclick = ()=>{
+  const v = document.getElementById('cmdInput').value.trim();
+  if(v) sendCommand(v);
+};
+document.getElementById('cmdInput').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('cmdBtn').click(); });
+
+cv.addEventListener('click', e=>{
+  if(!armed) return;
+  const rect = cv.getBoundingClientRect();
+  const px = (e.clientX-rect.left) * (LW/rect.width);
+  const py = (e.clientY-rect.top) * (LH/rect.height);
+  const [wx,wy] = toWorld(px,py);
+  sendCommand('MOVE ' + wx.toFixed(3) + ' ' + wy.toFixed(3) + ' 0.0');
+});
+
+document.getElementById('connectBtn').onclick = connect;
+document.getElementById('applyTopics').onclick = ()=>{ if(ros&&ros.isConnected) subscribeAll(); };
+
+// init
+setArmed(false);
+setPlateau('grand');
+resizeCanvas();
+</script>
+</body>
+</html>

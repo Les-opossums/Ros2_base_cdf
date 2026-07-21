@@ -21,8 +21,7 @@ class Script:
         self.id_mvt += 1
 
     def run(self, node):
-        node.write_log("Script AHAHHAHAHA is running...")
+        node.write_log("Test camera : suivi du tag ArUco en mouvement...")
 
-        # Banderole
-        # node.follow_ennemi()
+        # node.follow_ennemi()  # suivi d'un robot ennemi (lidar) -- pas ce test
         node.follow_tag_aruco()
