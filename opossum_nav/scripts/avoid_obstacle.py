@@ -94,6 +94,10 @@ class ObstacleAvoider(Node):
         self.obstacle_detected = False
         self.in_avoid = False
         self.last_command_sent = None
+        # Override maitre depuis l'interface web (topic avoidance_enable) :
+        # coupe totalement l'evitement, quel que soit enable_detection (qui est
+        # remis a sa valeur par defaut a chaque nouveau goal). Independant.
+        self.avoidance_force_off = False
 
     def _init_publishers(self) -> None:
         """Initialize publishers."""
@@ -150,6 +154,23 @@ class ObstacleAvoider(Node):
         self.sub_end_of_match = self.create_subscription(
             Bool, "end_of_match", self.reset_all_end_of_match, 10
         )
+
+        # Activation/desactivation de l'evitement depuis l'interface web.
+        self.sub_avoidance_enable = self.create_subscription(
+            Bool, "avoidance_enable", self.set_avoidance_enable, 10
+        )
+
+    def set_avoidance_enable(self, msg):
+        """Active (True) / desactive (False) totalement l'evitement via l'IHM
+        web. Quand desactive, on libere le robot en signalant 'aucun obstacle'."""
+        self.avoidance_force_off = not bool(msg.data)
+        self.get_logger().warn(
+            f"Evitement {'DESACTIVE' if self.avoidance_force_off else 'ACTIVE'} via interface web"
+        )
+        if self.avoidance_force_off:
+            self.obstacle_detected = False
+            self.in_avoid = False
+            self.pub_obstacle_detected.publish(Bool(data=False))
 
     def reset_all_au(self, msg):
         # self.get_logger().info(f"I received a stop from AU")
@@ -236,7 +257,11 @@ class ObstacleAvoider(Node):
             self.len_scan = int((msg.angle_max - msg.angle_min) / msg.angle_increment)
             self._compute_security_rectangle_distances()
 
-        if not self.enable_detection:
+        if self.avoidance_force_off or not self.enable_detection:
+            # Evitement coupe : on s'assure que rien ne reste bloque.
+            if self.obstacle_detected:
+                self.obstacle_detected = False
+                self.pub_obstacle_detected.publish(Bool(data=False))
             return
 
         if self.in_avoid:

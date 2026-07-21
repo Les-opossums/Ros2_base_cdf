@@ -103,6 +103,8 @@
       <h2>Sécurité</h2>
       <button id="armBtn" class="armbtn sec">🔒 Mode LECTURE SEULE</button>
       <p class="muted" id="armHint">Aucune commande ne sera envoyée tant que le mode est verrouillé.</p>
+      <button id="avoidBtn" class="armbtn" style="margin-top:8px;background:#2ecc71;">🛡️ Évitement : ACTIF</button>
+      <p class="muted">Coupe/active l'évitement d'obstacle qui bloque le robot (indépendant du mode ci-dessus).</p>
     </div>
 
     <div class="card">
@@ -120,6 +122,7 @@
       <div class="topic-row"><span class="muted">Tags bruts (GlobalView)</span><input type="text" id="topicObj" value="/main_robot/aruco_world"></div>
       <div class="topic-row"><span class="muted">Tags fusionnés (GlobalView)</span><input type="text" id="topicFused" value="/main_robot/aruco_world_fused"></div>
       <div class="topic-row"><span class="muted">Commande</span><input type="text" id="topicCmd" value="/main_robot/command"></div>
+      <div class="topic-row"><span class="muted">Évitement (Bool)</span><input type="text" id="topicAvoid" value="/main_robot/avoidance_enable"></div>
       <div class="topic-row"><span class="muted">Config plateau</span><input type="text" id="topicPlat" value="/plateau_config"></div>
       <button id="applyTopics" class="sec" style="width:100%;margin-top:10px">Ré-abonner</button>
     </div>
@@ -302,7 +305,7 @@ function updateDispersion(){
 }
 
 // ---------------- ROS ----------------
-let ros=null, subPos=null, subObj=null, subPlat=null, subFused=null, pubCmd=null;
+let ros=null, subPos=null, subObj=null, subPlat=null, subFused=null, pubCmd=null, pubAvoid=null;
 let msgCount=0; setInterval(()=>{ document.getElementById('rateText').textContent = ros&&ros.isConnected? (msgCount+' msg/s'):''; msgCount=0; }, 1000);
 
 function setStatus(on, txt){
@@ -364,6 +367,9 @@ function subscribeAll(){
   pubCmd = new ROSLIB.Topic({ ros, name:document.getElementById('topicCmd').value.trim(),
                               messageType:'std_msgs/String' });
   document.getElementById('cmdTopicLbl').textContent = document.getElementById('topicCmd').value.trim();
+
+  pubAvoid = new ROSLIB.Topic({ ros, name:document.getElementById('topicAvoid').value.trim(),
+                                messageType:'std_msgs/Bool' });
 }
 
 // ---------------- Commandes + sécurité ----------------
@@ -380,6 +386,20 @@ function setArmed(v){
     : 'Aucune commande ne sera envoyée tant que le mode est verrouillé.';
 }
 armBtn.onclick = ()=> setArmed(!armed);
+
+// Toggle évitement d'obstacle (publie std_msgs/Bool sur avoidance_enable)
+let avoidEnabled = true;
+const avoidBtn = document.getElementById('avoidBtn');
+function setAvoid(v){
+  avoidEnabled = v;
+  avoidBtn.textContent = v ? '🛡️ Évitement : ACTIF' : '⛔ Évitement : COUPÉ';
+  avoidBtn.style.background = v ? '#2ecc71' : '#ff5c5c';
+}
+avoidBtn.onclick = ()=>{
+  if(!pubAvoid){ return; }
+  setAvoid(!avoidEnabled);
+  pubAvoid.publish(new ROSLIB.Message({ data: avoidEnabled }));
+};
 
 function sendCommand(str){
   if(!armed || !pubCmd){ return; }

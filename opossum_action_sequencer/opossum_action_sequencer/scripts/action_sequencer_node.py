@@ -461,6 +461,7 @@ class ActionManager(Node):
         self._tag_fuse_alpha = 0.35  # poids d'une nouvelle obs (EMA)
         self._tag_gate_m = 0.12      # rejet outlier : obs trop loin de l'estime
         self._tag_match_m = 0.15     # association obs -> estime existant
+        self._tag_min_hits = 3       # nb d'observations avant d'afficher (anti-fantome)
         self._tag_static_vlin = 0.03 # < ce seuil (m/s) : robot considere a l'arret
         self._tag_static_vt = 0.05   # < ce seuil (rad/s) : idem en rotation
         self._tag_forget_s = 1.0     # oublie un estime plus vu depuis
@@ -503,6 +504,7 @@ class ActionManager(Node):
         gv = GlobalView()
         gv.robots = []
         gv.objects = []
+        dets = []
         for det in msg.object:
             # Filtres de bruit : chassis (trop pres + haut) et objets trop loin.
             r2 = det.x ** 2 + det.y ** 2
@@ -514,52 +516,77 @@ class ActionManager(Node):
             wx = frame_pose.x + (det.x * cos_t - det.y * sin_t)
             wy = frame_pose.y + (det.x * sin_t + det.y * cos_t)
             wt = frame_pose.t + det.theta
+            color = self._aruco_color_name(det.id)
 
             obj = Objects()
             obj.id = int(det.id)
-            obj.type = self._aruco_color_name(det.id)
+            obj.type = color
             obj.state = f"cam{cam_key}"
             obj.x = float(wx)
             obj.y = float(wy)
             obj.theta = float(wt)
             gv.objects.append(obj)
 
-            with self._tag_lock:
-                self._fuse_tag(det.id, wx, wy, wt, now, static)
+            dets.append({"id": int(det.id), "color": color, "x": wx, "y": wy, "theta": wt})
 
         self.pub_aruco_world.publish(gv)
 
-    def _fuse_tag(self, aruco_id, x, y, theta, now, static):
-        """Associe l'obs a l'estime le plus proche (plusieurs caisses peuvent
-        partager le meme id ArUco) ou en cree un ; met a jour la pose lissee
-        (EMA) et accumule la dispersion (Welford) selon arret/mouvement."""
-        best_k, best_d = None, self._tag_match_m
-        for k, e in self._tag_estimates.items():
-            d = math.hypot(e["x"] - x, e["y"] - y)
-            if d < best_d:
-                best_d, best_k = d, k
+        # Fusion de TOUTE la trame en une passe (association optimale).
+        with self._tag_lock:
+            self._fuse_frame(dets, now, static)
 
-        if best_k is None:
-            k = self._tag_next_key
-            self._tag_next_key += 1
-            self._tag_estimates[k] = {
-                "x": x, "y": y, "theta": theta,
-                "color": self._aruco_color_name(aruco_id), "last_seen": now,
-                "s": {"n": 0, "mx": 0.0, "my": 0.0, "M2x": 0.0, "M2y": 0.0},
-                "m": {"n": 0, "mx": 0.0, "my": 0.0, "M2x": 0.0, "M2y": 0.0},
-            }
+    def _new_estimate(self, d, now):
+        k = self._tag_next_key
+        self._tag_next_key += 1
+        self._tag_estimates[k] = {
+            "x": d["x"], "y": d["y"], "theta": d["theta"], "color": d["color"],
+            "last_seen": now, "hits": 1,
+            "s": {"n": 0, "mx": 0.0, "my": 0.0, "M2x": 0.0, "M2y": 0.0},
+            "m": {"n": 0, "mx": 0.0, "my": 0.0, "M2x": 0.0, "M2y": 0.0},
+        }
+
+    def _fuse_frame(self, dets, now, static):
+        """Associe en UNE fois toutes les detections d'une trame aux estimes
+        existants (assignation optimale Hungarian : une caisse <-> une
+        detection, jamais entre couleurs differentes), met a jour les estimes
+        apparies (EMA + dispersion Welford) et cree les nouveaux. Corrige le
+        souci de l'association gloutonne (fusions/dedoublements de tags)."""
+        if not dets:
+            return
+        keys = list(self._tag_estimates.keys())
+        if not keys:
+            for d in dets:
+                self._new_estimate(d, now)
             return
 
-        e = self._tag_estimates[best_k]
-        # Rejet d'outlier : saut brutal -> on ne fusionne pas (on garde l'estime)
-        if math.hypot(e["x"] - x, e["y"] - y) > self._tag_gate_m:
-            return
+        BIG = 1e3
+        cost = np.full((len(keys), len(dets)), BIG)
+        for i, k in enumerate(keys):
+            e = self._tag_estimates[k]
+            for j, d in enumerate(dets):
+                if d["color"] != e["color"]:
+                    continue  # inter-couleur interdit (cout laisse a BIG)
+                cost[i, j] = math.hypot(e["x"] - d["x"], e["y"] - d["y"])
+
+        rows, cols = linear_sum_assignment(cost)
+        matched = set()
         a = self._tag_fuse_alpha
-        e["x"] += a * (x - e["x"])
-        e["y"] += a * (y - e["y"])
-        e["theta"] = self._ema_angle(e["theta"], theta, a)
-        e["last_seen"] = now
-        self._welford_add(e["s"] if static else e["m"], x, y)
+        for i, j in zip(rows, cols):
+            if cost[i, j] > self._tag_match_m:
+                continue  # gating : trop loin (ou couleur differente) -> pas d'appariement
+            e = self._tag_estimates[keys[i]]
+            d = dets[j]
+            e["x"] += a * (d["x"] - e["x"])
+            e["y"] += a * (d["y"] - e["y"])
+            e["theta"] = self._ema_angle(e["theta"], d["theta"], a)
+            e["last_seen"] = now
+            e["hits"] += 1
+            self._welford_add(e["s"] if static else e["m"], d["x"], d["y"])
+            matched.add(j)
+
+        for j, d in enumerate(dets):
+            if j not in matched:
+                self._new_estimate(d, now)
 
     @staticmethod
     def _welford_add(acc, x, y):
@@ -596,6 +623,8 @@ class ActionManager(Node):
             for k in stale:
                 del self._tag_estimates[k]
             for k, e in self._tag_estimates.items():
+                if e["hits"] < self._tag_min_hits:
+                    continue  # pas encore confirme -> on n'affiche pas (anti-fantome)
                 obj = Objects()
                 obj.id = int(k)
                 obj.type = e["color"]
