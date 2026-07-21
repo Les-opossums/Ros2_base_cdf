@@ -28,6 +28,7 @@ ament_python_install_package(${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
   scripts/dev_gui.py
+  scripts/calibration_manager.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

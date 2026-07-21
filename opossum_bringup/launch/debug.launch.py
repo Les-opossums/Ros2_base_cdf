@@ -141,6 +141,24 @@ def generate_launch_description():
         parameters=[param_vision],
     )
 
+    # Fusion des tags en coordonnees monde (aruco_world / aruco_world_fused).
+    node_tag_fusion = Node(
+        namespace=namespace,
+        package="opossum_vision",
+        executable="tag_fusion_node.py",
+        name="tag_fusion_node",
+        output="screen",
+    )
+
+    # Gestionnaire de calibration camera (pilotable depuis l'IHM web).
+    node_calibration = Node(
+        namespace=namespace,
+        package="opossum_dev_gui",
+        executable="calibration_manager.py",
+        name="calibration_manager",
+        output="screen",
+    )
+
     ld.add_action(node_ihm)
     ld.add_action(param_server)
     ld.add_action(node_action_sequencer)
@@ -152,6 +170,8 @@ def generate_launch_description():
     ld.add_action(node_avoid_obstacle)
     ld.add_action(node_vision_one)
     ld.add_action(node_vision_two)
-    ld.add_action(node_vision_three)  
+    ld.add_action(node_vision_three)
+    ld.add_action(node_tag_fusion)
+    ld.add_action(node_calibration)
 
     return ld

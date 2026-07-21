@@ -14,7 +14,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 from std_msgs.msg import String, Bool, Int32
-from opossum_msgs.msg import RobotData, LidarLoc, VisionDataFrame, GlobalView, Objects
+from opossum_msgs.msg import RobotData, LidarLoc, VisionDataFrame
 from std_srvs.srv import Trigger
 from types import SimpleNamespace
 
@@ -438,204 +438,6 @@ class ActionManager(Node):
             10
         )
 
-        # DEBUG / TUNING de la localisation MONDE des tags :
-        #   - 'aruco_world'       : detections BRUTES recalees, publiees a
-        #     CHAQUE trame camera (evenementiel, cf aruco_callback) -> exploite
-        #     100% du debit camera, aucune trame jetee.
-        #   - 'aruco_world_fused' : estimation STABLE par tag (fusion temporelle
-        #     + rejet d'outliers) et DISPERSION mesuree (arret vs mouvement),
-        #     publiee a 10 Hz.
-        self.pub_aruco_world = self.create_publisher(GlobalView, "aruco_world", 20)
-        self.pub_aruco_fused = self.create_publisher(GlobalView, "aruco_world_fused", 10)
-
-        # Latence camera CONSTANTE additionnelle (expo + traitement JeVois) a
-        # soustraire au timestamp de capture, EN PLUS de la sync HEARTBEAT.
-        # Reglable a chaud pour calibrer : ros2 param set /main_robot/
-        # action_sequencer_node camera_extra_latency_s 0.03
-        self.declare_parameter("camera_extra_latency_s", 0.0)
-
-        # Fusion temporelle des tags (caisses statiques -> on lisse et on mesure)
-        self._tag_lock = threading.Lock()
-        self._tag_estimates = {}     # key -> dict (pose lissee + accumulateurs)
-        self._tag_next_key = 1
-        self._tag_fuse_alpha = 0.35  # poids d'une nouvelle obs (EMA)
-        self._tag_gate_m = 0.12      # rejet outlier : obs trop loin de l'estime
-        self._tag_match_m = 0.15     # association obs -> estime existant
-        self._tag_min_hits = 3       # nb d'observations avant d'afficher (anti-fantome)
-        self._tag_static_vlin = 0.03 # < ce seuil (m/s) : robot considere a l'arret
-        self._tag_static_vt = 0.05   # < ce seuil (rad/s) : idem en rotation
-        self._tag_forget_s = 1.0     # oublie un estime plus vu depuis
-
-        self.aruco_fused_timer = self.create_timer(
-            0.1, self.publish_fused_tags, callback_group=self.cb_group
-        )
-
-    @staticmethod
-    def _aruco_color_name(aruco_id):
-        return {47: "yellow", 36: "blue", 41: "rot"}.get(int(aruco_id), "tag")
-
-    def _process_tag_frame(self, cam_key, msg):
-        """Traite UNE trame camera (appele des sa reception -> chaque trame est
-        exploitee). Recalage robot-frame -> monde avec la pose du robot au
-        moment de la capture (retard HEARTBEAT + latence constante reglable),
-        publication brute sur 'aruco_world', et mise a jour de la fusion."""
-        if not getattr(msg, "object", None):
-            return
-        now = time.time()
-        extra = float(self.get_parameter("camera_extra_latency_s").value)
-
-        frame_pose = None
-        cap = getattr(msg, "capture_time", 0.0)
-        if cap > 0.0:
-            frame_pose, _ = self.pose_history.get_pose_at(cap - extra)
-        if frame_pose is None:
-            frame_pose = self.robot_pos
-        if frame_pose is None:
-            return
-
-        sp = getattr(self, "robot_speed", None)
-        static = True
-        if sp is not None:
-            static = abs(sp.x) < self._tag_static_vlin and abs(sp.t) < self._tag_static_vt
-
-        cos_t = math.cos(frame_pose.t)
-        sin_t = math.sin(frame_pose.t)
-
-        gv = GlobalView()
-        gv.robots = []
-        gv.objects = []
-        dets = []
-        for det in msg.object:
-            # Filtres de bruit : chassis (trop pres + haut) et objets trop loin.
-            r2 = det.x ** 2 + det.y ** 2
-            if r2 < 0.05 and det.z > 0.17:
-                continue
-            if r2 > 1.0 ** 2:
-                continue
-
-            wx = frame_pose.x + (det.x * cos_t - det.y * sin_t)
-            wy = frame_pose.y + (det.x * sin_t + det.y * cos_t)
-            wt = frame_pose.t + det.theta
-            color = self._aruco_color_name(det.id)
-
-            obj = Objects()
-            obj.id = int(det.id)
-            obj.type = color
-            obj.state = f"cam{cam_key}"
-            obj.x = float(wx)
-            obj.y = float(wy)
-            obj.theta = float(wt)
-            gv.objects.append(obj)
-
-            dets.append({"id": int(det.id), "color": color, "x": wx, "y": wy, "theta": wt})
-
-        self.pub_aruco_world.publish(gv)
-
-        # Fusion de TOUTE la trame en une passe (association optimale).
-        with self._tag_lock:
-            self._fuse_frame(dets, now, static)
-
-    def _new_estimate(self, d, now):
-        k = self._tag_next_key
-        self._tag_next_key += 1
-        self._tag_estimates[k] = {
-            "x": d["x"], "y": d["y"], "theta": d["theta"], "color": d["color"],
-            "last_seen": now, "hits": 1,
-            "s": {"n": 0, "mx": 0.0, "my": 0.0, "M2x": 0.0, "M2y": 0.0},
-            "m": {"n": 0, "mx": 0.0, "my": 0.0, "M2x": 0.0, "M2y": 0.0},
-        }
-
-    def _fuse_frame(self, dets, now, static):
-        """Associe en UNE fois toutes les detections d'une trame aux estimes
-        existants (assignation optimale Hungarian : une caisse <-> une
-        detection, jamais entre couleurs differentes), met a jour les estimes
-        apparies (EMA + dispersion Welford) et cree les nouveaux. Corrige le
-        souci de l'association gloutonne (fusions/dedoublements de tags)."""
-        if not dets:
-            return
-        keys = list(self._tag_estimates.keys())
-        if not keys:
-            for d in dets:
-                self._new_estimate(d, now)
-            return
-
-        BIG = 1e3
-        cost = np.full((len(keys), len(dets)), BIG)
-        for i, k in enumerate(keys):
-            e = self._tag_estimates[k]
-            for j, d in enumerate(dets):
-                if d["color"] != e["color"]:
-                    continue  # inter-couleur interdit (cout laisse a BIG)
-                cost[i, j] = math.hypot(e["x"] - d["x"], e["y"] - d["y"])
-
-        rows, cols = linear_sum_assignment(cost)
-        matched = set()
-        a = self._tag_fuse_alpha
-        for i, j in zip(rows, cols):
-            if cost[i, j] > self._tag_match_m:
-                continue  # gating : trop loin (ou couleur differente) -> pas d'appariement
-            e = self._tag_estimates[keys[i]]
-            d = dets[j]
-            e["x"] += a * (d["x"] - e["x"])
-            e["y"] += a * (d["y"] - e["y"])
-            e["theta"] = self._ema_angle(e["theta"], d["theta"], a)
-            e["last_seen"] = now
-            e["hits"] += 1
-            self._welford_add(e["s"] if static else e["m"], d["x"], d["y"])
-            matched.add(j)
-
-        for j, d in enumerate(dets):
-            if j not in matched:
-                self._new_estimate(d, now)
-
-    @staticmethod
-    def _welford_add(acc, x, y):
-        acc["n"] += 1
-        n = acc["n"]
-        dx = x - acc["mx"]; acc["mx"] += dx / n; acc["M2x"] += dx * (x - acc["mx"])
-        dy = y - acc["my"]; acc["my"] += dy / n; acc["M2y"] += dy * (y - acc["my"])
-
-    @staticmethod
-    def _welford_std_mm(acc):
-        if acc["n"] < 2:
-            return 0
-        return int(round(math.sqrt((acc["M2x"] + acc["M2y"]) / acc["n"]) * 1000.0))
-
-    @staticmethod
-    def _ema_angle(a0, a1, alpha):
-        d = a1 - a0
-        while d > math.pi:
-            d -= 2 * math.pi
-        while d < -math.pi:
-            d += 2 * math.pi
-        return a0 + alpha * d
-
-    def publish_fused_tags(self):
-        """Publie a 10 Hz l'estimation stable de chaque tag + sa dispersion
-        (ecart-type de position, en mm) mesuree a l'arret et en mouvement."""
-        now = time.time()
-        gv = GlobalView()
-        gv.robots = []
-        gv.objects = []
-        with self._tag_lock:
-            stale = [k for k, e in self._tag_estimates.items()
-                     if now - e["last_seen"] > self._tag_forget_s]
-            for k in stale:
-                del self._tag_estimates[k]
-            for k, e in self._tag_estimates.items():
-                if e["hits"] < self._tag_min_hits:
-                    continue  # pas encore confirme -> on n'affiche pas (anti-fantome)
-                obj = Objects()
-                obj.id = int(k)
-                obj.type = e["color"]
-                obj.state = (f"stat {self._welford_std_mm(e['s'])}mm/{e['s']['n']}"
-                             f" mvt {self._welford_std_mm(e['m'])}mm/{e['m']['n']}")
-                obj.x = float(e["x"])
-                obj.y = float(e["y"])
-                obj.theta = float(e["theta"])
-                gv.objects.append(obj)
-        self.pub_aruco_fused.publish(gv)
-
     def _init_subscribers(self):
         """Initialize the subscribers of the node."""
         self.subscription = self.create_subscription(
@@ -854,11 +656,11 @@ class ActionManager(Node):
     # UNIFIED CAMERA CALLBACK (HUNGARIAN TRACKING WITH ARUCO ID)
     # =========================================================================
     def aruco_callback(self, msg: VisionDataFrame):
-        """Sauve la derniere trame (pour stare/follow) ET la traite immediatement
-        pour le debug/fusion, de sorte que CHAQUE trame camera soit exploitee."""
+        """Sauve la derniere trame camera (utilisee par stare_and_update et
+        follow_tag_aruco). La fusion/debug des tags monde est desormais dans le
+        noeud dedie opossum_vision/tag_fusion_node (topics aruco_world[_fused])."""
         self.cameras[msg.id].last_msg = msg
         self.cameras[msg.id].last_timestamp = time.time()
-        self._process_tag_frame(msg.id, msg)
 
     def obstacle_detected_callback(self, msg):
         """Continuously save the latest camera frame without processing it."""
