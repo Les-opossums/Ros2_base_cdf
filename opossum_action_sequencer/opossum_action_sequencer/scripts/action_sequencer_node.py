@@ -14,7 +14,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 from std_msgs.msg import String, Bool, Int32
-from opossum_msgs.msg import RobotData, LidarLoc, VisionDataFrame
+from opossum_msgs.msg import RobotData, LidarLoc, VisionDataFrame, GlobalView, Objects
 from std_srvs.srv import Trigger
 from types import SimpleNamespace
 
@@ -437,6 +437,71 @@ class ActionManager(Node):
             "board_state_updates",
             10
         )
+
+        # DEBUG : positions MONDE des tags detectes, recalees via la pose
+        # robot compensee du retard camera. Sert a verifier visuellement (page
+        # web) la localisation des tags, y compris EN MOUVEMENT. Topic dedie,
+        # n'interfere avec aucune logique de match.
+        self.pub_aruco_world = self.create_publisher(
+            GlobalView,
+            "aruco_world",
+            10
+        )
+        self.aruco_world_timer = self.create_timer(
+            0.1, self.publish_aruco_world, callback_group=self.cb_group
+        )
+
+    def publish_aruco_world(self):
+        """Publie en continu (10 Hz) la position MONDE des tags actuellement
+        vus par les cameras, apres transformation robot-frame -> monde avec la
+        pose du robot AU MOMENT DE LA CAPTURE (compensation du retard camera,
+        cf _frame_pose_for_camera_msg). Objectif : voir graphiquement si la
+        localisation des tags reste juste pendant que le robot bouge.
+
+        Sortie : GlobalView sur 'aruco_world' (objects = tags monde). Aucun
+        clipping aux boundaries ici (contrairement a stare_and_update), pour
+        laisser voir une eventuelle derive hors zone."""
+        current_time = time.time()
+        gv = GlobalView()
+        gv.robots = []
+        gv.objects = []
+
+        for key, cam in self.cameras.items():
+            msg = cam.last_msg
+            if msg is None or (current_time - cam.last_timestamp > 0.4):
+                continue
+            if not msg.object:
+                continue
+
+            frame_pose = self._frame_pose_for_camera_msg(key, msg, current_time)
+            if frame_pose is None:
+                continue
+            cos_t = math.cos(frame_pose.t)
+            sin_t = math.sin(frame_pose.t)
+
+            for det in msg.object:
+                # Memes filtres de bruit que stare_and_update : rejette le
+                # chassis (trop pres + haut) et les detections trop lointaines.
+                r2 = det.x ** 2 + det.y ** 2
+                if r2 < 0.05 and det.z > 0.17:
+                    continue
+                if r2 > 1.0 ** 2:
+                    continue
+
+                obj = Objects()
+                obj.id = int(det.id)
+                obj.type = self._aruco_color_name(det.id)
+                obj.state = f"cam{key}"
+                obj.x = float(frame_pose.x + (det.x * cos_t - det.y * sin_t))
+                obj.y = float(frame_pose.y + (det.x * sin_t + det.y * cos_t))
+                obj.theta = float(frame_pose.t + det.theta)
+                gv.objects.append(obj)
+
+        self.pub_aruco_world.publish(gv)
+
+    @staticmethod
+    def _aruco_color_name(aruco_id):
+        return {47: "yellow", 36: "blue", 41: "rot"}.get(int(aruco_id), "tag")
 
     def _init_subscribers(self):
         """Initialize the subscribers of the node."""

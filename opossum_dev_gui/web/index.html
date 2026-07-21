@@ -75,8 +75,9 @@
       <span><i class="sw" style="background:#4c8dff"></i>Robot</span>
       <span><i class="sw" style="background:#ff5c5c"></i>Adverse</span>
       <span><i class="sw" style="background:#ffd447"></i>Balise</span>
-      <span><i class="sw" style="background:#33d17a"></i>Objet libre</span>
-      <span><i class="sw" style="background:#b06cff"></i>Objet tenu</span>
+      <span><i class="sw" style="background:#ffd447"></i>Tag jaune</span>
+      <span><i class="sw" style="background:#4c8dff"></i>Tag bleu</span>
+      <span><i class="sw" style="background:#ff5c5c"></i>Tag rouge</span>
       <span><i class="sw" style="background:#2b3550;border:1px solid #4c8dff"></i>Zone active</span>
     </div>
     <p class="muted">Clic sur le plateau = position cible (mode ARMÉ requis).</p>
@@ -110,7 +111,7 @@
     <div class="card">
       <h2>Topics</h2>
       <div class="topic-row"><span class="muted">Position</span><input type="text" id="topicPos" value="/main_robot/position_out"></div>
-      <div class="topic-row"><span class="muted">Objets (GlobalView)</span><input type="text" id="topicObj" value="/global_view"></div>
+      <div class="topic-row"><span class="muted">Tags / objets (GlobalView)</span><input type="text" id="topicObj" value="/main_robot/aruco_world"></div>
       <div class="topic-row"><span class="muted">Commande</span><input type="text" id="topicCmd" value="/main_robot/command"></div>
       <div class="topic-row"><span class="muted">Config plateau</span><input type="text" id="topicPlat" value="/plateau_config"></div>
       <button id="applyTopics" class="sec" style="width:100%;margin-top:10px">Ré-abonner</button>
@@ -240,13 +241,24 @@ function drawBalise(b){
   ctx.beginPath(); ctx.arc(px,py,5,0,2*Math.PI); ctx.fill();
 }
 
+const TAG_COLORS = { yellow:'#ffd447', blue:'#4c8dff', rot:'#ff5c5c', red:'#ff5c5c' };
 function drawObject(o){
   const [px,py] = toPx(o.x, o.y);
-  const held = (o.state||'').toLowerCase() !== 'free';
-  ctx.fillStyle = held ? '#b06cff' : '#33d17a';
-  ctx.fillRect(px-7, py-7, 14, 14);
+  const col = TAG_COLORS[(o.type||'').toLowerCase()] || '#33d17a';
+  // carré du tag
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(-(o.theta||0));
+  ctx.fillStyle = col; ctx.strokeStyle = '#0d1017'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.rect(-7,-7,14,14); ctx.fill(); ctx.stroke();
+  // orientation
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(13,0); ctx.stroke();
+  ctx.restore();
+  // libellé (id + caméra source)
   ctx.fillStyle = '#cdd3e0'; ctx.font = '10px system-ui';
-  ctx.fillText((o.type||'') + ' #' + (o.id ?? ''), px+9, py+3);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.fillText('#' + (o.id ?? '') + (o.state ? ' ' + o.state : ''), px+10, py+3);
 }
 
 function render(){
