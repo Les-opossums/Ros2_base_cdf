@@ -90,7 +90,13 @@
       <div class="kv"><span>y (m)</span><b id="ry">—</b></div>
       <div class="kv"><span>θ (°)</span><b id="rt">—</b></div>
       <div class="kv"><span>Balises</span><b id="rb">—</b></div>
-      <div class="kv"><span>Objets</span><b id="ro">—</b></div>
+      <div class="kv"><span>Tags bruts</span><b id="ro">—</b></div>
+    </div>
+
+    <div class="card">
+      <h2>Dispersion des tags</h2>
+      <p class="muted">Écart-type de position (mm) / nb obs — plus c'est bas, mieux c'est localisé.</p>
+      <div id="dispList" class="muted">En attente…</div>
     </div>
 
     <div class="card">
@@ -111,7 +117,8 @@
     <div class="card">
       <h2>Topics</h2>
       <div class="topic-row"><span class="muted">Position</span><input type="text" id="topicPos" value="/main_robot/position_out"></div>
-      <div class="topic-row"><span class="muted">Tags / objets (GlobalView)</span><input type="text" id="topicObj" value="/main_robot/aruco_world"></div>
+      <div class="topic-row"><span class="muted">Tags bruts (GlobalView)</span><input type="text" id="topicObj" value="/main_robot/aruco_world"></div>
+      <div class="topic-row"><span class="muted">Tags fusionnés (GlobalView)</span><input type="text" id="topicFused" value="/main_robot/aruco_world_fused"></div>
       <div class="topic-row"><span class="muted">Commande</span><input type="text" id="topicCmd" value="/main_robot/command"></div>
       <div class="topic-row"><span class="muted">Config plateau</span><input type="text" id="topicPlat" value="/plateau_config"></div>
       <button id="applyTopics" class="sec" style="width:100%;margin-top:10px">Ré-abonner</button>
@@ -163,7 +170,7 @@ if (window.ResizeObserver) new ResizeObserver(resizeCanvas).observe(box);
 window.addEventListener('resize', ()=>{ fitField(); resizeCanvas(); });
 document.getElementById('sizeSlider').addEventListener('input', ()=>{ fitField(); });
 
-let state = { robot:null, others:[], balises:[], objects:[] };
+let state = { robot:null, others:[], balises:[], objects:[], fused:[] };
 
 function drawField(){
   ctx.clearRect(0,0,LW,LH);
@@ -242,29 +249,36 @@ function drawBalise(b){
 }
 
 const TAG_COLORS = { yellow:'#ffd447', blue:'#4c8dff', rot:'#ff5c5c', red:'#ff5c5c' };
-function drawObject(o){
+// o = {x,y,theta,type,id,state}. opts.solid: rempli (fusionné) ou creux (brut).
+function drawTag(o, opts){
   const [px,py] = toPx(o.x, o.y);
   const col = TAG_COLORS[(o.type||'').toLowerCase()] || '#33d17a';
-  // carré du tag
+  const s = opts.solid ? 8 : 6;
   ctx.save();
   ctx.translate(px, py);
   ctx.rotate(-(o.theta||0));
-  ctx.fillStyle = col; ctx.strokeStyle = '#0d1017'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.rect(-7,-7,14,14); ctx.fill(); ctx.stroke();
-  // orientation
-  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(13,0); ctx.stroke();
+  ctx.lineWidth = opts.solid ? 2 : 1.5; ctx.strokeStyle = col;
+  if(opts.solid){ ctx.fillStyle = col; ctx.beginPath(); ctx.rect(-s,-s,2*s,2*s); ctx.fill(); ctx.strokeStyle='#0d1017'; ctx.stroke(); }
+  else { ctx.beginPath(); ctx.rect(-s,-s,2*s,2*s); ctx.stroke(); }        // brut = contour
+  ctx.strokeStyle = opts.solid ? '#fff' : col; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s+5,0); ctx.stroke();
   ctx.restore();
-  // libellé (id + caméra source)
-  ctx.fillStyle = '#cdd3e0'; ctx.font = '10px system-ui';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-  ctx.fillText('#' + (o.id ?? '') + (o.state ? ' ' + o.state : ''), px+10, py+3);
+  if(opts.label){
+    ctx.fillStyle = '#cdd3e0'; ctx.font = '10px system-ui';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText(opts.label, px+s+4, py+3);
+  }
 }
 
 function render(){
   drawField();
   state.balises.forEach(drawBalise);
-  state.objects.forEach(drawObject);
+  // détections BRUTES (chaque trame) : contours faibles
+  ctx.globalAlpha = 0.28;
+  state.objects.forEach(o => drawTag(o, {solid:false}));
+  ctx.globalAlpha = 1;
+  // estimations FUSIONNÉES : pleines + libellé id
+  state.fused.forEach(o => drawTag(o, {solid:true, label:'#'+(o.id ?? '')}));
   state.others.forEach(o => drawRobot(o, '#ff5c5c', false));
   drawRobot(state.robot, '#4c8dff', true);
 }
@@ -276,8 +290,19 @@ function setPlateau(v){
   render();
 }
 
+function updateDispersion(){
+  const el = document.getElementById('dispList');
+  if(!state.fused.length){ el.textContent = 'Aucun tag suivi.'; return; }
+  const rows = state.fused.map(o=>{
+    const col = TAG_COLORS[(o.type||'').toLowerCase()] || '#33d17a';
+    return `<div class="kv"><span><i class="sw" style="background:${col}"></i> #${o.id} ${o.type||''}</span>`
+         + `<b style="font-size:12px">${o.state||''}</b></div>`;
+  }).join('');
+  el.innerHTML = rows;
+}
+
 // ---------------- ROS ----------------
-let ros=null, subPos=null, subObj=null, subPlat=null, pubCmd=null;
+let ros=null, subPos=null, subObj=null, subPlat=null, subFused=null, pubCmd=null;
 let msgCount=0; setInterval(()=>{ document.getElementById('rateText').textContent = ros&&ros.isConnected? (msgCount+' msg/s'):''; msgCount=0; }, 1000);
 
 function setStatus(on, txt){
@@ -297,7 +322,7 @@ function connect(){
 
 function subscribeAll(){
   if(!ros) return;
-  [subPos, subObj, subPlat].forEach(s => { if(s) s.unsubscribe(); });
+  [subPos, subObj, subPlat, subFused].forEach(s => { if(s) s.unsubscribe(); });
 
   subPos = new ROSLIB.Topic({ ros, name:document.getElementById('topicPos').value.trim(),
                               messageType:'opossum_msgs/msg/LidarLoc' });
@@ -320,6 +345,15 @@ function subscribeAll(){
     msgCount++;
     state.objects = (m.objects||[]).map(o=>({id:o.id,type:o.type,state:o.state,x:o.x||0,y:o.y||0,theta:o.theta||0}));
     document.getElementById('ro').textContent = state.objects.length;
+    render();
+  });
+
+  subFused = new ROSLIB.Topic({ ros, name:document.getElementById('topicFused').value.trim(),
+                                messageType:'opossum_msgs/msg/GlobalView' });
+  subFused.subscribe(m=>{
+    msgCount++;
+    state.fused = (m.objects||[]).map(o=>({id:o.id,type:o.type,state:o.state,x:o.x||0,y:o.y||0,theta:o.theta||0}));
+    updateDispersion();
     render();
   });
 
