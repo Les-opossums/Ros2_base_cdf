@@ -2,14 +2,19 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 
 def launch_setup(context, *args, **kwargs):
     robot_names = [n.strip() for n in
                    LaunchConfiguration("robot_names").perform(context).split(",")
                    if n.strip()]
+    # Source unique des reglages (dont la latence camera calibree).
+    param_file = PathJoinSubstitution(
+        [FindPackageShare("opossum_vision"), "config", "tag_fusion_params.yaml"]
+    )
     nodes = []
     for robot in robot_names:
         nodes.append(Node(
@@ -18,13 +23,7 @@ def launch_setup(context, *args, **kwargs):
             name="tag_fusion_node",
             namespace=robot,
             output="screen",
-            parameters=[{
-                "camera_extra_latency_s": 0.0,
-                "fuse_alpha": 0.35,
-                "gate_m": 0.12,
-                "match_m": 0.15,
-                "min_hits": 3,
-            }],
+            parameters=[param_file],
         ))
     return nodes
 

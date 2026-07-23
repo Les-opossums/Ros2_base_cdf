@@ -1,0 +1,17 @@
+# Paramètres du nœud de fusion des tags (opossum_vision/tag_fusion_node.py).
+# Chargé au démarrage par les bringups -> valeurs appliquées à chaque boot.
+# "/**" : s'applique quel que soit le namespace du robot (main_robot, second_robot...).
+/**/tag_fusion_node:
+  ros__parameters:
+    # Latence caméra constante (s), trouvée par auto-calibration
+    camera_extra_latency_s: 0.025
+
+    # Fusion temporelle
+    fuse_alpha: 0.35      # poids d'une nouvelle observation (EMA)
+    gate_m: 0.12          # rejet d'outlier (saut > à cette distance, m)
+    match_m: 0.15         # association obs -> estimé existant (m)
+    min_hits: 3           # nb d'observations avant d'afficher (anti-fantôme)
+    static_vlin: 0.03     # < seuil (m/s) : robot considéré à l'arrêt
+    static_vt: 0.05       # < seuil (rad/s) : idem en rotation
+    forget_s: 1.0         # oubli d'un estimé plus vu depuis (s)
+    fused_rate_hz: 10.0   # fréquence de publication d'aruco_world_fused

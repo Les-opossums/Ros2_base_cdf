@@ -141,12 +141,17 @@ def generate_launch_description():
     )
 
     # Fusion des tags en coordonnees monde (aruco_world / aruco_world_fused).
+    # Parametres (dont la latence camera calibree) charges depuis le YAML.
+    param_tag_fusion = PathJoinSubstitution(
+        [FindPackageShare("opossum_vision"), "config", "tag_fusion_params.yaml"]
+    )
     node_tag_fusion = Node(
         namespace=namespace,
         package="opossum_vision",
         executable="tag_fusion_node.py",
         name="tag_fusion_node",
         output="screen",
+        parameters=[param_tag_fusion],
     )
 
     # Gestionnaire de calibration camera (pilotable depuis l'IHM web).
