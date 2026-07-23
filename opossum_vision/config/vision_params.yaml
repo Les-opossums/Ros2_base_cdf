@@ -5,6 +5,9 @@ main_robot:
       simulation: false
       port: '/dev/jevois_cam1'  # Penser à mettre une règle udev (ex: /dev/ttyCAM_LEFT)
       baudrate: 115200
+      # true = trames binaires (doit matcher binary_output du module JeVois).
+      # Défaut du noeud = true ; réglé ici pour les 3 caméras du robot principal.
+      binary_input: true
       camera_id: 1
       
       # Paramètres communs conservés
@@ -22,6 +25,7 @@ main_robot:
       simulation: false
       port: '/dev/jevois_cam2'
       baudrate: 115200
+      binary_input: true
       camera_id: 2
       # Paramètres communs...
       rcv_comm_topic: zync_raspi
@@ -33,6 +37,7 @@ main_robot:
       simulation: false
       port: '/dev/jevois_cam3'
       baudrate: 115200
+      binary_input: true
       camera_id: 3
       # Paramètres communs...
       rcv_comm_topic: zync_raspi

@@ -5,6 +5,8 @@ from rclpy.node import Node
 import serial
 import threading
 import time
+import math
+import struct
 from collections import deque
 
 # Assurez-vous que l'import fonctionne selon votre structure
@@ -61,11 +63,14 @@ class SingleVisionNode(Node):
         self.declare_parameter("baudrate", 115200)
         self.declare_parameter("camera_id", 1)
         self.declare_parameter("simulation", False)
-        
+        # true = trames BINAIRES (doit matcher binary_output du module JeVois).
+        self.declare_parameter("binary_input", True)
+
         self.port = self.get_parameter("port").get_parameter_value().string_value
         self.baudrate = self.get_parameter("baudrate").get_parameter_value().integer_value
         self.camera_id = self.get_parameter("camera_id").get_parameter_value().integer_value
         self.simulation = self.get_parameter("simulation").get_parameter_value().bool_value
+        self.binary = self.get_parameter("binary_input").get_parameter_value().bool_value
         
         # 2. Initialisation des Publishers
         self.aruco_pub = self.create_publisher(VisionDataFrame, 'aruco_loc', 10)
@@ -114,19 +119,98 @@ class SingleVisionNode(Node):
         return None
 
     def _serial_read_worker(self):
-        """Thread dédié à la lecture série bloquante."""
-        self.get_logger().info(f"Thread d'écoute démarré sur {self.port}.")
-        
+        """Thread de lecture serie.
+
+        Lit par GROS BLOCS (un seul appel systeme draine tout le buffer serie)
+        au lieu du read_until octet-par-octet de pyserial (1 syscall/octet).
+        Puis decoupe soit des trames binaires (framing magic+crc), soit des
+        lignes ASCII, selon binary_input."""
+        self.get_logger().info(
+            f"Thread d'ecoute demarre sur {self.port} "
+            f"({'BINAIRE' if self.binary else 'ASCII'}).")
+
+        buf = bytearray()
+        ser = self.serial_card
         while rclpy.ok() and self.is_running:
             try:
-                raw_line = self.serial_card.read_until(b'\n')
-                if raw_line:
-                    line = raw_line.decode('utf-8', errors="ignore").strip()
-                    if line:
-                        self._handle_received_line(line)
-            except serial.SerialException as e:
+                n = ser.in_waiting
+                chunk = ser.read(n if n > 0 else 1)  # bloque sur 1 octet si idle
+            except (serial.SerialException, OSError) as e:
                 self.get_logger().error(f"Port série déconnecté sur {self.port}: {e}")
-                break # Sort de la boucle, le node devra être relancé
+                break
+            if not chunk:
+                continue
+            buf.extend(chunk)
+            if self.binary:
+                self._consume_binary(buf)
+            else:
+                self._consume_lines(buf)
+
+    def _consume_lines(self, buf: bytearray):
+        """Extrait les lignes ASCII completes du buffer."""
+        while True:
+            i = buf.find(b'\n')
+            if i < 0:
+                return
+            raw = bytes(buf[:i]); del buf[:i + 1]
+            line = raw.decode('utf-8', errors="ignore").strip()
+            if line:
+                self._handle_received_line(line)
+
+    # --- Protocole binaire : 0xA5 0x5A | type | len | payload | crc(xor) ---
+    def _consume_binary(self, buf: bytearray):
+        while True:
+            i = buf.find(b'\xA5\x5A')
+            if i < 0:
+                # pas de magic : ne garder que le dernier octet (magic coupe entre 2 lectures)
+                if len(buf) > 1:
+                    del buf[:-1]
+                return
+            if i > 0:
+                del buf[:i]  # jette le bruit (ex: terminateur de ligne) avant le magic
+            if len(buf) < 5:
+                return       # header incomplet, on attend
+            typ = buf[2]; ln = buf[3]
+            total = 4 + ln + 1
+            if len(buf) < total:
+                return       # payload incomplet, on attend
+            payload = bytes(buf[4:4 + ln]); crc = buf[4 + ln]
+            calc = typ ^ ln
+            for c in payload:
+                calc ^= c
+            if (calc & 0xFF) == crc:
+                self._handle_binary(typ, payload)
+                del buf[:total]
+            else:
+                del buf[:2]  # CRC faux : on saute le magic et on resynchronise
+
+    def _handle_binary(self, typ, payload):
+        try:
+            if typ == 0x02:      # HEARTBEAT : cam_id(u8) capture_us(i64)
+                _cam, cap = struct.unpack_from('<Bq', payload, 0)
+                self._clock_sync.update(cap, time.time())
+            elif typ == 0x01:    # ARUCO : cam_id(u8) capture_us(i64) count(u8) tags[]
+                cam, cap, count = struct.unpack_from('<BqB', payload, 0)
+                off = 10  # 1 + 8 + 1
+                frame = VisionDataFrame()
+                frame.id = int(cam)
+                lt = self._clock_sync.to_local(cap)
+                frame.capture_time = lt if lt is not None else 0.0
+                frame.object = []
+                for _ in range(count):
+                    tid, x, y, z, yaw = struct.unpack_from('<hffff', payload, off)
+                    off += 18  # 2 + 4*4
+                    vd = VisionData()
+                    vd.id = int(tid)
+                    vd.x = x / 1000.0
+                    vd.y = y / 1000.0
+                    vd.z = z / 1000.0
+                    vd.theta = yaw * math.pi / 180.0 + math.pi / 2
+                    frame.object.append(vd)
+                self.aruco_pub.publish(frame)
+            # typ 0x03 (ROBOTPOS) : ignore cote Pi, comme en ASCII.
+        except struct.error:
+            pass  # trame tronquee/corrompue -> ignoree (le CRC a normalement filtre)
 
     def _handle_received_line(self, data):
         if data and data[0].isalpha():
