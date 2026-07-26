@@ -1,0 +1,5 @@
+# Caches Python / pytest (ne jamais committer)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/

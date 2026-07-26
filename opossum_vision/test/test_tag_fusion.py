@@ -52,19 +52,19 @@ def test_fuser_two_tags_no_merge():
         {"x": 1.5, "y": 0.5, "theta": 0.0, "color": "blue"},
     ]
     for _ in range(3):
-        f.update([dict(d) for d in dets], now=0.0, static=True)
-    snap = f.snapshot()
+        f.update([dict(d) for d in dets], now=0.0)
+    snap = f.snapshot(now=0.0)
     assert len(snap) == 2  # deux estimes distincts, pas de fusion
 
 
 def test_fuser_confirmation_min_hits():
     f = TagFuser(min_hits=3)
     d = {"x": 0.5, "y": 0.5, "theta": 0.0, "color": "blue"}
-    f.update([dict(d)], now=0.0, static=True)
-    assert f.snapshot() == []            # 1 hit -> pas encore confirme
-    f.update([dict(d)], now=0.0, static=True)
-    f.update([dict(d)], now=0.0, static=True)
-    assert len(f.snapshot()) == 1        # >= min_hits -> confirme
+    f.update([dict(d)], now=0.0)
+    assert f.snapshot(now=0.0) == []            # 1 hit -> pas encore confirme
+    f.update([dict(d)], now=0.0)
+    f.update([dict(d)], now=0.0)
+    assert len(f.snapshot(now=0.0)) == 1        # >= min_hits -> confirme
 
 
 def test_fuser_no_cross_color_merge():
@@ -73,8 +73,8 @@ def test_fuser_no_cross_color_merge():
     for _ in range(3):
         f.update([{"x": 0.5, "y": 0.5, "theta": 0.0, "color": "blue"},
                   {"x": 0.51, "y": 0.5, "theta": 0.0, "color": "yellow"}],
-                 now=0.0, static=True)
-    snap = f.snapshot()
+                 now=0.0)
+    snap = f.snapshot(now=0.0)
     assert len(snap) == 2
 
 
@@ -85,8 +85,8 @@ def test_dispersion_static_accumulates():
     for _ in range(200):
         f.update([{"x": 0.5 + random.gauss(0, 0.002),
                    "y": 0.5 + random.gauss(0, 0.002),
-                   "theta": 0.0, "color": "blue"}], now=0.0, static=True)
-    snap = f.snapshot()
+                   "theta": 0.0, "color": "blue"}], now=0.0)
+    snap = f.snapshot(now=0.0)
     assert len(snap) == 1
     assert snap[0]["n_static"] > 100
     assert snap[0]["std_static_m"] < 0.02  # dispersion faible (bruit ~2mm)
@@ -97,3 +97,51 @@ def test_aruco_color_name():
     assert aruco_color_name(36) == "blue"
     assert aruco_color_name(41) == "rot"
     assert aruco_color_name(99) == "tag"
+
+
+# --------------------------------------------------------------------------- #
+#  Confiance vs mouvement / persistance
+# --------------------------------------------------------------------------- #
+def test_confidence_high_when_static():
+    f = TagFuser(min_hits=1)
+    d = {"x": 0.5, "y": 0.5, "theta": 0.0, "color": "blue"}
+    for _ in range(20):
+        f.update([dict(d)], now=0.0, vlin=0.0, vt=0.0)   # robot à l'arrêt
+    assert f.snapshot(now=0.0)[0]["confidence"] > 0.9
+
+
+def test_confidence_drops_under_rotation():
+    f = TagFuser(min_hits=1)
+    d = {"x": 0.5, "y": 0.5, "theta": 0.0, "color": "blue"}
+    # D'abord confiance haute à l'arrêt, puis rotation soutenue.
+    for _ in range(20):
+        f.update([dict(d)], now=0.0, vlin=0.0, vt=0.0)
+    conf_static = f.snapshot(now=0.0)[0]["confidence"]
+    for _ in range(20):
+        f.update([dict(d)], now=0.0, vlin=0.0, vt=0.2)   # rotation
+    conf_rot = f.snapshot(now=0.0)[0]["confidence"]
+    assert conf_rot < conf_static
+    # À vitesse numérique égale, la rotation pénalise plus que la translation.
+    g = TagFuser(min_hits=1)
+    for _ in range(20):
+        g.update([dict(d)], now=0.0, vlin=0.0, vt=0.0)
+    for _ in range(20):
+        g.update([dict(d)], now=0.0, vlin=0.2, vt=0.0)   # translation seule
+    conf_trans = g.snapshot(now=0.0)[0]["confidence"]
+    assert conf_rot < conf_trans
+
+
+def test_persistence_present_then_forgotten():
+    f = TagFuser(min_hits=1, absent_s=2.0, forget_s=5.0)
+    d = {"x": 0.5, "y": 0.5, "theta": 0.0, "color": "blue"}
+    f.update([dict(d)], now=0.0, vlin=0.0, vt=0.0)
+    # Vu à t=0 : présent.
+    snap = f.snapshot(now=0.0)
+    assert snap and snap[0]["present"] is True
+    # t=3s sans le revoir : encore mémorisé mais non présent (persistance).
+    snap = f.snapshot(now=3.0)
+    assert snap and snap[0]["present"] is False
+    assert snap[0]["confidence"] < 0.5     # confiance décrue avec l'âge
+    # t=6s : oublié après forget_s.
+    f.forget(now=6.0)
+    assert f.snapshot(now=6.0) == []

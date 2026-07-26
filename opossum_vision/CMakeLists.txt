@@ -26,7 +26,6 @@ ament_python_install_package(${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
   scripts/vision_node.py
-  scripts/vision_emulator_node.py
   scripts/tag_fusion_node.py
   DESTINATION lib/${PROJECT_NAME}
 )

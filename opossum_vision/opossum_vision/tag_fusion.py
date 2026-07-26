@@ -159,18 +159,53 @@ class PoseHistory:
 # --------------------------------------------------------------------------- #
 #  Fusion des tags
 # --------------------------------------------------------------------------- #
+def clamp(v, lo, hi):
+    return lo if v < lo else hi if v > hi else v
+
+
+def observation_weight(vlin, vt, ref_vlin, ref_vt, rot_penalty, w_min):
+    """Qualite [w_min..1] d'une observation selon le mouvement du robot.
+
+    - a l'arret (vlin=vt=0) -> 1.0 (confiance maximale) ;
+    - la vitesse lineaire degrade lineairement la qualite ;
+    - la ROTATION est penalisee `rot_penalty` fois plus (c'est le pire cas
+      pour la localisation d'un tag vu du robot : un petit retard camera
+      combine a une rotation deplace beaucoup la position projetee).
+
+    w = 1 - |vlin|/ref_vlin - rot_penalty*|vt|/ref_vt, borne a [w_min, 1].
+    """
+    w = 1.0 - abs(vlin) / max(ref_vlin, 1e-6) \
+            - rot_penalty * abs(vt) / max(ref_vt, 1e-6)
+    return clamp(w, w_min, 1.0)
+
+
 class TagFuser:
-    """Fusion temporelle des detections monde en estimations stables par tag."""
+    """Fusion temporelle des detections monde en estimations stables par tag,
+    avec une CONFIANCE par tag (haute a l'arret, degradee en mouvement -- et
+    surtout en rotation) et une PERSISTANCE (un objet reste memorise, avec une
+    confiance qui decroit avec le temps, jusqu'a `forget_s`)."""
 
     def __init__(self, alpha=0.35, gate_m=0.12, match_m=0.15, min_hits=3,
-                 static_vlin=0.03, static_vt=0.05, forget_s=1.0):
+                 static_vlin=0.03, static_vt=0.05,
+                 absent_s=2.0, forget_s=5.0,
+                 ref_vlin=0.5, ref_vt=0.5, rot_penalty=2.0, w_min=0.05,
+                 conf_beta=0.2, conf_tau_s=1.5):
         self.alpha = alpha
         self.gate_m = gate_m
         self.match_m = match_m
         self.min_hits = min_hits
         self.static_vlin = static_vlin
         self.static_vt = static_vt
-        self.forget_s = forget_s
+        self.absent_s = absent_s          # au-dela : objet marque non-present
+        self.forget_s = forget_s          # au-dela : objet oublie (supprime)
+        # Modele de qualite d'observation vs mouvement
+        self.ref_vlin = ref_vlin          # vitesse lin. de reference (m/s)
+        self.ref_vt = ref_vt              # vitesse ang. de reference (rad/s)
+        self.rot_penalty = rot_penalty    # poids de la rotation vs translation
+        self.w_min = w_min                # qualite minimale d'une observation
+        # Lissage de la confiance
+        self.conf_beta = conf_beta        # EMA de la confiance vers sa cible
+        self.conf_tau_s = conf_tau_s      # constante de decroissance temporelle
         self._estimates = {}
         self._next_key = 1
 
@@ -183,27 +218,33 @@ class TagFuser:
     def is_static(self, vlin, vt):
         return abs(vlin) < self.static_vlin and abs(vt) < self.static_vt
 
-    def _new_estimate(self, d, now):
+    def _new_estimate(self, d, now, w):
         k = self._next_key
         self._next_key += 1
         self._estimates[k] = {
             "x": d["x"], "y": d["y"], "theta": d["theta"],
             "color": d.get("color", "tag"), "last_seen": now, "hits": 1,
+            "conf": w,                    # confiance initiale = qualite de l'obs
             "s": _new_acc(), "m": _new_acc(),
         }
 
-    def update(self, dets, now, static):
+    def update(self, dets, now, vlin=0.0, vt=0.0):
         """Integre les detections monde d'UNE trame.
 
-        dets : liste de dicts {x, y, theta, color}. Association optimale
-        (Hungarian) aux estimes existants, une detection par estime, jamais
-        entre couleurs differentes ; mise a jour EMA + dispersion Welford."""
+        dets : liste de dicts {x, y, theta, color}. `vlin`/`vt` : vitesses
+        robot a l'instant de la trame -> pondere la confiance et le lissage
+        (une observation prise en rotation rapide bouge tres peu l'estime et
+        fait chuter sa confiance). Association optimale (Hungarian), une
+        detection par estime, jamais entre couleurs differentes."""
+        static = self.is_static(vlin, vt)
+        w = observation_weight(vlin, vt, self.ref_vlin, self.ref_vt,
+                               self.rot_penalty, self.w_min)
         if not dets:
             return
         keys = list(self._estimates.keys())
         if not keys:
             for d in dets:
-                self._new_estimate(d, now)
+                self._new_estimate(d, now, w)
             return
 
         BIG = 1e3
@@ -217,7 +258,9 @@ class TagFuser:
 
         rows, cols = linear_sum_assignment(cost)
         matched = set()
-        a = self.alpha
+        # Lissage pondere par la qualite de l'obs : en mouvement/rotation,
+        # l'estime bouge peu (on fait confiance a la memoire, pas a l'obs).
+        a = self.alpha * w
         for i, j in zip(rows, cols):
             if cost[i, j] > self.match_m:
                 continue  # trop loin (ou couleur differente) -> pas d'appariement
@@ -232,12 +275,14 @@ class TagFuser:
             e["theta"] = ema_angle(e["theta"], d["theta"], a)
             e["last_seen"] = now
             e["hits"] += 1
+            # Confiance : EMA vers la qualite de l'observation courante.
+            e["conf"] += self.conf_beta * (w - e["conf"])
             _welford_add(e["s"] if static else e["m"], d["x"], d["y"])
             matched.add(j)
 
         for j, d in enumerate(dets):
             if j not in matched:
-                self._new_estimate(d, now)
+                self._new_estimate(d, now, w)
 
     def forget(self, now):
         stale = [k for k, e in self._estimates.items()
@@ -245,16 +290,28 @@ class TagFuser:
         for k in stale:
             del self._estimates[k]
 
-    def snapshot(self, confirmed_only=True):
-        """Liste des estimations : dict {key, color, x, y, theta, hits,
-        std_static_m, n_static, std_moving_m, n_moving}."""
+    def confidence_at(self, e, now):
+        """Confiance effective [0..1] : confiance accumulee, decroissante avec
+        le temps ecoule depuis la derniere observation (persistance)."""
+        age = now - e["last_seen"]
+        return clamp(e["conf"] * math.exp(-age / max(self.conf_tau_s, 1e-6)), 0.0, 1.0)
+
+    def snapshot(self, now, confirmed_only=True):
+        """Liste des estimations memorisees (y compris non vues a l'instant,
+        tant que age < forget_s -> persistance).
+
+        Chaque item : {key, color, x, y, theta, hits, confidence, age_s,
+        present, std_static_m, n_static, std_moving_m, n_moving}."""
         out = []
         for k, e in self._estimates.items():
             if confirmed_only and e["hits"] < self.min_hits:
                 continue
+            age = now - e["last_seen"]
             out.append({
                 "key": k, "color": e["color"],
                 "x": e["x"], "y": e["y"], "theta": e["theta"], "hits": e["hits"],
+                "confidence": self.confidence_at(e, now),
+                "age_s": age, "present": age < self.absent_s,
                 "std_static_m": _welford_std(e["s"]), "n_static": e["s"]["n"],
                 "std_moving_m": _welford_std(e["m"]), "n_moving": e["m"]["n"],
             })

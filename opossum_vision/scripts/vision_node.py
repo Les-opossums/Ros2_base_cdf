@@ -9,15 +9,7 @@ import math
 import struct
 from collections import deque
 
-# Assurez-vous que l'import fonctionne selon votre structure
-try:
-    from opossum_msgs.msg import VisionData, VisionDataFrame, CameraLoc
-    from std_msgs.msg import String
-except ImportError:
-    class VisionData: pass
-    class VisionDataFrame: pass
-    class CameraLoc: pass
-    class String: pass
+from opossum_msgs.msg import VisionData, VisionDataFrame
 
 class JevoisClockSync:
     """Estime l'offset entre l'horloge locale (arbitraire, boot du module) du
@@ -72,10 +64,8 @@ class SingleVisionNode(Node):
         self.simulation = self.get_parameter("simulation").get_parameter_value().bool_value
         self.binary = self.get_parameter("binary_input").get_parameter_value().bool_value
         
-        # 2. Initialisation des Publishers
+        # 2. Publisher unique : détections ArUco brutes (repère robot).
         self.aruco_pub = self.create_publisher(VisionDataFrame, 'aruco_loc', 10)
-        self.pub_command = self.create_publisher(String, "command", 10)
-        self.camera_loc_pub = self.create_publisher(CameraLoc, 'camera_loc', 10)
 
         # Calibration d'horloge JeVois -> Pi, alimentee par les trames HEARTBEAT.
         # Necessaire pour convertir le CAPTURE_US envoye dans les trames ARUCO

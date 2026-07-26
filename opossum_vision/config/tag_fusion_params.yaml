@@ -7,11 +7,23 @@
     camera_extra_latency_s: 0.025
 
     # Fusion temporelle
-    fuse_alpha: 0.35      # poids d'une nouvelle observation (EMA)
+    fuse_alpha: 0.35      # poids d'une nouvelle observation (EMA, à l'arrêt)
     gate_m: 0.12          # rejet d'outlier (saut > à cette distance, m)
     match_m: 0.15         # association obs -> estimé existant (m)
     min_hits: 3           # nb d'observations avant d'afficher (anti-fantôme)
     static_vlin: 0.03     # < seuil (m/s) : robot considéré à l'arrêt
     static_vt: 0.05       # < seuil (rad/s) : idem en rotation
-    forget_s: 1.0         # oubli d'un estimé plus vu depuis (s)
+
+    # Persistance temporelle des objets
+    absent_s: 2.0         # au-delà (s sans revoir l'objet) : marqué non-présent
+    forget_s: 5.0         # au-delà (s) : objet oublié (supprimé)
+
+    # Modèle de confiance vs mouvement (la rotation est le pire cas)
+    ref_vlin: 0.5         # vitesse lin. de référence pour dégrader la confiance (m/s)
+    ref_vt: 0.5           # vitesse ang. de référence (rad/s)
+    rot_penalty: 2.0      # la rotation dégrade la confiance 2x plus que la translation
+    w_min: 0.05           # qualité minimale d'une observation en plein mouvement
+    conf_beta: 0.2        # lissage (EMA) de la confiance vers sa cible
+    conf_tau_s: 1.5       # constante de décroissance de la confiance avec l'âge (s)
+
     fused_rate_hz: 10.0   # fréquence de publication d'aruco_world_fused

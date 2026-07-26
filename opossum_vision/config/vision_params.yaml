@@ -1,24 +1,16 @@
-# --- Configuration pour le Robot Principal ---
+# Paramètres des nœuds caméra (opossum_vision/vision_node.py).
+# Un bloc par caméra ; la clé doit correspondre à f"vision_node_{cam}" du launch.
+# Seuls les paramètres réellement déclarés par le nœud sont listés :
+#   simulation, port, baudrate, camera_id, binary_input.
+
 main_robot:
-  vision_node_one: # Doit correspondre à f"vision_node_{cam}" dans le launch
+  vision_node_one:
     ros__parameters:
       simulation: false
-      port: '/dev/jevois_cam1'  # Penser à mettre une règle udev (ex: /dev/ttyCAM_LEFT)
+      port: '/dev/jevois_cam1'   # règle udev conseillée (ex: /dev/jevois_cam_left)
       baudrate: 115200
-      # true = trames binaires (doit matcher binary_output du module JeVois).
-      # Défaut du noeud = true ; réglé ici pour les 3 caméras du robot principal.
-      binary_input: true
+      binary_input: true         # true = trames binaires (doit matcher le module JeVois)
       camera_id: 1
-      
-      # Paramètres communs conservés
-      rcv_comm_topic: zync_raspi
-      send_comm_topic: raspi_zync
-      comm_state_topic: comm_state
-      asserv_topic: asserv
-      robot_data_topic: robot_data
-      goal_position_topic: goal_position
-      command_topic: command
-      feedback_command_topic: feedback_command
 
   vision_node_two:
     ros__parameters:
@@ -27,10 +19,6 @@ main_robot:
       baudrate: 115200
       binary_input: true
       camera_id: 2
-      # Paramètres communs...
-      rcv_comm_topic: zync_raspi
-      asserv_topic: asserv
-      command_topic: command
 
   vision_node_three:
     ros__parameters:
@@ -39,37 +27,29 @@ main_robot:
       baudrate: 115200
       binary_input: true
       camera_id: 3
-      # Paramètres communs...
-      rcv_comm_topic: zync_raspi
-      asserv_topic: asserv
-      command_topic: command
 
-
-# --- Configuration pour un second robot potentiel ---
+# --- Second robot éventuel ---
 second_robot:
   vision_node_one:
     ros__parameters:
       simulation: false
       port: '/dev/jevois_cam1'
       baudrate: 115200
+      binary_input: true
       camera_id: 1
-      rcv_comm_topic: zync_raspi
-      asserv_topic: asserv
 
   vision_node_two:
     ros__parameters:
       simulation: false
       port: '/dev/jevois_cam2'
       baudrate: 115200
+      binary_input: true
       camera_id: 2
-      rcv_comm_topic: zync_raspi
-      asserv_topic: asserv
 
   vision_node_three:
     ros__parameters:
       simulation: false
       port: '/dev/jevois_cam3'
       baudrate: 115200
+      binary_input: true
       camera_id: 3
-      rcv_comm_topic: zync_raspi
-      asserv_topic: asserv

@@ -40,7 +40,15 @@ class TagFusionNode(Node):
         self.declare_parameter("min_hits", 3)
         self.declare_parameter("static_vlin", 0.03)
         self.declare_parameter("static_vt", 0.05)
-        self.declare_parameter("forget_s", 1.0)
+        self.declare_parameter("absent_s", 2.0)
+        self.declare_parameter("forget_s", 5.0)
+        # Modele confiance vs mouvement
+        self.declare_parameter("ref_vlin", 0.4)
+        self.declare_parameter("ref_vt", 1.2)
+        self.declare_parameter("rot_penalty", 2.5)
+        self.declare_parameter("w_min", 0.05)
+        self.declare_parameter("conf_beta", 0.2)
+        self.declare_parameter("conf_tau_s", 1.5)
         self.declare_parameter("fused_rate_hz", 10.0)
         self.declare_parameter("near_reject_m2", 0.05)   # rejet chassis (dist^2)
         self.declare_parameter("near_reject_z", 0.17)    # ... si z au-dessus
@@ -68,6 +76,11 @@ class TagFusionNode(Node):
         self.get_logger().info("tag_fusion_node demarre.")
 
     # ---------------- Parametres ----------------
+    _TUNABLE = ("fuse_alpha", "gate_m", "match_m", "min_hits",
+                "static_vlin", "static_vt", "absent_s", "forget_s",
+                "ref_vlin", "ref_vt", "rot_penalty", "w_min",
+                "conf_beta", "conf_tau_s")
+
     def _apply_fuser_params(self):
         self.fuser.set_config(
             alpha=self.get_parameter("fuse_alpha").value,
@@ -76,15 +89,21 @@ class TagFusionNode(Node):
             min_hits=self.get_parameter("min_hits").value,
             static_vlin=self.get_parameter("static_vlin").value,
             static_vt=self.get_parameter("static_vt").value,
+            absent_s=self.get_parameter("absent_s").value,
             forget_s=self.get_parameter("forget_s").value,
+            ref_vlin=self.get_parameter("ref_vlin").value,
+            ref_vt=self.get_parameter("ref_vt").value,
+            rot_penalty=self.get_parameter("rot_penalty").value,
+            w_min=self.get_parameter("w_min").value,
+            conf_beta=self.get_parameter("conf_beta").value,
+            conf_tau_s=self.get_parameter("conf_tau_s").value,
         )
 
     def _on_set_params(self, params):
         for p in params:
             if p.name == "camera_extra_latency_s":
                 self.extra_latency = p.value
-            elif p.name in ("fuse_alpha", "gate_m", "match_m", "min_hits",
-                            "static_vlin", "static_vt", "forget_s"):
+            elif p.name in self._TUNABLE:
                 key = "alpha" if p.name == "fuse_alpha" else p.name
                 self.fuser.set_config(**{key: p.value})
         return SetParametersResult(successful=True)
@@ -135,19 +154,24 @@ class TagFusionNode(Node):
         self.pub_world.publish(gv)
 
         vlin, vt = self.robot_speed
-        self.fuser.update(dets, now, self.fuser.is_static(vlin, vt))
+        self.fuser.update(dets, now, vlin=vlin, vt=vt)
 
     def publish_fused(self):
         now = time.time()
         self.fuser.forget(now)
         gv = GlobalView(); gv.robots = []; gv.objects = []
-        for e in self.fuser.snapshot(confirmed_only=True):
+        for e in self.fuser.snapshot(now, confirmed_only=True):
             o = Objects()
             o.id = int(e["key"])
             o.type = e["color"]
-            o.state = (f"stat {int(round(e['std_static_m']*1000))}mm/{e['n_static']}"
+            o.state = (f"conf {int(round(e['confidence']*100))}%"
+                       f" age {e['age_s']:.1f}s"
+                       f" stat {int(round(e['std_static_m']*1000))}mm/{e['n_static']}"
                        f" mvt {int(round(e['std_moving_m']*1000))}mm/{e['n_moving']}")
             o.x = float(e["x"]); o.y = float(e["y"]); o.theta = float(e["theta"])
+            o.confidence = float(e["confidence"])
+            o.age_s = float(e["age_s"])
+            o.present = bool(e["present"])
             gv.objects.append(o)
         self.pub_fused.publish(gv)
 
