@@ -29,6 +29,8 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   scripts/dev_gui.py
   scripts/calibration_manager.py
+  scripts/system_monitor.py
+  scripts/node_manager.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

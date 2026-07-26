@@ -1,0 +1,39 @@
+# Registre des noeuds pilotes par le superviseur (node_manager.py).
+#
+# Chaque entree decrit COMMENT (re)lancer un noeud. Le superviseur peut le
+# demarrer / arreter a la demande (sous-process `ros2 run`). La presence reelle
+# du noeud dans le graphe ROS est detectee automatiquement (qu'il ait ete lance
+# par le superviseur ou par un bringup externe).
+#
+# Champs par noeud :
+#   key        : identifiant court unique (utilise par l'IHM web)
+#   label      : nom affiche
+#   group      : regroupement dans l'IHM (comm / localisation / vision / nav ...)
+#   package    : package ROS 2
+#   executable : executable (ros2 run <package> <executable>)
+#   node_name  : nom du noeud dans le graphe (pour detecter sa presence)
+#   namespace  : namespace ROS (defaut: main_robot)
+#   params     : (optionnel) chemin d'un fichier de parametres --params-file
+#   autostart  : (optionnel) true => demarre par le superviseur au lancement
+#
+# NB : par defaut autostart=false pour ne PAS entrer en conflit avec un bringup
+# monolithique deja lance. Migre les noeuds vers le superviseur au fur et a
+# mesure (en les retirant du bringup) pour pouvoir les piloter depuis l'IHM.
+
+main_robot:
+  node_manager:
+    ros__parameters:
+      namespace_default: main_robot
+      nodes:
+        - {key: comm,           label: "Comm (Zynq)",        group: comm,         package: opossum_comm,             executable: comm_node,               node_name: comm_node}
+        - {key: action_seq,     label: "Action sequencer",   group: strategie,    package: opossum_action_sequencer, executable: action_sequencer_node.py, node_name: action_sequencer_node}
+        - {key: tf_broadcaster, label: "TF broadcaster",     group: localisation, package: opossum_localisation,     executable: tf_broadcaster.py,       node_name: tf_broadcaster_node}
+        - {key: rplidar,        label: "RPLidar",            group: localisation, package: rplidar_ros,              executable: rplidar_node,            node_name: rplidar_node}
+        - {key: beacon,         label: "Beacon detector",    group: localisation, package: opossum_localisation,     executable: beacon_detector,         node_name: beacon_detector_node}
+        - {key: obstacle,       label: "Obstacle extractor", group: nav,          package: obstacle_detector,        executable: obstacle_extractor_node, node_name: obstacle_extractor_node}
+        - {key: avoid,          label: "Avoid obstacle",     group: nav,          package: opossum_nav,              executable: avoid_obstacle.py,       node_name: avoid_obstacle_node}
+        - {key: vision_one,     label: "Vision cam 1",       group: vision,       package: opossum_vision,           executable: vision_node.py,          node_name: vision_node_one}
+        - {key: vision_two,     label: "Vision cam 2",       group: vision,       package: opossum_vision,           executable: vision_node.py,          node_name: vision_node_two}
+        - {key: vision_three,   label: "Vision cam 3",       group: vision,       package: opossum_vision,           executable: vision_node.py,          node_name: vision_node_three}
+        - {key: tag_fusion,     label: "Tag fusion",         group: vision,       package: opossum_vision,           executable: tag_fusion_node.py,      node_name: tag_fusion_node}
+        - {key: calibration,    label: "Calibration cam",    group: vision,       package: opossum_dev_gui,          executable: calibration_manager.py,  node_name: calibration_manager}

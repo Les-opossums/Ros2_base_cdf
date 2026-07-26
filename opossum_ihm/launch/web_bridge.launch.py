@@ -76,6 +76,28 @@ def generate_launch_description():
         output="screen",
     )
 
+    # --- Moniteur systeme (CPU/RAM) pour la page « Systeme » de l'IHM web ---
+    node_system_monitor = Node(
+        namespace=namespace,
+        package="opossum_dev_gui",
+        executable="system_monitor.py",
+        name="system_monitor",
+        output="screen",
+    )
+
+    # --- Superviseur de noeuds (allumer/couper + statut) ---
+    node_manager_params = PathJoinSubstitution(
+        [FindPackageShare("opossum_dev_gui"), "config", "node_manager.yaml"]
+    )
+    node_manager = Node(
+        namespace=namespace,
+        package="opossum_dev_gui",
+        executable="node_manager.py",
+        name="node_manager",
+        output="screen",
+        parameters=[node_manager_params],
+    )
+
     return LaunchDescription(
         [
             declare_namespace,
@@ -83,5 +105,7 @@ def generate_launch_description():
             rosbridge,
             node_tag_fusion,
             node_calibration,
+            node_system_monitor,
+            node_manager,
         ]
     )
