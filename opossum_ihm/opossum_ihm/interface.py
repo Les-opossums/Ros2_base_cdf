@@ -66,7 +66,24 @@ class HomePage(QWidget):
         self.b_rb.clicked.connect(self.toggle_rosbridge)
         self._style_rosbridge_btn()
         l.addWidget(self.b_rb)
+
+        # Redemarrage du service ROS (meme niveau que les autres boutons).
+        b_ros = QPushButton("RESTART ROS"); b_ros.setFont(QFont("Arial", 15, QFont.Bold))
+        b_ros.setStyleSheet("background-color: #c0392b; color: white; border: 2px solid black; border-radius: 10px;")
+        b_ros.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed); b_ros.setMinimumHeight(90)
+        b_ros.clicked.connect(self.restart_ros)
+        l.addWidget(b_ros)
         l.addStretch(1)
+
+    def restart_ros(self):
+        # Redemarre le service ROS 2 (launch.service) sans passer par SSH.
+        if QMessageBox.question(self, 'Confirmation', "Redémarrer le service ROS 2 ?",
+                                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
+        try:
+            subprocess.run(['systemctl', '--user', 'restart', 'launch.service'], check=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Restart ROS", f"Echec du redémarrage :\n{e}")
 
     # ---------- Setup « connexion IHM web » (rosbridge + support debug) ----------
     def _style_rosbridge_btn(self):
