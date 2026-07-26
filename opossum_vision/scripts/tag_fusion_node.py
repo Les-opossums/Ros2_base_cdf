@@ -35,9 +35,11 @@ class TagFusionNode(Node):
         # --- Parametres reglables a chaud ---
         self.declare_parameter("camera_extra_latency_s", 0.0)
         self.declare_parameter("fuse_alpha", 0.35)
-        self.declare_parameter("gate_m", 0.12)
-        self.declare_parameter("match_m", 0.15)
-        self.declare_parameter("min_hits", 3)
+        self.declare_parameter("gate_m", 0.30)
+        self.declare_parameter("match_m", 0.25)
+        self.declare_parameter("min_hits", 1)
+        self.declare_parameter("pos_w_min", 0.4)
+        self.declare_parameter("motion_gate_k", 0.15)
         self.declare_parameter("static_vlin", 0.03)
         self.declare_parameter("static_vt", 0.05)
         self.declare_parameter("absent_s", 2.0)
@@ -79,7 +81,7 @@ class TagFusionNode(Node):
     _TUNABLE = ("fuse_alpha", "gate_m", "match_m", "min_hits",
                 "static_vlin", "static_vt", "absent_s", "forget_s",
                 "ref_vlin", "ref_vt", "rot_penalty", "w_min",
-                "conf_beta", "conf_tau_s")
+                "conf_beta", "conf_tau_s", "pos_w_min", "motion_gate_k")
 
     def _apply_fuser_params(self):
         self.fuser.set_config(
@@ -87,6 +89,8 @@ class TagFusionNode(Node):
             gate_m=self.get_parameter("gate_m").value,
             match_m=self.get_parameter("match_m").value,
             min_hits=self.get_parameter("min_hits").value,
+            pos_w_min=self.get_parameter("pos_w_min").value,
+            motion_gate_k=self.get_parameter("motion_gate_k").value,
             static_vlin=self.get_parameter("static_vlin").value,
             static_vt=self.get_parameter("static_vt").value,
             absent_s=self.get_parameter("absent_s").value,

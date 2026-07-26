@@ -185,27 +185,31 @@ class TagFuser:
     surtout en rotation) et une PERSISTANCE (un objet reste memorise, avec une
     confiance qui decroit avec le temps, jusqu'a `forget_s`)."""
 
-    def __init__(self, alpha=0.35, gate_m=0.12, match_m=0.15, min_hits=3,
+    def __init__(self, alpha=0.35, gate_m=0.30, match_m=0.25, min_hits=1,
                  static_vlin=0.03, static_vt=0.05,
                  absent_s=2.0, forget_s=5.0,
                  ref_vlin=0.5, ref_vt=0.5, rot_penalty=2.0, w_min=0.05,
-                 conf_beta=0.2, conf_tau_s=1.5):
+                 conf_beta=0.35, conf_tau_s=1.5,
+                 pos_w_min=0.4, motion_gate_k=0.15):
         self.alpha = alpha
-        self.gate_m = gate_m
-        self.match_m = match_m
-        self.min_hits = min_hits
+        self.gate_m = gate_m              # rejet outlier de base (m)
+        self.match_m = match_m            # association de base (m)
+        self.min_hits = min_hits          # 1 = affiche des la 1re detection
         self.static_vlin = static_vlin
         self.static_vt = static_vt
         self.absent_s = absent_s          # au-dela : objet marque non-present
         self.forget_s = forget_s          # au-dela : objet oublie (supprime)
-        # Modele de qualite d'observation vs mouvement
+        # Modele de qualite d'observation vs mouvement (-> CONFIANCE)
         self.ref_vlin = ref_vlin          # vitesse lin. de reference (m/s)
         self.ref_vt = ref_vt              # vitesse ang. de reference (rad/s)
         self.rot_penalty = rot_penalty    # poids de la rotation vs translation
-        self.w_min = w_min                # qualite minimale d'une observation
+        self.w_min = w_min                # confiance minimale d'une observation
         # Lissage de la confiance
         self.conf_beta = conf_beta        # EMA de la confiance vers sa cible
         self.conf_tau_s = conf_tau_s      # constante de decroissance temporelle
+        # Reactivite / permissivite (DETECTION, independante de la confiance)
+        self.pos_w_min = pos_w_min        # plancher du poids EMA de position
+        self.motion_gate_k = motion_gate_k  # elargit gate/match avec la vitesse
         self._estimates = {}
         self._next_key = 1
 
@@ -237,8 +241,19 @@ class TagFuser:
         fait chuter sa confiance). Association optimale (Hungarian), une
         detection par estime, jamais entre couleurs differentes."""
         static = self.is_static(vlin, vt)
+        # w : qualite de l'observation -> alimente la CONFIANCE (plein domaine).
         w = observation_weight(vlin, vt, self.ref_vlin, self.ref_vt,
                                self.rot_penalty, self.w_min)
+        # Seuils d'association/gating ELARGIS avec la vitesse : en mouvement la
+        # position monde projetee "bave" (latence camera residuelle) ; sans ca
+        # l'objet n'est jamais reassocie -> jamais affiche.
+        speed = abs(vlin) + abs(vt)
+        match_thr = self.match_m + self.motion_gate_k * speed
+        gate_thr = self.gate_m + self.motion_gate_k * speed
+        # EMA de position REACTIVE meme en mouvement (plancher), pour valider
+        # vite une position ; la defiance en mouvement est portee par la
+        # confiance, pas par un gel de l'estime.
+        a = self.alpha * clamp(w, self.pos_w_min, 1.0)
         if not dets:
             return
         keys = list(self._estimates.keys())
@@ -258,16 +273,13 @@ class TagFuser:
 
         rows, cols = linear_sum_assignment(cost)
         matched = set()
-        # Lissage pondere par la qualite de l'obs : en mouvement/rotation,
-        # l'estime bouge peu (on fait confiance a la memoire, pas a l'obs).
-        a = self.alpha * w
         for i, j in zip(rows, cols):
-            if cost[i, j] > self.match_m:
+            if cost[i, j] > match_thr:
                 continue  # trop loin (ou couleur differente) -> pas d'appariement
             e = self._estimates[keys[i]]
             d = dets[j]
             # gating d'outlier : saut brutal -> on ignore l'obs (garde l'estime)
-            if math.hypot(e["x"] - d["x"], e["y"] - d["y"]) > self.gate_m:
+            if math.hypot(e["x"] - d["x"], e["y"] - d["y"]) > gate_thr:
                 matched.add(j)
                 continue
             e["x"] += a * (d["x"] - e["x"])

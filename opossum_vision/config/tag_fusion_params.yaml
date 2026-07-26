@@ -8,9 +8,11 @@
 
     # Fusion temporelle
     fuse_alpha: 0.35      # poids d'une nouvelle observation (EMA, à l'arrêt)
-    gate_m: 0.12          # rejet d'outlier (saut > à cette distance, m)
-    match_m: 0.15         # association obs -> estimé existant (m)
-    min_hits: 3           # nb d'observations avant d'afficher (anti-fantôme)
+    gate_m: 0.30          # rejet d'outlier de base (saut > à cette distance, m)
+    match_m: 0.25         # association obs -> estimé existant, de base (m)
+    min_hits: 1           # 1 = affiche dès la 1re détection (réactif)
+    pos_w_min: 0.4        # plancher de réactivité de la position en mouvement
+    motion_gate_k: 0.15   # élargit gate/match avec la vitesse (m par (m/s+rad/s))
     static_vlin: 0.03     # < seuil (m/s) : robot considéré à l'arrêt
     static_vt: 0.05       # < seuil (rad/s) : idem en rotation
 
