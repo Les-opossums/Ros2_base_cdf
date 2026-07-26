@@ -170,20 +170,22 @@ def main():
     app = QApplication(sys.argv)
 
     # --- STYLE GLOBAL ---
+    # Tailles adaptees a l'ecran 4,3" (480x800 portrait) : popups et boutons
+    # compacts pour ne pas deborder de l'ecran.
     app.setStyleSheet("""
         QMessageBox { background-color: #F0F0F0; }
         QMessageBox QLabel {
-            font-size: 24px; font-weight: bold; color: black;
-            min-width: 420px; margin: 20px;
+            font-size: 14px; font-weight: bold; color: black;
+            min-width: 300px; margin: 10px;
         }
         QMessageBox QPushButton {
-            font-size: 22px; font-weight: bold;
-            min-width: 180px; min-height: 100px;
-            border-radius: 12px; border: 2px solid #333333;
-            background-color: #DDDDDD; margin: 10px;
+            font-size: 14px; font-weight: bold;
+            min-width: 110px; min-height: 50px;
+            border-radius: 8px; border: 2px solid #333333;
+            background-color: #DDDDDD; margin: 6px;
         }
         QMessageBox QPushButton:pressed { background-color: #999999; }
-        QPushButton { font-size: 18px; font-weight: bold; }
+        QPushButton { font-size: 14px; font-weight: bold; }
     """)
 
     # Initialisation du thread ROS (le noeud est créé instantanément)
@@ -217,7 +219,9 @@ def main():
         ]
     )
 
-    window.show()
+    # Plein ecran : l'IHM occupe exactement l'ecran 4,3" (pas de debordement
+    # ni de decorations de fenetre qui sortiraient de l'ecran).
+    window.showFullScreen()
 
     # Arret propre : couper rosbridge (s'il tourne) puis le thread ROS
     app.aboutToQuit.connect(window.page_match.stop_rosbridge)

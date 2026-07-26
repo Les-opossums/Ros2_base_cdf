@@ -38,31 +38,31 @@ class HomePage(QWidget):
 
     def __init__(self):
         super().__init__()
-        l = QVBoxLayout(self); l.setSpacing(20); l.setContentsMargins(25, 25, 25, 25)
-        title = QLabel("Opossum"); title.setFont(QFont("Arial", 30, QFont.Bold))
+        l = QVBoxLayout(self); l.setSpacing(12); l.setContentsMargins(14, 14, 14, 14)
+        title = QLabel("Opossum"); title.setFont(QFont("Arial", 20, QFont.Bold))
         title.setAlignment(Qt.AlignCenter); l.addWidget(title)
-        subtitle = QLabel("Accueil"); subtitle.setFont(QFont("Arial", 16))
-        subtitle.setAlignment(Qt.AlignCenter); l.addWidget(subtitle)
+        l.addStretch(1)
 
-        b_match = QPushButton("SÉLECTION\nMATCH"); b_match.setFont(QFont("Arial", 24, QFont.Bold))
-        b_match.setStyleSheet("background-color: #27ae60; color: white; border: 3px solid black; border-radius: 14px;")
-        b_match.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        b_match = QPushButton("SÉLECTION MATCH"); b_match.setFont(QFont("Arial", 15, QFont.Bold))
+        b_match.setStyleSheet("background-color: #27ae60; color: white; border: 2px solid black; border-radius: 10px;")
+        b_match.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed); b_match.setMinimumHeight(90)
         b_match.clicked.connect(self.request_match.emit)
         l.addWidget(b_match)
 
-        b_upd = QPushButton("MISE À JOUR\nDU CODE"); b_upd.setFont(QFont("Arial", 24, QFont.Bold))
-        b_upd.setStyleSheet("background-color: #2980b9; color: white; border: 3px solid black; border-radius: 14px;")
-        b_upd.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        b_upd = QPushButton("MISE À JOUR DU CODE"); b_upd.setFont(QFont("Arial", 15, QFont.Bold))
+        b_upd.setStyleSheet("background-color: #2980b9; color: white; border: 2px solid black; border-radius: 10px;")
+        b_upd.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed); b_upd.setMinimumHeight(90)
         b_upd.clicked.connect(self.request_update.emit)
         l.addWidget(b_upd)
+        l.addStretch(1)
 
 
 def _make_back_button(callback):
     """Petit bouton 'Retour' homogene pour toutes les pages."""
     b = QPushButton("← Retour")
     b.setStyleSheet("background-color: #7f8c8d; color: white; font-weight: bold; "
-                    "border-radius: 8px; padding: 8px 14px;")
-    b.setMaximumWidth(160)
+                    "font-size: 13px; border-radius: 7px; padding: 5px 10px;")
+    b.setFixedWidth(96); b.setFixedHeight(38)
     b.clicked.connect(callback)
     return b
 
@@ -75,15 +75,15 @@ class ConfigPage(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        layout = QVBoxLayout(self); layout.setSpacing(15); layout.setContentsMargins(20, 20, 20, 20)
+        layout = QVBoxLayout(self); layout.setSpacing(8); layout.setContentsMargins(12, 12, 12, 12)
         top = QHBoxLayout()
         top.addWidget(_make_back_button(self.request_back.emit))
-        title = QLabel("Choix de la Stratégie"); title.setFont(QFont("Arial", 22, QFont.Bold)); title.setAlignment(Qt.AlignCenter)
+        title = QLabel("Choix de la Stratégie"); title.setFont(QFont("Arial", 16, QFont.Bold)); title.setAlignment(Qt.AlignCenter)
         top.addWidget(title, 1)
-        top.addSpacing(160)  # equilibre visuel avec le bouton retour
+        top.addSpacing(96)  # equilibre visuel avec le bouton retour
         layout.addLayout(top)
         
-        font_btn = QFont("Arial", 18, QFont.Bold)
+        font_btn = QFont("Arial", 13, QFont.Bold)
 
         # Liste des boutons à générer en "Grands"
         buttons_data = [
@@ -104,9 +104,10 @@ class ConfigPage(QWidget):
         for text, bg, fg, color, script in buttons_data:
             btn = QPushButton(text)
             btn.setFont(font_btn)
-            btn.setStyleSheet(f"background-color: {bg}; color: {fg}; border: 3px solid black; border-radius: 10px;")
-            # Cette ligne rend les boutons GRANDS (remplissent l'espace vertical)
+            btn.setStyleSheet(f"background-color: {bg}; color: {fg}; border: 2px solid black; border-radius: 8px;")
+            # Boutons compacts adaptes au petit ecran 4,3" (480x800 portrait)
             btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            btn.setMinimumHeight(56)
             btn.clicked.connect(lambda checked, c=color, s=script, n=text: self.launch(c, s, n))
             layout.addWidget(btn)
 
@@ -132,37 +133,37 @@ class UpdatePage(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        l = QVBoxLayout(self); l.setContentsMargins(15, 15, 15, 15); l.setSpacing(10)
+        l = QVBoxLayout(self); l.setContentsMargins(10, 8, 10, 10); l.setSpacing(7)
         top = QHBoxLayout()
         top.addWidget(_make_back_button(self.request_back.emit))
-        title = QLabel("Mise à jour du code"); title.setFont(QFont("Arial", 20, QFont.Bold))
-        title.setAlignment(Qt.AlignCenter); top.addWidget(title, 1); top.addSpacing(160)
+        title = QLabel("Mise à jour du code"); title.setFont(QFont("Arial", 15, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter); top.addWidget(title, 1); top.addSpacing(96)
         l.addLayout(top)
 
         row = QHBoxLayout()
-        self.b_fetch = QPushButton("git fetch --all")
-        self.b_fetch.setStyleSheet("background-color: #2980b9; color: white; font-weight: bold; height: 55px; border-radius: 10px;")
+        self.b_fetch = QPushButton("git fetch")
+        self.b_fetch.setStyleSheet("background-color: #2980b9; color: white; font-weight: bold; font-size: 13px; min-height: 44px; border-radius: 8px;")
         self.b_fetch.clicked.connect(self.do_fetch)
         row.addWidget(self.b_fetch)
-        self.combo = QComboBox(); self.combo.setMinimumHeight(55)
-        self.combo.setStyleSheet("font-size: 18px; padding: 4px;")
+        self.combo = QComboBox(); self.combo.setMinimumHeight(44)
+        self.combo.setStyleSheet("font-size: 14px; padding: 3px;")
         row.addWidget(self.combo, 1)
         l.addLayout(row)
 
-        self.b_build = QPushButton("Checkout branche + colcon build")
-        self.b_build.setStyleSheet("background-color: #e67e22; color: white; font-weight: bold; height: 60px; border-radius: 10px;")
+        self.b_build = QPushButton("Checkout + colcon build")
+        self.b_build.setStyleSheet("background-color: #e67e22; color: white; font-weight: bold; font-size: 13px; min-height: 48px; border-radius: 8px;")
         self.b_build.setEnabled(False); self.b_build.clicked.connect(self.do_update)
         l.addWidget(self.b_build)
 
         self.console = QTextEdit(); self.console.setReadOnly(True)
-        self.console.setStyleSheet("background-color: #111; color: #33d17a; font-family: monospace; font-size: 13px;")
+        self.console.setStyleSheet("background-color: #111; color: #33d17a; font-family: monospace; font-size: 11px;")
         l.addWidget(self.console, 1)
 
         bottom = QHBoxLayout()
-        self.status = QLabel("Prêt."); self.status.setFont(QFont("Arial", 13, QFont.Bold))
+        self.status = QLabel("Prêt."); self.status.setFont(QFont("Arial", 11, QFont.Bold)); self.status.setWordWrap(True)
         bottom.addWidget(self.status, 1)
         self.b_restart = QPushButton("Redémarrer ROS")
-        self.b_restart.setStyleSheet("background-color: #c0392b; color: white; font-weight: bold; height: 45px; border-radius: 10px;")
+        self.b_restart.setStyleSheet("background-color: #c0392b; color: white; font-weight: bold; font-size: 12px; min-height: 40px; border-radius: 8px;")
         self.b_restart.setEnabled(False); self.b_restart.clicked.connect(self.do_restart)
         bottom.addWidget(self.b_restart)
         l.addLayout(bottom)
@@ -261,6 +262,7 @@ class UpdatePage(QWidget):
 
 class MatchPage(QWidget):
     request_restart_match = pyqtSignal()
+    request_home = pyqtSignal()
     def __init__(self):
         super().__init__()
         self.team_color = "lightgray"; self.is_au = False; self.comm_state = True; self.is_match = False
@@ -281,19 +283,22 @@ class MatchPage(QWidget):
         self.chrono_timer = QTimer(self); self.chrono_timer.timeout.connect(self.tick_chrono)
 
     def init_ui(self):
-        l = QVBoxLayout(self)
-        self.lbl_score = QLabel("0"); self.lbl_score.setFont(QFont("Arial", 90, QFont.Bold)); self.lbl_score.setAlignment(Qt.AlignCenter); l.addWidget(self.lbl_score, stretch=1)
-        f_main = QFont("Arial", 18, QFont.Bold)
+        l = QVBoxLayout(self); l.setContentsMargins(8, 6, 8, 8); l.setSpacing(4)
+        top = QHBoxLayout()
+        top.addWidget(_make_back_button(self.request_home.emit)); top.addStretch(1)
+        l.addLayout(top)
+        self.lbl_score = QLabel("0"); self.lbl_score.setFont(QFont("Arial", 64, QFont.Bold)); self.lbl_score.setAlignment(Qt.AlignCenter); l.addWidget(self.lbl_score, stretch=1)
+        f_main = QFont("Arial", 13, QFont.Bold)
         self.lbl_zynq = QLabel(); self.lbl_zynq.setFont(f_main); self.lbl_zynq.setAlignment(Qt.AlignCenter); l.addWidget(self.lbl_zynq)
         self.lbl_lidar = QLabel(); self.lbl_lidar.setFont(f_main); self.lbl_lidar.setAlignment(Qt.AlignCenter); l.addWidget(self.lbl_lidar)
-        f_cam = QFont("Arial", 15, QFont.Bold)
+        f_cam = QFont("Arial", 11, QFont.Bold)
         self.cam_labels = {}
         for i in range(1, 4):
             lbl = QLabel(); lbl.setFont(f_cam); lbl.setAlignment(Qt.AlignCenter); l.addWidget(lbl); self.cam_labels[i] = lbl
-        l.addSpacing(20)
-        btn_l = QHBoxLayout(); btn_l.setSpacing(10)
-        b_res = QPushButton("Restart\nMatch"); b_res.setStyleSheet("background-color: #3498db; color: white; font-weight: bold; height: 80px; border-radius: 10px;"); b_res.clicked.connect(self.trigger_restart_match)
-        b_srv = QPushButton("Restart\nService"); b_srv.setStyleSheet("background-color: orange; color: black; font-weight: bold; height: 80px; border-radius: 10px;"); b_srv.clicked.connect(self.restart_service)
+        l.addSpacing(8)
+        btn_l = QHBoxLayout(); btn_l.setSpacing(6)
+        b_res = QPushButton("Restart\nMatch"); b_res.setStyleSheet("background-color: #3498db; color: white; font-weight: bold; font-size: 13px; min-height: 52px; border-radius: 8px;"); b_res.clicked.connect(self.trigger_restart_match)
+        b_srv = QPushButton("Restart\nService"); b_srv.setStyleSheet("background-color: orange; color: black; font-weight: bold; font-size: 13px; min-height: 52px; border-radius: 8px;"); b_srv.clicked.connect(self.restart_service)
         self.b_rb = QPushButton("Connexion Web\nOFF"); self.b_rb.clicked.connect(self.toggle_rosbridge)
         self._style_rosbridge_btn()
         btn_l.addWidget(b_res); btn_l.addWidget(b_srv); btn_l.addWidget(self.b_rb); l.addLayout(btn_l)
@@ -308,7 +313,7 @@ class MatchPage(QWidget):
         bg, text = styles.get(self.rb_state, styles["off"])
         self.b_rb.setText(text)
         self.b_rb.setStyleSheet(
-            f"background-color: {bg}; color: white; font-weight: bold; height: 80px; border-radius: 10px;"
+            f"background-color: {bg}; color: white; font-weight: bold; font-size: 13px; min-height: 52px; border-radius: 8px;"
         )
 
     def toggle_rosbridge(self):
@@ -465,6 +470,7 @@ class MainWindow(QMainWindow):
         self.page_home.request_update.connect(lambda: self.sw.setCurrentWidget(self.page_update))
         self.page_config.request_back.connect(lambda: self.sw.setCurrentWidget(self.page_home))
         self.page_update.request_back.connect(lambda: self.sw.setCurrentWidget(self.page_home))
+        self.page_match.request_home.connect(lambda: self.sw.setCurrentWidget(self.page_home))
 
         # Page d'accueil affichee au demarrage
         self.sw.setCurrentWidget(self.page_home)
