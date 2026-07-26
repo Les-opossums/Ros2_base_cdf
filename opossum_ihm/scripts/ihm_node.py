@@ -224,7 +224,7 @@ def main():
     window.showFullScreen()
 
     # Arret propre : couper rosbridge (s'il tourne) puis le thread ROS
-    app.aboutToQuit.connect(window.page_match.stop_rosbridge)
+    app.aboutToQuit.connect(window.page_home.stop_rosbridge)
     app.aboutToQuit.connect(ros_thread.stop)
     sys.exit(app.exec_())
 

@@ -38,6 +38,11 @@ class HomePage(QWidget):
 
     def __init__(self):
         super().__init__()
+        # Setup « connexion IHM web » : rosbridge + tag_fusion + calibration,
+        # lances/coupes d'un seul bouton (couper allege le CPU en match).
+        self.rosbridge_proc = None            # process du launch web_bridge
+        self.rb_state = "off"                 # 'off' | 'starting' | 'on'
+
         l = QVBoxLayout(self); l.setSpacing(12); l.setContentsMargins(14, 14, 14, 14)
         title = QLabel("Opossum"); title.setFont(QFont("Arial", 20, QFont.Bold))
         title.setAlignment(Qt.AlignCenter); l.addWidget(title)
@@ -54,7 +59,81 @@ class HomePage(QWidget):
         b_upd.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed); b_upd.setMinimumHeight(90)
         b_upd.clicked.connect(self.request_update.emit)
         l.addWidget(b_upd)
+
+        # Bouton bridge (connexion IHM web) au meme niveau que les 2 ci-dessus.
+        self.b_rb = QPushButton(); self.b_rb.setFont(QFont("Arial", 15, QFont.Bold))
+        self.b_rb.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed); self.b_rb.setMinimumHeight(90)
+        self.b_rb.clicked.connect(self.toggle_rosbridge)
+        self._style_rosbridge_btn()
+        l.addWidget(self.b_rb)
         l.addStretch(1)
+
+    # ---------- Setup « connexion IHM web » (rosbridge + support debug) ----------
+    def _style_rosbridge_btn(self):
+        # Couleur / libelle selon l'etat du setup web (off / starting / on).
+        styles = {
+            "off":      ("#7f8c8d", "CONNEXION WEB\nOFF"),
+            "starting": ("#e67e22", "CONNEXION WEB\ndémarrage…"),
+            "on":       ("#2ecc71", "CONNEXION WEB\nON"),
+        }
+        bg, text = styles.get(self.rb_state, styles["off"])
+        self.b_rb.setText(text)
+        self.b_rb.setStyleSheet(
+            f"background-color: {bg}; color: white; border: 2px solid black; border-radius: 10px;"
+        )
+
+    def toggle_rosbridge(self):
+        # Lance / coupe le setup complet « connexion IHM web » :
+        #   rosbridge_server + tag_fusion_node + calibration_manager
+        # (launch opossum_ihm/web_bridge.launch.py). Couper libere du CPU en match.
+        if self.rb_state == "starting":
+            return  # anti double-clic pendant le demarrage
+        if self.rosbridge_proc is None:
+            try:
+                self.rosbridge_proc = subprocess.Popen(
+                    ["ros2", "launch", "opossum_ihm", "web_bridge.launch.py"],
+                    start_new_session=True,  # groupe de process propre -> kill fiable
+                )
+                self.rb_state = "starting"
+                QTimer.singleShot(3500, self._confirm_rosbridge)
+            except Exception as e:
+                self.rosbridge_proc = None
+                self.rb_state = "off"
+                QMessageBox.warning(self, "Connexion Web", f"Echec du lancement :\n{e}")
+        else:
+            self.stop_rosbridge()
+        self._style_rosbridge_btn()
+
+    def _confirm_rosbridge(self):
+        if self.rosbridge_proc is None:
+            self.rb_state = "off"
+        elif self.rosbridge_proc.poll() is None:
+            self.rb_state = "on"
+        else:
+            self.rosbridge_proc = None
+            self.rb_state = "off"
+            QMessageBox.warning(
+                self, "Connexion Web",
+                "Le setup web s'est arrêté au démarrage.\n"
+                "Vérifier rosbridge_server / tag_fusion / calibration.",
+            )
+        self._style_rosbridge_btn()
+
+    def stop_rosbridge(self):
+        if self.rosbridge_proc is None:
+            self.rb_state = "off"
+            return
+        try:
+            os.killpg(os.getpgid(self.rosbridge_proc.pid), signal.SIGINT)
+            self.rosbridge_proc.wait(timeout=5)
+        except Exception:
+            try:
+                os.killpg(os.getpgid(self.rosbridge_proc.pid), signal.SIGKILL)
+            except Exception:
+                pass
+        self.rosbridge_proc = None
+        self.rb_state = "off"
+        self._style_rosbridge_btn()
 
 
 def _make_back_button(callback):
@@ -267,11 +346,8 @@ class MatchPage(QWidget):
         super().__init__()
         self.team_color = "lightgray"; self.is_au = False; self.comm_state = True; self.is_match = False
         self.position_mismatch = False; self.positions = {}; self.current_score = 0; self.match_time = 0
-        # Setup « connexion IHM web » : rosbridge + tag_fusion + calibration,
-        # lancés/coupés d'un seul bouton (couper allège le CPU en match).
-        self.rosbridge_proc = None            # process du launch web_bridge
-        self.rb_state = "off"                 # 'off' | 'starting' | 'on'
-        
+        # (Le bouton « Connexion Web » / bridge est desormais sur la page d'accueil.)
+
         self.buf_zynq = "ZYNQ - X: --.-- Y: --.-- T: --.--"
         self.buf_lidar = "LIDAR - X: --.-- Y: --.-- T: --.--"
         self.buf_cams = {1: "X: --.-- Y: --.--", 2: "X: --.-- Y: --.--", 3: "X: --.-- Y: --.--"}
@@ -299,82 +375,7 @@ class MatchPage(QWidget):
         btn_l = QHBoxLayout(); btn_l.setSpacing(6)
         b_res = QPushButton("Restart\nMatch"); b_res.setStyleSheet("background-color: #3498db; color: white; font-weight: bold; font-size: 13px; min-height: 52px; border-radius: 8px;"); b_res.clicked.connect(self.trigger_restart_match)
         b_srv = QPushButton("Restart\nService"); b_srv.setStyleSheet("background-color: orange; color: black; font-weight: bold; font-size: 13px; min-height: 52px; border-radius: 8px;"); b_srv.clicked.connect(self.restart_service)
-        self.b_rb = QPushButton("Connexion Web\nOFF"); self.b_rb.clicked.connect(self.toggle_rosbridge)
-        self._style_rosbridge_btn()
-        btn_l.addWidget(b_res); btn_l.addWidget(b_srv); btn_l.addWidget(self.b_rb); l.addLayout(btn_l)
-
-    def _style_rosbridge_btn(self):
-        # Couleur / libelle selon l'etat du setup web (off / starting / on).
-        styles = {
-            "off":      ("#7f8c8d", "Connexion Web\nOFF"),
-            "starting": ("#e67e22", "Connexion Web\ndémarrage…"),
-            "on":       ("#2ecc71", "Connexion Web\nON"),
-        }
-        bg, text = styles.get(self.rb_state, styles["off"])
-        self.b_rb.setText(text)
-        self.b_rb.setStyleSheet(
-            f"background-color: {bg}; color: white; font-weight: bold; font-size: 13px; min-height: 52px; border-radius: 8px;"
-        )
-
-    def toggle_rosbridge(self):
-        # Lance / coupe le setup complet « connexion IHM web » :
-        #   rosbridge_server + tag_fusion_node + calibration_manager
-        # (launch opossum_ihm/web_bridge.launch.py). Le process herite de
-        # l'environnement ROS deja source par l'IHM (RMW, ROS_DOMAIN_ID), donc
-        # il voit les memes topics. Couper ce setup libere du CPU en vrai match.
-        if self.rb_state == "starting":
-            return  # anti double-clic pendant le demarrage
-        if self.rosbridge_proc is None:
-            try:
-                self.rosbridge_proc = subprocess.Popen(
-                    ["ros2", "launch", "opossum_ihm", "web_bridge.launch.py"],
-                    start_new_session=True,  # groupe de process propre -> kill fiable
-                )
-                self.rb_state = "starting"
-                # Laisse ~3.5 s aux noeuds (rosbridge + fusion + calibration)
-                # pour demarrer avant de confirmer l'etat ON.
-                QTimer.singleShot(3500, self._confirm_rosbridge)
-            except Exception as e:
-                self.rosbridge_proc = None
-                self.rb_state = "off"
-                QMessageBox.warning(self, "Connexion Web", f"Echec du lancement :\n{e}")
-        else:
-            self.stop_rosbridge()
-        self._style_rosbridge_btn()
-
-    def _confirm_rosbridge(self):
-        # Appele apres le delai de demarrage : verifie que le launch tourne
-        # toujours (poll() is None) sinon signale l'echec.
-        if self.rosbridge_proc is None:
-            self.rb_state = "off"
-        elif self.rosbridge_proc.poll() is None:
-            self.rb_state = "on"
-        else:
-            # Le launch s'est termine tout seul -> echec de setup.
-            self.rosbridge_proc = None
-            self.rb_state = "off"
-            QMessageBox.warning(
-                self, "Connexion Web",
-                "Le setup web s'est arrêté au démarrage.\n"
-                "Vérifier rosbridge_server / tag_fusion / calibration.",
-            )
-        self._style_rosbridge_btn()
-
-    def stop_rosbridge(self):
-        if self.rosbridge_proc is None:
-            self.rb_state = "off"
-            return
-        try:
-            os.killpg(os.getpgid(self.rosbridge_proc.pid), signal.SIGINT)
-            self.rosbridge_proc.wait(timeout=5)
-        except Exception:
-            try:
-                os.killpg(os.getpgid(self.rosbridge_proc.pid), signal.SIGKILL)
-            except Exception:
-                pass
-        self.rosbridge_proc = None
-        self.rb_state = "off"
-        self._style_rosbridge_btn()
+        btn_l.addWidget(b_res); btn_l.addWidget(b_srv); l.addLayout(btn_l)
 
     def refresh_gui_elements(self):
         if self.is_match:
