@@ -5,10 +5,17 @@ import subprocess
 from ament_index_python.packages import get_package_share_directory
 
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                             QPushButton, QLabel, QMessageBox, 
-                             QStackedWidget, QDialog, QSizePolicy)
-from PyQt5.QtCore import pyqtSignal, Qt, QTimer
-from PyQt5.QtGui import QFont, QMovie
+                             QPushButton, QLabel, QMessageBox, QComboBox,
+                             QTextEdit, QStackedWidget, QDialog, QSizePolicy)
+from PyQt5.QtCore import pyqtSignal, Qt, QTimer, QProcess
+from PyQt5.QtGui import QFont, QMovie, QTextCursor
+
+# --- Chemins sur le robot (workspace ROS 2 + depot git) ---
+# Le workspace colcon est /home/opossum/robot_ws et le depot git (toutes les
+# packages) est dans son sous-dossier src/. ROS 2 distro : humble.
+WS_DIR = "/home/opossum/robot_ws"
+REPO_DIR = WS_DIR + "/src"
+ROS_SETUP = "/opt/ros/humble/setup.bash"
 
 class GifPopup(QDialog):
     def __init__(self, gif_path, parent=None):
@@ -20,15 +27,61 @@ class GifPopup(QDialog):
         self.movie = QMovie(gif_path); self.label.setMovie(self.movie); self.movie.start()
         QTimer.singleShot(3000, self.accept)
 
+class HomePage(QWidget):
+    """Page d'accueil : point d'entree de l'IHM.
+
+    Permet d'aller vers la selection de match ou vers la page de mise a jour
+    du code (git + colcon build), pour ne jamais avoir a passer par SSH.
+    """
+    request_match = pyqtSignal()
+    request_update = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        l = QVBoxLayout(self); l.setSpacing(20); l.setContentsMargins(25, 25, 25, 25)
+        title = QLabel("Opossum"); title.setFont(QFont("Arial", 30, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter); l.addWidget(title)
+        subtitle = QLabel("Accueil"); subtitle.setFont(QFont("Arial", 16))
+        subtitle.setAlignment(Qt.AlignCenter); l.addWidget(subtitle)
+
+        b_match = QPushButton("SÉLECTION\nMATCH"); b_match.setFont(QFont("Arial", 24, QFont.Bold))
+        b_match.setStyleSheet("background-color: #27ae60; color: white; border: 3px solid black; border-radius: 14px;")
+        b_match.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        b_match.clicked.connect(self.request_match.emit)
+        l.addWidget(b_match)
+
+        b_upd = QPushButton("MISE À JOUR\nDU CODE"); b_upd.setFont(QFont("Arial", 24, QFont.Bold))
+        b_upd.setStyleSheet("background-color: #2980b9; color: white; border: 3px solid black; border-radius: 14px;")
+        b_upd.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        b_upd.clicked.connect(self.request_update.emit)
+        l.addWidget(b_upd)
+
+
+def _make_back_button(callback):
+    """Petit bouton 'Retour' homogene pour toutes les pages."""
+    b = QPushButton("← Retour")
+    b.setStyleSheet("background-color: #7f8c8d; color: white; font-weight: bold; "
+                    "border-radius: 8px; padding: 8px 14px;")
+    b.setMaximumWidth(160)
+    b.clicked.connect(callback)
+    return b
+
+
 class ConfigPage(QWidget):
     request_param_update = pyqtSignal(str, int)
+    request_back = pyqtSignal()
     def __init__(self):
         super().__init__()
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self); layout.setSpacing(15); layout.setContentsMargins(20, 20, 20, 20)
-        title = QLabel("Choix de la Stratégie"); title.setFont(QFont("Arial", 22, QFont.Bold)); title.setAlignment(Qt.AlignCenter); layout.addWidget(title)
+        top = QHBoxLayout()
+        top.addWidget(_make_back_button(self.request_back.emit))
+        title = QLabel("Choix de la Stratégie"); title.setFont(QFont("Arial", 22, QFont.Bold)); title.setAlignment(Qt.AlignCenter)
+        top.addWidget(title, 1)
+        top.addSpacing(160)  # equilibre visuel avec le bouton retour
+        layout.addLayout(top)
         
         font_btn = QFont("Arial", 18, QFont.Bold)
 
@@ -61,6 +114,150 @@ class ConfigPage(QWidget):
         reply = QMessageBox.question(self, 'Confirmation', f"Valider : {name} ?", QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
             self.request_param_update.emit(color, script)
+
+
+class UpdatePage(QWidget):
+    """Mise a jour du code du robot sans SSH.
+
+    Flux : 'git fetch --all' -> l'utilisateur choisit une branche -> checkout
+    de la branche + reset sur origin/<branche> + 'colcon build'. La sortie des
+    commandes est streamee dans une console. Un bouton permet ensuite de
+    redemarrer le service ROS pour appliquer le nouveau build.
+    """
+    request_back = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        self.proc = None
+        self.init_ui()
+
+    def init_ui(self):
+        l = QVBoxLayout(self); l.setContentsMargins(15, 15, 15, 15); l.setSpacing(10)
+        top = QHBoxLayout()
+        top.addWidget(_make_back_button(self.request_back.emit))
+        title = QLabel("Mise à jour du code"); title.setFont(QFont("Arial", 20, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter); top.addWidget(title, 1); top.addSpacing(160)
+        l.addLayout(top)
+
+        row = QHBoxLayout()
+        self.b_fetch = QPushButton("git fetch --all")
+        self.b_fetch.setStyleSheet("background-color: #2980b9; color: white; font-weight: bold; height: 55px; border-radius: 10px;")
+        self.b_fetch.clicked.connect(self.do_fetch)
+        row.addWidget(self.b_fetch)
+        self.combo = QComboBox(); self.combo.setMinimumHeight(55)
+        self.combo.setStyleSheet("font-size: 18px; padding: 4px;")
+        row.addWidget(self.combo, 1)
+        l.addLayout(row)
+
+        self.b_build = QPushButton("Checkout branche + colcon build")
+        self.b_build.setStyleSheet("background-color: #e67e22; color: white; font-weight: bold; height: 60px; border-radius: 10px;")
+        self.b_build.setEnabled(False); self.b_build.clicked.connect(self.do_update)
+        l.addWidget(self.b_build)
+
+        self.console = QTextEdit(); self.console.setReadOnly(True)
+        self.console.setStyleSheet("background-color: #111; color: #33d17a; font-family: monospace; font-size: 13px;")
+        l.addWidget(self.console, 1)
+
+        bottom = QHBoxLayout()
+        self.status = QLabel("Prêt."); self.status.setFont(QFont("Arial", 13, QFont.Bold))
+        bottom.addWidget(self.status, 1)
+        self.b_restart = QPushButton("Redémarrer ROS")
+        self.b_restart.setStyleSheet("background-color: #c0392b; color: white; font-weight: bold; height: 45px; border-radius: 10px;")
+        self.b_restart.setEnabled(False); self.b_restart.clicked.connect(self.do_restart)
+        bottom.addWidget(self.b_restart)
+        l.addLayout(bottom)
+
+    # ---------- Helpers ----------
+    def _append(self, text):
+        self.console.moveCursor(QTextCursor.End)
+        self.console.insertPlainText(text)
+        self.console.moveCursor(QTextCursor.End)
+
+    def _busy(self, busy):
+        self.b_fetch.setEnabled(not busy)
+        self.b_build.setEnabled(not busy and self.combo.count() > 0)
+        self.b_restart.setEnabled(not busy and self.b_restart.property("ready") is True)
+
+    def _run(self, shell_cmd, on_done):
+        """Lance une commande shell en asynchrone (QProcess) et streame la sortie."""
+        self._append("\n$ " + shell_cmd + "\n")
+        self.proc = QProcess(self)
+        self.proc.setProcessChannelMode(QProcess.MergedChannels)
+        self.proc.readyRead.connect(
+            lambda: self._append(bytes(self.proc.readAll()).decode(errors="replace"))
+        )
+        self.proc.finished.connect(lambda code, _st: self._finished(code, on_done))
+        self.proc.start("bash", ["-lc", shell_cmd])
+
+    def _finished(self, code, on_done):
+        self.proc = None
+        on_done(code)
+
+    # ---------- Etape 1 : fetch + liste des branches ----------
+    def do_fetch(self):
+        self._busy(True); self.status.setText("git fetch --all…")
+        self._run(f"cd {REPO_DIR} && git fetch --all --prune", self._after_fetch)
+
+    def _after_fetch(self, code):
+        if code != 0:
+            self.status.setText("❌ Échec du git fetch (voir console)."); self._busy(False); return
+        # Liste des branches distantes (lecture rapide, bloquante < 1 s)
+        p = QProcess(self)
+        p.start("bash", ["-lc",
+                f"cd {REPO_DIR} && git for-each-ref --format='%(refname:short)' refs/remotes/origin"])
+        p.waitForFinished(5000)
+        out = bytes(p.readAllStandardOutput()).decode(errors="replace")
+        branches = []
+        for line in out.splitlines():
+            name = line.strip()
+            if name.startswith("origin/"):
+                name = name[len("origin/"):]
+            if name and name != "HEAD" and name not in branches:
+                branches.append(name)
+        self.combo.clear(); self.combo.addItems(branches)
+        self.status.setText(f"{len(branches)} branche(s) trouvée(s). Sélectionne puis lance le build.")
+        self._busy(False)
+
+    # ---------- Etape 2 : checkout + build ----------
+    def do_update(self):
+        branch = self.combo.currentText().strip()
+        if not branch:
+            return
+        if QMessageBox.question(
+            self, 'Confirmation',
+            f"Basculer sur '{branch}', écraser les modifs locales du robot\net relancer colcon build ?",
+            QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
+        self.b_restart.setProperty("ready", False)
+        self._busy(True); self.status.setText(f"Checkout {branch} + colcon build… (peut durer plusieurs minutes)")
+        cmd = (
+            f"set -e; source {ROS_SETUP}; "
+            f"cd {REPO_DIR}; git checkout {branch}; git reset --hard origin/{branch}; "
+            f"cd {WS_DIR}; colcon build"
+        )
+        self._run(cmd, self._after_build)
+
+    def _after_build(self, code):
+        if code == 0:
+            self.status.setText("✅ Build terminé. « Redémarrer ROS » pour appliquer.")
+            self.b_restart.setProperty("ready", True)
+        else:
+            self.status.setText(f"❌ Échec du build (code {code}). Voir la console.")
+            self.b_restart.setProperty("ready", False)
+        self._busy(False)
+
+    # ---------- Redemarrage du service ROS ----------
+    def do_restart(self):
+        if QMessageBox.question(self, 'Confirmation', "Redémarrer le service ROS 2 ?",
+                                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
+        self.status.setText("Redémarrage du service…")
+        try:
+            subprocess.run(['systemctl', '--user', 'restart', 'launch.service'], check=True)
+            self.status.setText("✅ Service redémarré.")
+        except Exception as e:
+            self.status.setText(f"❌ Échec du redémarrage : {e}")
+
 
 class MatchPage(QWidget):
     request_restart_match = pyqtSignal()
@@ -256,7 +453,25 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__(); self.resize(480, 800)
         self.sw = QStackedWidget(); self.setCentralWidget(self.sw)
-        self.page_config = ConfigPage(); self.page_match = MatchPage()
-        self.sw.addWidget(self.page_config); self.sw.addWidget(self.page_match)
+        self.page_home = HomePage()
+        self.page_config = ConfigPage()
+        self.page_match = MatchPage()
+        self.page_update = UpdatePage()
+        for p in (self.page_home, self.page_config, self.page_match, self.page_update):
+            self.sw.addWidget(p)
+
+        # --- Navigation entre pages ---
+        self.page_home.request_match.connect(lambda: self.sw.setCurrentWidget(self.page_config))
+        self.page_home.request_update.connect(lambda: self.sw.setCurrentWidget(self.page_update))
+        self.page_config.request_back.connect(lambda: self.sw.setCurrentWidget(self.page_home))
+        self.page_update.request_back.connect(lambda: self.sw.setCurrentWidget(self.page_home))
+
+        # Page d'accueil affichee au demarrage
+        self.sw.setCurrentWidget(self.page_home)
+
     def go_to_match_page(self, color):
-        self.page_match.team_color = color; self.page_match.update_background(); self.sw.setCurrentIndex(1)
+        self.page_match.team_color = color; self.page_match.update_background()
+        self.sw.setCurrentWidget(self.page_match)
+
+    def go_home(self):
+        self.sw.setCurrentWidget(self.page_home)
